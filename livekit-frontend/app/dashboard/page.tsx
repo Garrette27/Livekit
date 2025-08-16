@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
 
@@ -10,7 +10,7 @@ interface CallSummary {
   id: string;
   roomName: string;
   summary: string;
-  createdAt: any; // Firestore Timestamp
+  createdAt: Timestamp;
   participants: string[];
   duration: number;
 }
