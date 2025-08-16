@@ -1,0 +1,7 @@
+{
+  "buildCommand": "cd livekit-frontend && npm run build",
+  "outputDirectory": "livekit-frontend/.next",
+  "installCommand": "cd livekit-frontend && npm install",
+  "framework": "nextjs",
+  "rootDirectory": "livekit-frontend"
+}

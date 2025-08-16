@@ -2,12 +2,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import { auth, db } from '@/lib/firebase';
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
 import { collection, doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import Link from 'next/link';
 
 export default function Page() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [roomName, setRoomName] = useState('');
   const [token, setToken] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState('');

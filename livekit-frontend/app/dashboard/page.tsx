@@ -1,21 +1,22 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import Link from 'next/link';
 
 interface CallSummary {
   id: string;
   roomName: string;
   summary: string;
-  createdAt: any;
+  createdAt: any; // Firestore Timestamp
   participants: string[];
   duration: number;
 }
 
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [summaries, setSummaries] = useState<CallSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
