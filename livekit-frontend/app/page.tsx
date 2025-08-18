@@ -24,9 +24,13 @@ export default function Page() {
     try {
       setError(null);
       await signInWithPopup(auth, provider);
-    } catch (err) {
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error('Login error:', err.message);
+      } else {
+        console.error('Login error:', err);
+      }
       setError('Failed to sign in. Please try again.');
-      console.error('Login error:', err);
     }
   }
 
@@ -36,8 +40,12 @@ export default function Page() {
       setToken(null);
       setShareUrl('');
       setError(null);
-    } catch (err) {
-      console.error('Logout error:', err);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error('Logout error:', err.message);
+      } else {
+        console.error('Logout error:', err);
+      }
     }
   }
 
@@ -58,7 +66,7 @@ export default function Page() {
       const identity = user.displayName || user.email || user.uid;
       const cleanRoomName = roomName.trim().toLowerCase().replace(/\s+/g, '-');
 
-      // Create a call doc (id = roomName)
+      // Create or update Firestore call doc
       const callsRef = collection(db, 'calls');
       await setDoc(doc(callsRef, cleanRoomName), {
         createdBy: user.uid,
@@ -68,13 +76,13 @@ export default function Page() {
         creatorName: user.displayName || user.email,
       }, { merge: true });
 
-      // Generate token from our Next.js server route
+      // Get LiveKit token from API route
       const res = await fetch('/api/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomName: cleanRoomName, participantName: identity }),
       });
-      
+
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Failed to get token');
@@ -83,7 +91,7 @@ export default function Page() {
       setToken(data.token);
       setShareUrl(`${window.location.origin}/room/${encodeURIComponent(cleanRoomName)}`);
       setRoomName(cleanRoomName);
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create room';
       setError(errorMessage);
       console.error('Room creation error:', err);
@@ -100,13 +108,17 @@ export default function Page() {
           status: 'ended', 
           endedAt: serverTimestamp() 
         });
-      } catch (err) {
-        console.error('Error updating call status:', err);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          console.error('Error updating call status:', err.message);
+        } else {
+          console.error('Error updating call status:', err);
+        }
       }
     }
   }
 
-  // Signed-out view - Simple and clean
+  // Signed-out view
   if (!user) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
@@ -137,11 +149,11 @@ export default function Page() {
     );
   }
 
-  // Pre-join view - Simple and clean
+  // Pre-join view
   if (!token) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#F9FAFB' }}>
-        {/* Header with sign-out button */}
+        {/* Header */}
         <div style={{ backgroundColor: 'white', borderBottom: '1px solid #E5E7EB', padding: '1rem 2rem' }}>
           <div style={{ maxWidth: '80rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
@@ -149,27 +161,12 @@ export default function Page() {
               <p style={{ color: '#4B5563' }}>Welcome, Dr. {user.displayName?.split(' ')[0] || user.email?.split('@')[0]}</p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-              <Link 
-                href="/dashboard" 
-                style={{ color: '#2563EB', fontSize: '1.125rem', fontWeight: '500', textDecoration: 'none' }}
-                onMouseOver={(e) => (e.target as HTMLElement).style.textDecoration = 'underline'}
-                onMouseOut={(e) => (e.target as HTMLElement).style.textDecoration = 'none'}
-              >
+              <Link href="/dashboard" style={{ color: '#2563EB', fontSize: '1.125rem', fontWeight: '500', textDecoration: 'none' }}>
                 View History
               </Link>
               <button 
                 onClick={logout} 
                 style={{ color: '#DC2626', fontSize: '1.125rem', fontWeight: '500', padding: '0.5rem 1rem', borderRadius: '0.5rem', border: 'none', cursor: 'pointer', backgroundColor: 'transparent' }}
-                onMouseOver={(e) => { 
-                  const target = e.target as HTMLElement;
-                  target.style.backgroundColor = '#FEF2F2'; 
-                  target.style.textDecoration = 'underline'; 
-                }}
-                onMouseOut={(e) => { 
-                  const target = e.target as HTMLElement;
-                  target.style.backgroundColor = 'transparent'; 
-                  target.style.textDecoration = 'none'; 
-                }}
               >
                 Sign out
               </button>
@@ -177,12 +174,11 @@ export default function Page() {
           </div>
         </div>
 
-        {/* Main content - centered */}
+        {/* Main content */}
         <div style={{ maxWidth: '80rem', margin: '0 auto', padding: '2rem' }}>
-          {/* Room Creation Form */}
           <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: '2rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>Create New Consultation Room</h2>
-            <p style={{ fontSize: '1.125rem', color: '#4B5563', marginBottom: '2rem' }}>Enter a room name to start a secure video consultation. Patients can join using the generated link.</p>
+            <p style={{ fontSize: '1.125rem', color: '#4B5563', marginBottom: '2rem' }}>Enter a room name to start a secure video consultation.</p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div>
@@ -210,18 +206,6 @@ export default function Page() {
                       border: 'none', 
                       cursor: isCreating || !roomName.trim() ? 'not-allowed' : 'pointer'
                     }}
-                    onMouseOver={(e) => {
-                      if (!isCreating && roomName.trim()) {
-                        const target = e.target as HTMLElement;
-                        target.style.backgroundColor = '#1D4ED8';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (!isCreating && roomName.trim()) {
-                        const target = e.target as HTMLElement;
-                        target.style.backgroundColor = '#2563EB';
-                      }
-                    }}
                   >
                     {isCreating ? 'Creating...' : 'Create Room'}
                   </button>
@@ -237,17 +221,11 @@ export default function Page() {
               {shareUrl && (
                 <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '1.5rem' }}>
                   <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>Patient Invitation Link</h3>
-                  <p style={{ fontSize: '1.125rem', color: '#4B5563', marginBottom: '1rem' }}>Share this link with your patient to join the consultation room.</p>
+                  <p style={{ fontSize: '1.125rem', color: '#4B5563', marginBottom: '1rem' }}>Share this link with your patient.</p>
                   <div style={{ display: 'flex', gap: '1rem' }}>
-                    <input
-                      value={shareUrl}
-                      readOnly
-                      style={{ flex: '1', border: '1px solid #D1D5DB', borderRadius: '0.5rem', padding: '0.75rem 1rem', backgroundColor: '#F9FAFB', color: '#111827', fontSize: '1.125rem' }}
-                    />
+                    <input value={shareUrl} readOnly style={{ flex: '1', border: '1px solid #D1D5DB', borderRadius: '0.5rem', padding: '0.75rem 1rem', backgroundColor: '#F9FAFB', fontSize: '1.125rem' }} />
                     <button
                       style={{ backgroundColor: '#2563EB', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '0.5rem', fontWeight: '600', fontSize: '1.125rem', border: 'none', cursor: 'pointer' }}
-                      onMouseOver={(e) => (e.target as HTMLElement).style.backgroundColor = '#1D4ED8'}
-                      onMouseOut={(e) => (e.target as HTMLElement).style.backgroundColor = '#2563EB'}
                       onClick={() => navigator.clipboard.writeText(shareUrl)}
                     >
                       Copy link
