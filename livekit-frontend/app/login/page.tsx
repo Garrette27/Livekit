@@ -3,6 +3,9 @@
 import { signInWithPopup } from "firebase/auth";
 import { auth, provider } from "@/lib/firebase";
 
+// Force dynamic rendering to prevent build-time Firebase errors
+export const dynamic = 'force-dynamic';
+
 export default function LoginPage() {
   const signIn = async () => {
     await signInWithPopup(auth, provider);

@@ -5,6 +5,9 @@ import { useState } from "react";
 import { LiveKitRoom, VideoConference } from "@livekit/components-react";
 import "@livekit/components-styles";
 
+// Force dynamic rendering to prevent build-time errors
+export const dynamic = 'force-dynamic';
+
 export default function RoomPage() {
   const { room } = useParams();
   const roomName = room as string;

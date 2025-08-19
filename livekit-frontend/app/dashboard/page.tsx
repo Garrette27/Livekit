@@ -6,6 +6,9 @@ import { collection, onSnapshot, orderBy, query, Timestamp } from 'firebase/fire
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
 
+// Force dynamic rendering to prevent build-time Firebase errors
+export const dynamic = 'force-dynamic';
+
 interface CallSummary {
   id: string;
   roomName: string;

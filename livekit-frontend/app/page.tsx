@@ -6,6 +6,9 @@ import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, User 
 import { collection, doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import Link from 'next/link';
 
+// Force dynamic rendering to prevent build-time Firebase errors
+export const dynamic = 'force-dynamic';
+
 export default function Page() {
   const [user, setUser] = useState<User | null>(null);
   const [roomName, setRoomName] = useState<string>('');
