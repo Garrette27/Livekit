@@ -1,6 +1,15 @@
 {
   "version": 2,
   "builds": [
-    { "src": "livekit-frontend/package.json", "use": "@vercel/next" }
+    {
+      "src": "livekit-frontend/package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/livekit-frontend/$1"
+    }
   ]
 }
