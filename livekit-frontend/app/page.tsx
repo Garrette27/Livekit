@@ -8,10 +8,10 @@ import Link from 'next/link';
 
 export default function Page() {
   const [user, setUser] = useState<User | null>(null);
-  const [roomName, setRoomName] = useState('');
+  const [roomName, setRoomName] = useState<string>('');
   const [token, setToken] = useState<string | null>(null);
-  const [shareUrl, setShareUrl] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string>('');
+  const [isCreating, setIsCreating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

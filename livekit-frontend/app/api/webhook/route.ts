@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '../../../lib/firebase-admin';
+import { getFirebaseAdmin } from '../../../lib/firebase-admin';
 
 export async function POST(req: Request) {
   try {
@@ -13,9 +13,15 @@ export async function POST(req: Request) {
       if (roomName) {
         // 1. Delete call record from Firestore immediately
         try {
-          const callRef = db.collection('calls').doc(roomName);
-          await callRef.delete();
-          console.log(`Deleted call record for room: ${roomName}`);
+          // Check if Firebase is properly initialized
+          const db = getFirebaseAdmin();
+          if (db) {
+            const callRef = db.collection('calls').doc(roomName);
+            await callRef.delete();
+            console.log(`Deleted call record for room: ${roomName}`);
+          } else {
+            console.log('Firebase not initialized, skipping call record deletion');
+          }
         } catch (error) {
           console.error('Error deleting call record:', error);
         }
@@ -25,16 +31,21 @@ export async function POST(req: Request) {
           const summary = await generateAISummary(roomName);
           
           // Store summary in a separate collection
-          const summaryRef = db.collection('call-summaries').doc(roomName);
-          await summaryRef.set({
-            roomName,
-            summary,
-            createdAt: new Date(),
-            participants: event.room?.participants || [],
-            duration: event.room?.duration || 0,
-          });
-          
-          console.log(`AI summary generated and stored for room: ${roomName}`);
+          const db = getFirebaseAdmin();
+          if (db) {
+            const summaryRef = db.collection('call-summaries').doc(roomName);
+            await summaryRef.set({
+              roomName,
+              summary,
+              createdAt: new Date(),
+              participants: event.room?.participants || [],
+              duration: event.room?.duration || 0,
+            });
+            
+            console.log(`AI summary generated and stored for room: ${roomName}`);
+          } else {
+            console.log('Firebase not initialized, skipping summary storage');
+          }
         } catch (error) {
           console.error('Error generating AI summary:', error);
         }
