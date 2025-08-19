@@ -17,11 +17,6 @@ const nextConfig: NextConfig = {
   webpack: (config) => config,
   poweredByHeader: false,
   generateEtags: false,
-  // Disable static generation to prevent Firebase build-time errors
-  output: 'standalone',
-  trailingSlash: false,
-  // Force all pages to be dynamic
-  generateStaticParams: async () => [],
 };
 
 export default nextConfig;
