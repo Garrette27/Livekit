@@ -18,8 +18,16 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, setUser);
+    return onAuthStateChanged(auth, (user) => {
+      console.log('Auth state changed:', user ? 'User logged in' : 'No user');
+      console.log('User details:', user);
+      setUser(user);
+    });
   }, []);
+
+  // Debug logging
+  console.log('Current user state:', user);
+  console.log('Current token state:', token);
 
   const provider = useMemo(() => new GoogleAuthProvider(), []);
 
