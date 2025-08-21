@@ -17,22 +17,35 @@ export default function Page() {
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [isJoining, setIsJoining] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFirebaseReady, setIsFirebaseReady] = useState<boolean>(false);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (user) => {
-      console.log('Auth state changed:', user ? 'User logged in' : 'No user');
-      console.log('User details:', user);
-      setUser(user);
-    });
+    // Check if Firebase is initialized
+    if (auth && db) {
+      setIsFirebaseReady(true);
+      return onAuthStateChanged(auth, (user) => {
+        console.log('Auth state changed:', user ? 'User logged in' : 'No user');
+        console.log('User details:', user);
+        setUser(user);
+      });
+    } else {
+      console.warn('Firebase not initialized');
+    }
   }, []);
 
   // Debug logging
   console.log('Current user state:', user);
   console.log('Current token state:', token);
+  console.log('Firebase ready:', isFirebaseReady);
 
   const provider = useMemo(() => new GoogleAuthProvider(), []);
 
   async function login() {
+    if (!auth || !provider) {
+      setError('Firebase not initialized. Please refresh the page.');
+      return;
+    }
+
     try {
       setError(null);
       await signInWithPopup(auth, provider);
@@ -47,6 +60,11 @@ export default function Page() {
   }
 
   async function logout() {
+    if (!auth) {
+      setError('Firebase not initialized. Please refresh the page.');
+      return;
+    }
+
     try {
       await signOut(auth);
       setToken(null);
@@ -62,6 +80,11 @@ export default function Page() {
   }
 
   async function createRoom() {
+    if (!auth || !db) {
+      setError('Firebase not initialized. Please refresh the page.');
+      return;
+    }
+
     if (!user) {
       setError('Please sign in first');
       return;
@@ -134,7 +157,7 @@ export default function Page() {
 
   async function onDisconnected() {
     setToken(null);
-    if (roomName) {
+    if (roomName && db) {
       try {
         await updateDoc(doc(db, 'calls', roomName), { 
           status: 'ended', 
@@ -148,6 +171,19 @@ export default function Page() {
         }
       }
     }
+  }
+
+  // Loading state while Firebase initializes
+  if (!isFirebaseReady) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+        <div style={{ textAlign: 'center', maxWidth: '28rem' }}>
+          <h1 style={{ fontSize: '2.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>Telehealth Console</h1>
+          <p style={{ fontSize: '1.25rem', color: '#4B5563', marginBottom: '2rem' }}>Loading...</p>
+          <div style={{ width: '2rem', height: '2rem', border: '3px solid #E5E7EB', borderTop: '3px solid #2563EB', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }}></div>
+        </div>
+      </div>
+    );
   }
 
   // Signed-out view
