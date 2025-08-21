@@ -15,6 +15,7 @@ export default function Page() {
   const [token, setToken] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
+  const [isJoining, setIsJoining] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,7 +61,7 @@ export default function Page() {
     }
   }
 
-  async function createOrJoinRoom() {
+  async function createRoom() {
     if (!user) {
       setError('Please sign in first');
       return;
@@ -74,7 +75,6 @@ export default function Page() {
       setIsCreating(true);
       setError(null);
 
-      const identity = user.displayName || user.email || user.uid;
       const cleanRoomName = roomName.trim().toLowerCase().replace(/\s+/g, '-');
 
       // Create or update Firestore call doc
@@ -87,19 +87,6 @@ export default function Page() {
         creatorName: user.displayName || user.email,
       }, { merge: true });
 
-      // Get LiveKit token from API route
-      const res = await fetch('/api/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomName: cleanRoomName, participantName: identity }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to get token');
-      }
-
-      setToken(data.token);
       setShareUrl(`${window.location.origin}/room/${encodeURIComponent(cleanRoomName)}`);
       setRoomName(cleanRoomName);
     } catch (err: unknown) {
@@ -108,6 +95,40 @@ export default function Page() {
       console.error('Room creation error:', err);
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function joinRoom() {
+    if (!user || !roomName) {
+      setError('Please create a room first');
+      return;
+    }
+
+    try {
+      setIsJoining(true);
+      setError(null);
+
+      const identity = user.displayName || user.email || user.uid;
+
+      // Get LiveKit token from API route
+      const res = await fetch('/api/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomName, participantName: identity }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to get token');
+      }
+
+      setToken(data.token);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to join room';
+      setError(errorMessage);
+      console.error('Room join error:', err);
+    } finally {
+      setIsJoining(false);
     }
   }
 
@@ -201,21 +222,30 @@ export default function Page() {
                     value={roomName}
                     onChange={(e) => setRoomName(e.target.value)}
                     placeholder="e.g., dr-smith-aug15"
-                    style={{ flex: '1', border: '1px solid #D1D5DB', borderRadius: '0.5rem', padding: '1rem 1.25rem', fontSize: '1.125rem' }}
-                    onKeyPress={(e) => e.key === 'Enter' && createOrJoinRoom()}
+                    disabled={!!shareUrl}
+                    style={{ 
+                      flex: '1', 
+                      border: '1px solid #D1D5DB', 
+                      borderRadius: '0.5rem', 
+                      padding: '1rem 1.25rem', 
+                      fontSize: '1.125rem',
+                      backgroundColor: shareUrl ? '#F9FAFB' : 'white',
+                      color: shareUrl ? '#6B7280' : '#111827'
+                    }}
+                    onKeyPress={(e) => e.key === 'Enter' && !shareUrl && createRoom()}
                   />
                   <button 
-                    onClick={createOrJoinRoom} 
-                    disabled={isCreating || !roomName.trim()}
+                    onClick={createRoom} 
+                    disabled={isCreating || !roomName.trim() || !!shareUrl}
                     style={{ 
-                      backgroundColor: isCreating || !roomName.trim() ? '#9CA3AF' : '#2563EB', 
+                      backgroundColor: isCreating || !roomName.trim() || shareUrl ? '#9CA3AF' : '#2563EB', 
                       color: 'white', 
                       padding: '1rem 2rem', 
                       borderRadius: '0.5rem', 
                       fontWeight: '600', 
                       fontSize: '1.125rem', 
                       border: 'none', 
-                      cursor: isCreating || !roomName.trim() ? 'not-allowed' : 'pointer'
+                      cursor: isCreating || !roomName.trim() || shareUrl ? 'not-allowed' : 'pointer'
                     }}
                   >
                     {isCreating ? 'Creating...' : 'Create Room'}
@@ -231,15 +261,51 @@ export default function Page() {
 
               {shareUrl && (
                 <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '1.5rem' }}>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>Patient Invitation Link</h3>
-                  <p style={{ fontSize: '1.125rem', color: '#4B5563', marginBottom: '1rem' }}>Share this link with your patient.</p>
-                  <div style={{ display: 'flex', gap: '1rem' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>Room Created Successfully!</h3>
+                  <p style={{ fontSize: '1.125rem', color: '#4B5563', marginBottom: '1rem' }}>Share this link with your patient to start the consultation.</p>
+                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
                     <input value={shareUrl} readOnly style={{ flex: '1', border: '1px solid #D1D5DB', borderRadius: '0.5rem', padding: '0.75rem 1rem', backgroundColor: '#F9FAFB', fontSize: '1.125rem' }} />
                     <button
                       style={{ backgroundColor: '#2563EB', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '0.5rem', fontWeight: '600', fontSize: '1.125rem', border: 'none', cursor: 'pointer' }}
                       onClick={() => navigator.clipboard.writeText(shareUrl)}
                     >
                       Copy link
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button
+                      onClick={joinRoom}
+                      disabled={isJoining}
+                      style={{ 
+                        backgroundColor: isJoining ? '#9CA3AF' : '#059669', 
+                        color: 'white', 
+                        padding: '1rem 2rem', 
+                        borderRadius: '0.5rem', 
+                        fontWeight: '600', 
+                        fontSize: '1.125rem', 
+                        border: 'none', 
+                        cursor: isJoining ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {isJoining ? 'Joining...' : 'Join Call'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShareUrl('');
+                        setRoomName('');
+                      }}
+                      style={{ 
+                        backgroundColor: '#6B7280', 
+                        color: 'white', 
+                        padding: '1rem 2rem', 
+                        borderRadius: '0.5rem', 
+                        fontWeight: '600', 
+                        fontSize: '1.125rem', 
+                        border: 'none', 
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Create New Room
                     </button>
                   </div>
                 </div>
