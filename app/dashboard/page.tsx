@@ -29,7 +29,7 @@ export default function Dashboard() {
       setIsFirebaseReady(true);
       return onAuthStateChanged(auth, (user) => {
         setUser(user);
-        if (user) {
+        if (user && db) {
           // Listen to call summaries
           const q = query(collection(db, 'call-summaries'), orderBy('createdAt', 'desc'));
           const unsubscribe = onSnapshot(q, (snapshot) => {

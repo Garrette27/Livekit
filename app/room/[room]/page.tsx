@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LiveKitRoom, VideoConference } from "@livekit/components-react";
 import "@livekit/components-styles";
 import React from "react";
@@ -16,6 +16,14 @@ export default function RoomPage() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Add debugging for room parameter
+  useEffect(() => {
+    console.log('Room page loaded');
+    console.log('Room parameter:', room);
+    console.log('Room name:', roomName);
+    console.log('Current URL:', window.location.href);
+  }, [room, roomName]);
 
   async function join() {
     if (!name.trim()) {

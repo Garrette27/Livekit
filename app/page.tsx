@@ -99,6 +99,7 @@ export default function Page() {
       setError(null);
 
       const cleanRoomName = roomName.trim().toLowerCase().replace(/\s+/g, '-');
+      console.log('Creating room with name:', cleanRoomName);
 
       // Create or update Firestore call doc
       const callsRef = collection(db, 'calls');
@@ -110,7 +111,9 @@ export default function Page() {
         creatorName: user.displayName || user.email,
       }, { merge: true });
 
-      setShareUrl(`${window.location.origin}/room/${encodeURIComponent(cleanRoomName)}`);
+      const shareUrl = `${window.location.origin}/room/${encodeURIComponent(cleanRoomName)}`;
+      console.log('Generated share URL:', shareUrl);
+      setShareUrl(shareUrl);
       setRoomName(cleanRoomName);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create room';
