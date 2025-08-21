@@ -1,9 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, onSnapshot, orderBy, query, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import Link from 'next/link';
 
 // Force dynamic rendering to prevent build-time Firebase errors
@@ -22,26 +21,49 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [summaries, setSummaries] = useState<CallSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isFirebaseReady, setIsFirebaseReady] = useState<boolean>(false);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      if (user) {
-        // Listen to call summaries
-        const q = query(collection(db, 'call-summaries'), orderBy('createdAt', 'desc'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-          const summaryData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })) as CallSummary[];
-          setSummaries(summaryData);
-          setLoading(false);
-        });
+    // Check if Firebase is initialized
+    if (auth && db) {
+      setIsFirebaseReady(true);
+      return onAuthStateChanged(auth, (user) => {
+        setUser(user);
+        if (user) {
+          // Listen to call summaries
+          const q = query(collection(db, 'call-summaries'), orderBy('createdAt', 'desc'));
+          const unsubscribe = onSnapshot(q, (snapshot) => {
+            const summaryData = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            })) as CallSummary[];
+            setSummaries(summaryData);
+            setLoading(false);
+          });
 
-        return unsubscribe;
-      }
-    });
+          return unsubscribe;
+        } else {
+          setLoading(false);
+        }
+      });
+    } else {
+      console.warn('Firebase not initialized');
+      setLoading(false);
+    }
   }, []);
+
+  // Loading state while Firebase initializes
+  if (!isFirebaseReady) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-6"></div>
+          <h2 className="text-xl font-semibold text-gray-700">Loading Dashboard...</h2>
+          <p className="text-gray-500 mt-2">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -115,7 +137,7 @@ export default function Dashboard() {
                 New Call
               </Link>
               <button 
-                onClick={() => auth.signOut()}
+                onClick={() => auth?.signOut()}
                 className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-3 rounded-xl font-semibold transition-colors"
               >
                 Sign Out
