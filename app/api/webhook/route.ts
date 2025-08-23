@@ -4,7 +4,7 @@ import { getFirebaseAdmin } from '../../../lib/firebase-admin';
 export async function POST(req: Request) {
   try {
     const event = await req.json();
-    console.log('Webhook received:', event);
+    console.log('Webhook received:', JSON.stringify(event, null, 2));
 
     if (event.event === 'room_finished') {
       const roomName = event.room?.name;
@@ -13,11 +13,14 @@ export async function POST(req: Request) {
       if (roomName) {
         // 1. Generate comprehensive AI summary first
         try {
+          console.log('Starting AI summary generation...');
           const summaryData = await generateComprehensiveSummary(roomName, event.room);
+          console.log('AI summary generated:', summaryData);
           
           // Store detailed summary in Firestore
           const db = getFirebaseAdmin();
           if (db) {
+            console.log('Firebase Admin initialized, storing summary...');
             const summaryRef = db.collection('call-summaries').doc(roomName);
             await summaryRef.set({
               roomName,
@@ -32,12 +35,16 @@ export async function POST(req: Request) {
               }
             });
             
-            console.log(`Comprehensive AI summary generated and stored for room: ${roomName}`);
+            console.log(`✅ Comprehensive AI summary generated and stored for room: ${roomName}`);
           } else {
-            console.log('Firebase not initialized, skipping summary storage');
+            console.error('❌ Firebase Admin not initialized, cannot store summary');
+            console.log('Environment variables check:');
+            console.log('- FIREBASE_PROJECT_ID:', !!process.env.FIREBASE_PROJECT_ID);
+            console.log('- FIREBASE_CLIENT_EMAIL:', !!process.env.FIREBASE_CLIENT_EMAIL);
+            console.log('- FIREBASE_PRIVATE_KEY:', !!process.env.FIREBASE_PRIVATE_KEY);
           }
         } catch (error) {
-          console.error('Error generating comprehensive AI summary:', error);
+          console.error('❌ Error generating comprehensive AI summary:', error);
         }
 
         // 2. Delete call record from Firestore for security
@@ -46,12 +53,12 @@ export async function POST(req: Request) {
           if (db) {
             const callRef = db.collection('calls').doc(roomName);
             await callRef.delete();
-            console.log(`Deleted call record for room: ${roomName}`);
+            console.log(`✅ Deleted call record for room: ${roomName}`);
           } else {
-            console.log('Firebase not initialized, skipping call record deletion');
+            console.log('⚠️ Firebase not initialized, skipping call record deletion');
           }
         } catch (error) {
-          console.error('Error deleting call record:', error);
+          console.error('❌ Error deleting call record:', error);
         }
 
         // 3. Schedule automatic deletion of summary after 30 days for HIPAA compliance
@@ -70,26 +77,32 @@ export async function POST(req: Request) {
               reason: 'HIPAA compliance - automatic deletion after 30 days'
             });
             
-            console.log(`Scheduled automatic deletion for room: ${roomName} on ${deletionDate}`);
+            console.log(`✅ Scheduled automatic deletion for room: ${roomName} on ${deletionDate}`);
           }
         } catch (error) {
-          console.error('Error scheduling automatic deletion:', error);
+          console.error('❌ Error scheduling automatic deletion:', error);
         }
+      } else {
+        console.log('⚠️ No room name found in webhook event');
       }
+    } else {
+      console.log(`⚠️ Webhook event '${event.event}' not processed (only 'room_finished' events are handled)`);
     }
 
     return NextResponse.json({ received: true, processed: true });
   } catch (error) {
-    console.error('Webhook processing error:', error);
+    console.error('❌ Webhook processing error:', error);
     return NextResponse.json({ error: 'Processing failed' }, { status: 500 });
   }
 }
 
 async function generateComprehensiveSummary(roomName: string, roomData: any): Promise<any> {
   try {
+    console.log('Starting AI summary generation for room:', roomName);
+    
     // Check if OpenAI API key is configured
     if (!process.env.OPENAI_API_KEY) {
-      console.log('OpenAI API key not configured, using fallback summary');
+      console.log('⚠️ OpenAI API key not configured, using fallback summary');
       return {
         summary: 'AI summary not available - OpenAI not configured',
         keyPoints: ['No AI analysis available'],
@@ -99,6 +112,8 @@ async function generateComprehensiveSummary(roomName: string, roomData: any): Pr
         category: 'General Consultation'
       };
     }
+
+    console.log('✅ OpenAI API key found, generating AI summary...');
 
     // Create a comprehensive prompt for medical consultation summarization
     const prompt = `You are a medical AI assistant specializing in summarizing telehealth consultations. 
@@ -120,6 +135,7 @@ async function generateComprehensiveSummary(roomName: string, roomData: any): Pr
     If this appears to be a medical consultation, prioritize clinical relevance.
     If this appears to be a non-medical call, provide appropriate general consultation summary.`;
 
+    console.log('Calling OpenAI API...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -144,15 +160,19 @@ async function generateComprehensiveSummary(roomName: string, roomData: any): Pr
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('❌ OpenAI API error:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
     const content = data.choices[0]?.message?.content || '{}';
+    console.log('OpenAI response received:', content);
     
     try {
       // Parse the JSON response
       const parsedSummary = JSON.parse(content);
+      console.log('✅ Successfully parsed AI response');
       
       // Validate and provide fallbacks for missing fields
       return {
@@ -164,7 +184,7 @@ async function generateComprehensiveSummary(roomName: string, roomData: any): Pr
         category: parsedSummary.category || 'General Consultation'
       };
     } catch (parseError) {
-      console.error('Error parsing AI response:', parseError);
+      console.error('❌ Error parsing AI response:', parseError);
       return {
         summary: content || 'Summary generation failed',
         keyPoints: ['Unable to parse structured data'],
@@ -175,7 +195,7 @@ async function generateComprehensiveSummary(roomName: string, roomData: any): Pr
       };
     }
   } catch (error) {
-    console.error('Error calling OpenAI:', error);
+    console.error('❌ Error calling OpenAI:', error);
     return {
       summary: 'Error generating AI summary',
       keyPoints: ['Summary generation failed'],
