@@ -227,26 +227,94 @@ export default function RoomPage() {
   }
 
   return (
-    <LiveKitRoom
-      token={token}
-      serverUrl={livekitUrl}
-      video
-      audio
-      onDisconnected={() => {
-        console.log('Disconnected from room');
-        setToken(null);
-      }}
-      onConnected={() => {
-        console.log('Connected to room successfully');
-      }}
-      onError={(error) => {
-        console.error('LiveKit error:', error);
-        setError('Failed to connect to video call');
-        setToken(null);
-      }}
-      className="h-screen"
-    >
-      <VideoConference />
-    </LiveKitRoom>
+    <>
+      <style jsx global>{`
+        /* Fix mobile send button visibility */
+        .lk-chat-entry {
+          background-color: #f3f4f6 !important;
+          border: 1px solid #d1d5db !important;
+        }
+        
+        .lk-chat-entry input {
+          color: #374151 !important;
+          background-color: transparent !important;
+        }
+        
+        .lk-chat-entry input::placeholder {
+          color: #9ca3af !important;
+        }
+        
+        /* Make send button more visible on mobile */
+        .lk-chat-entry button[type="submit"] {
+          background-color: #2563eb !important;
+          color: white !important;
+          border: none !important;
+          border-radius: 0.5rem !important;
+          padding: 0.5rem 1rem !important;
+          font-weight: 600 !important;
+          min-width: 60px !important;
+          height: 40px !important;
+        }
+        
+        .lk-chat-entry button[type="submit"]:hover {
+          background-color: #1d4ed8 !important;
+        }
+        
+        .lk-chat-entry button[type="submit"]:disabled {
+          background-color: #9ca3af !important;
+          cursor: not-allowed !important;
+        }
+        
+        /* Ensure send icon is visible */
+        .lk-chat-entry button[type="submit"] svg {
+          color: white !important;
+          width: 1.25rem !important;
+          height: 1.25rem !important;
+        }
+        
+        /* Mobile-specific improvements */
+        @media (max-width: 768px) {
+          .lk-chat-entry button[type="submit"] {
+            min-width: 50px !important;
+            height: 44px !important;
+            border-radius: 0.75rem !important;
+          }
+          
+          .lk-chat-entry {
+            padding: 0.75rem !important;
+            border-radius: 1rem !important;
+          }
+        }
+      `}</style>
+      
+      <LiveKitRoom
+        token={token}
+        serverUrl={livekitUrl}
+        video
+        audio
+        onDisconnected={() => {
+          console.log('Disconnected from room');
+          console.log('Room ended - webhook should be triggered for room:', roomName);
+          
+          // Log webhook URL for debugging
+          const webhookUrl = `${window.location.origin}/api/webhook`;
+          console.log('Expected webhook URL:', webhookUrl);
+          
+          setToken(null);
+        }}
+        onConnected={() => {
+          console.log('Connected to room successfully');
+          console.log('Room started - participants can join');
+        }}
+        onError={(error) => {
+          console.error('LiveKit error:', error);
+          setError('Failed to connect to video call');
+          setToken(null);
+        }}
+        className="h-screen"
+      >
+        <VideoConference />
+      </LiveKitRoom>
+    </>
   );
 }

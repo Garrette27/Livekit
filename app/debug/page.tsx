@@ -62,6 +62,32 @@ export default function DebugPage() {
     }
   };
 
+  const testLiveKitWebhook = async () => {
+    if (!roomName.trim()) {
+      alert('Please enter a room name');
+      return;
+    }
+
+    setLoading(true);
+    setTestResult(null);
+    
+    try {
+      const response = await fetch('/api/test-livekit-webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ roomName: roomName.trim() }),
+      });
+      const result = await response.json();
+      setTestResult(result);
+    } catch (error) {
+      setTestResult({ error: 'LiveKit webhook test failed', details: error });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div style={{ 
       minHeight: '100vh', 
@@ -165,10 +191,10 @@ export default function DebugPage() {
             color: '#1e40af', 
             marginBottom: '1rem'
           }}>
-            Manual Webhook Trigger
+            Webhook Testing
           </h2>
           <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
-            This will manually trigger the webhook to generate an AI summary for a specific room.
+            Enter a room name to test webhook functionality and generate AI summaries.
           </p>
           <div style={{ marginBottom: '1rem' }}>
             <input
@@ -185,21 +211,38 @@ export default function DebugPage() {
               }}
             />
           </div>
-          <button
-            onClick={triggerManualWebhook}
-            disabled={loading || !roomName.trim()}
-            style={{
-              backgroundColor: loading || !roomName.trim() ? '#9ca3af' : '#dc2626',
-              color: 'white',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '0.5rem',
-              border: 'none',
-              cursor: loading || !roomName.trim() ? 'not-allowed' : 'pointer',
-              fontWeight: '600'
-            }}
-          >
-            {loading ? 'Triggering...' : 'Trigger Manual Webhook'}
-          </button>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={triggerManualWebhook}
+              disabled={loading || !roomName.trim()}
+              style={{
+                backgroundColor: loading || !roomName.trim() ? '#9ca3af' : '#dc2626',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                cursor: loading || !roomName.trim() ? 'not-allowed' : 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              {loading ? 'Triggering...' : 'Test Manual Webhook'}
+            </button>
+            <button
+              onClick={testLiveKitWebhook}
+              disabled={loading || !roomName.trim()}
+              style={{
+                backgroundColor: loading || !roomName.trim() ? '#9ca3af' : '#7c3aed',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                cursor: loading || !roomName.trim() ? 'not-allowed' : 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              {loading ? 'Testing...' : 'Test LiveKit Webhook'}
+            </button>
+          </div>
         </div>
 
         {testResult && (
@@ -253,7 +296,10 @@ export default function DebugPage() {
               <strong>Test Firebase Connection:</strong> If environment is OK, test Firebase Admin functionality
             </li>
             <li style={{ marginBottom: '0.5rem' }}>
-              <strong>Test Webhook:</strong> Use the manual trigger to test the full webhook flow
+              <strong>Test Manual Webhook:</strong> Use the manual trigger to test the full webhook flow
+            </li>
+            <li style={{ marginBottom: '0.5rem' }}>
+              <strong>Test LiveKit Webhook:</strong> Simulate a LiveKit room_finished event
             </li>
             <li style={{ marginBottom: '0.5rem' }}>
               <strong>Check Dashboard:</strong> After successful webhook, check the dashboard for the summary
