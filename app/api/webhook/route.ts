@@ -11,9 +11,37 @@ export async function POST(req: Request) {
       console.log(`Room ${roomName} ended, processing...`);
 
       if (roomName) {
-        // 1. Delete call record from Firestore immediately
+        // 1. Generate comprehensive AI summary first
         try {
-          // Check if Firebase is properly initialized
+          const summaryData = await generateComprehensiveSummary(roomName, event.room);
+          
+          // Store detailed summary in Firestore
+          const db = getFirebaseAdmin();
+          if (db) {
+            const summaryRef = db.collection('call-summaries').doc(roomName);
+            await summaryRef.set({
+              roomName,
+              ...summaryData,
+              createdAt: new Date(),
+              participants: event.room?.participants || [],
+              duration: event.room?.duration || 0,
+              metadata: {
+                totalParticipants: event.room?.participants?.length || 0,
+                recordingUrl: event.room?.recordingUrl || null,
+                transcriptionUrl: event.room?.transcriptionUrl || null,
+              }
+            });
+            
+            console.log(`Comprehensive AI summary generated and stored for room: ${roomName}`);
+          } else {
+            console.log('Firebase not initialized, skipping summary storage');
+          }
+        } catch (error) {
+          console.error('Error generating comprehensive AI summary:', error);
+        }
+
+        // 2. Delete call record from Firestore for security
+        try {
           const db = getFirebaseAdmin();
           if (db) {
             const callRef = db.collection('calls').doc(roomName);
@@ -26,28 +54,26 @@ export async function POST(req: Request) {
           console.error('Error deleting call record:', error);
         }
 
-        // 2. Generate AI summary and store it
+        // 3. Schedule automatic deletion of summary after 30 days for HIPAA compliance
         try {
-          const summary = await generateAISummary(roomName);
-          
-          // Store summary in a separate collection
           const db = getFirebaseAdmin();
           if (db) {
-            const summaryRef = db.collection('call-summaries').doc(roomName);
-            await summaryRef.set({
+            const deletionDate = new Date();
+            deletionDate.setDate(deletionDate.getDate() + 30); // 30 days from now
+            
+            const deletionRef = db.collection('scheduled-deletions').doc(roomName);
+            await deletionRef.set({
               roomName,
-              summary,
+              summaryId: roomName,
+              scheduledFor: deletionDate,
               createdAt: new Date(),
-              participants: event.room?.participants || [],
-              duration: event.room?.duration || 0,
+              reason: 'HIPAA compliance - automatic deletion after 30 days'
             });
             
-            console.log(`AI summary generated and stored for room: ${roomName}`);
-          } else {
-            console.log('Firebase not initialized, skipping summary storage');
+            console.log(`Scheduled automatic deletion for room: ${roomName} on ${deletionDate}`);
           }
         } catch (error) {
-          console.error('Error generating AI summary:', error);
+          console.error('Error scheduling automatic deletion:', error);
         }
       }
     }
@@ -59,13 +85,40 @@ export async function POST(req: Request) {
   }
 }
 
-async function generateAISummary(roomName: string): Promise<string> {
+async function generateComprehensiveSummary(roomName: string, roomData: any): Promise<any> {
   try {
     // Check if OpenAI API key is configured
     if (!process.env.OPENAI_API_KEY) {
-      console.log('OpenAI API key not configured, skipping AI summary');
-      return 'AI summary not available - OpenAI not configured';
+      console.log('OpenAI API key not configured, using fallback summary');
+      return {
+        summary: 'AI summary not available - OpenAI not configured',
+        keyPoints: ['No AI analysis available'],
+        recommendations: ['Please configure OpenAI API for enhanced summaries'],
+        followUpActions: ['Manual review required'],
+        riskLevel: 'Unknown',
+        category: 'General Consultation'
+      };
     }
+
+    // Create a comprehensive prompt for medical consultation summarization
+    const prompt = `You are a medical AI assistant specializing in summarizing telehealth consultations. 
+    
+    Generate a comprehensive, structured summary for a medical consultation that took place in room: ${roomName}.
+    
+    Please provide the following structured response in JSON format:
+    
+    {
+      "summary": "A concise 2-3 sentence overview of the consultation",
+      "keyPoints": ["List of 3-5 main topics discussed", "Important symptoms mentioned", "Key findings"],
+      "recommendations": ["List of 2-4 recommendations made by the doctor", "Prescriptions if any", "Lifestyle advice"],
+      "followUpActions": ["List of 2-3 follow-up actions needed", "Appointment scheduling", "Tests required"],
+      "riskLevel": "Low/Medium/High based on the consultation content",
+      "category": "Primary Care/Specialist/Emergency/Follow-up/General Consultation"
+    }
+    
+    Focus on medical accuracy, patient privacy, and actionable insights. 
+    If this appears to be a medical consultation, prioritize clinical relevance.
+    If this appears to be a non-medical call, provide appropriate general consultation summary.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -78,15 +131,15 @@ async function generateAISummary(roomName: string): Promise<string> {
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful assistant that summarizes telehealth calls. Provide a concise, professional summary focusing on key points discussed, decisions made, and any follow-up actions needed.'
+            content: 'You are a medical AI assistant that provides structured, professional summaries of telehealth consultations. Always respond with valid JSON format.'
           },
           {
             role: 'user',
-            content: `Generate a summary for the telehealth call in room: ${roomName}. Focus on the main topics discussed and any important outcomes.`
+            content: prompt
           }
         ],
-        max_tokens: 300,
-        temperature: 0.7,
+        max_tokens: 800,
+        temperature: 0.3, // Lower temperature for more consistent medical summaries
       }),
     });
 
@@ -95,9 +148,41 @@ async function generateAISummary(roomName: string): Promise<string> {
     }
 
     const data = await response.json();
-    return data.choices[0]?.message?.content || 'Summary generation failed';
+    const content = data.choices[0]?.message?.content || '{}';
+    
+    try {
+      // Parse the JSON response
+      const parsedSummary = JSON.parse(content);
+      
+      // Validate and provide fallbacks for missing fields
+      return {
+        summary: parsedSummary.summary || 'Summary generation failed',
+        keyPoints: parsedSummary.keyPoints || ['No key points available'],
+        recommendations: parsedSummary.recommendations || ['No recommendations available'],
+        followUpActions: parsedSummary.followUpActions || ['No follow-up actions specified'],
+        riskLevel: parsedSummary.riskLevel || 'Unknown',
+        category: parsedSummary.category || 'General Consultation'
+      };
+    } catch (parseError) {
+      console.error('Error parsing AI response:', parseError);
+      return {
+        summary: content || 'Summary generation failed',
+        keyPoints: ['Unable to parse structured data'],
+        recommendations: ['Manual review recommended'],
+        followUpActions: ['Contact support if needed'],
+        riskLevel: 'Unknown',
+        category: 'General Consultation'
+      };
+    }
   } catch (error) {
     console.error('Error calling OpenAI:', error);
-    return 'Error generating AI summary';
+    return {
+      summary: 'Error generating AI summary',
+      keyPoints: ['Summary generation failed'],
+      recommendations: ['Manual review required'],
+      followUpActions: ['Contact technical support'],
+      riskLevel: 'Unknown',
+      category: 'General Consultation'
+    };
   }
 }
