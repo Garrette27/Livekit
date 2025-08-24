@@ -356,17 +356,48 @@ export default function RoomPage() {
           transform: translateY(0) !important;
         }
         
-        /* Specific styling for microphone and camera controls */
+        /* Specific styling for microphone and camera controls - Enhanced targeting */
         .lk-control-bar button[data-lk-kind="microphone"],
-        .lk-control-bar button[data-lk-kind="camera"] {
+        .lk-control-bar button[data-lk-kind="camera"],
+        .lk-control-bar button[aria-label*="microphone"],
+        .lk-control-bar button[aria-label*="camera"],
+        .lk-control-bar button[title*="microphone"],
+        .lk-control-bar button[title*="camera"] {
           background-color: #059669 !important;
           border-color: #047857 !important;
+          color: white !important;
         }
         
         .lk-control-bar button[data-lk-kind="microphone"]:hover,
-        .lk-control-bar button[data-lk-kind="camera"]:hover {
+        .lk-control-bar button[data-lk-kind="camera"]:hover,
+        .lk-control-bar button[aria-label*="microphone"]:hover,
+        .lk-control-bar button[aria-label*="camera"]:hover,
+        .lk-control-bar button[title*="microphone"]:hover,
+        .lk-control-bar button[title*="camera"]:hover {
           background-color: #047857 !important;
           box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3) !important;
+        }
+        
+        /* Force all control bar buttons to have proper styling */
+        .lk-control-bar button {
+          background-color: #2563eb !important;
+          border: 1px solid #1d4ed8 !important;
+          border-radius: 0.75rem !important;
+          color: white !important;
+          padding: 0.75rem 1rem !important;
+          transition: all 0.2s ease !important;
+          font-weight: 600 !important;
+          min-width: 80px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 0.5rem !important;
+        }
+        
+        .lk-control-bar button:hover {
+          background-color: #1d4ed8 !important;
+          transform: translateY(-1px) !important;
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
         }
         
         /* Leave button styling */
@@ -519,14 +550,23 @@ export default function RoomPage() {
           console.log('Expected webhook URL:', webhookUrl);
           
           // Trigger manual webhook for testing
+          console.log('Triggering manual webhook for room:', roomName);
           fetch('/api/manual-webhook', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ roomName })
           }).then(response => {
-            console.log('Manual webhook response:', response.status);
+            console.log('Manual webhook response status:', response.status);
+            if (response.ok) {
+              console.log('✅ Manual webhook triggered successfully');
+            } else {
+              console.error('❌ Manual webhook failed with status:', response.status);
+            }
+            return response.json();
+          }).then(data => {
+            console.log('Manual webhook response data:', data);
           }).catch(error => {
-            console.error('Manual webhook error:', error);
+            console.error('❌ Manual webhook error:', error);
           });
           
           setToken(null);
