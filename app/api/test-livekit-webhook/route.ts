@@ -3,59 +3,70 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request) {
   try {
     const { roomName } = await req.json();
-    
+    console.log('Test LiveKit webhook for room:', roomName);
+
     if (!roomName) {
       return NextResponse.json({ error: 'Room name is required' }, { status: 400 });
     }
 
-    console.log(`🧪 Testing LiveKit webhook for room: ${roomName}`);
-
-    // Simulate a LiveKit webhook event
-    const webhookPayload = {
+    // Simulate the exact LiveKit webhook format
+    const livekitWebhookPayload = {
       event: 'room_finished',
       room: {
         name: roomName,
-        participants: ['doctor', 'patient'],
-        duration: 300, // 5 minutes
-        recordingUrl: null,
-        transcriptionUrl: null,
-        metadata: {
-          roomType: 'consultation',
-          participants: 2
-        }
-      },
-      timestamp: new Date().toISOString()
+        sid: `RM_${Date.now()}`,
+        creation_time: new Date().toISOString(),
+        metadata: 'test-consultation',
+        participants: [
+          {
+            sid: 'PA_doctor',
+            identity: 'doctor',
+            name: 'Dr. Smith',
+            metadata: 'role:doctor'
+          },
+          {
+            sid: 'PA_patient',
+            identity: 'patient',
+            name: 'John Doe',
+            metadata: 'role:patient'
+          }
+        ],
+        duration: Math.floor(Math.random() * 30) + 5, // Random duration 5-35 minutes
+        recording_url: null,
+        transcription_url: null
+      }
     };
 
-    console.log('Webhook payload:', JSON.stringify(webhookPayload, null, 2));
+    console.log('Simulating LiveKit webhook payload:', livekitWebhookPayload);
 
-    // Call our own webhook endpoint
+    // Call our actual webhook endpoint with the LiveKit format
     const webhookUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/webhook`;
     
-    console.log('Calling webhook at:', webhookUrl);
+    console.log('Calling webhook endpoint:', webhookUrl);
 
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'User-Agent': 'LiveKit-Webhook/1.0'
       },
-      body: JSON.stringify(webhookPayload),
+      body: JSON.stringify(livekitWebhookPayload),
     });
 
     if (response.ok) {
       const result = await response.json();
-      console.log('✅ Webhook test successful:', result);
+      console.log('✅ LiveKit webhook test successful:', result);
       return NextResponse.json({ 
         success: true, 
-        message: 'LiveKit webhook test successful',
+        message: 'LiveKit webhook test completed successfully',
         roomName,
-        result 
+        webhookResponse: result
       });
     } else {
       const errorText = await response.text();
-      console.error('❌ Webhook test failed:', response.status, errorText);
+      console.error('❌ LiveKit webhook test failed:', response.status, errorText);
       return NextResponse.json({ 
-        error: 'Webhook test failed',
+        error: 'LiveKit webhook test failed',
         status: response.status,
         details: errorText
       }, { status: 500 });

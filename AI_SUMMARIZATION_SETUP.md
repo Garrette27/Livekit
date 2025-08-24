@@ -254,3 +254,4 @@ This implementation is designed to be HIPAA-compliant, but you should:
 4. **Train Staff**: Ensure staff understand the new features
 5. **Monitor Usage**: Regularly review usage and compliance
 
+

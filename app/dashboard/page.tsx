@@ -29,23 +29,31 @@ export default function Dashboard() {
   useEffect(() => {
     if (auth && db) {
       return onAuthStateChanged(auth, (user) => {
+        console.log('Dashboard: Auth state changed:', user ? 'User logged in' : 'No user');
         setUser(user);
         if (user && db) {
+          console.log('Dashboard: Setting up Firestore listener for call-summaries');
           const q = query(collection(db, 'call-summaries'), orderBy('createdAt', 'desc'));
           const unsubscribe = onSnapshot(q, (snapshot) => {
             const summaryData = snapshot.docs.map(doc => ({
               id: doc.id,
               ...doc.data()
             })) as CallSummary[];
+            console.log('Dashboard: Received summaries:', summaryData.length, 'summaries');
             setSummaries(summaryData);
+            setLoading(false);
+          }, (error) => {
+            console.error('Dashboard: Firestore listener error:', error);
             setLoading(false);
           });
           return unsubscribe;
         } else {
+          console.log('Dashboard: No user or db, setting loading to false');
           setLoading(false);
         }
       });
     } else {
+      console.log('Dashboard: Auth or db not available, setting loading to false');
       setLoading(false);
     }
   }, []);
@@ -177,6 +185,19 @@ export default function Dashboard() {
               }}
             >
               New Call
+            </Link>
+            <Link 
+              href="/test" 
+              style={{
+                backgroundColor: '#059669',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.75rem',
+                fontWeight: '600',
+                textDecoration: 'none'
+              }}
+            >
+              Test Webhook
             </Link>
             <button 
               onClick={() => auth?.signOut()}

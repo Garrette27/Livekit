@@ -11,10 +11,26 @@ export async function POST(req: Request) {
       console.log(`Room ${roomName} ended, processing...`);
 
       if (roomName) {
+        // Extract participant information from LiveKit format
+        const participants = event.room?.participants || [];
+        const participantNames = participants.map((p: any) => p.identity || p.name || 'Unknown');
+        const duration = event.room?.duration || 0;
+        
+        console.log('Room details:', {
+          roomName,
+          participants: participantNames,
+          duration,
+          totalParticipants: participants.length
+        });
+
         // 1. Generate comprehensive AI summary first
         try {
           console.log('Starting AI summary generation...');
-          const summaryData = await generateComprehensiveSummary(roomName, event.room);
+          const summaryData = await generateComprehensiveSummary(roomName, {
+            ...event.room,
+            participants: participantNames,
+            duration
+          });
           console.log('AI summary generated:', summaryData);
           
           // Store detailed summary in Firestore
@@ -26,12 +42,15 @@ export async function POST(req: Request) {
               roomName,
               ...summaryData,
               createdAt: new Date(),
-              participants: event.room?.participants || [],
-              duration: event.room?.duration || 0,
+              participants: participantNames,
+              duration: duration,
               metadata: {
-                totalParticipants: event.room?.participants?.length || 0,
-                recordingUrl: event.room?.recordingUrl || null,
-                transcriptionUrl: event.room?.transcriptionUrl || null,
+                totalParticipants: participants.length,
+                recordingUrl: event.room?.recording_url || event.room?.recordingUrl || null,
+                transcriptionUrl: event.room?.transcription_url || event.room?.transcriptionUrl || null,
+                source: 'livekit_webhook',
+                roomSid: event.room?.sid || null,
+                creationTime: event.room?.creation_time || null
               }
             });
             
