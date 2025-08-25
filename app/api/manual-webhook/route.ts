@@ -122,6 +122,8 @@ async function generateComprehensiveSummary(roomName: string, roomData: any): Pr
     Since this is a test consultation, provide appropriate test data that would be typical for a medical consultation.`;
 
     console.log('Calling OpenAI API...');
+    console.log('OpenAI API Key preview:', process.env.OPENAI_API_KEY?.substring(0, 10) + '...');
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -156,8 +158,16 @@ async function generateComprehensiveSummary(roomName: string, roomData: any): Pr
     console.log('OpenAI response received:', content);
     
     try {
+      // Clean the content - remove markdown code blocks if present
+      let cleanContent = content.trim();
+      if (cleanContent.startsWith('```json')) {
+        cleanContent = cleanContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanContent.startsWith('```')) {
+        cleanContent = cleanContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+      
       // Parse the JSON response
-      const parsedSummary = JSON.parse(content);
+      const parsedSummary = JSON.parse(cleanContent);
       console.log('✅ Successfully parsed AI response');
       
       // Validate and provide fallbacks for missing fields

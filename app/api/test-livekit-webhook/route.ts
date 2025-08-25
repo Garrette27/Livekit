@@ -40,7 +40,13 @@ export async function POST(req: Request) {
     console.log('Simulating LiveKit webhook payload:', livekitWebhookPayload);
 
     // Call our actual webhook endpoint with the LiveKit format
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    
+    // If using VERCEL_URL, add https protocol
+    if (!baseUrl && process.env.VERCEL_URL) {
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    }
+    
     const webhookUrl = `${baseUrl}/api/webhook`;
     
     console.log('Calling webhook endpoint:', webhookUrl);
