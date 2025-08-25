@@ -40,18 +40,25 @@ export async function POST(req: Request) {
     console.log('Simulating LiveKit webhook payload:', livekitWebhookPayload);
 
     // Call our actual webhook endpoint with the LiveKit format
-    const webhookUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/webhook`;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+    const webhookUrl = `${baseUrl}/api/webhook`;
     
     console.log('Calling webhook endpoint:', webhookUrl);
-
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'LiveKit-Webhook/1.0'
-      },
-      body: JSON.stringify(livekitWebhookPayload),
+    console.log('Base URL:', baseUrl);
+    console.log('Environment check:', {
+      NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
+      VERCEL_URL: process.env.VERCEL_URL
     });
+
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'LiveKit-Webhook/1.0'
+        },
+        body: JSON.stringify(livekitWebhookPayload),
+      });
 
     if (response.ok) {
       const result = await response.json();
@@ -69,6 +76,13 @@ export async function POST(req: Request) {
         error: 'LiveKit webhook test failed',
         status: response.status,
         details: errorText
+      }, { status: 500 });
+    }
+    } catch (fetchError) {
+      console.error('❌ Fetch error in LiveKit webhook test:', fetchError);
+      return NextResponse.json({ 
+        error: 'LiveKit webhook test failed',
+        details: fetchError instanceof Error ? fetchError.message : 'fetch failed'
       }, { status: 500 });
     }
 

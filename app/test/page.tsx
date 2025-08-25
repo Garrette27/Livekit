@@ -5,6 +5,7 @@ export default function TestPage() {
   const [roomName, setRoomName] = useState('test-room-' + Date.now());
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [envCheck, setEnvCheck] = useState<any>(null);
 
   const testWebhook = async () => {
     setLoading(true);
@@ -63,6 +64,25 @@ export default function TestPage() {
     } catch (error) {
       console.error('LiveKit webhook test error:', error);
       setResult({ error: 'Test failed', details: error });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkEnvironment = async () => {
+    setLoading(true);
+    setEnvCheck(null);
+    
+    try {
+      console.log('Checking environment configuration...');
+      
+      const response = await fetch('/api/env-check');
+      const data = await response.json();
+      console.log('Environment check result:', data);
+      setEnvCheck(data);
+    } catch (error) {
+      console.error('Environment check error:', error);
+      setEnvCheck({ error: 'Environment check failed', details: error });
     } finally {
       setLoading(false);
     }
@@ -155,6 +175,22 @@ export default function TestPage() {
             >
               {loading ? 'Testing...' : 'Test LiveKit Webhook'}
             </button>
+
+            <button
+              onClick={checkEnvironment}
+              disabled={loading}
+              style={{
+                backgroundColor: loading ? '#9ca3af' : '#059669',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              {loading ? 'Checking...' : 'Check Environment'}
+            </button>
           </div>
         </div>
 
@@ -194,6 +230,66 @@ export default function TestPage() {
           </div>
         )}
 
+        {envCheck && (
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '1rem',
+            padding: '2rem',
+            marginTop: '2rem',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+          }}>
+            <h2 style={{ 
+              fontSize: '1.5rem', 
+              fontWeight: 'bold', 
+              color: envCheck.isConfigured ? '#059669' : '#dc2626', 
+              marginBottom: '1rem'
+            }}>
+              Environment Configuration
+            </h2>
+            
+            {envCheck.criticalIssues && envCheck.criticalIssues.length > 0 && (
+              <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#fef2f2', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
+                <h3 style={{ color: '#dc2626', margin: '0 0 0.5rem 0', fontSize: '1rem' }}>Critical Issues:</h3>
+                <ul style={{ color: '#dc2626', margin: 0, paddingLeft: '1.5rem' }}>
+                  {envCheck.criticalIssues.map((issue: string, index: number) => (
+                    <li key={index}>{issue}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {envCheck.warnings && envCheck.warnings.length > 0 && (
+              <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#fffbeb', borderRadius: '0.5rem', border: '1px solid #fed7aa' }}>
+                <h3 style={{ color: '#d97706', margin: '0 0 0.5rem 0', fontSize: '1rem' }}>Warnings:</h3>
+                <ul style={{ color: '#d97706', margin: 0, paddingLeft: '1.5rem' }}>
+                  {envCheck.warnings.map((warning: string, index: number) => (
+                    <li key={index}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {envCheck.isConfigured && (
+              <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f0fdf4', borderRadius: '0.5rem', border: '1px solid #bbf7d0' }}>
+                <p style={{ color: '#059669', margin: 0, fontWeight: '600' }}>
+                  ✅ All critical environment variables are properly configured!
+                </p>
+              </div>
+            )}
+
+            <pre style={{
+              backgroundColor: '#f3f4f6',
+              padding: '1rem',
+              borderRadius: '0.5rem',
+              overflow: 'auto',
+              fontSize: '0.875rem',
+              color: '#374151'
+            }}>
+              {JSON.stringify(envCheck.envStatus, null, 2)}
+            </pre>
+          </div>
+        )}
+
         <div style={{
           backgroundColor: 'white',
           borderRadius: '1rem',
@@ -211,6 +307,9 @@ export default function TestPage() {
           </h2>
           <ol style={{ color: '#6b7280', lineHeight: '1.6' }}>
             <li style={{ marginBottom: '0.5rem' }}>
+              Click "Check Environment" to verify your configuration
+            </li>
+            <li style={{ marginBottom: '0.5rem' }}>
               Click one of the test buttons above to generate a test summary
             </li>
             <li style={{ marginBottom: '0.5rem' }}>
@@ -223,6 +322,15 @@ export default function TestPage() {
               Test with actual video calls to verify webhook triggering
             </li>
           </ol>
+          
+          <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '0.5rem', border: '1px solid #0ea5e9' }}>
+            <p style={{ color: '#0c4a6e', margin: '0 0 0.5rem 0', fontWeight: '600' }}>
+              Need help configuring environment variables?
+            </p>
+            <p style={{ color: '#0c4a6e', margin: 0, fontSize: '0.875rem' }}>
+              Check the <a href="/ENVIRONMENT_SETUP.md" target="_blank" style={{ color: '#0ea5e9', textDecoration: 'underline' }}>Environment Setup Guide</a> for detailed instructions.
+            </p>
+          </div>
         </div>
       </div>
     </div>
