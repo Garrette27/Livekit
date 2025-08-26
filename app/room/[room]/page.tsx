@@ -26,6 +26,7 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
   const transcriptionRef = useRef<string[]>([]);
   const lastUpdateRef = useRef<number>(0);
   const recognitionRef = useRef<any>(null);
+  const [speechRecognitionStatus, setSpeechRecognitionStatus] = useState<string>('initializing');
 
   useEffect(() => {
     if (!room || !localParticipant) return;
@@ -44,6 +45,7 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
 
       recognitionRef.current.onstart = () => {
         console.log('✅ Speech recognition started successfully');
+        setSpeechRecognitionStatus('active');
       };
 
       recognitionRef.current.onresult = (event: any) => {
@@ -57,14 +59,17 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
           const confidence = event.results[i][0].confidence;
           console.log(`Result ${i}: "${transcript}" (confidence: ${confidence}, isFinal: ${event.results[i].isFinal})`);
           
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript;
-          } else {
-            interimTranscript += transcript;
+          // Only process results with actual content
+          if (transcript && transcript.trim().length > 0) {
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
           }
         }
 
-        if (finalTranscript) {
+        if (finalTranscript && finalTranscript.trim().length > 0) {
           const timestamp = new Date().toISOString();
           const entry = `[${localParticipant.identity}] (${timestamp}): ${finalTranscript}`;
           transcriptionRef.current.push(entry);
@@ -82,6 +87,7 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
       recognitionRef.current.onerror = (event: any) => {
         console.error('❌ Speech recognition error:', event.error);
         console.error('Error details:', event);
+        setSpeechRecognitionStatus('error');
         
         // Try to restart if it's a recoverable error
         if (event.error === 'no-speech' || event.error === 'audio-capture') {
@@ -89,8 +95,10 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
           setTimeout(() => {
             try {
               recognitionRef.current.start();
+              setSpeechRecognitionStatus('restarting');
             } catch (error) {
               console.error('Failed to restart speech recognition:', error);
+              setSpeechRecognitionStatus('failed');
             }
           }, 1000);
         }
@@ -98,12 +106,14 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
 
       recognitionRef.current.onend = () => {
         console.log('🔄 Speech recognition ended, attempting to restart...');
+        setSpeechRecognitionStatus('restarting');
         // Restart recognition if it ends unexpectedly
         if (room.state === 'connected') {
           try {
             recognitionRef.current.start();
           } catch (error) {
             console.error('Error restarting speech recognition:', error);
+            setSpeechRecognitionStatus('failed');
           }
         }
       };
@@ -114,6 +124,7 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
         console.log('🎤 Speech recognition started');
       } catch (error) {
         console.error('❌ Error starting speech recognition:', error);
+        setSpeechRecognitionStatus('failed');
       }
     } else {
       console.log('⚠️ Speech recognition not supported in this browser');
@@ -121,6 +132,7 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
         SpeechRecognition: 'SpeechRecognition' in window,
         webkitSpeechRecognition: 'webkitSpeechRecognition' in window
       });
+      setSpeechRecognitionStatus('not-supported');
     }
 
     // Listen for data messages (chat messages)
@@ -176,6 +188,47 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
     }
   };
 
+  // Show speech recognition status indicator
+  if (speechRecognitionStatus === 'not-supported') {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        backgroundColor: '#fef3c7',
+        color: '#92400e',
+        padding: '0.75rem 1rem',
+        borderRadius: '0.5rem',
+        fontSize: '0.875rem',
+        fontWeight: '600',
+        zIndex: 1000,
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+      }}>
+        ⚠️ Speech recognition not supported - use manual notes
+      </div>
+    );
+  }
+
+  if (speechRecognitionStatus === 'failed') {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        backgroundColor: '#fee2e2',
+        color: '#991b1b',
+        padding: '0.75rem 1rem',
+        borderRadius: '0.5rem',
+        fontSize: '0.875rem',
+        fontWeight: '600',
+        zIndex: 1000,
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+      }}>
+        ❌ Speech recognition failed - use manual notes
+      </div>
+    );
+  }
+
   return null; // This component doesn't render anything visible
 }
 
@@ -205,27 +258,39 @@ function ManualTranscriptionInput({ roomName }: { roomName: string }) {
     }
   };
 
-  // Always show the button during calls
+  // Always show the button during calls - make it more prominent
   if (!isVisible) {
     return (
       <button
         onClick={() => setIsVisible(true)}
         style={{
           position: 'fixed',
-          bottom: '100px',
+          bottom: '120px',
           right: '20px',
           backgroundColor: '#2563eb',
           color: 'white',
           border: 'none',
           borderRadius: '50%',
-          width: '60px',
-          height: '60px',
-          fontSize: '24px',
+          width: '70px',
+          height: '70px',
+          fontSize: '28px',
           cursor: 'pointer',
-          zIndex: 1000,
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+          zIndex: 9999,
+          boxShadow: '0 8px 25px rgba(37, 99, 235, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'all 0.3s ease'
         }}
         title="Add conversation note"
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.1)';
+          e.currentTarget.style.boxShadow = '0 12px 35px rgba(37, 99, 235, 0.4)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.boxShadow = '0 8px 25px rgba(37, 99, 235, 0.3)';
+        }}
       >
         📝
       </button>
@@ -235,24 +300,25 @@ function ManualTranscriptionInput({ roomName }: { roomName: string }) {
   return (
     <div style={{
       position: 'fixed',
-      bottom: '100px',
+      bottom: '120px',
       right: '20px',
       backgroundColor: 'white',
-      border: '1px solid #e5e7eb',
-      borderRadius: '0.75rem',
-      padding: '1rem',
-      width: '300px',
-      zIndex: 1000,
-      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
+      border: '2px solid #2563eb',
+      borderRadius: '1rem',
+      padding: '1.5rem',
+      width: '350px',
+      zIndex: 9999,
+      boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)'
     }}>
-      <div style={{ marginBottom: '0.75rem' }}>
+      <div style={{ marginBottom: '1rem' }}>
         <label style={{
           display: 'block',
-          marginBottom: '0.5rem',
-          fontWeight: '600',
-          color: '#374151'
+          marginBottom: '0.75rem',
+          fontWeight: '700',
+          color: '#1e293b',
+          fontSize: '1.1rem'
         }}>
-          Add Conversation Note
+          📝 Add Conversation Note
         </label>
         <textarea
           value={note}
@@ -260,21 +326,23 @@ function ManualTranscriptionInput({ roomName }: { roomName: string }) {
           placeholder="Enter important points from the conversation..."
           style={{
             width: '100%',
-            minHeight: '80px',
-            padding: '0.5rem',
-            border: '1px solid #d1d5db',
-            borderRadius: '0.375rem',
-            fontSize: '0.875rem',
-            resize: 'vertical'
+            minHeight: '100px',
+            padding: '0.75rem',
+            border: '2px solid #e2e8f0',
+            borderRadius: '0.5rem',
+            fontSize: '1rem',
+            resize: 'vertical',
+            fontFamily: 'inherit'
           }}
           onKeyPress={(e) => {
             if (e.key === 'Enter' && e.ctrlKey) {
               addNote();
             }
           }}
+          autoFocus
         />
       </div>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.75rem' }}>
         <button
           onClick={addNote}
           disabled={!note.trim()}
@@ -283,10 +351,12 @@ function ManualTranscriptionInput({ roomName }: { roomName: string }) {
             backgroundColor: note.trim() ? '#2563eb' : '#9ca3af',
             color: 'white',
             border: 'none',
-            borderRadius: '0.375rem',
-            padding: '0.5rem',
-            fontSize: '0.875rem',
-            cursor: note.trim() ? 'pointer' : 'not-allowed'
+            borderRadius: '0.5rem',
+            padding: '0.75rem',
+            fontSize: '1rem',
+            fontWeight: '600',
+            cursor: note.trim() ? 'pointer' : 'not-allowed',
+            transition: 'all 0.2s ease'
           }}
         >
           Add Note
@@ -297,10 +367,12 @@ function ManualTranscriptionInput({ roomName }: { roomName: string }) {
             backgroundColor: '#6b7280',
             color: 'white',
             border: 'none',
-            borderRadius: '0.375rem',
-            padding: '0.5rem',
-            fontSize: '0.875rem',
-            cursor: 'pointer'
+            borderRadius: '0.5rem',
+            padding: '0.75rem',
+            fontSize: '1rem',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
           }}
         >
           Cancel
@@ -608,9 +680,9 @@ export default function RoomPage() {
           box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
         }
         
-        /* Control bar improvements - Enhanced visibility */
+        /* Control bar improvements - FORCE BLUE CONTROLS ON ALL SIDES */
         .lk-control-bar {
-          background-color: rgba(255, 255, 255, 0.95) !important;
+          background-color: rgba(255, 255, 255, 0.98) !important;
           backdrop-filter: blur(10px) !important;
           border-radius: 1rem !important;
           margin: 1rem !important;
@@ -619,7 +691,11 @@ export default function RoomPage() {
           border: 1px solid rgba(0, 0, 0, 0.1) !important;
         }
         
-        .lk-control-bar button {
+        /* FORCE ALL CONTROL BAR BUTTONS TO BE BLUE - OVERRIDE ANY DEFAULTS */
+        .lk-control-bar button,
+        .lk-control-bar button[data-lk-kind],
+        .lk-control-bar button[aria-label],
+        .lk-control-bar button[title] {
           background-color: #2563eb !important;
           border: 1px solid #1d4ed8 !important;
           border-radius: 0.75rem !important;
@@ -632,19 +708,26 @@ export default function RoomPage() {
           align-items: center !important;
           justify-content: center !important;
           gap: 0.5rem !important;
+          box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important;
         }
         
-        .lk-control-bar button:hover {
+        .lk-control-bar button:hover,
+        .lk-control-bar button[data-lk-kind]:hover,
+        .lk-control-bar button[aria-label]:hover,
+        .lk-control-bar button[title]:hover {
           background-color: #1d4ed8 !important;
           transform: translateY(-1px) !important;
-          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
+          box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3) !important;
         }
         
-        .lk-control-bar button:active {
+        .lk-control-bar button:active,
+        .lk-control-bar button[data-lk-kind]:active,
+        .lk-control-bar button[aria-label]:active,
+        .lk-control-bar button[title]:active {
           transform: translateY(0) !important;
         }
         
-        /* Specific styling for microphone and camera controls - Enhanced targeting */
+        /* Specific styling for microphone and camera controls - ENHANCED VISIBILITY */
         .lk-control-bar button[data-lk-kind="microphone"],
         .lk-control-bar button[data-lk-kind="camera"],
         .lk-control-bar button[aria-label*="microphone"],
@@ -654,6 +737,7 @@ export default function RoomPage() {
           background-color: #059669 !important;
           border-color: #047857 !important;
           color: white !important;
+          box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.2) !important;
         }
         
         .lk-control-bar button[data-lk-kind="microphone"]:hover,
@@ -663,73 +747,60 @@ export default function RoomPage() {
         .lk-control-bar button[title*="microphone"]:hover,
         .lk-control-bar button[title*="camera"]:hover {
           background-color: #047857 !important;
-          box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3) !important;
-        }
-        
-        /* Force all control bar buttons to have proper styling */
-        .lk-control-bar button {
-          background-color: #2563eb !important;
-          border: 1px solid #1d4ed8 !important;
-          border-radius: 0.75rem !important;
-          color: white !important;
-          padding: 0.75rem 1rem !important;
-          transition: all 0.2s ease !important;
-          font-weight: 600 !important;
-          min-width: 80px !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          gap: 0.5rem !important;
-        }
-        
-        .lk-control-bar button:hover {
-          background-color: #1d4ed8 !important;
-          transform: translateY(-1px) !important;
-          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
+          box-shadow: 0 6px 12px rgba(5, 150, 105, 0.3) !important;
         }
         
         /* Leave button styling */
         .lk-control-bar button[data-lk-kind="leave"] {
           background-color: #dc2626 !important;
           border-color: #b91c1c !important;
+          box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.2) !important;
         }
         
         .lk-control-bar button[data-lk-kind="leave"]:hover {
           background-color: #b91c1c !important;
-          box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3) !important;
+          box-shadow: 0 6px 12px rgba(220, 38, 38, 0.3) !important;
         }
         
         /* Share screen button styling */
         .lk-control-bar button[data-lk-kind="share-screen"] {
           background-color: #7c3aed !important;
           border-color: #6d28d9 !important;
+          box-shadow: 0 4px 6px -1px rgba(124, 58, 237, 0.2) !important;
         }
         
         .lk-control-bar button[data-lk-kind="share-screen"]:hover {
           background-color: #6d28d9 !important;
-          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3) !important;
+          box-shadow: 0 6px 12px rgba(124, 58, 237, 0.3) !important;
         }
         
         /* Chat button styling */
         .lk-control-bar button[data-lk-kind="chat"] {
           background-color: #ea580c !important;
           border-color: #c2410c !important;
+          box-shadow: 0 4px 6px -1px rgba(234, 88, 12, 0.2) !important;
         }
         
         .lk-control-bar button[data-lk-kind="chat"]:hover {
           background-color: #c2410c !important;
-          box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3) !important;
+          box-shadow: 0 6px 12px rgba(234, 88, 12, 0.3) !important;
         }
         
         /* Ensure all icons and text are white */
-        .lk-control-bar button svg {
+        .lk-control-bar button svg,
+        .lk-control-bar button[data-lk-kind] svg,
+        .lk-control-bar button[aria-label] svg,
+        .lk-control-bar button[title] svg {
           color: white !important;
           fill: white !important;
           width: 1.25rem !important;
           height: 1.25rem !important;
         }
         
-        .lk-control-bar button span {
+        .lk-control-bar button span,
+        .lk-control-bar button[data-lk-kind] span,
+        .lk-control-bar button[aria-label] span,
+        .lk-control-bar button[title] span {
           color: white !important;
           font-weight: 600 !important;
         }
