@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import { auth, db } from '@/lib/firebase';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
-import { collection, doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, setDoc, updateDoc, getFirestore } from 'firebase/firestore';
 import Link from 'next/link';
 
 // Force dynamic rendering to prevent build-time Firebase errors
@@ -85,11 +85,15 @@ export default function Page() {
       return;
     }
 
+    if (!db) {
+      alert('Firebase not initialized. Please refresh the page.');
+      return;
+    }
+
     try {
       setIsCreating(true);
       
       // Store room creation with user ID
-      const db = getFirestore();
       const roomRef = doc(db, 'rooms', roomName);
       await setDoc(roomRef, {
         roomName,
