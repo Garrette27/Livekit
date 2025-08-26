@@ -30,6 +30,9 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
   useEffect(() => {
     if (!room || !localParticipant) return;
 
+    console.log('Setting up transcription for room:', roomName);
+    console.log('Local participant:', localParticipant.identity);
+
     // Initialize Web Speech API for speech recognition
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -39,12 +42,21 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
 
+      recognitionRef.current.onstart = () => {
+        console.log('✅ Speech recognition started successfully');
+      };
+
       recognitionRef.current.onresult = (event: any) => {
+        console.log('🎤 Speech recognition result received:', event.results.length, 'results');
+        
         let finalTranscript = '';
         let interimTranscript = '';
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
+          const confidence = event.results[i][0].confidence;
+          console.log(`Result ${i}: "${transcript}" (confidence: ${confidence}, isFinal: ${event.results[i].isFinal})`);
+          
           if (event.results[i].isFinal) {
             finalTranscript += transcript;
           } else {
@@ -56,7 +68,7 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
           const timestamp = new Date().toISOString();
           const entry = `[${localParticipant.identity}] (${timestamp}): ${finalTranscript}`;
           transcriptionRef.current.push(entry);
-          console.log('Speech captured:', entry);
+          console.log('✅ Speech captured:', entry);
           
           // Update Firestore every 5 seconds to avoid too many writes
           const now = Date.now();
@@ -68,10 +80,24 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
       };
 
       recognitionRef.current.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
+        console.error('❌ Speech recognition error:', event.error);
+        console.error('Error details:', event);
+        
+        // Try to restart if it's a recoverable error
+        if (event.error === 'no-speech' || event.error === 'audio-capture') {
+          console.log('🔄 Attempting to restart speech recognition...');
+          setTimeout(() => {
+            try {
+              recognitionRef.current.start();
+            } catch (error) {
+              console.error('Failed to restart speech recognition:', error);
+            }
+          }, 1000);
+        }
       };
 
       recognitionRef.current.onend = () => {
+        console.log('🔄 Speech recognition ended, attempting to restart...');
         // Restart recognition if it ends unexpectedly
         if (room.state === 'connected') {
           try {
@@ -85,12 +111,16 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
       // Start speech recognition
       try {
         recognitionRef.current.start();
-        console.log('Speech recognition started');
+        console.log('🎤 Speech recognition started');
       } catch (error) {
-        console.error('Error starting speech recognition:', error);
+        console.error('❌ Error starting speech recognition:', error);
       }
     } else {
-      console.log('Speech recognition not supported in this browser');
+      console.log('⚠️ Speech recognition not supported in this browser');
+      console.log('Available APIs:', {
+        SpeechRecognition: 'SpeechRecognition' in window,
+        webkitSpeechRecognition: 'webkitSpeechRecognition' in window
+      });
     }
 
     // Listen for data messages (chat messages)
@@ -100,6 +130,7 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
         const timestamp = new Date().toISOString();
         const entry = `[${participant.identity}] (${timestamp}): ${transcription}`;
         transcriptionRef.current.push(entry);
+        console.log('📝 Chat transcription received:', entry);
         
         // Update Firestore every 5 seconds to avoid too many writes
         const now = Date.now();
@@ -120,6 +151,7 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
+          console.log('🛑 Speech recognition stopped');
         } catch (error) {
           console.error('Error stopping speech recognition:', error);
         }
@@ -138,9 +170,9 @@ function TranscriptionCapture({ roomName }: { roomName: string }) {
         transcription: transcriptionRef.current,
         lastTranscriptionUpdate: new Date()
       });
-      console.log('Transcription updated in Firestore:', transcriptionRef.current.length, 'entries');
+      console.log('💾 Transcription updated in Firestore:', transcriptionRef.current.length, 'entries');
     } catch (error) {
-      console.error('Error updating transcription:', error);
+      console.error('❌ Error updating transcription:', error);
     }
   };
 
@@ -173,6 +205,7 @@ function ManualTranscriptionInput({ roomName }: { roomName: string }) {
     }
   };
 
+  // Always show the button during calls
   if (!isVisible) {
     return (
       <button
@@ -797,6 +830,15 @@ export default function RoomPage() {
         connect
         audio
         video
+        onDisconnected={() => {
+          console.log('🔌 Disconnected from room, redirecting to join page...');
+          setToken(null);
+        }}
+        onError={(error) => {
+          console.error('❌ LiveKit error:', error);
+          setError('Failed to connect to video call');
+          setToken(null);
+        }}
         className="min-h-screen"
       >
         <TranscriptionCapture roomName={roomName} />

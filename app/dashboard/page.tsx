@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [summaries, setSummaries] = useState<CallSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [testLoading, setTestLoading] = useState(false);
 
   useEffect(() => {
     if (auth && db) {
@@ -57,6 +58,89 @@ export default function Dashboard() {
       setLoading(false);
     }
   }, []);
+
+  const handleTestWebhook = async () => {
+    try {
+      setTestLoading(true);
+      const response = await fetch('/api/test-livekit-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomName: 'test-room-' + Date.now() })
+      });
+      
+      const result = await response.json();
+      console.log('Test webhook result:', result);
+      
+      if (result.success) {
+        alert('✅ Test completed successfully! Check the dashboard to see the generated summary.');
+      } else {
+        alert('❌ Test failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Test webhook error:', error);
+      alert('❌ Test failed: ' + error);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const handleTestTranscription = async () => {
+    try {
+      setTestLoading(true);
+      const roomName = 'test-transcription-' + Date.now();
+      
+      // First, add test transcription data
+      const transcriptionResponse = await fetch('/api/test-transcription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          roomName,
+          testData: [
+            `[Doctor] (${new Date().toISOString()}): Hello, how are you feeling today?`,
+            `[Patient] (${new Date().toISOString()}): I've been experiencing some issues with binary search trees and data structures.`,
+            `[Doctor] (${new Date().toISOString()}): I understand. Let's discuss your symptoms and see how we can help with your algorithm problems.`,
+            `[Patient] (${new Date().toISOString()}): Yes, I've been having trouble with time complexity and space complexity analysis.`,
+            `[Doctor] (${new Date().toISOString()}): That's a common issue. Let me explain how we can optimize your approach.`,
+            `[Manual Note] (${new Date().toISOString()}): Patient discussed binary search trees, time complexity, and algorithm optimization. Recommended further study of data structures.`
+          ]
+        })
+      });
+      
+      const transcriptionResult = await transcriptionResponse.json();
+      console.log('Test transcription result:', transcriptionResult);
+      
+      if (!transcriptionResult.success) {
+        alert('❌ Transcription test failed: ' + (transcriptionResult.error || 'Unknown error'));
+        return;
+      }
+      
+      // Then trigger the webhook
+      const webhookResponse = await fetch('/api/manual-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomName })
+      });
+      
+      const webhookResult = await webhookResponse.json();
+      console.log('Test webhook result:', webhookResult);
+      
+      if (webhookResult.success) {
+        alert('✅ Transcription test completed successfully! Check the dashboard to see the generated summary with actual conversation data.');
+      } else {
+        alert('❌ Webhook test failed: ' + (webhookResult.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Test transcription error:', error);
+      alert('❌ Test failed: ' + error);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    auth?.signOut();
+    window.location.href = '/';
+  };
 
   if (!user) {
     return (
@@ -168,45 +252,67 @@ export default function Dashboard() {
           }}>
             Welcome, {user.displayName || user.email}
           </p>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            gap: '1rem' 
-          }}>
-            <Link 
-              href="/" 
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+            <button
+              onClick={() => window.location.href = '/'}
               style={{
                 backgroundColor: '#2563eb',
                 color: 'white',
                 padding: '0.75rem 1.5rem',
-                borderRadius: '0.75rem',
+                borderRadius: '0.5rem',
+                border: 'none',
                 fontWeight: '600',
-                textDecoration: 'none'
+                cursor: 'pointer',
+                fontSize: '1rem'
               }}
             >
               New Call
-            </Link>
-            <Link 
-              href="/test" 
+            </button>
+            <button
+              onClick={handleTestWebhook}
+              disabled={testLoading}
               style={{
                 backgroundColor: '#059669',
                 color: 'white',
                 padding: '0.75rem 1.5rem',
-                borderRadius: '0.75rem',
+                borderRadius: '0.5rem',
+                border: 'none',
                 fontWeight: '600',
-                textDecoration: 'none'
+                cursor: testLoading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                opacity: testLoading ? 0.7 : 1
               }}
             >
-              Test Webhook
-            </Link>
-            <button 
-              onClick={() => auth?.signOut()}
+              {testLoading ? 'Testing...' : 'Test Webhook'}
+            </button>
+            <button
+              onClick={handleTestTranscription}
+              disabled={testLoading}
               style={{
-                color: '#dc2626',
-                fontWeight: '600',
-                background: 'none',
+                backgroundColor: '#7c3aed',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
                 border: 'none',
-                cursor: 'pointer'
+                fontWeight: '600',
+                cursor: testLoading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                opacity: testLoading ? 0.7 : 1
+              }}
+            >
+              {testLoading ? 'Testing...' : 'Test Transcription'}
+            </button>
+            <button
+              onClick={handleSignOut}
+              style={{
+                backgroundColor: 'transparent',
+                color: '#dc2626',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #dc2626',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '1rem'
               }}
             >
               Sign Out
