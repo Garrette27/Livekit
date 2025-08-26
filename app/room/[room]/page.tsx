@@ -15,8 +15,8 @@ declare global {
   }
 }
 
-export default function RoomPage({ params }: { params: { room: string } }) {
-  const { room: roomName } = params;
+// Client component for the room functionality
+function RoomClient({ roomName }: { roomName: string }) {
   const [token, setToken] = useState<string | null>(null);
   const [transcription, setTranscription] = useState<string[]>([]);
   const [manualNotes, setManualNotes] = useState<string[]>([]);
@@ -535,4 +535,11 @@ export default function RoomPage({ params }: { params: { room: string } }) {
       </LiveKitRoom>
     </>
   );
+}
+
+// Server component that handles the params
+export default async function RoomPage({ params }: { params: Promise<{ room: string }> }) {
+  const { room: roomName } = await params;
+  
+  return <RoomClient roomName={roomName} />;
 }
