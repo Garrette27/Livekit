@@ -79,50 +79,46 @@ export default function Page() {
     }
   }
 
-  async function createRoom() {
-    if (!auth || !db) {
-      setError('Firebase not initialized. Please refresh the page.');
-      return;
-    }
-
-    if (!user) {
-      setError('Please sign in first');
-      return;
-    }
+  const handleCreateRoom = async () => {
     if (!roomName.trim()) {
-      setError('Please enter a room name');
+      alert('Please enter a room name');
       return;
     }
 
     try {
       setIsCreating(true);
-      setError(null);
+      
+      // Store room creation with user ID
+      const db = getFirestore();
+      const roomRef = doc(db, 'rooms', roomName);
+      await setDoc(roomRef, {
+        roomName,
+        createdBy: user?.uid || 'anonymous',
+        createdAt: new Date(),
+        status: 'active'
+      });
 
-      const cleanRoomName = roomName.trim().toLowerCase().replace(/\s+/g, '-');
-      console.log('Creating room with name:', cleanRoomName);
-
-      // Create or update Firestore call doc
-      const callsRef = collection(db, 'calls');
-      await setDoc(doc(callsRef, cleanRoomName), {
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-        status: 'active',
-        roomName: cleanRoomName,
-        creatorName: user.displayName || user.email,
-      }, { merge: true });
-
-      const shareUrl = `${window.location.origin}/room/${encodeURIComponent(cleanRoomName)}`;
-      console.log('Generated share URL:', shareUrl);
+      // Generate share URL
+      const shareUrl = `${window.location.origin}/room/${roomName}`;
       setShareUrl(shareUrl);
-      setRoomName(cleanRoomName);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create room';
-      setError(errorMessage);
-      console.error('Room creation error:', err);
+      
+      console.log('Generated share URL:', shareUrl);
+      
+      // Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Room created! Share URL copied to clipboard.');
+      } catch (err) {
+        alert('Room created! Share URL: ' + shareUrl);
+      }
+      
+    } catch (error) {
+      console.error('Error creating room:', error);
+      alert('Error creating room. Please try again.');
     } finally {
       setIsCreating(false);
     }
-  }
+  };
 
   async function joinRoom() {
     if (!user || !roomName) {
@@ -271,10 +267,10 @@ export default function Page() {
                       backgroundColor: shareUrl ? '#F9FAFB' : 'white',
                       color: shareUrl ? '#6B7280' : '#111827'
                     }}
-                    onKeyPress={(e) => e.key === 'Enter' && !shareUrl && createRoom()}
+                    onKeyPress={(e) => e.key === 'Enter' && !shareUrl && handleCreateRoom()}
                   />
                   <button 
-                    onClick={createRoom} 
+                    onClick={handleCreateRoom} 
                     disabled={isCreating || !roomName.trim() || !!shareUrl}
                     style={{ 
                       backgroundColor: isCreating || !roomName.trim() || shareUrl ? '#9CA3AF' : '#2563EB', 

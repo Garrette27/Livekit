@@ -5,8 +5,9 @@ import { useState, useEffect, useRef } from "react";
 import { LiveKitRoom, VideoConference, useRoomContext, useLocalParticipant } from "@livekit/components-react";
 import "@livekit/components-styles";
 import React from "react";
-import { db } from "@/lib/firebase";
-import { doc, updateDoc, onSnapshot } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { doc, updateDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { onAuthStateChanged, User } from "firebase/auth";
 
 // Force dynamic rendering to prevent build-time errors
 export const dynamic = 'force-dynamic';
@@ -389,6 +390,16 @@ export default function RoomPage() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+
+  // Handle authentication
+  useEffect(() => {
+    if (auth) {
+      return onAuthStateChanged(auth, (user) => {
+        setUser(user);
+      });
+    }
+  }, []);
 
   // Add debugging for room parameter
   useEffect(() => {
@@ -397,6 +408,25 @@ export default function RoomPage() {
     console.log('Room name:', roomName);
     console.log('Current URL:', window.location.href);
   }, [room, roomName]);
+
+  // Store call data in Firestore when joining
+  useEffect(() => {
+    if (token && roomName && db && user) {
+      const callRef = doc(db, 'calls', roomName);
+      setDoc(callRef, {
+        roomName,
+        createdBy: user.uid, // Store user ID
+        createdAt: new Date(),
+        status: 'active',
+        creatorName: user.displayName || user.email,
+        metadata: {
+          createdBy: user.uid // Store in metadata for webhook
+        }
+      }, { merge: true }).catch(error => {
+        console.error('Error storing call data:', error);
+      });
+    }
+  }, [token, roomName, db, user]);
 
   async function join() {
     if (!name.trim()) {
@@ -585,6 +615,54 @@ export default function RoomPage() {
     setToken(null);
     return null;
   }
+
+  // Force blue controls after LiveKit renders
+  useEffect(() => {
+    if (token) {
+      const forceBlueControls = () => {
+        const controlBar = document.querySelector('.lk-control-bar');
+        if (controlBar) {
+          // Force all buttons to be blue
+          const buttons = controlBar.querySelectorAll('button');
+          buttons.forEach(button => {
+            button.style.setProperty('background-color', '#2563eb', 'important');
+            button.style.setProperty('color', 'white', 'important');
+            button.style.setProperty('border-color', '#1d4ed8', 'important');
+            button.style.setProperty('border-radius', '0.75rem', 'important');
+            button.style.setProperty('padding', '0.75rem 1rem', 'important');
+            button.style.setProperty('font-weight', '600', 'important');
+            button.style.setProperty('min-width', '80px', 'important');
+            button.style.setProperty('display', 'flex', 'important');
+            button.style.setProperty('align-items', 'center', 'important');
+            button.style.setProperty('justify-content', 'center', 'important');
+            button.style.setProperty('gap', '0.5rem', 'important');
+            button.style.setProperty('box-shadow', '0 4px 6px -1px rgba(37, 99, 235, 0.2)', 'important');
+          });
+
+          // Force all icons and text to be white
+          const icons = controlBar.querySelectorAll('svg');
+          icons.forEach(icon => {
+            icon.style.setProperty('color', 'white', 'important');
+            icon.style.setProperty('fill', 'white', 'important');
+          });
+
+          const spans = controlBar.querySelectorAll('span');
+          spans.forEach(span => {
+            span.style.setProperty('color', 'white', 'important');
+            span.style.setProperty('font-weight', '600', 'important');
+          });
+
+          console.log('✅ Forced blue controls applied');
+        }
+      };
+
+      // Apply immediately and then every 2 seconds to catch dynamic content
+      forceBlueControls();
+      const interval = setInterval(forceBlueControls, 2000);
+
+      return () => clearInterval(interval);
+    }
+  }, [token]);
 
   return (
     <>
@@ -1034,6 +1112,95 @@ export default function RoomPage() {
             title="Add conversation note"
           >
             📝
+          </div>
+        )}
+
+        {/* Room Link Display for Doctor */}
+        {token && (
+          <div
+            style={{
+              position: 'fixed',
+              top: '20px',
+              left: '20px',
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              border: '2px solid #2563eb',
+              borderRadius: '1rem',
+              padding: '1rem',
+              zIndex: 9999,
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+              maxWidth: '400px'
+            }}
+          >
+            <div style={{ marginBottom: '0.75rem' }}>
+              <h3 style={{ 
+                margin: '0 0 0.5rem 0', 
+                color: '#1e40af', 
+                fontSize: '1rem',
+                fontWeight: '600'
+              }}>
+                🔗 Room Link
+              </h3>
+              <p style={{ 
+                margin: '0', 
+                color: '#6b7280', 
+                fontSize: '0.875rem',
+                marginBottom: '0.75rem'
+              }}>
+                Share this link with your patient:
+              </p>
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem',
+              alignItems: 'center'
+            }}>
+              <input
+                type="text"
+                value={`https://livekit-frontend-tau.vercel.app/room/${roomName}`}
+                readOnly
+                style={{
+                  flex: 1,
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.875rem',
+                  backgroundColor: '#f9fafb',
+                  color: '#374151'
+                }}
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}`);
+                  alert('Room link copied to clipboard!');
+                }}
+                style={{
+                  backgroundColor: '#059669',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Copy
+              </button>
+            </div>
+            
+            <div style={{
+              marginTop: '0.75rem',
+              padding: '0.5rem',
+              backgroundColor: '#fef3c7',
+              border: '1px solid #f59e0b',
+              borderRadius: '0.375rem',
+              fontSize: '0.75rem',
+              color: '#92400e'
+            }}>
+              💡 <strong>Tip:</strong> Send this link to your patient so they can join the consultation.
+            </div>
           </div>
         )}
       </LiveKitRoom>

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, onSnapshot, orderBy, query, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, getFirestore } from 'firebase/firestore';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -30,37 +30,49 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [testLoading, setTestLoading] = useState(false);
 
+  // Handle authentication
   useEffect(() => {
-    if (auth && db) {
+    if (auth) {
       return onAuthStateChanged(auth, (user) => {
         console.log('Dashboard: Auth state changed:', user ? 'User logged in' : 'No user');
         setUser(user);
-        if (user && db) {
-          console.log('Dashboard: Setting up Firestore listener for call-summaries');
-          const q = query(collection(db, 'call-summaries'), orderBy('createdAt', 'desc'));
-          const unsubscribe = onSnapshot(q, (snapshot) => {
-            const summaryData = snapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            })) as CallSummary[];
-            console.log('Dashboard: Received summaries:', summaryData.length, 'summaries');
-            setSummaries(summaryData);
-            setLoading(false);
-          }, (error) => {
-            console.error('Dashboard: Firestore listener error:', error);
-            setLoading(false);
-          });
-          return unsubscribe;
-        } else {
-          console.log('Dashboard: No user or db, setting loading to false');
-          setLoading(false);
-        }
       });
-    } else {
-      console.log('Dashboard: Auth or db not available, setting loading to false');
-      setLoading(false);
     }
   }, []);
+
+  // Fetch summaries from Firestore
+  useEffect(() => {
+    if (!user) return;
+
+    console.log('Dashboard: Setting up Firestore listener for call-summaries');
+    
+    const db = getFirestore();
+    const summariesRef = collection(db, 'call-summaries');
+    
+    // Filter summaries by user - this is the key fix for shared history issue
+    const q = query(
+      summariesRef,
+      where('createdBy', '==', user.uid), // Filter by current user
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const summariesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as CallSummary[];
+      
+      console.log('Dashboard: Received summaries:', summariesData.length, 'summaries');
+      setSummaries(summariesData);
+      setLoading(false);
+    }, (error) => {
+      console.error('Dashboard: Error fetching summaries:', error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   const handleTestWebhook = async () => {
     try {

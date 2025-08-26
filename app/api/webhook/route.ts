@@ -79,23 +79,24 @@ export async function POST(req: Request) {
           if (db) {
             console.log('Firebase Admin initialized, storing summary...');
             const summaryRef = db.collection('call-summaries').doc(roomName);
-            await summaryRef.set({
-              roomName,
-              ...summaryData,
-              createdAt: new Date(),
-              participants: participantNames,
-              duration: duration,
-              transcriptionData: transcriptionData, // Store the actual transcription
-              metadata: {
-                totalParticipants: participants.length,
-                recordingUrl: event.room?.recording_url || event.room?.recordingUrl || null,
-                transcriptionUrl: event.room?.transcription_url || event.room?.transcriptionUrl || null,
-                source: 'livekit_webhook',
-                roomSid: event.room?.sid || null,
-                creationTime: event.room?.creation_time || null,
-                hasTranscriptionData: !!transcriptionData && transcriptionData.length > 0
-              }
-            });
+                          await summaryRef.set({
+                ...summaryData,
+                createdAt: new Date(),
+                createdBy: event.room?.metadata?.createdBy || 'unknown', // Store user ID
+                participants: participantNames,
+                duration: duration,
+                transcriptionData: transcriptionData, // Store the actual transcription
+                metadata: {
+                  totalParticipants: participants.length,
+                  recordingUrl: event.room?.recording_url || event.room?.recordingUrl || null,
+                  transcriptionUrl: event.room?.transcription_url || event.room?.transcriptionUrl || null,
+                  source: 'livekit_webhook',
+                  roomSid: event.room?.sid || null,
+                  creationTime: event.room?.creation_time || null,
+                  hasTranscriptionData: !!transcriptionData && transcriptionData.length > 0,
+                  callCreatedAt: new Date() // Add call creation timestamp
+                }
+              });
             
             console.log('✅ Summary stored successfully in Firestore');
           } else {
