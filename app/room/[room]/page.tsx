@@ -695,7 +695,9 @@ export default function RoomPage() {
         .lk-control-bar button,
         .lk-control-bar button[data-lk-kind],
         .lk-control-bar button[aria-label],
-        .lk-control-bar button[title] {
+        .lk-control-bar button[title],
+        .lk-control-bar button[type="button"],
+        .lk-control-bar button[type="submit"] {
           background-color: #2563eb !important;
           border: 1px solid #1d4ed8 !important;
           border-radius: 0.75rem !important;
@@ -714,7 +716,9 @@ export default function RoomPage() {
         .lk-control-bar button:hover,
         .lk-control-bar button[data-lk-kind]:hover,
         .lk-control-bar button[aria-label]:hover,
-        .lk-control-bar button[title]:hover {
+        .lk-control-bar button[title]:hover,
+        .lk-control-bar button[type="button"]:hover,
+        .lk-control-bar button[type="submit"]:hover {
           background-color: #1d4ed8 !important;
           transform: translateY(-1px) !important;
           box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3) !important;
@@ -723,7 +727,9 @@ export default function RoomPage() {
         .lk-control-bar button:active,
         .lk-control-bar button[data-lk-kind]:active,
         .lk-control-bar button[aria-label]:active,
-        .lk-control-bar button[title]:active {
+        .lk-control-bar button[title]:active,
+        .lk-control-bar button[type="button"]:active,
+        .lk-control-bar button[type="submit"]:active {
           transform: translateY(0) !important;
         }
         
@@ -790,7 +796,9 @@ export default function RoomPage() {
         .lk-control-bar button svg,
         .lk-control-bar button[data-lk-kind] svg,
         .lk-control-bar button[aria-label] svg,
-        .lk-control-bar button[title] svg {
+        .lk-control-bar button[title] svg,
+        .lk-control-bar button[type="button"] svg,
+        .lk-control-bar button[type="submit"] svg {
           color: white !important;
           fill: white !important;
           width: 1.25rem !important;
@@ -800,7 +808,9 @@ export default function RoomPage() {
         .lk-control-bar button span,
         .lk-control-bar button[data-lk-kind] span,
         .lk-control-bar button[aria-label] span,
-        .lk-control-bar button[title] span {
+        .lk-control-bar button[title] span,
+        .lk-control-bar button[type="button"] span,
+        .lk-control-bar button[type="submit"] span {
           color: white !important;
           font-weight: 600 !important;
         }
@@ -895,6 +905,69 @@ export default function RoomPage() {
         }
       `}</style>
       
+      {/* Force blue controls with inline styles as backup */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          /* EMERGENCY OVERRIDE - Force all LiveKit controls to be blue */
+          .lk-control-bar * {
+            background-color: #2563eb !important;
+            color: white !important;
+            border-color: #1d4ed8 !important;
+          }
+          
+          .lk-control-bar button {
+            background-color: #2563eb !important;
+            color: white !important;
+            border: 1px solid #1d4ed8 !important;
+            border-radius: 0.75rem !important;
+            padding: 0.75rem 1rem !important;
+            font-weight: 600 !important;
+            min-width: 80px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 0.5rem !important;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important;
+          }
+          
+          .lk-control-bar button:hover {
+            background-color: #1d4ed8 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3) !important;
+          }
+          
+          .lk-control-bar button svg {
+            color: white !important;
+            fill: white !important;
+          }
+          
+          .lk-control-bar button span {
+            color: white !important;
+            font-weight: 600 !important;
+          }
+          
+          /* Force note button to be visible */
+          .note-button {
+            position: fixed !important;
+            bottom: 120px !important;
+            right: 20px !important;
+            background-color: #2563eb !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 50% !important;
+            width: 70px !important;
+            height: 70px !important;
+            font-size: 28px !important;
+            cursor: pointer !important;
+            z-index: 9999 !important;
+            box-shadow: 0 8px 25px rgba(37, 99, 235, 0.3) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+          }
+        `
+      }} />
+      
       <LiveKitRoom
         token={token}
         serverUrl={livekitUrl}
@@ -915,6 +988,54 @@ export default function RoomPage() {
         <TranscriptionCapture roomName={roomName} />
         <VideoConference />
         <ManualTranscriptionInput roomName={roomName} />
+        {/* Force note button to always be visible during calls */}
+        {token && (
+          <div
+            className="note-button"
+            onClick={() => {
+              // Create a simple prompt for manual notes
+              const note = prompt('Add a conversation note:');
+              if (note && note.trim()) {
+                const timestamp = new Date().toISOString();
+                const entry = `[Manual Note] (${timestamp}): ${note}`;
+                console.log('Manual note added:', entry);
+                
+                // Store in Firestore if available
+                if (db) {
+                  const callRef = doc(db, 'calls', roomName);
+                  updateDoc(callRef, {
+                    transcription: [entry],
+                    lastTranscriptionUpdate: new Date()
+                  }).catch(error => {
+                    console.error('Error storing manual note:', error);
+                  });
+                }
+              }
+            }}
+            style={{
+              position: 'fixed',
+              bottom: '120px',
+              right: '20px',
+              backgroundColor: '#2563eb',
+              color: 'white',
+              border: 'none',
+              borderRadius: '50%',
+              width: '70px',
+              height: '70px',
+              fontSize: '28px',
+              cursor: 'pointer',
+              zIndex: 9999,
+              boxShadow: '0 8px 25px rgba(37, 99, 235, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.3s ease'
+            }}
+            title="Add conversation note"
+          >
+            📝
+          </div>
+        )}
       </LiveKitRoom>
     </>
   );

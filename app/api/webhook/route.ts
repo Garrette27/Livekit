@@ -47,14 +47,33 @@ export async function POST(req: Request) {
         // 2. Generate comprehensive AI summary using actual conversation data
         try {
           console.log('Starting AI summary generation with transcription data...');
-          const summaryData = await generateComprehensiveSummary(roomName, {
-            ...event.room,
-            participants: participantNames,
-            duration,
-            transcription: transcriptionData
-          });
-          console.log('AI summary generated:', summaryData);
+          const summary = await generateComprehensiveSummary(roomName, participants, duration, transcriptionData);
           
+                     // Store the summary in Firestore
+           const summaryData = {
+             roomName,
+             summary: summary.summary,
+             keyPoints: summary.keyPoints,
+             recommendations: summary.recommendations,
+             followUpActions: summary.followUpActions,
+             riskLevel: summary.riskLevel,
+             category: summary.category,
+             participants: participants.length,
+             duration: Math.round(duration / 60), // Convert to minutes
+             createdAt: new Date(),
+             callCreatedAt: new Date(), // Add call creation timestamp
+             transcriptionData: transcriptionData,
+             hasTranscriptionData: transcriptionData && transcriptionData.length > 0,
+             metadata: {
+               participants: participants.length,
+               duration: Math.round(duration / 60),
+               transcriptionEntries: transcriptionData ? transcriptionData.length : 0,
+               hasTranscriptionData: transcriptionData && transcriptionData.length > 0,
+               callCreatedAt: new Date(), // Add call creation timestamp
+               summaryGeneratedAt: new Date()
+             }
+           };
+
           // Store detailed summary in Firestore
           const db = getFirebaseAdmin();
           if (db) {
@@ -138,7 +157,7 @@ export async function POST(req: Request) {
   }
 }
 
-async function generateComprehensiveSummary(roomName: string, roomData: any): Promise<any> {
+async function generateComprehensiveSummary(roomName: string, participants: any[], duration: number, transcriptionData: any[]): Promise<any> {
   try {
     console.log('Starting AI summary generation for room:', roomName);
     
@@ -158,13 +177,9 @@ async function generateComprehensiveSummary(roomName: string, roomData: any): Pr
     console.log('✅ OpenAI API key found, generating AI summary...');
 
     // Prepare conversation context for AI
-    const transcription = roomData.transcription || [];
-    const participants = roomData.participants || [];
-    const duration = roomData.duration || 0;
-    
     let conversationContext = '';
-    if (transcription && transcription.length > 0) {
-      conversationContext = `\n\nActual conversation transcript:\n${transcription.join('\n')}`;
+    if (transcriptionData && transcriptionData.length > 0) {
+      conversationContext = `\n\nActual conversation transcript:\n${transcriptionData.join('\n')}`;
     } else {
       conversationContext = '\n\nNo conversation transcript available. This may be a test call or the transcription feature was not enabled.';
     }

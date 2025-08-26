@@ -19,6 +19,9 @@ interface CallSummary {
   createdAt: Timestamp;
   participants: string[];
   duration: number;
+  metadata?: {
+    totalParticipants: number;
+  };
 }
 
 export default function Dashboard() {
@@ -504,34 +507,27 @@ export default function Dashboard() {
                       </p>
                     </div>
                     
-                    <div style={{
+                    {/* Summary metadata */}
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '1rem', 
+                      marginTop: '1rem',
                       fontSize: '0.875rem',
-                      color: '#2563eb',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '1.5rem'
+                      color: '#6b7280'
                     }}>
-                      <span>
-                        📅 {summary.createdAt?.toDate?.() 
-                          ? summary.createdAt.toDate().toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })
-                          : 'Date unavailable'
-                        }
-                      </span>
-                      {summary.participants && summary.participants.length > 0 && (
-                        <span>👥 {summary.participants.length} participants</span>
-                      )}
-                      <span style={{
-                        backgroundColor: '#dbeafe',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '0.375rem',
-                        fontSize: '0.75rem'
-                      }}>
-                        🔒 Auto-delete in 30 days
-                      </span>
+                      <span>📅 {summary.createdAt?.toDate?.() ? 
+                        summary.createdAt.toDate().toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : 
+                        'Date not available'
+                      }</span>
+                      <span>👥 {summary.participants || summary.metadata?.totalParticipants || 0} participants</span>
+                      <span>🔒 Auto-delete in 30 days</span>
                     </div>
                   </div>
                 ))}
