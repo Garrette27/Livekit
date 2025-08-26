@@ -618,50 +618,72 @@ export default function RoomPage() {
 
   // Force blue controls after LiveKit renders
   useEffect(() => {
-    if (token) {
-      const forceBlueControls = () => {
-        const controlBar = document.querySelector('.lk-control-bar');
-        if (controlBar) {
-          // Force all buttons to be blue
-          const buttons = controlBar.querySelectorAll('button');
-          buttons.forEach(button => {
-            button.style.setProperty('background-color', '#2563eb', 'important');
-            button.style.setProperty('color', 'white', 'important');
-            button.style.setProperty('border-color', '#1d4ed8', 'important');
-            button.style.setProperty('border-radius', '0.75rem', 'important');
-            button.style.setProperty('padding', '0.75rem 1rem', 'important');
-            button.style.setProperty('font-weight', '600', 'important');
-            button.style.setProperty('min-width', '80px', 'important');
-            button.style.setProperty('display', 'flex', 'important');
-            button.style.setProperty('align-items', 'center', 'important');
-            button.style.setProperty('justify-content', 'center', 'important');
-            button.style.setProperty('gap', '0.5rem', 'important');
-            button.style.setProperty('box-shadow', '0 4px 6px -1px rgba(37, 99, 235, 0.2)', 'important');
-          });
+    if (!token) return;
 
-          // Force all icons and text to be white
-          const icons = controlBar.querySelectorAll('svg');
-          icons.forEach(icon => {
-            icon.style.setProperty('color', 'white', 'important');
-            icon.style.setProperty('fill', 'white', 'important');
-          });
+    const forceBlueControls = () => {
+      const controlBar = document.querySelector('.lk-control-bar');
+      if (controlBar) {
+        // Force all buttons to be blue
+        const buttons = controlBar.querySelectorAll('button');
+        buttons.forEach(button => {
+          button.style.setProperty('background-color', '#2563eb', 'important');
+          button.style.setProperty('color', 'white', 'important');
+          button.style.setProperty('border-color', '#1d4ed8', 'important');
+          button.style.setProperty('border-radius', '0.75rem', 'important');
+          button.style.setProperty('padding', '0.75rem 1rem', 'important');
+          button.style.setProperty('font-weight', '600', 'important');
+          button.style.setProperty('min-width', '80px', 'important');
+          button.style.setProperty('display', 'flex', 'important');
+          button.style.setProperty('align-items', 'center', 'important');
+          button.style.setProperty('justify-content', 'center', 'important');
+          button.style.setProperty('gap', '0.5rem', 'important');
+          button.style.setProperty('box-shadow', '0 4px 6px -1px rgba(37, 99, 235, 0.2)', 'important');
+        });
 
-          const spans = controlBar.querySelectorAll('span');
-          spans.forEach(span => {
-            span.style.setProperty('color', 'white', 'important');
-            span.style.setProperty('font-weight', '600', 'important');
-          });
+        // Force all icons and text to be white
+        const icons = controlBar.querySelectorAll('svg');
+        icons.forEach(icon => {
+          icon.style.setProperty('color', 'white', 'important');
+          icon.style.setProperty('fill', 'white', 'important');
+        });
 
-          console.log('✅ Forced blue controls applied');
+        const spans = controlBar.querySelectorAll('span');
+        spans.forEach(span => {
+          span.style.setProperty('color', 'white', 'important');
+          span.style.setProperty('font-weight', '600', 'important');
+        });
+
+        console.log('✅ Forced blue controls applied');
+      }
+    };
+
+    // Apply immediately
+    forceBlueControls();
+
+    // Set up MutationObserver to watch for control bar changes
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList' || mutation.type === 'attributes') {
+          forceBlueControls();
         }
-      };
+      });
+    });
 
-      // Apply immediately and then every 2 seconds to catch dynamic content
-      forceBlueControls();
-      const interval = setInterval(forceBlueControls, 2000);
+    // Start observing the document body for changes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    });
 
-      return () => clearInterval(interval);
-    }
+    // Also apply every 2 seconds as backup
+    const interval = setInterval(forceBlueControls, 2000);
+
+    return () => {
+      observer.disconnect();
+      clearInterval(interval);
+    };
   }, [token]);
 
   return (
@@ -1046,6 +1068,28 @@ export default function RoomPage() {
         `
       }} />
       
+      {/* Debug Info - Remove this after testing */}
+      {token && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            color: 'white',
+            padding: '0.5rem',
+            borderRadius: '0.25rem',
+            fontSize: '0.75rem',
+            zIndex: 10000,
+            fontFamily: 'monospace'
+          }}
+        >
+          Token: {token ? '✅' : '❌'}<br/>
+          Room: {roomName}<br/>
+          User: {user?.uid || 'none'}
+        </div>
+      )}
+
       <LiveKitRoom
         token={token}
         serverUrl={livekitUrl}

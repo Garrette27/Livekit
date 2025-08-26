@@ -22,6 +22,7 @@ interface CallSummary {
   metadata?: {
     totalParticipants: number;
   };
+  createdBy?: string; // Added for client-side filtering
 }
 
 export default function Dashboard() {
@@ -49,22 +50,28 @@ export default function Dashboard() {
     const db = getFirestore();
     const summariesRef = collection(db, 'call-summaries');
     
-    // Filter summaries by user - this is the key fix for shared history issue
+    // Use a simpler query that doesn't require a composite index
+    // We'll filter by user on the client side for now
     const q = query(
       summariesRef,
-      where('createdBy', '==', user.uid), // Filter by current user
       orderBy('createdAt', 'desc'),
-      limit(50)
+      limit(100)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const summariesData = snapshot.docs.map(doc => ({
+      const allSummaries = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as CallSummary[];
       
-      console.log('Dashboard: Received summaries:', summariesData.length, 'summaries');
-      setSummaries(summariesData);
+      // Filter by user on the client side
+      const userSummaries = allSummaries.filter(summary => 
+        summary.createdBy === user.uid || 
+        !summary.createdBy // Include summaries without createdBy for backward compatibility
+      );
+      
+      console.log('Dashboard: Received summaries:', userSummaries.length, 'summaries for user', user.uid);
+      setSummaries(userSummaries);
       setLoading(false);
     }, (error) => {
       console.error('Dashboard: Error fetching summaries:', error);
