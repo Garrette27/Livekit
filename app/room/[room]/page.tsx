@@ -621,40 +621,60 @@ export default function RoomPage() {
     if (!token) return;
 
     const forceBlueControls = () => {
-      const controlBar = document.querySelector('.lk-control-bar');
-      if (controlBar) {
-        // Force all buttons to be blue
-        const buttons = controlBar.querySelectorAll('button');
-        buttons.forEach(button => {
-          button.style.setProperty('background-color', '#2563eb', 'important');
-          button.style.setProperty('color', 'white', 'important');
-          button.style.setProperty('border-color', '#1d4ed8', 'important');
-          button.style.setProperty('border-radius', '0.75rem', 'important');
-          button.style.setProperty('padding', '0.75rem 1rem', 'important');
-          button.style.setProperty('font-weight', '600', 'important');
-          button.style.setProperty('min-width', '80px', 'important');
-          button.style.setProperty('display', 'flex', 'important');
-          button.style.setProperty('align-items', 'center', 'important');
-          button.style.setProperty('justify-content', 'center', 'important');
-          button.style.setProperty('gap', '0.5rem', 'important');
-          button.style.setProperty('box-shadow', '0 4px 6px -1px rgba(37, 99, 235, 0.2)', 'important');
-        });
+      // Target all possible control bar selectors
+      const selectors = [
+        '.lk-control-bar',
+        '[data-lk-kind]',
+        '.lk-control-bar button',
+        '.lk-control-bar *',
+        'button[data-lk-kind]',
+        'button[aria-label*="microphone"]',
+        'button[aria-label*="camera"]',
+        'button[aria-label*="chat"]',
+        'button[aria-label*="leave"]',
+        'button[aria-label*="share"]'
+      ];
 
-        // Force all icons and text to be white
-        const icons = controlBar.querySelectorAll('svg');
-        icons.forEach(icon => {
+      selectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+          if (element instanceof HTMLElement) {
+            // Force blue background and white text
+            element.style.setProperty('background-color', '#2563eb', 'important');
+            element.style.setProperty('color', 'white', 'important');
+            element.style.setProperty('border-color', '#1d4ed8', 'important');
+            element.style.setProperty('border-radius', '0.75rem', 'important');
+            element.style.setProperty('padding', '0.75rem 1rem', 'important');
+            element.style.setProperty('font-weight', '600', 'important');
+            element.style.setProperty('min-width', '80px', 'important');
+            element.style.setProperty('display', 'flex', 'important');
+            element.style.setProperty('align-items', 'center', 'important');
+            element.style.setProperty('justify-content', 'center', 'important');
+            element.style.setProperty('gap', '0.5rem', 'important');
+            element.style.setProperty('box-shadow', '0 4px 6px -1px rgba(37, 99, 235, 0.2)', 'important');
+          }
+        });
+      });
+
+      // Force all icons and text to be white
+      const icons = document.querySelectorAll('.lk-control-bar svg, [data-lk-kind] svg');
+      icons.forEach(icon => {
+        if (icon instanceof SVGElement) {
           icon.style.setProperty('color', 'white', 'important');
           icon.style.setProperty('fill', 'white', 'important');
-        });
+          icon.style.setProperty('stroke', 'white', 'important');
+        }
+      });
 
-        const spans = controlBar.querySelectorAll('span');
-        spans.forEach(span => {
+      const spans = document.querySelectorAll('.lk-control-bar span, [data-lk-kind] span');
+      spans.forEach(span => {
+        if (span instanceof HTMLElement) {
           span.style.setProperty('color', 'white', 'important');
           span.style.setProperty('font-weight', '600', 'important');
-        });
+        }
+      });
 
-        console.log('✅ Forced blue controls applied');
-      }
+      console.log('✅ Aggressive blue controls applied');
     };
 
     // Apply immediately
@@ -662,11 +682,23 @@ export default function RoomPage() {
 
     // Set up MutationObserver to watch for control bar changes
     const observer = new MutationObserver((mutations) => {
+      let shouldForceControls = false;
       mutations.forEach((mutation) => {
-        if (mutation.type === 'childList' || mutation.type === 'attributes') {
-          forceBlueControls();
+        if (mutation.type === 'childList') {
+          mutation.addedNodes.forEach((node) => {
+            if (node instanceof HTMLElement) {
+              if (node.classList.contains('lk-control-bar') || 
+                  node.querySelector('.lk-control-bar') ||
+                  node.hasAttribute('data-lk-kind')) {
+                shouldForceControls = true;
+              }
+            }
+          });
         }
       });
+      if (shouldForceControls) {
+        setTimeout(forceBlueControls, 100); // Small delay to ensure DOM is ready
+      }
     });
 
     // Start observing the document body for changes
@@ -674,15 +706,102 @@ export default function RoomPage() {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'style']
+      attributeFilter: ['class', 'style', 'data-lk-kind']
     });
 
-    // Also apply every 2 seconds as backup
-    const interval = setInterval(forceBlueControls, 2000);
+    // Apply every 1 second as aggressive backup
+    const interval = setInterval(forceBlueControls, 1000);
 
     return () => {
       observer.disconnect();
       clearInterval(interval);
+    };
+  }, [token]);
+
+  // Inject global CSS override
+  useEffect(() => {
+    if (!token) return;
+
+    // Create and inject CSS
+    const style = document.createElement('style');
+    style.id = 'livekit-blue-controls-override';
+    style.textContent = `
+      /* GLOBAL OVERRIDE - Force all LiveKit controls to be blue */
+      .lk-control-bar,
+      .lk-control-bar *,
+      [data-lk-kind],
+      button[data-lk-kind],
+      button[aria-label*="microphone"],
+      button[aria-label*="camera"],
+      button[aria-label*="chat"],
+      button[aria-label*="leave"],
+      button[aria-label*="share"] {
+        background-color: #2563eb !important;
+        color: white !important;
+        border-color: #1d4ed8 !important;
+        border-radius: 0.75rem !important;
+        padding: 0.75rem 1rem !important;
+        font-weight: 600 !important;
+        min-width: 80px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0.5rem !important;
+        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important;
+      }
+
+      .lk-control-bar svg,
+      [data-lk-kind] svg,
+      button[data-lk-kind] svg {
+        color: white !important;
+        fill: white !important;
+        stroke: white !important;
+      }
+
+      .lk-control-bar span,
+      [data-lk-kind] span,
+      button[data-lk-kind] span {
+        color: white !important;
+        font-weight: 600 !important;
+      }
+
+      /* Force note button to be visible */
+      .note-button {
+        position: fixed !important;
+        bottom: 120px !important;
+        right: 20px !important;
+        background-color: #2563eb !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 50% !important;
+        width: 70px !important;
+        height: 70px !important;
+        font-size: 28px !important;
+        cursor: pointer !important;
+        z-index: 9999 !important;
+        box-shadow: 0 8px 25px rgba(37, 99, 235, 0.3) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+    `;
+
+    // Remove existing style if present
+    const existingStyle = document.getElementById('livekit-blue-controls-override');
+    if (existingStyle) {
+      existingStyle.remove();
+    }
+
+    // Inject new style
+    document.head.appendChild(style);
+    console.log('✅ Global CSS override injected');
+
+    return () => {
+      // Cleanup
+      const styleToRemove = document.getElementById('livekit-blue-controls-override');
+      if (styleToRemove) {
+        styleToRemove.remove();
+      }
     };
   }, [token]);
 
@@ -1068,28 +1187,6 @@ export default function RoomPage() {
         `
       }} />
       
-      {/* Debug Info - Remove this after testing */}
-      {token && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            color: 'white',
-            padding: '0.5rem',
-            borderRadius: '0.25rem',
-            fontSize: '0.75rem',
-            zIndex: 10000,
-            fontFamily: 'monospace'
-          }}
-        >
-          Token: {token ? '✅' : '❌'}<br/>
-          Room: {roomName}<br/>
-          User: {user?.uid || 'none'}
-        </div>
-      )}
-
       <LiveKitRoom
         token={token}
         serverUrl={livekitUrl}
@@ -1245,6 +1342,28 @@ export default function RoomPage() {
             }}>
               💡 <strong>Tip:</strong> Send this link to your patient so they can join the consultation.
             </div>
+          </div>
+        )}
+
+        {/* Debug Info - Remove this after testing */}
+        {token && (
+          <div
+            style={{
+              position: 'fixed',
+              top: '20px',
+              right: '20px',
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              color: 'white',
+              padding: '0.5rem',
+              borderRadius: '0.25rem',
+              fontSize: '0.75rem',
+              zIndex: 10000,
+              fontFamily: 'monospace'
+            }}
+          >
+            Token: {token ? '✅' : '❌'}<br/>
+            Room: {roomName}<br/>
+            User: {user?.uid || 'none'}
           </div>
         )}
       </LiveKitRoom>

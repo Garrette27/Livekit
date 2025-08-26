@@ -21,6 +21,7 @@ interface CallSummary {
   duration: number;
   metadata?: {
     totalParticipants: number;
+    createdBy?: string;
   };
   createdBy?: string; // Added for client-side filtering
 }
@@ -46,6 +47,7 @@ export default function Dashboard() {
     if (!user) return;
 
     console.log('Dashboard: Setting up Firestore listener for call-summaries');
+    console.log('Dashboard: Current user ID:', user.uid);
     
     const db = getFirestore();
     const summariesRef = collection(db, 'call-summaries');
@@ -65,12 +67,20 @@ export default function Dashboard() {
       })) as CallSummary[];
       
       // Filter by user on the client side
-      const userSummaries = allSummaries.filter(summary => 
-        summary.createdBy === user.uid || 
-        !summary.createdBy // Include summaries without createdBy for backward compatibility
-      );
+      const userSummaries = allSummaries.filter(summary => {
+        const summaryUserId = summary.createdBy || summary.metadata?.createdBy;
+        const isUserSummary = summaryUserId === user.uid;
+        const isLegacySummary = !summaryUserId; // Include summaries without createdBy for backward compatibility
+        
+        if (isUserSummary) {
+          console.log('Dashboard: Found user summary:', summary.roomName);
+        }
+        
+        return isUserSummary || isLegacySummary;
+      });
       
       console.log('Dashboard: Received summaries:', userSummaries.length, 'summaries for user', user.uid);
+      console.log('Dashboard: Total summaries in database:', allSummaries.length);
       setSummaries(userSummaries);
       setLoading(false);
     }, (error) => {
