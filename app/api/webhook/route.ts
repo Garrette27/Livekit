@@ -23,13 +23,35 @@ export async function POST(req: Request) {
           totalParticipants: participants.length
         });
 
-        // 1. Generate comprehensive AI summary first
+        // 1. Fetch transcription data from Firestore first
+        let transcriptionData = null;
         try {
-          console.log('Starting AI summary generation...');
+          const db = getFirebaseAdmin();
+          if (db) {
+            console.log('Fetching transcription data from Firestore...');
+            const callRef = db.collection('calls').doc(roomName);
+            const callDoc = await callRef.get();
+            
+            if (callDoc.exists) {
+              const callData = callDoc.data();
+              transcriptionData = callData?.transcription || [];
+              console.log('Transcription data found:', transcriptionData.length, 'entries');
+            } else {
+              console.log('No call document found in Firestore');
+            }
+          }
+        } catch (error) {
+          console.error('❌ Error fetching transcription data:', error);
+        }
+
+        // 2. Generate comprehensive AI summary using actual conversation data
+        try {
+          console.log('Starting AI summary generation with transcription data...');
           const summaryData = await generateComprehensiveSummary(roomName, {
             ...event.room,
             participants: participantNames,
-            duration
+            duration,
+            transcription: transcriptionData
           });
           console.log('AI summary generated:', summaryData);
           
@@ -44,17 +66,19 @@ export async function POST(req: Request) {
               createdAt: new Date(),
               participants: participantNames,
               duration: duration,
+              transcriptionData: transcriptionData, // Store the actual transcription
               metadata: {
                 totalParticipants: participants.length,
                 recordingUrl: event.room?.recording_url || event.room?.recordingUrl || null,
                 transcriptionUrl: event.room?.transcription_url || event.room?.transcriptionUrl || null,
                 source: 'livekit_webhook',
                 roomSid: event.room?.sid || null,
-                creationTime: event.room?.creation_time || null
+                creationTime: event.room?.creation_time || null,
+                hasTranscriptionData: !!transcriptionData && transcriptionData.length > 0
               }
             });
             
-            console.log(`✅ Comprehensive AI summary generated and stored for room: ${roomName}`);
+            console.log('✅ Summary stored successfully in Firestore');
           } else {
             console.error('❌ Firebase Admin not initialized, cannot store summary');
             console.log('Environment variables check:');
@@ -66,7 +90,7 @@ export async function POST(req: Request) {
           console.error('❌ Error generating comprehensive AI summary:', error);
         }
 
-        // 2. Delete call record from Firestore for security
+        // 3. Delete call record from Firestore for security
         try {
           const db = getFirebaseAdmin();
           if (db) {
@@ -80,7 +104,7 @@ export async function POST(req: Request) {
           console.error('❌ Error deleting call record:', error);
         }
 
-        // 3. Schedule automatic deletion of summary after 30 days for HIPAA compliance
+        // 4. Schedule automatic deletion of summary after 30 days for HIPAA compliance
         try {
           const db = getFirebaseAdmin();
           if (db) {
@@ -101,17 +125,16 @@ export async function POST(req: Request) {
         } catch (error) {
           console.error('❌ Error scheduling automatic deletion:', error);
         }
-      } else {
-        console.log('⚠️ No room name found in webhook event');
       }
-    } else {
-      console.log(`⚠️ Webhook event '${event.event}' not processed (only 'room_finished' events are handled)`);
     }
 
-    return NextResponse.json({ received: true, processed: true });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('❌ Webhook processing error:', error);
-    return NextResponse.json({ error: 'Processing failed' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Webhook processing failed' },
+      { status: 500 }
+    );
   }
 }
 
@@ -134,27 +157,46 @@ async function generateComprehensiveSummary(roomName: string, roomData: any): Pr
 
     console.log('✅ OpenAI API key found, generating AI summary...');
 
+    // Prepare conversation context for AI
+    const transcription = roomData.transcription || [];
+    const participants = roomData.participants || [];
+    const duration = roomData.duration || 0;
+    
+    let conversationContext = '';
+    if (transcription && transcription.length > 0) {
+      conversationContext = `\n\nActual conversation transcript:\n${transcription.join('\n')}`;
+    } else {
+      conversationContext = '\n\nNo conversation transcript available. This may be a test call or the transcription feature was not enabled.';
+    }
+
     // Create a comprehensive prompt for medical consultation summarization
     const prompt = `You are a medical AI assistant specializing in summarizing telehealth consultations. 
     
     Generate a comprehensive, structured summary for a medical consultation that took place in room: ${roomName}.
     
+    Consultation details:
+    - Duration: ${duration} seconds (${Math.round(duration / 60)} minutes)
+    - Participants: ${participants.join(', ')}
+    ${conversationContext}
+    
     Please provide the following structured response in JSON format:
     
     {
-      "summary": "A concise 2-3 sentence overview of the consultation",
-      "keyPoints": ["List of 3-5 main topics discussed", "Important symptoms mentioned", "Key findings"],
+      "summary": "A concise 2-3 sentence overview of the consultation based on the actual conversation",
+      "keyPoints": ["List of 3-5 main topics discussed", "Important symptoms mentioned", "Key findings from the conversation"],
       "recommendations": ["List of 2-4 recommendations made by the doctor", "Prescriptions if any", "Lifestyle advice"],
       "followUpActions": ["List of 2-3 follow-up actions needed", "Appointment scheduling", "Tests required"],
       "riskLevel": "Low/Medium/High based on the consultation content",
       "category": "Primary Care/Specialist/Emergency/Follow-up/General Consultation"
     }
     
+    IMPORTANT: Base your summary on the actual conversation content provided. If no conversation transcript is available, indicate this clearly in the summary.
+    
     Focus on medical accuracy, patient privacy, and actionable insights. 
     If this appears to be a medical consultation, prioritize clinical relevance.
-    If this appears to be a non-medical call, provide appropriate general consultation summary.`;
+    If this appears to be a non-medical call or test call, provide appropriate general consultation summary.`;
 
-    console.log('Calling OpenAI API...');
+    console.log('Calling OpenAI API with conversation context...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -166,14 +208,14 @@ async function generateComprehensiveSummary(roomName: string, roomData: any): Pr
         messages: [
           {
             role: 'system',
-            content: 'You are a medical AI assistant that provides structured, professional summaries of telehealth consultations. Always respond with valid JSON format.'
+            content: 'You are a medical AI assistant that provides structured, professional summaries of telehealth consultations. Always respond with valid JSON format. Base your analysis on the actual conversation content provided.'
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_tokens: 800,
+        max_tokens: 1000,
         temperature: 0.3, // Lower temperature for more consistent medical summaries
       }),
     });
