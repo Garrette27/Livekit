@@ -442,11 +442,11 @@ function RoomClient({ roomName }: { roomName: string }) {
     );
   };
 
-        // Force blue controls
-      useEffect(() => {
-        if (!token) return;
+  // Force blue controls
+  useEffect(() => {
+    if (!token) return;
 
-        const forceBlueControls = () => {
+    const forceBlueControls = () => {
           // Inject CSS to force blue controls - More aggressive approach
           const style = document.createElement('style');
           style.textContent = `
@@ -556,15 +556,15 @@ function RoomClient({ roomName }: { roomName: string }) {
           `;
           document.head.appendChild(style);
 
-          const selectors = [
-            '.lk-control-bar',
-            '[data-lk-kind]',
-            '.lk-control-bar button',
-            'button[data-lk-kind]',
-            'button[aria-label*="microphone"]',
-            'button[aria-label*="camera"]',
-            'button[aria-label*="chat"]',
-            'button[aria-label*="leave"]',
+      const selectors = [
+        '.lk-control-bar',
+        '[data-lk-kind]',
+        '.lk-control-bar button',
+        'button[data-lk-kind]',
+        'button[aria-label*="microphone"]',
+        'button[aria-label*="camera"]',
+        'button[aria-label*="chat"]',
+        'button[aria-label*="leave"]',
             'button[aria-label*="share"]',
             '.lk-button',
             '.lk-button-group button',
@@ -575,7 +575,7 @@ function RoomClient({ roomName }: { roomName: string }) {
             '.lk-device-menu-item button',
             '.lk-device-menu-item[role="menuitem"]',
             '.lk-device-menu-item[role="menuitem"] button'
-          ];
+      ];
 
       selectors.forEach(selector => {
         const elements = document.querySelectorAll(selector);
@@ -631,15 +631,15 @@ function RoomClient({ roomName }: { roomName: string }) {
     // Apply immediately
     forceBlueControls();
 
-          // Set up interval to apply every 2 seconds
-      const interval = setInterval(forceBlueControls, 2000);
+    // Set up interval to apply every 2 seconds
+    const interval = setInterval(forceBlueControls, 2000);
 
       // Also apply immediately
       forceBlueControls();
 
-      return () => {
-        clearInterval(interval);
-      };
+    return () => {
+      clearInterval(interval);
+    };
   }, [token]);
 
   // Inject global CSS override
@@ -877,14 +877,14 @@ function RoomClient({ roomName }: { roomName: string }) {
           console.log('Disconnected from room');
           setToken(null);
           
-          // Update call status in Firestore
+          // Update call status in Firestore - use setDoc with merge to avoid "No document to update" error
           if (db && roomName) {
             try {
               const callRef = doc(db, 'calls', roomName);
-              updateDoc(callRef, {
+              setDoc(callRef, {
                 status: 'completed',
                 endedAt: new Date()
-              }).catch(error => {
+              }, { merge: true }).catch(error => {
                 console.error('Error updating call status:', error);
               });
             } catch (error) {
@@ -899,20 +899,20 @@ function RoomClient({ roomName }: { roomName: string }) {
         <ManualTranscriptionInput />
         
         {/* Room Link Display - Always Visible */}
-        <div
-          style={{
-            position: 'fixed',
-            top: '20px',
-            left: '20px',
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            border: '2px solid #2563eb',
-            borderRadius: '1rem',
-            padding: '1rem',
-            zIndex: 9999,
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-            maxWidth: '400px'
-          }}
-        >
+          <div
+            style={{
+              position: 'fixed',
+              top: '20px',
+              left: '20px',
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              border: '2px solid #2563eb',
+              borderRadius: '1rem',
+              padding: '1rem',
+              zIndex: 9999,
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+              maxWidth: '400px'
+            }}
+          >
           {/* Back to Home Button */}
           <div style={{ marginBottom: '0.75rem' }}>
             <Link href="/" style={{
@@ -927,65 +927,65 @@ function RoomClient({ roomName }: { roomName: string }) {
               ← Back to Home
             </Link>
           </div>
-          <div style={{ marginBottom: '0.75rem' }}>
-            <h3 style={{ 
-              margin: '0 0 0.5rem 0', 
-              color: '#1e40af', 
-              fontSize: '1rem',
-              fontWeight: '600'
-            }}>
-              🔗 Room Link
-            </h3>
-            <p style={{ 
-              margin: '0', 
-              color: '#6b7280', 
-              fontSize: '0.875rem',
-              marginBottom: '0.75rem'
-            }}>
-              Share this link with your patient:
-            </p>
-          </div>
-          
-          <div style={{
-            display: 'flex',
-            gap: '0.5rem',
+            <div style={{ marginBottom: '0.75rem' }}>
+              <h3 style={{ 
+                margin: '0 0 0.5rem 0', 
+                color: '#1e40af', 
+                fontSize: '1rem',
+                fontWeight: '600'
+              }}>
+                🔗 Room Link
+              </h3>
+              <p style={{ 
+                margin: '0', 
+                color: '#6b7280', 
+                fontSize: '0.875rem',
+                marginBottom: '0.75rem'
+              }}>
+                Share this link with your patient:
+              </p>
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem',
             alignItems: 'center',
             marginBottom: '0.75rem'
-          }}>
-            <input
-              type="text"
+            }}>
+              <input
+                type="text"
               value={`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
-              readOnly
-              style={{
-                flex: 1,
-                padding: '0.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                backgroundColor: '#f9fafb',
-                color: '#374151'
-              }}
-            />
-            <button
-              onClick={() => {
+                readOnly
+                style={{
+                  flex: 1,
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.875rem',
+                  backgroundColor: '#f9fafb',
+                  color: '#374151'
+                }}
+              />
+              <button
+                onClick={() => {
                 navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
-                alert('Room link copied to clipboard!');
-              }}
-              style={{
-                backgroundColor: '#059669',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                padding: '0.5rem 0.75rem',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              Copy
-            </button>
-          </div>
+                  alert('Room link copied to clipboard!');
+                }}
+                style={{
+                  backgroundColor: '#059669',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Copy
+              </button>
+            </div>
             
             {/* Create New Room Button */}
             <div style={{

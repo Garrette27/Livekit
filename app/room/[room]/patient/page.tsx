@@ -244,105 +244,107 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
   }
 
   return (
-    <LiveKitRoom
-      token={token}
-      serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
-      connect={true}
-      onDisconnected={() => {
-        console.log('Patient disconnected from room');
-        setToken(null);
-        // Clear the in-call flag when disconnected
-        localStorage.removeItem(`patientInCall_${roomName}`);
-        
-        // Track patient leaving consultation
-        fetch('/api/track-consultation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            roomName,
-            action: 'leave',
-            patientName
-          }),
-        }).catch(error => {
-          console.error('Error tracking consultation leave:', error);
-        });
-        
-        // Redirect to patient join page instead of main page
-        window.location.href = `/room/${roomName}/patient`;
-      }}
-      onError={(error) => {
-        console.error('LiveKit error:', error);
-        setError('Connection error. Please try again.');
-      }}
-    >
-      {/* Patient-specific overlay - Full screen video interface */}
-      <div
-        style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          border: '2px solid #059669',
-          borderRadius: '0.75rem',
-          padding: '1rem',
-          zIndex: 9999,
-          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-          maxWidth: '300px'
+    <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
+      <LiveKitRoom
+        token={token}
+        serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
+        connect={true}
+        onDisconnected={() => {
+          console.log('Patient disconnected from room');
+          setToken(null);
+          // Clear the in-call flag when disconnected
+          localStorage.removeItem(`patientInCall_${roomName}`);
+          
+          // Track patient leaving consultation
+          fetch('/api/track-consultation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              roomName,
+              action: 'leave',
+              patientName
+            }),
+          }).catch(error => {
+            console.error('Error tracking consultation leave:', error);
+          });
+          
+          // Redirect to patient join page instead of main page
+          window.location.href = `/room/${roomName}/patient`;
+        }}
+        onError={(error) => {
+          console.error('LiveKit error:', error);
+          setError('Connection error. Please try again.');
         }}
       >
-        <div style={{ marginBottom: '0.75rem' }}>
-          <h3 style={{ 
-            margin: '0 0 0.5rem 0', 
-            color: '#047857', 
-            fontSize: '1rem',
-            fontWeight: '600'
-          }}>
-            👤 Patient View
-          </h3>
-          <p style={{ 
-            margin: '0', 
-            color: '#6b7280', 
-            fontSize: '0.875rem',
-            marginBottom: '0.75rem'
-          }}>
-            Connected as: {patientName}
-          </p>
-        </div>
-        
-        <div style={{
-          display: 'flex',
-          gap: '0.5rem',
-          flexDirection: 'column'
-        }}>
-          <div style={{
-            backgroundColor: '#f3f4f6',
-            border: '1px solid #d1d5db',
-            borderRadius: '0.375rem',
-            padding: '0.5rem',
-            fontSize: '0.75rem',
-            color: '#374151',
-            wordBreak: 'break-all',
-            marginBottom: '0.5rem'
-          }}>
-            Room: {roomName}
+        {/* Patient-specific overlay - Full screen video interface */}
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #059669',
+            borderRadius: '0.75rem',
+            padding: '1rem',
+            zIndex: 9999,
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+            maxWidth: '300px'
+          }}
+        >
+          <div style={{ marginBottom: '0.75rem' }}>
+            <h3 style={{ 
+              margin: '0 0 0.5rem 0', 
+              color: '#047857', 
+              fontSize: '1rem',
+              fontWeight: '600'
+            }}>
+              👤 Patient View
+            </h3>
+            <p style={{ 
+              margin: '0', 
+              color: '#6b7280', 
+              fontSize: '0.875rem',
+              marginBottom: '0.75rem'
+            }}>
+              Connected as: {patientName}
+            </p>
           </div>
-          <Link href={`/room/${roomName}/patient`} style={{
-            backgroundColor: '#6B7280',
-            color: 'white',
-            border: 'none',
-            borderRadius: '0.375rem',
-            padding: '0.5rem 0.75rem',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            cursor: 'pointer',
-            textDecoration: 'none',
-            display: 'inline-block'
+          
+          <div style={{
+            display: 'flex',
+            gap: '0.5rem',
+            flexDirection: 'column'
           }}>
-            Leave Call
-          </Link>
+            <div style={{
+              backgroundColor: '#f3f4f6',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.375rem',
+              padding: '0.5rem',
+              fontSize: '0.75rem',
+              color: '#374151',
+              wordBreak: 'break-all',
+              marginBottom: '0.5rem'
+            }}>
+              Room: {roomName}
+            </div>
+            <Link href={`/room/${roomName}/patient`} style={{
+              backgroundColor: '#6B7280',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.375rem',
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              textDecoration: 'none',
+              display: 'inline-block'
+            }}>
+              Leave Call
+            </Link>
+          </div>
         </div>
-      </div>
-    </LiveKitRoom>
+      </LiveKitRoom>
+    </div>
   );
 }
 

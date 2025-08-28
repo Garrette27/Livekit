@@ -282,6 +282,33 @@ export default function Dashboard() {
     ? Math.round(realSummaries.reduce((acc, s) => acc + (s.duration || 0), 0) / realSummaries.length)
     : 0;
 
+  // Also fetch real consultations from the consultations collection for additional tracking
+  useEffect(() => {
+    if (!user || !db) return;
+
+    const consultationsRef = collection(db, 'consultations');
+    const q = query(
+      consultationsRef,
+      where('isRealConsultation', '==', true),
+      orderBy('joinedAt', 'desc'),
+      limit(50)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const realConsultations = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      console.log('Dashboard: Found real consultations:', realConsultations.length);
+      // You can use this data to update statistics or show additional info
+    }, (error) => {
+      console.error('Dashboard: Error fetching consultations:', error);
+    });
+
+    return () => unsubscribe();
+  }, [user, db]);
+
   return (
     <div style={{ 
       minHeight: '100vh', 
