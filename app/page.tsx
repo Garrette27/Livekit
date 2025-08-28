@@ -99,7 +99,13 @@ export default function Page() {
         roomName,
         createdBy: user?.uid || 'anonymous',
         createdAt: new Date(),
-        status: 'active'
+        status: 'active',
+        metadata: {
+          createdBy: user?.uid || 'anonymous',
+          userId: user?.uid || 'anonymous',
+          userEmail: user?.email,
+          userName: user?.displayName
+        }
       });
 
       // Generate share URL

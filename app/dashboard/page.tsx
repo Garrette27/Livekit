@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [summaries, setSummaries] = useState<CallSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [testLoading, setTestLoading] = useState(false);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
 
   // Handle authentication
   useEffect(() => {
@@ -66,17 +67,16 @@ export default function Dashboard() {
         ...doc.data()
       })) as CallSummary[];
       
-      // Filter by user on the client side
+      // Filter by user on the client side - only show summaries created by current user
       const userSummaries = allSummaries.filter(summary => {
         const summaryUserId = summary.createdBy || summary.metadata?.createdBy;
         const isUserSummary = summaryUserId === user.uid;
-        const isLegacySummary = !summaryUserId; // Include summaries without createdBy for backward compatibility
         
         if (isUserSummary) {
           console.log('Dashboard: Found user summary:', summary.roomName);
         }
         
-        return isUserSummary || isLegacySummary;
+        return isUserSummary; // Only show summaries created by current user
       });
       
       console.log('Dashboard: Received summaries:', userSummaries.length, 'summaries for user', user.uid);
@@ -172,6 +172,35 @@ export default function Dashboard() {
   const handleSignOut = () => {
     auth?.signOut();
     window.location.href = '/';
+  };
+
+  const handleCleanupSummaries = async () => {
+    if (!user) return;
+    
+    try {
+      setCleanupLoading(true);
+      const response = await fetch('/api/cleanup-summaries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid })
+      });
+      
+      const result = await response.json();
+      console.log('Cleanup result:', result);
+      
+      if (result.success) {
+        alert(`✅ Cleanup completed!\n\nCleaned: ${result.cleanedCount} summaries\nDeleted: ${result.deletedCount} legacy summaries\nTotal processed: ${result.totalProcessed}`);
+        // Refresh the page to show updated data
+        window.location.reload();
+      } else {
+        alert('❌ Cleanup failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Cleanup error:', error);
+      alert('❌ Cleanup failed: ' + error);
+    } finally {
+      setCleanupLoading(false);
+    }
   };
 
   if (!user) {
@@ -333,6 +362,23 @@ export default function Dashboard() {
               }}
             >
               {testLoading ? 'Testing...' : 'Test Transcription'}
+            </button>
+            <button
+              onClick={handleCleanupSummaries}
+              disabled={cleanupLoading}
+              style={{
+                backgroundColor: '#f59e0b',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: cleanupLoading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                opacity: cleanupLoading ? 0.7 : 1
+              }}
+            >
+              {cleanupLoading ? 'Cleaning...' : 'Clean Data'}
             </button>
             <button
               onClick={handleSignOut}

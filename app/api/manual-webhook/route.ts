@@ -10,8 +10,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Room name is required' }, { status: 400 });
     }
 
-    // Fetch transcription data from Firestore first
+    // Fetch transcription data and call metadata from Firestore first
     let transcriptionData = null;
+    let createdBy = 'unknown';
     try {
       const db = getFirebaseAdmin();
       if (db) {
@@ -22,7 +23,9 @@ export async function POST(req: Request) {
         if (callDoc.exists) {
           const callData = callDoc.data();
           transcriptionData = callData?.transcription || [];
+          createdBy = callData?.createdBy || callData?.metadata?.createdBy || 'unknown';
           console.log('Transcription data found:', transcriptionData.length, 'entries');
+          console.log('Call created by:', createdBy);
         } else {
           console.log('No call document found in Firestore');
         }
@@ -61,6 +64,7 @@ export async function POST(req: Request) {
           roomName,
           ...summaryData,
           createdAt: new Date(),
+          createdBy: createdBy, // Store user ID from call data
           participants: mockEvent.room.participants,
           duration: mockEvent.room.duration,
           transcriptionData: transcriptionData, // Store the actual transcription

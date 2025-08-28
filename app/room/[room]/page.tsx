@@ -6,6 +6,7 @@ import { Room } from 'livekit-client';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, updateDoc, getFirestore } from 'firebase/firestore';
+import Link from 'next/link';
 
 // Type definitions for Web Speech API
 declare global {
@@ -22,6 +23,10 @@ function RoomClient({ roomName }: { roomName: string }) {
   const [manualNotes, setManualNotes] = useState<string[]>([]);
   const [speechRecognitionStatus, setSpeechRecognitionStatus] = useState<string>('idle');
   const [user, setUser] = useState<User | null>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [isJoining, setIsJoining] = useState<boolean>(false);
+  const [newRoomName, setNewRoomName] = useState<string>('');
+  const [isCreatingRoom, setIsCreatingRoom] = useState<boolean>(false);
 
   // Handle authentication
   useEffect(() => {
@@ -32,6 +37,82 @@ function RoomClient({ roomName }: { roomName: string }) {
     }
   }, []);
   const db = getFirestore();
+
+  // Function to create a new room
+  const handleCreateNewRoom = async () => {
+    if (!newRoomName.trim()) {
+      alert('Please enter a room name');
+      return;
+    }
+
+    if (!db) {
+      alert('Firebase not initialized. Please refresh the page.');
+      return;
+    }
+
+    try {
+      setIsCreatingRoom(true);
+      
+      // Store room creation with user ID
+      const roomRef = doc(db, 'rooms', newRoomName);
+      await setDoc(roomRef, {
+        roomName: newRoomName,
+        createdBy: user?.uid || 'anonymous',
+        createdAt: new Date(),
+        status: 'active',
+        metadata: {
+          createdBy: user?.uid || 'anonymous',
+          userId: user?.uid || 'anonymous',
+          userEmail: user?.email,
+          userName: user?.displayName
+        }
+      });
+
+      // Navigate to the new room
+      window.location.href = `/room/${newRoomName}`;
+      
+    } catch (error) {
+      console.error('Error creating room:', error);
+      alert('Error creating room. Please try again.');
+    } finally {
+      setIsCreatingRoom(false);
+    }
+  };
+
+  // Function to join the current room
+  const handleJoinRoom = async () => {
+    if (!user || !roomName) {
+      alert('Please ensure you are logged in and have a room name');
+      return;
+    }
+
+    try {
+      setIsJoining(true);
+      setTokenError(null);
+
+      const identity = user.displayName || user.email || user.uid;
+
+      // Get LiveKit token from API route
+      const res = await fetch('/api/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomName, participantName: identity }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to get token');
+      }
+
+      setToken(data.token);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to join room';
+      setTokenError(errorMessage);
+      console.error('Room join error:', err);
+    } finally {
+      setIsJoining(false);
+    }
+  };
 
   // Get token for the room
   useEffect(() => {
@@ -46,18 +127,20 @@ function RoomClient({ roomName }: { roomName: string }) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            room: roomName,
-            participant: user.displayName || user.uid,
+            roomName: roomName,
+            participantName: user.displayName || user.uid,
           }),
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
         console.log('Token received:', data);
         setToken(data.token);
+        setTokenError(null);
 
         // Store call data in Firestore
         if (db) {
@@ -67,12 +150,18 @@ function RoomClient({ roomName }: { roomName: string }) {
             createdBy: user.uid,
             createdAt: new Date(),
             status: 'active',
-            metadata: { createdBy: user.uid }
+            metadata: { 
+              createdBy: user.uid,
+              userId: user.uid,
+              userEmail: user.email,
+              userName: user.displayName
+            }
           }, { merge: true });
-          console.log('Call data stored in Firestore');
+          console.log('Call data stored in Firestore with user ID:', user.uid);
         }
       } catch (error) {
         console.error('Error getting token:', error);
+        setTokenError(error instanceof Error ? error.message : 'Failed to get token');
       }
     };
 
@@ -404,14 +493,158 @@ function RoomClient({ roomName }: { roomName: string }) {
   if (!token) {
     return (
       <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        fontSize: '1.2rem',
-        color: '#6b7280'
+        minHeight: '100vh',
+        backgroundColor: '#F9FAFB',
+        padding: '2rem'
       }}>
-        Loading room...
+        {/* Header */}
+        <div style={{ 
+          backgroundColor: 'white', 
+          borderBottom: '1px solid #E5E7EB', 
+          padding: '1rem 2rem',
+          marginBottom: '2rem',
+          borderRadius: '0.75rem'
+        }}>
+          <div style={{ maxWidth: '80rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>Telehealth Console</h1>
+              <p style={{ color: '#4B5563' }}>Room: {roomName}</p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+              <Link href="/dashboard" style={{ color: '#2563EB', fontSize: '1.125rem', fontWeight: '500', textDecoration: 'none' }}>
+                View History
+              </Link>
+              <Link href="/" style={{ color: '#059669', fontSize: '1.125rem', fontWeight: '500', textDecoration: 'none' }}>
+                Home
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Main content */}
+        <div style={{ maxWidth: '80rem', margin: '0 auto' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: '2rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>Consultation Room</h2>
+            <p style={{ fontSize: '1.125rem', color: '#4B5563', marginBottom: '2rem' }}>Room "{roomName}" is ready. Share the link below with your patient or join the call.</p>
+            
+            {/* Room URL Display */}
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>🔗 Room Link</h3>
+              <p style={{ fontSize: '1rem', color: '#6B7280', marginBottom: '1rem' }}>Share this link with your patient:</p>
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                <input
+                  value={`https://livekit-frontend-tau.vercel.app/room/${roomName}`}
+                  readOnly
+                  style={{ 
+                    flex: '1', 
+                    border: '1px solid #D1D5DB', 
+                    borderRadius: '0.5rem', 
+                    padding: '0.75rem 1rem', 
+                    backgroundColor: '#F9FAFB', 
+                    fontSize: '1rem',
+                    color: '#374151'
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}`);
+                    alert('Room link copied to clipboard!');
+                  }}
+                  style={{ 
+                    backgroundColor: '#059669', 
+                    color: 'white', 
+                    padding: '0.75rem 1.5rem', 
+                    borderRadius: '0.5rem', 
+                    fontWeight: '600', 
+                    fontSize: '1rem', 
+                    border: 'none', 
+                    cursor: 'pointer'
+                  }}
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            {/* Error Display */}
+            {tokenError && (
+              <div style={{ 
+                padding: '1.25rem', 
+                backgroundColor: '#FEF2F2', 
+                border: '1px solid #FECACA', 
+                borderRadius: '0.5rem', 
+                color: '#DC2626', 
+                fontSize: '1rem',
+                marginBottom: '2rem'
+              }}>
+                <strong>Error:</strong> {tokenError}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+              <button
+                onClick={handleJoinRoom}
+                disabled={isJoining}
+                style={{ 
+                  backgroundColor: isJoining ? '#9CA3AF' : '#2563EB', 
+                  color: 'white', 
+                  padding: '1rem 2rem', 
+                  borderRadius: '0.5rem', 
+                  fontWeight: '600', 
+                  fontSize: '1.125rem', 
+                  border: 'none', 
+                  cursor: isJoining ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isJoining ? 'Joining...' : 'Join Call'}
+              </button>
+            </div>
+
+            {/* Create New Room Section */}
+            <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '2rem' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '1rem' }}>Create New Room</h3>
+              <p style={{ fontSize: '1rem', color: '#6B7280', marginBottom: '1.5rem' }}>Need to create a different consultation room?</p>
+              
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
+                <div style={{ flex: '1' }}>
+                  <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                    New Room Name
+                  </label>
+                  <input
+                    value={newRoomName}
+                    onChange={(e) => setNewRoomName(e.target.value)}
+                    placeholder="e.g., dr-smith-aug16"
+                    style={{ 
+                      width: '100%', 
+                      border: '1px solid #D1D5DB', 
+                      borderRadius: '0.5rem', 
+                      padding: '0.75rem 1rem', 
+                      fontSize: '1rem'
+                    }}
+                    onKeyPress={(e) => e.key === 'Enter' && handleCreateNewRoom()}
+                  />
+                </div>
+                <button 
+                  onClick={handleCreateNewRoom} 
+                  disabled={isCreatingRoom || !newRoomName.trim()}
+                  style={{ 
+                    backgroundColor: isCreatingRoom || !newRoomName.trim() ? '#9CA3AF' : '#059669', 
+                    color: 'white', 
+                    padding: '0.75rem 1.5rem', 
+                    borderRadius: '0.5rem', 
+                    fontWeight: '600', 
+                    fontSize: '1rem', 
+                    border: 'none', 
+                    cursor: isCreatingRoom || !newRoomName.trim() ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isCreatingRoom ? 'Creating...' : 'Create New Room'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -450,6 +683,20 @@ function RoomClient({ roomName }: { roomName: string }) {
               maxWidth: '400px'
             }}
           >
+            {/* Back to Home Button */}
+            <div style={{ marginBottom: '0.75rem' }}>
+              <Link href="/" style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                color: '#6b7280',
+                textDecoration: 'none',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}>
+                ← Back to Home
+              </Link>
+            </div>
             <div style={{ marginBottom: '0.75rem' }}>
               <h3 style={{ 
                 margin: '0 0 0.5rem 0', 
@@ -472,7 +719,8 @@ function RoomClient({ roomName }: { roomName: string }) {
             <div style={{
               display: 'flex',
               gap: '0.5rem',
-              alignItems: 'center'
+              alignItems: 'center',
+              marginBottom: '0.75rem'
             }}>
               <input
                 type="text"
@@ -506,6 +754,35 @@ function RoomClient({ roomName }: { roomName: string }) {
                 }}
               >
                 Copy
+              </button>
+            </div>
+            
+            {/* Create New Room Button */}
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem'
+            }}>
+              <button
+                onClick={() => {
+                  const newRoomName = prompt('Enter new room name:');
+                  if (newRoomName && newRoomName.trim()) {
+                    window.location.href = `/room/${newRoomName.trim()}`;
+                  }
+                }}
+                style={{
+                  backgroundColor: '#7c3aed',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  flex: 1
+                }}
+              >
+                Create New Room
               </button>
             </div>
           </div>

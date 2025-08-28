@@ -23,8 +23,9 @@ export async function POST(req: Request) {
           totalParticipants: participants.length
         });
 
-        // 1. Fetch transcription data from Firestore first
+        // 1. Fetch transcription data and call metadata from Firestore first
         let transcriptionData = null;
+        let createdBy = 'unknown';
         try {
           const db = getFirebaseAdmin();
           if (db) {
@@ -35,7 +36,9 @@ export async function POST(req: Request) {
             if (callDoc.exists) {
               const callData = callDoc.data();
               transcriptionData = callData?.transcription || [];
+              createdBy = callData?.createdBy || callData?.metadata?.createdBy || 'unknown';
               console.log('Transcription data found:', transcriptionData.length, 'entries');
+              console.log('Call created by:', createdBy);
             } else {
               console.log('No call document found in Firestore');
             }
@@ -82,7 +85,7 @@ export async function POST(req: Request) {
                           await summaryRef.set({
                 ...summaryData,
                 createdAt: new Date(),
-                createdBy: event.room?.metadata?.createdBy || 'unknown', // Store user ID
+                createdBy: createdBy, // Store user ID from call data
                 participants: participantNames,
                 duration: duration,
                 transcriptionData: transcriptionData, // Store the actual transcription
