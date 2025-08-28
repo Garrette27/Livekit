@@ -5,7 +5,7 @@ import { LiveKitRoom, useRoomContext } from '@livekit/components-react';
 import { Room } from 'livekit-client';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 
 // Type definitions for Web Speech API
@@ -38,7 +38,31 @@ function RoomClient({ roomName }: { roomName: string }) {
       console.warn('Firebase auth not initialized');
     }
   }, []);
-  // Use the imported db instance
+
+  // Check if this is a doctor trying to access their own room
+  useEffect(() => {
+    if (user && roomName && db) {
+      // Check if this room was created by the current user
+      const checkRoomOwnership = async () => {
+        if (!db) return;
+        try {
+          const roomRef = doc(db, 'rooms', roomName);
+          const roomDoc = await getDoc(roomRef);
+          if (roomDoc.exists()) {
+            const roomData = roomDoc.data();
+            if (roomData?.createdBy === user.uid) {
+              // This is the doctor who created the room, auto-join
+              console.log('Doctor detected, auto-joining room:', roomName);
+              handleJoinRoom();
+            }
+          }
+        } catch (error) {
+          console.error('Error checking room ownership:', error);
+        }
+      };
+      checkRoomOwnership();
+    }
+  }, [user, roomName]);
 
   // Function to create a new room
   const handleCreateNewRoom = async () => {
@@ -155,19 +179,19 @@ function RoomClient({ roomName }: { roomName: string }) {
         // Store call data in Firestore
         if (db) {
           try {
-            const callRef = doc(db, 'calls', roomName);
-            await setDoc(callRef, {
-              roomName,
-              createdBy: user.uid,
-              createdAt: new Date(),
-              status: 'active',
+          const callRef = doc(db, 'calls', roomName);
+          await setDoc(callRef, {
+            roomName,
+            createdBy: user.uid,
+            createdAt: new Date(),
+            status: 'active',
               metadata: { 
                 createdBy: user.uid,
                 userId: user.uid,
                 userEmail: user.email,
                 userName: user.displayName
               }
-            }, { merge: true });
+          }, { merge: true });
             console.log('Call data stored in Firestore with user ID:', user.uid);
           } catch (error) {
             console.error('Error storing call data:', error);
@@ -253,13 +277,13 @@ function RoomClient({ roomName }: { roomName: string }) {
               // Store in Firestore
               if (db) {
                 try {
-                  const callRef = doc(db, 'calls', roomName);
-                  updateDoc(callRef, {
-                    transcription: newTranscription,
-                    lastTranscriptionUpdate: new Date()
-                  }).catch(error => {
-                    console.error('Error storing transcription:', error);
-                  });
+                const callRef = doc(db, 'calls', roomName);
+                updateDoc(callRef, {
+                  transcription: newTranscription,
+                  lastTranscriptionUpdate: new Date()
+                }).catch(error => {
+                  console.error('Error storing transcription:', error);
+                });
                 } catch (error) {
                   console.error('Error with Firestore operation:', error);
                 }
@@ -277,14 +301,14 @@ function RoomClient({ roomName }: { roomName: string }) {
         
         // Only restart if it's not an aborted error
         if (event.error !== 'aborted') {
-          setTimeout(() => {
-            try {
+        setTimeout(() => {
+          try {
               if (recognition.state !== 'recording') {
-                recognition.start();
+            recognition.start();
               }
-            } catch (error) {
-              console.error('Failed to restart speech recognition:', error);
-            }
+          } catch (error) {
+            console.error('Failed to restart speech recognition:', error);
+          }
           }, 2000);
         }
       };
@@ -297,7 +321,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         setTimeout(() => {
           try {
             if (recognition.state !== 'recording') {
-              recognition.start();
+            recognition.start();
             }
           } catch (error) {
             console.error('Failed to restart speech recognition:', error);
@@ -318,7 +342,7 @@ function RoomClient({ roomName }: { roomName: string }) {
       return () => {
         try {
           if (recognition && recognition.state === 'recording') {
-            recognition.stop();
+          recognition.stop();
           }
         } catch (error) {
           console.error('Error stopping speech recognition:', error);
@@ -380,13 +404,13 @@ function RoomClient({ roomName }: { roomName: string }) {
                 // Store in Firestore
                 if (db) {
                   try {
-                    const callRef = doc(db, 'calls', roomName);
-                    updateDoc(callRef, {
-                      transcription: newTranscription,
-                      lastTranscriptionUpdate: new Date()
-                    }).catch(error => {
-                      console.error('Error storing manual note:', error);
-                    });
+                  const callRef = doc(db, 'calls', roomName);
+                  updateDoc(callRef, {
+                    transcription: newTranscription,
+                    lastTranscriptionUpdate: new Date()
+                  }).catch(error => {
+                    console.error('Error storing manual note:', error);
+                  });
                   } catch (error) {
                     console.error('Error with Firestore operation:', error);
                   }
@@ -439,7 +463,9 @@ function RoomClient({ roomName }: { roomName: string }) {
         '.lk-device-menu',
         '.lk-device-menu button',
         '.lk-device-menu-item',
-        '.lk-device-menu-item button'
+        '.lk-device-menu-item button',
+        '.lk-device-menu-item[role="menuitem"]',
+        '.lk-device-menu-item[role="menuitem"] button'
       ];
 
       selectors.forEach(selector => {
@@ -463,7 +489,7 @@ function RoomClient({ roomName }: { roomName: string }) {
       });
 
       // Force all icons and text to be white
-      const icons = document.querySelectorAll('.lk-control-bar svg, [data-lk-kind] svg, .lk-button svg, .lk-device-menu svg');
+      const icons = document.querySelectorAll('.lk-control-bar svg, [data-lk-kind] svg, .lk-button svg, .lk-device-menu svg, .lk-device-menu-item svg');
       icons.forEach(icon => {
         if (icon instanceof SVGElement) {
           icon.style.setProperty('color', 'white', 'important');
@@ -472,7 +498,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         }
       });
 
-      const spans = document.querySelectorAll('.lk-control-bar span, [data-lk-kind] span, .lk-button span, .lk-device-menu span');
+      const spans = document.querySelectorAll('.lk-control-bar span, [data-lk-kind] span, .lk-button span, .lk-device-menu span, .lk-device-menu-item span');
       spans.forEach(span => {
         if (span instanceof HTMLElement) {
           span.style.setProperty('color', 'white', 'important');
@@ -751,7 +777,7 @@ function RoomClient({ roomName }: { roomName: string }) {
             style={{
               position: 'fixed',
               top: '20px',
-              right: '20px',
+              left: '20px',
               backgroundColor: 'rgba(255, 255, 255, 0.95)',
               border: '2px solid #2563eb',
               borderRadius: '1rem',
@@ -866,12 +892,85 @@ function RoomClient({ roomName }: { roomName: string }) {
           </div>
         )}
 
+        {/* Room URL Display - Always Visible */}
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #2563eb',
+            borderRadius: '0.75rem',
+            padding: '1rem',
+            zIndex: 10000,
+            maxWidth: '400px',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)'
+          }}
+        >
+          <div style={{ marginBottom: '0.75rem' }}>
+            <h3 style={{
+              margin: '0 0 0.5rem 0',
+              color: '#1e40af',
+              fontSize: '1rem',
+              fontWeight: '600'
+            }}>
+              📋 Room Information
+            </h3>
+            <p style={{
+              margin: '0',
+              color: '#6b7280',
+              fontSize: '0.875rem',
+              marginBottom: '0.5rem'
+            }}>
+              Room: {roomName}
+            </p>
+            <p style={{
+              margin: '0',
+              color: '#6b7280',
+              fontSize: '0.875rem',
+              marginBottom: '0.75rem'
+            }}>
+              Patient Link:
+            </p>
+            <div style={{
+              backgroundColor: '#f3f4f6',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.375rem',
+              padding: '0.5rem',
+              fontSize: '0.75rem',
+              color: '#374151',
+              wordBreak: 'break-all',
+              marginBottom: '0.5rem'
+            }}>
+              {`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
+                alert('Patient link copied to clipboard!');
+              }}
+              style={{
+                backgroundColor: '#2563eb',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.375rem',
+                padding: '0.25rem 0.5rem',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                width: '100%'
+              }}
+            >
+              Copy Patient Link
+            </button>
+          </div>
+        </div>
+
         {/* Debug Info */}
         {token && (
           <div
             style={{
               position: 'fixed',
-              top: '20px',
+              bottom: '20px',
               right: '20px',
               backgroundColor: 'rgba(0, 0, 0, 0.8)',
               color: 'white',

@@ -3,7 +3,7 @@ import { getFirebaseAdmin } from '../../../lib/firebase-admin';
 
 export async function POST(req: Request) {
   try {
-    const { roomName, userId, isTest } = await req.json();
+    const { roomName, userId } = await req.json();
     console.log('Manual webhook triggered for room:', roomName);
 
     if (!roomName) {
@@ -64,20 +64,18 @@ export async function POST(req: Request) {
         await summaryRef.set({
           roomName,
           ...summaryData,
-                     createdAt: new Date(),
-           createdBy: createdBy, // Store user ID from call data
-           participants: mockEvent.room.participants,
-           duration: mockEvent.room.duration,
-           transcriptionData: transcriptionData, // Store the actual transcription
-           isTestData: isTest || false, // Mark if this is test data
-           metadata: {
-             totalParticipants: mockEvent.room.participants.length,
-             recordingUrl: mockEvent.room.recordingUrl,
-             transcriptionUrl: mockEvent.room.transcriptionUrl,
-             source: 'manual_webhook',
-             hasTranscriptionData: !!transcriptionData && transcriptionData.length > 0,
-             isTestData: isTest || false
-           }
+          createdAt: new Date(),
+          createdBy: createdBy, // Store user ID from call data
+          participants: mockEvent.room.participants,
+          duration: mockEvent.room.duration,
+          transcriptionData: transcriptionData, // Store the actual transcription
+          metadata: {
+            totalParticipants: mockEvent.room.participants.length,
+            recordingUrl: mockEvent.room.recordingUrl,
+            transcriptionUrl: mockEvent.room.transcriptionUrl,
+            source: 'manual_webhook',
+            hasTranscriptionData: !!transcriptionData && transcriptionData.length > 0
+          }
         });
         
         console.log(`✅ Manual webhook: AI summary generated and stored for room: ${roomName}`);

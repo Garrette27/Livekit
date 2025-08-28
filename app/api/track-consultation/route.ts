@@ -3,8 +3,8 @@ import { getFirebaseAdmin } from '../../../lib/firebase-admin';
 
 export async function POST(req: Request) {
   try {
-    const { roomName, action, participantName, userId } = await req.json();
-    console.log('Consultation tracking:', { roomName, action, participantName, userId });
+    const { roomName, action, patientName, duration } = await req.json();
+    console.log(`Track consultation: ${action} for room: ${roomName}`);
 
     if (!roomName || !action) {
       return NextResponse.json({ error: 'Room name and action are required' }, { status: 400 });
@@ -25,14 +25,13 @@ export async function POST(req: Request) {
       // Track when patient joins
       await consultationRef.set({
         roomName,
-        patientJoined: new Date(),
-        participantName,
-        createdBy: userId || 'unknown',
+        patientName: patientName || 'Unknown Patient',
+        joinedAt: new Date(),
         status: 'active',
+        isRealConsultation: true, // Mark as real consultation, not test
         metadata: {
-          createdBy: userId || 'unknown',
-          userId: userId || 'unknown',
-          patientName: participantName
+          source: 'patient_join',
+          trackedAt: new Date()
         }
       }, { merge: true });
       
@@ -43,18 +42,20 @@ export async function POST(req: Request) {
       const consultationDoc = await consultationRef.get();
       if (consultationDoc.exists) {
         const data = consultationDoc.data();
-        const joinTime = data?.patientJoined?.toDate() || new Date();
-        const leaveTime = new Date();
-        const durationMinutes = Math.round((leaveTime.getTime() - joinTime.getTime()) / 1000 / 60);
+        const joinedAt = data?.joinedAt?.toDate() || new Date();
+        const leftAt = new Date();
+        const durationMinutes = Math.round((leftAt.getTime() - joinedAt.getTime()) / (1000 * 60));
         
         await consultationRef.update({
-          patientLeft: leaveTime,
-          durationMinutes,
+          leftAt,
+          duration: durationMinutes,
           status: 'completed',
+          isRealConsultation: true,
           metadata: {
             ...data?.metadata,
+            source: 'patient_leave',
             durationMinutes,
-            completedAt: leaveTime
+            trackedAt: new Date()
           }
         });
         
@@ -70,9 +71,9 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    console.error('❌ Consultation tracking error:', error);
+    console.error('❌ Track consultation error:', error);
     return NextResponse.json({ 
-      error: 'Consultation tracking failed',
+      error: 'Failed to track consultation',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }

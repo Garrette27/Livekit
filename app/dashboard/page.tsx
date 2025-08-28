@@ -19,11 +19,9 @@ interface CallSummary {
   createdAt: Timestamp;
   participants: string[];
   duration: number;
-  isTestData?: boolean;
   metadata?: {
     totalParticipants: number;
     createdBy?: string;
-    isTestData?: boolean;
   };
   createdBy?: string; // Added for client-side filtering
 }
@@ -31,7 +29,6 @@ interface CallSummary {
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [summaries, setSummaries] = useState<CallSummary[]>([]);
-  const [consultations, setConsultations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [testLoading, setTestLoading] = useState(false);
 
@@ -78,18 +75,16 @@ export default function Dashboard() {
         // This ensures existing summaries are still visible
         const isLegacySummary = !summaryUserId;
         
-        // Exclude test data from main consultation count
-        const isNotTestData = !summary.isTestData && !summary.metadata?.isTestData;
+        // Exclude test data
+        const isTestData = (summary.metadata as any)?.testData || (summary as any).testData || (summary.metadata as any)?.source === 'test';
         
-        if (isUserSummary && isNotTestData) {
+        if (isUserSummary && !isTestData) {
           console.log('Dashboard: Found user summary:', summary.roomName);
-        } else if (isLegacySummary && isNotTestData) {
+        } else if (isLegacySummary && !isTestData) {
           console.log('Dashboard: Found legacy summary (no user ID):', summary.roomName);
-        } else if (!isNotTestData) {
-          console.log('Dashboard: Excluded test data:', summary.roomName);
         }
         
-        return (isUserSummary || isLegacySummary) && isNotTestData; // Show user summaries and legacy summaries, exclude test data
+        return (isUserSummary || isLegacySummary) && !isTestData; // Show user summaries and legacy summaries, exclude test data
       });
       
       console.log('Dashboard: Received summaries:', userSummaries.length, 'summaries for user', user.uid);
@@ -99,37 +94,6 @@ export default function Dashboard() {
     }, (error) => {
       console.error('Dashboard: Error fetching summaries:', error);
       setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
-
-  // Fetch consultation analytics
-  useEffect(() => {
-    if (!user) return;
-
-    console.log('Dashboard: Setting up Firestore listener for consultations');
-    
-    const db = getFirestore();
-    const consultationsRef = collection(db, 'consultations');
-    
-    const q = query(
-      consultationsRef,
-      where('createdBy', '==', user.uid),
-      orderBy('patientJoined', 'desc'),
-      limit(100)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const userConsultations = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      console.log('Dashboard: Received consultations:', userConsultations.length, 'for user', user.uid);
-      setConsultations(userConsultations);
-    }, (error) => {
-      console.error('Dashboard: Error fetching consultations:', error);
     });
 
     return () => unsubscribe();
@@ -175,7 +139,6 @@ export default function Dashboard() {
         body: JSON.stringify({ 
           roomName,
           userId: user?.uid, // Include user ID
-          isTest: true, // Mark as test data
           testData: [
             `[Doctor] (${new Date().toISOString()}): Hello, how are you feeling today?`,
             `[Patient] (${new Date().toISOString()}): I've been experiencing some issues with binary search trees and data structures.`,
@@ -201,8 +164,7 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           roomName,
-          userId: user?.uid, // Include user ID
-          isTest: true // Mark as test data
+          userId: user?.uid // Include user ID
         })
       });
       
@@ -301,18 +263,20 @@ export default function Dashboard() {
     );
   }
 
-  // Calculate statistics from consultations
-  const totalCalls = consultations.filter(c => c.status === 'completed').length;
-  const thisMonth = consultations.filter(consultation => {
-    const consultationDate = consultation.patientJoined?.toDate?.() || new Date(consultation.patientJoined);
+  // Filter out test data for statistics
+  const realSummaries = summaries.filter(summary => {
+    const isTestData = (summary.metadata as any)?.testData || (summary as any).testData || (summary.metadata as any)?.source === 'test';
+    return !isTestData;
+  });
+
+  const totalCalls = realSummaries.length;
+  const thisMonth = realSummaries.filter(s => {
     const monthAgo = new Date();
     monthAgo.setMonth(monthAgo.getMonth() - 1);
-    return consultation.status === 'completed' && consultationDate > monthAgo;
+    return s.createdAt?.toDate?.() ? s.createdAt.toDate() > monthAgo : false;
   }).length;
-  
-  const completedConsultations = consultations.filter(c => c.status === 'completed');
-  const avgDuration = completedConsultations.length > 0 
-    ? Math.round(completedConsultations.reduce((acc, consultation) => acc + (consultation.durationMinutes || 0), 0) / completedConsultations.length)
+  const avgDuration = realSummaries.length > 0 
+    ? Math.round(realSummaries.reduce((acc, s) => acc + (s.duration || 0), 0) / realSummaries.length)
     : 0;
 
   return (
