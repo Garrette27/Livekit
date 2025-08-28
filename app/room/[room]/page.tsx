@@ -432,7 +432,14 @@ function RoomClient({ roomName }: { roomName: string }) {
         'button[aria-label*="camera"]',
         'button[aria-label*="chat"]',
         'button[aria-label*="leave"]',
-        'button[aria-label*="share"]'
+        'button[aria-label*="share"]',
+        '.lk-button',
+        '.lk-button-group button',
+        '.lk-focus-toggle',
+        '.lk-device-menu',
+        '.lk-device-menu button',
+        '.lk-device-menu-item',
+        '.lk-device-menu-item button'
       ];
 
       selectors.forEach(selector => {
@@ -456,7 +463,7 @@ function RoomClient({ roomName }: { roomName: string }) {
       });
 
       // Force all icons and text to be white
-      const icons = document.querySelectorAll('.lk-control-bar svg, [data-lk-kind] svg');
+      const icons = document.querySelectorAll('.lk-control-bar svg, [data-lk-kind] svg, .lk-button svg, .lk-device-menu svg');
       icons.forEach(icon => {
         if (icon instanceof SVGElement) {
           icon.style.setProperty('color', 'white', 'important');
@@ -465,11 +472,21 @@ function RoomClient({ roomName }: { roomName: string }) {
         }
       });
 
-      const spans = document.querySelectorAll('.lk-control-bar span, [data-lk-kind] span');
+      const spans = document.querySelectorAll('.lk-control-bar span, [data-lk-kind] span, .lk-button span, .lk-device-menu span');
       spans.forEach(span => {
         if (span instanceof HTMLElement) {
           span.style.setProperty('color', 'white', 'important');
           span.style.setProperty('font-weight', '600', 'important');
+        }
+      });
+
+      // Force dropdown menus to be blue
+      const dropdowns = document.querySelectorAll('.lk-device-menu, .lk-device-menu-item, .lk-device-menu-item button');
+      dropdowns.forEach(dropdown => {
+        if (dropdown instanceof HTMLElement) {
+          dropdown.style.setProperty('background-color', '#2563eb', 'important');
+          dropdown.style.setProperty('color', 'white', 'important');
+          dropdown.style.setProperty('border-color', '#1d4ed8', 'important');
         }
       });
 
@@ -734,7 +751,7 @@ function RoomClient({ roomName }: { roomName: string }) {
             style={{
               position: 'fixed',
               top: '20px',
-              left: '20px',
+              right: '20px',
               backgroundColor: 'rgba(255, 255, 255, 0.95)',
               border: '2px solid #2563eb',
               borderRadius: '1rem',

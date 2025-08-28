@@ -19,9 +19,11 @@ interface CallSummary {
   createdAt: Timestamp;
   participants: string[];
   duration: number;
+  isTestData?: boolean;
   metadata?: {
     totalParticipants: number;
     createdBy?: string;
+    isTestData?: boolean;
   };
   createdBy?: string; // Added for client-side filtering
 }
@@ -29,6 +31,7 @@ interface CallSummary {
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [summaries, setSummaries] = useState<CallSummary[]>([]);
+  const [consultations, setConsultations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [testLoading, setTestLoading] = useState(false);
 
@@ -66,7 +69,7 @@ export default function Dashboard() {
         ...doc.data()
       })) as CallSummary[];
       
-      // Filter by user on the client side - show summaries for current user
+      // Filter by user on the client side - show summaries for current user and exclude test data
       const userSummaries = allSummaries.filter(summary => {
         const summaryUserId = summary.createdBy || summary.metadata?.createdBy;
         const isUserSummary = summaryUserId === user.uid;
@@ -75,13 +78,18 @@ export default function Dashboard() {
         // This ensures existing summaries are still visible
         const isLegacySummary = !summaryUserId;
         
-        if (isUserSummary) {
+        // Exclude test data from main consultation count
+        const isNotTestData = !summary.isTestData && !summary.metadata?.isTestData;
+        
+        if (isUserSummary && isNotTestData) {
           console.log('Dashboard: Found user summary:', summary.roomName);
-        } else if (isLegacySummary) {
+        } else if (isLegacySummary && isNotTestData) {
           console.log('Dashboard: Found legacy summary (no user ID):', summary.roomName);
+        } else if (!isNotTestData) {
+          console.log('Dashboard: Excluded test data:', summary.roomName);
         }
         
-        return isUserSummary || isLegacySummary; // Show user summaries and legacy summaries
+        return (isUserSummary || isLegacySummary) && isNotTestData; // Show user summaries and legacy summaries, exclude test data
       });
       
       console.log('Dashboard: Received summaries:', userSummaries.length, 'summaries for user', user.uid);
@@ -91,6 +99,37 @@ export default function Dashboard() {
     }, (error) => {
       console.error('Dashboard: Error fetching summaries:', error);
       setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Fetch consultation analytics
+  useEffect(() => {
+    if (!user) return;
+
+    console.log('Dashboard: Setting up Firestore listener for consultations');
+    
+    const db = getFirestore();
+    const consultationsRef = collection(db, 'consultations');
+    
+    const q = query(
+      consultationsRef,
+      where('createdBy', '==', user.uid),
+      orderBy('patientJoined', 'desc'),
+      limit(100)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const userConsultations = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      console.log('Dashboard: Received consultations:', userConsultations.length, 'for user', user.uid);
+      setConsultations(userConsultations);
+    }, (error) => {
+      console.error('Dashboard: Error fetching consultations:', error);
     });
 
     return () => unsubscribe();
@@ -136,6 +175,7 @@ export default function Dashboard() {
         body: JSON.stringify({ 
           roomName,
           userId: user?.uid, // Include user ID
+          isTest: true, // Mark as test data
           testData: [
             `[Doctor] (${new Date().toISOString()}): Hello, how are you feeling today?`,
             `[Patient] (${new Date().toISOString()}): I've been experiencing some issues with binary search trees and data structures.`,
@@ -161,7 +201,8 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           roomName,
-          userId: user?.uid // Include user ID
+          userId: user?.uid, // Include user ID
+          isTest: true // Mark as test data
         })
       });
       
@@ -260,14 +301,18 @@ export default function Dashboard() {
     );
   }
 
-  const totalCalls = summaries.length;
-  const thisMonth = summaries.filter(s => {
+  // Calculate statistics from consultations
+  const totalCalls = consultations.filter(c => c.status === 'completed').length;
+  const thisMonth = consultations.filter(consultation => {
+    const consultationDate = consultation.patientJoined?.toDate?.() || new Date(consultation.patientJoined);
     const monthAgo = new Date();
     monthAgo.setMonth(monthAgo.getMonth() - 1);
-    return s.createdAt?.toDate?.() ? s.createdAt.toDate() > monthAgo : false;
+    return consultation.status === 'completed' && consultationDate > monthAgo;
   }).length;
-  const avgDuration = summaries.length > 0 
-    ? Math.round(summaries.reduce((acc, s) => acc + (s.duration || 0), 0) / summaries.length)
+  
+  const completedConsultations = consultations.filter(c => c.status === 'completed');
+  const avgDuration = completedConsultations.length > 0 
+    ? Math.round(completedConsultations.reduce((acc, consultation) => acc + (consultation.durationMinutes || 0), 0) / completedConsultations.length)
     : 0;
 
   return (
