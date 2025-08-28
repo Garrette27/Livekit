@@ -275,7 +275,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         setError('Connection error. Please try again.');
       }}
     >
-      {/* Patient-specific controls - Full screen video interface */}
+      {/* Patient-specific overlay - Full screen video interface */}
       <div
         style={{
           position: 'fixed',

@@ -447,9 +447,10 @@ function RoomClient({ roomName }: { roomName: string }) {
         if (!token) return;
 
         const forceBlueControls = () => {
-          // Inject CSS to force blue controls
+          // Inject CSS to force blue controls - More aggressive approach
           const style = document.createElement('style');
           style.textContent = `
+            /* Force ALL LiveKit controls to be blue */
             .lk-control-bar button,
             .lk-control-bar [data-lk-kind],
             .lk-button,
@@ -465,7 +466,15 @@ function RoomClient({ roomName }: { roomName: string }) {
             button[aria-label*="camera"],
             button[aria-label*="chat"],
             button[aria-label*="leave"],
-            button[aria-label*="share"] {
+            button[aria-label*="share"],
+            .lk-control-bar *,
+            .lk-button *,
+            [class*="lk-"] *,
+            button[aria-label*="microphone"] *,
+            button[aria-label*="camera"] *,
+            button[aria-label*="chat"] *,
+            button[aria-label*="leave"] *,
+            button[aria-label*="share"] * {
               background-color: #2563eb !important;
               color: white !important;
               border-color: #1d4ed8 !important;
@@ -480,6 +489,7 @@ function RoomClient({ roomName }: { roomName: string }) {
               box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important;
             }
             
+            /* Force ALL LiveKit icons to be white */
             .lk-control-bar svg,
             .lk-button svg,
             [class*="lk-"] svg,
@@ -487,12 +497,16 @@ function RoomClient({ roomName }: { roomName: string }) {
             button[aria-label*="camera"] svg,
             button[aria-label*="chat"] svg,
             button[aria-label*="leave"] svg,
-            button[aria-label*="share"] svg {
+            button[aria-label*="share"] svg,
+            .lk-control-bar * svg,
+            .lk-button * svg,
+            [class*="lk-"] * svg {
               color: white !important;
               fill: white !important;
               stroke: white !important;
             }
             
+            /* Force ALL LiveKit text to be white */
             .lk-control-bar span,
             .lk-button span,
             [class*="lk-"] span,
@@ -500,9 +514,44 @@ function RoomClient({ roomName }: { roomName: string }) {
             button[aria-label*="camera"] span,
             button[aria-label*="chat"] span,
             button[aria-label*="leave"] span,
-            button[aria-label*="share"] span {
+            button[aria-label*="share"] span,
+            .lk-control-bar * span,
+            .lk-button * span,
+            [class*="lk-"] * span {
               color: white !important;
               font-weight: 600 !important;
+            }
+            
+            /* Override any dark themes */
+            .lk-control-bar,
+            .lk-button,
+            [class*="lk-"] {
+              background-color: transparent !important;
+            }
+            
+            /* Force dropdown menus to be blue */
+            .lk-device-menu,
+            .lk-device-menu-item,
+            .lk-device-menu-item button,
+            .lk-device-menu *,
+            .lk-device-menu-item * {
+              background-color: #2563eb !important;
+              color: white !important;
+              border-color: #1d4ed8 !important;
+            }
+            
+            /* Prevent animation bugs */
+            .lk-focus-toggle,
+            .lk-focus-toggle *,
+            [class*="lk-"] {
+              transition: none !important;
+              animation: none !important;
+            }
+            
+            /* Fix expand window animation */
+            .lk-focus-toggle {
+              transform: none !important;
+              transition: none !important;
             }
           `;
           document.head.appendChild(style);
@@ -582,12 +631,15 @@ function RoomClient({ roomName }: { roomName: string }) {
     // Apply immediately
     forceBlueControls();
 
-    // Set up interval to apply every 2 seconds
-    const interval = setInterval(forceBlueControls, 2000);
+          // Set up interval to apply every 2 seconds
+      const interval = setInterval(forceBlueControls, 2000);
 
-    return () => {
-      clearInterval(interval);
-    };
+      // Also apply immediately
+      forceBlueControls();
+
+      return () => {
+        clearInterval(interval);
+      };
   }, [token]);
 
   // Inject global CSS override
@@ -846,95 +898,94 @@ function RoomClient({ roomName }: { roomName: string }) {
       >
         <ManualTranscriptionInput />
         
-        {/* Room Link Display */}
-        {token && (
-          <div
-            style={{
-              position: 'fixed',
-              top: '20px',
-              left: '20px',
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              border: '2px solid #2563eb',
-              borderRadius: '1rem',
-              padding: '1rem',
-              zIndex: 9999,
-              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-              maxWidth: '400px'
-            }}
-          >
-            {/* Back to Home Button */}
-            <div style={{ marginBottom: '0.75rem' }}>
-              <Link href="/" style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                color: '#6b7280',
-                textDecoration: 'none',
-                fontSize: '0.875rem',
-                fontWeight: '500'
-              }}>
-                ← Back to Home
-              </Link>
-            </div>
-            <div style={{ marginBottom: '0.75rem' }}>
-              <h3 style={{ 
-                margin: '0 0 0.5rem 0', 
-                color: '#1e40af', 
-                fontSize: '1rem',
-                fontWeight: '600'
-              }}>
-                🔗 Room Link
-              </h3>
-              <p style={{ 
-                margin: '0', 
-                color: '#6b7280', 
-                fontSize: '0.875rem',
-                marginBottom: '0.75rem'
-              }}>
-                Share this link with your patient:
-              </p>
-            </div>
-            
-            <div style={{
-              display: 'flex',
-              gap: '0.5rem',
+        {/* Room Link Display - Always Visible */}
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            left: '20px',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #2563eb',
+            borderRadius: '1rem',
+            padding: '1rem',
+            zIndex: 9999,
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+            maxWidth: '400px'
+          }}
+        >
+          {/* Back to Home Button */}
+          <div style={{ marginBottom: '0.75rem' }}>
+            <Link href="/" style={{
+              display: 'inline-flex',
               alignItems: 'center',
+              gap: '0.5rem',
+              color: '#6b7280',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              fontWeight: '500'
+            }}>
+              ← Back to Home
+            </Link>
+          </div>
+          <div style={{ marginBottom: '0.75rem' }}>
+            <h3 style={{ 
+              margin: '0 0 0.5rem 0', 
+              color: '#1e40af', 
+              fontSize: '1rem',
+              fontWeight: '600'
+            }}>
+              🔗 Room Link
+            </h3>
+            <p style={{ 
+              margin: '0', 
+              color: '#6b7280', 
+              fontSize: '0.875rem',
               marginBottom: '0.75rem'
             }}>
-              <input
-                type="text"
-                value={`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
-                readOnly
-                style={{
-                  flex: 1,
-                  padding: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem',
-                  fontSize: '0.875rem',
-                  backgroundColor: '#f9fafb',
-                  color: '#374151'
-                }}
-              />
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
-                  alert('Room link copied to clipboard!');
-                }}
-                style={{
-                  backgroundColor: '#059669',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
-                  padding: '0.5rem 0.75rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                Copy
-              </button>
-            </div>
+              Share this link with your patient:
+            </p>
+          </div>
+          
+          <div style={{
+            display: 'flex',
+            gap: '0.5rem',
+            alignItems: 'center',
+            marginBottom: '0.75rem'
+          }}>
+            <input
+              type="text"
+              value={`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
+              readOnly
+              style={{
+                flex: 1,
+                padding: '0.5rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                backgroundColor: '#f9fafb',
+                color: '#374151'
+              }}
+            />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
+                alert('Room link copied to clipboard!');
+              }}
+              style={{
+                backgroundColor: '#059669',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.375rem',
+                padding: '0.5rem 0.75rem',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Copy
+            </button>
+          </div>
             
             {/* Create New Room Button */}
             <div style={{
@@ -965,7 +1016,6 @@ function RoomClient({ roomName }: { roomName: string }) {
               </button>
             </div>
           </div>
-        )}
 
         {/* Room URL Display - Always Visible */}
         <div

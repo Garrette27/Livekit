@@ -66,26 +66,28 @@ export default function Dashboard() {
         ...doc.data()
       })) as CallSummary[];
       
-      // Filter by user on the client side - show summaries for current user and exclude test data
-      const userSummaries = allSummaries.filter(summary => {
-        const summaryUserId = summary.createdBy || summary.metadata?.createdBy;
-        const isUserSummary = summaryUserId === user.uid;
-        
-        // For legacy summaries without user ID, include them for now
-        // This ensures existing summaries are still visible
-        const isLegacySummary = !summaryUserId;
-        
-        // Exclude test data
-        const isTestData = (summary.metadata as any)?.testData || (summary as any).testData || (summary.metadata as any)?.source === 'test';
-        
-        if (isUserSummary && !isTestData) {
-          console.log('Dashboard: Found user summary:', summary.roomName);
-        } else if (isLegacySummary && !isTestData) {
-          console.log('Dashboard: Found legacy summary (no user ID):', summary.roomName);
-        }
-        
-        return (isUserSummary || isLegacySummary) && !isTestData; // Show user summaries and legacy summaries, exclude test data
-      });
+        // Filter by user on the client side - show summaries for current user and exclude test data
+  const userSummaries = allSummaries.filter(summary => {
+    const summaryUserId = summary.createdBy || summary.metadata?.createdBy;
+    const isUserSummary = summaryUserId === user.uid;
+    
+    // For legacy summaries without user ID, include them for now
+    // This ensures existing summaries are still visible
+    const isLegacySummary = !summaryUserId;
+    
+    // Exclude test data
+    const isTestData = (summary.metadata as any)?.testData || (summary as any).testData || (summary.metadata as any)?.source === 'test';
+    
+    if (isUserSummary && !isTestData) {
+      console.log('Dashboard: Found user summary:', summary.roomName);
+    } else if (isLegacySummary && !isTestData) {
+      console.log('Dashboard: Found legacy summary (no user ID):', summary.roomName);
+    }
+    
+    return (isUserSummary || isLegacySummary) && !isTestData; // Show user summaries and legacy summaries, exclude test data
+  });
+
+
       
       console.log('Dashboard: Received summaries:', userSummaries.length, 'summaries for user', user.uid);
       console.log('Dashboard: Total summaries in database:', allSummaries.length);
