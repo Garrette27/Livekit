@@ -442,31 +442,91 @@ function RoomClient({ roomName }: { roomName: string }) {
     );
   };
 
-  // Force blue controls
-  useEffect(() => {
-    if (!token) return;
+        // Force blue controls
+      useEffect(() => {
+        if (!token) return;
 
-    const forceBlueControls = () => {
-      const selectors = [
-        '.lk-control-bar',
-        '[data-lk-kind]',
-        '.lk-control-bar button',
-        'button[data-lk-kind]',
-        'button[aria-label*="microphone"]',
-        'button[aria-label*="camera"]',
-        'button[aria-label*="chat"]',
-        'button[aria-label*="leave"]',
-        'button[aria-label*="share"]',
-        '.lk-button',
-        '.lk-button-group button',
-        '.lk-focus-toggle',
-        '.lk-device-menu',
-        '.lk-device-menu button',
-        '.lk-device-menu-item',
-        '.lk-device-menu-item button',
-        '.lk-device-menu-item[role="menuitem"]',
-        '.lk-device-menu-item[role="menuitem"] button'
-      ];
+        const forceBlueControls = () => {
+          // Inject CSS to force blue controls
+          const style = document.createElement('style');
+          style.textContent = `
+            .lk-control-bar button,
+            .lk-control-bar [data-lk-kind],
+            .lk-button,
+            .lk-button-group button,
+            .lk-focus-toggle,
+            .lk-device-menu,
+            .lk-device-menu button,
+            .lk-device-menu-item,
+            .lk-device-menu-item button,
+            [class*="lk-"] button,
+            button[class*="lk-"],
+            button[aria-label*="microphone"],
+            button[aria-label*="camera"],
+            button[aria-label*="chat"],
+            button[aria-label*="leave"],
+            button[aria-label*="share"] {
+              background-color: #2563eb !important;
+              color: white !important;
+              border-color: #1d4ed8 !important;
+              border-radius: 0.75rem !important;
+              padding: 0.75rem 1rem !important;
+              font-weight: 600 !important;
+              min-width: 80px !important;
+              display: flex !important;
+              align-items: center !important;
+              justify-content: center !important;
+              gap: 0.5rem !important;
+              box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important;
+            }
+            
+            .lk-control-bar svg,
+            .lk-button svg,
+            [class*="lk-"] svg,
+            button[aria-label*="microphone"] svg,
+            button[aria-label*="camera"] svg,
+            button[aria-label*="chat"] svg,
+            button[aria-label*="leave"] svg,
+            button[aria-label*="share"] svg {
+              color: white !important;
+              fill: white !important;
+              stroke: white !important;
+            }
+            
+            .lk-control-bar span,
+            .lk-button span,
+            [class*="lk-"] span,
+            button[aria-label*="microphone"] span,
+            button[aria-label*="camera"] span,
+            button[aria-label*="chat"] span,
+            button[aria-label*="leave"] span,
+            button[aria-label*="share"] span {
+              color: white !important;
+              font-weight: 600 !important;
+            }
+          `;
+          document.head.appendChild(style);
+
+          const selectors = [
+            '.lk-control-bar',
+            '[data-lk-kind]',
+            '.lk-control-bar button',
+            'button[data-lk-kind]',
+            'button[aria-label*="microphone"]',
+            'button[aria-label*="camera"]',
+            'button[aria-label*="chat"]',
+            'button[aria-label*="leave"]',
+            'button[aria-label*="share"]',
+            '.lk-button',
+            '.lk-button-group button',
+            '.lk-focus-toggle',
+            '.lk-device-menu',
+            '.lk-device-menu button',
+            '.lk-device-menu-item',
+            '.lk-device-menu-item button',
+            '.lk-device-menu-item[role="menuitem"]',
+            '.lk-device-menu-item[role="menuitem"] button'
+          ];
 
       selectors.forEach(selector => {
         const elements = document.querySelectorAll(selector);
@@ -764,6 +824,21 @@ function RoomClient({ roomName }: { roomName: string }) {
         onDisconnected={() => {
           console.log('Disconnected from room');
           setToken(null);
+          
+          // Update call status in Firestore
+          if (db && roomName) {
+            try {
+              const callRef = doc(db, 'calls', roomName);
+              updateDoc(callRef, {
+                status: 'completed',
+                endedAt: new Date()
+              }).catch(error => {
+                console.error('Error updating call status:', error);
+              });
+            } catch (error) {
+              console.error('Error updating call status:', error);
+            }
+          }
         }}
         onError={(error) => {
           console.error('LiveKit error:', error);

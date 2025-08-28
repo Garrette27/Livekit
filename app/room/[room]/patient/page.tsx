@@ -266,21 +266,24 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         }).catch(error => {
           console.error('Error tracking consultation leave:', error);
         });
+        
+        // Redirect to patient join page instead of main page
+        window.location.href = `/room/${roomName}/patient`;
       }}
       onError={(error) => {
         console.error('LiveKit error:', error);
         setError('Connection error. Please try again.');
       }}
     >
-      {/* Patient-specific controls */}
+      {/* Patient-specific controls - Full screen video interface */}
       <div
         style={{
           position: 'fixed',
           top: '20px',
-          left: '20px',
+          right: '20px',
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           border: '2px solid #059669',
-          borderRadius: '1rem',
+          borderRadius: '0.75rem',
           padding: '1rem',
           zIndex: 9999,
           boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
@@ -323,7 +326,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
           }}>
             Room: {roomName}
           </div>
-          <Link href="/" style={{
+          <Link href={`/room/${roomName}/patient`} style={{
             backgroundColor: '#6B7280',
             color: 'white',
             border: 'none',

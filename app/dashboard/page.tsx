@@ -271,9 +271,10 @@ export default function Dashboard() {
 
   const totalCalls = realSummaries.length;
   const thisMonth = realSummaries.filter(s => {
-    const monthAgo = new Date();
-    monthAgo.setMonth(monthAgo.getMonth() - 1);
-    return s.createdAt?.toDate?.() ? s.createdAt.toDate() > monthAgo : false;
+    const now = new Date();
+    const summaryDate = s.createdAt?.toDate?.() ? s.createdAt.toDate() : (s.createdAt instanceof Date ? s.createdAt : new Date());
+    return summaryDate.getMonth() === now.getMonth() && 
+           summaryDate.getFullYear() === now.getFullYear();
   }).length;
   const avgDuration = realSummaries.length > 0 
     ? Math.round(realSummaries.reduce((acc, s) => acc + (s.duration || 0), 0) / realSummaries.length)
@@ -320,6 +321,26 @@ export default function Dashboard() {
               }}
             >
               New Call
+            </button>
+            <button
+              onClick={() => {
+                const roomName = prompt('Enter room name to join:');
+                if (roomName && roomName.trim()) {
+                  window.location.href = `/room/${roomName.trim()}/patient`;
+                }
+              }}
+              style={{
+                backgroundColor: '#059669',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}
+            >
+              Join Room
             </button>
             <button
               onClick={handleTestWebhook}

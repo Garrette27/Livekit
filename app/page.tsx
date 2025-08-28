@@ -258,6 +258,7 @@ export default function Page() {
             <p style={{ fontSize: '1.125rem', color: '#4B5563', marginBottom: '2rem' }}>Enter a room name to start a secure video consultation.</p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Create Room Section */}
               <div>
                 <label style={{ display: 'block', fontSize: '1.125rem', fontWeight: '500', color: '#374151', marginBottom: '0.75rem' }}>
                   Room Name
@@ -294,6 +295,58 @@ export default function Page() {
                     }}
                   >
                     {isCreating ? 'Creating...' : 'Create Room'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Join Room Section */}
+              <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '1.5rem' }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#374151', marginBottom: '0.75rem' }}>
+                  Join Existing Room
+                </h3>
+                <p style={{ fontSize: '1rem', color: '#6B7280', marginBottom: '1rem' }}>
+                  Have a room link? Enter the room name to join as a patient.
+                </p>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <input
+                    placeholder="Enter room name to join"
+                    style={{ 
+                      flex: '1', 
+                      border: '1px solid #D1D5DB', 
+                      borderRadius: '0.5rem', 
+                      padding: '1rem 1.25rem', 
+                      fontSize: '1.125rem',
+                      backgroundColor: 'white',
+                      color: '#111827'
+                    }}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        const target = e.target as HTMLInputElement;
+                        if (target.value.trim()) {
+                          window.location.href = `/room/${target.value.trim()}/patient`;
+                        }
+                      }
+                    }}
+                  />
+                  <button 
+                    onClick={() => {
+                      const joinRoomName = (document.querySelector('input[placeholder="Enter room name to join"]') as HTMLInputElement)?.value;
+                      if (joinRoomName && joinRoomName.trim()) {
+                        window.location.href = `/room/${joinRoomName.trim()}/patient`;
+                      }
+                    }}
+                    style={{ 
+                      backgroundColor: '#059669', 
+                      color: 'white', 
+                      padding: '1rem 2rem', 
+                      borderRadius: '0.5rem', 
+                      fontWeight: '600', 
+                      fontSize: '1.125rem', 
+                      border: 'none', 
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Join Room
                   </button>
                 </div>
               </div>
