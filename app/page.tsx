@@ -109,7 +109,7 @@ export default function Page() {
       });
 
       // Generate share URL
-      const shareUrl = `${window.location.origin}/room/${roomName}`;
+      const shareUrl = `${window.location.origin}/room/${roomName}/patient`;
       setShareUrl(shareUrl);
       
       console.log('Generated share URL:', shareUrl);

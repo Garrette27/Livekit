@@ -3,7 +3,7 @@ import { getFirebaseAdmin } from '../../../lib/firebase-admin';
 
 export async function POST(req: Request) {
   try {
-    const { roomName } = await req.json();
+    const { roomName, userId } = await req.json();
     console.log('Manual webhook triggered for room:', roomName);
 
     if (!roomName) {
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
 
     // Fetch transcription data and call metadata from Firestore first
     let transcriptionData = null;
-    let createdBy = 'unknown';
+    let createdBy = userId || 'unknown'; // Use provided userId or fallback
     try {
       const db = getFirebaseAdmin();
       if (db) {
@@ -23,7 +23,8 @@ export async function POST(req: Request) {
         if (callDoc.exists) {
           const callData = callDoc.data();
           transcriptionData = callData?.transcription || [];
-          createdBy = callData?.createdBy || callData?.metadata?.createdBy || 'unknown';
+          // Use provided userId, then call data, then fallback
+          createdBy = userId || callData?.createdBy || callData?.metadata?.createdBy || 'unknown';
           console.log('Transcription data found:', transcriptionData.length, 'entries');
           console.log('Call created by:', createdBy);
         } else {

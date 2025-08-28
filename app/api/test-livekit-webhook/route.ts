@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { roomName } = await req.json();
+    const { roomName, userId } = await req.json();
     console.log('Test LiveKit webhook for room:', roomName);
 
     if (!roomName) {
@@ -16,7 +16,10 @@ export async function POST(req: Request) {
         name: roomName,
         sid: `RM_${Date.now()}`,
         creation_time: new Date().toISOString(),
-        metadata: 'test-consultation',
+        metadata: JSON.stringify({
+          test: true,
+          createdBy: userId || 'unknown'
+        }),
         participants: [
           {
             sid: 'PA_doctor',

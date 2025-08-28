@@ -1,4 +1,4 @@
-import { initializeApp, FirebaseApp } from "firebase/app";
+import { initializeApp, FirebaseApp, getApps } from "firebase/app";
 import { getAuth, Auth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
 
@@ -24,20 +24,25 @@ let provider: GoogleAuthProvider | undefined;
 
 if (isClient && hasFirebaseConfig) {
   try {
-    app = initializeApp(firebaseConfig);
-  } catch (error) {
-    // If app is already initialized, get the existing app
-    try {
-      app = initializeApp(firebaseConfig, 'default');
-    } catch (initError) {
-      console.warn('Firebase initialization failed:', initError);
+    // Check if Firebase is already initialized
+    const existingApps = getApps();
+    if (existingApps.length > 0) {
+      app = existingApps[0];
+    } else {
+      app = initializeApp(firebaseConfig);
     }
+  } catch (error) {
+    console.warn('Firebase initialization failed:', error);
   }
 
   if (app) {
-    auth = getAuth(app);
-    db = getFirestore(app);
-    provider = new GoogleAuthProvider();
+    try {
+      auth = getAuth(app);
+      db = getFirestore(app);
+      provider = new GoogleAuthProvider();
+    } catch (error) {
+      console.warn('Firebase services initialization failed:', error);
+    }
   }
 }
 

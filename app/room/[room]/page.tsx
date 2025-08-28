@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { LiveKitRoom, useRoomContext } from '@livekit/components-react';
 import { Room } from 'livekit-client';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, setDoc, updateDoc, getFirestore } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import Link from 'next/link';
 
 // Type definitions for Web Speech API
@@ -34,9 +34,11 @@ function RoomClient({ roomName }: { roomName: string }) {
       return onAuthStateChanged(auth, (user) => {
         setUser(user);
       });
+    } else {
+      console.warn('Firebase auth not initialized');
     }
   }, []);
-  const db = getFirestore();
+  // Use the imported db instance
 
   // Function to create a new room
   const handleCreateNewRoom = async () => {
@@ -54,19 +56,27 @@ function RoomClient({ roomName }: { roomName: string }) {
       setIsCreatingRoom(true);
       
       // Store room creation with user ID
-      const roomRef = doc(db, 'rooms', newRoomName);
-      await setDoc(roomRef, {
-        roomName: newRoomName,
-        createdBy: user?.uid || 'anonymous',
-        createdAt: new Date(),
-        status: 'active',
-        metadata: {
-          createdBy: user?.uid || 'anonymous',
-          userId: user?.uid || 'anonymous',
-          userEmail: user?.email,
-          userName: user?.displayName
+      if (db) {
+        try {
+          const roomRef = doc(db, 'rooms', newRoomName);
+          await setDoc(roomRef, {
+            roomName: newRoomName,
+            createdBy: user?.uid || 'anonymous',
+            createdAt: new Date(),
+            status: 'active',
+            metadata: {
+              createdBy: user?.uid || 'anonymous',
+              userId: user?.uid || 'anonymous',
+              userEmail: user?.email,
+              userName: user?.displayName
+            }
+          });
+        } catch (error) {
+          console.error('Error storing room data:', error);
         }
-      });
+      } else {
+        console.warn('Firestore not initialized');
+      }
 
       // Navigate to the new room
       window.location.href = `/room/${newRoomName}`;
@@ -144,20 +154,26 @@ function RoomClient({ roomName }: { roomName: string }) {
 
         // Store call data in Firestore
         if (db) {
-          const callRef = doc(db, 'calls', roomName);
-          await setDoc(callRef, {
-            roomName,
-            createdBy: user.uid,
-            createdAt: new Date(),
-            status: 'active',
-            metadata: { 
+          try {
+            const callRef = doc(db, 'calls', roomName);
+            await setDoc(callRef, {
+              roomName,
               createdBy: user.uid,
-              userId: user.uid,
-              userEmail: user.email,
-              userName: user.displayName
-            }
-          }, { merge: true });
-          console.log('Call data stored in Firestore with user ID:', user.uid);
+              createdAt: new Date(),
+              status: 'active',
+              metadata: { 
+                createdBy: user.uid,
+                userId: user.uid,
+                userEmail: user.email,
+                userName: user.displayName
+              }
+            }, { merge: true });
+            console.log('Call data stored in Firestore with user ID:', user.uid);
+          } catch (error) {
+            console.error('Error storing call data:', error);
+          }
+        } else {
+          console.warn('Firestore not initialized');
         }
       } catch (error) {
         console.error('Error getting token:', error);
@@ -170,8 +186,33 @@ function RoomClient({ roomName }: { roomName: string }) {
 
   // Transcription capture component
   const TranscriptionCapture = () => {
+    const [recognitionInstance, setRecognitionInstance] = useState<any>(null);
+    const [userInteracted, setUserInteracted] = useState<boolean>(false);
+    
     useEffect(() => {
       if (!token || !roomName) return;
+
+      // Wait for user interaction before starting speech recognition
+      const handleUserInteraction = () => {
+        setUserInteracted(true);
+        document.removeEventListener('click', handleUserInteraction);
+        document.removeEventListener('keydown', handleUserInteraction);
+        document.removeEventListener('touchstart', handleUserInteraction);
+      };
+
+      document.addEventListener('click', handleUserInteraction);
+      document.addEventListener('keydown', handleUserInteraction);
+      document.addEventListener('touchstart', handleUserInteraction);
+
+      return () => {
+        document.removeEventListener('click', handleUserInteraction);
+        document.removeEventListener('keydown', handleUserInteraction);
+        document.removeEventListener('touchstart', handleUserInteraction);
+      };
+    }, [token, roomName]);
+
+    useEffect(() => {
+      if (!token || !roomName || !userInteracted) return;
 
       console.log('Setting up transcription for room:', roomName);
       
@@ -181,6 +222,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         return;
       }
 
+      // Create a single recognition instance
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
@@ -210,13 +252,17 @@ function RoomClient({ roomName }: { roomName: string }) {
               
               // Store in Firestore
               if (db) {
-                const callRef = doc(db, 'calls', roomName);
-                updateDoc(callRef, {
-                  transcription: newTranscription,
-                  lastTranscriptionUpdate: new Date()
-                }).catch(error => {
-                  console.error('Error storing transcription:', error);
-                });
+                try {
+                  const callRef = doc(db, 'calls', roomName);
+                  updateDoc(callRef, {
+                    transcription: newTranscription,
+                    lastTranscriptionUpdate: new Date()
+                  }).catch(error => {
+                    console.error('Error storing transcription:', error);
+                  });
+                } catch (error) {
+                  console.error('Error with Firestore operation:', error);
+                }
               }
               
               return newTranscription;
@@ -229,29 +275,38 @@ function RoomClient({ roomName }: { roomName: string }) {
         console.error('🎤 Speech recognition error:', event.error);
         setSpeechRecognitionStatus('error');
         
-        // Restart recognition after error
-        setTimeout(() => {
-          try {
-            recognition.start();
-          } catch (error) {
-            console.error('Failed to restart speech recognition:', error);
-          }
-        }, 1000);
+        // Only restart if it's not an aborted error
+        if (event.error !== 'aborted') {
+          setTimeout(() => {
+            try {
+              if (recognition.state !== 'recording') {
+                recognition.start();
+              }
+            } catch (error) {
+              console.error('Failed to restart speech recognition:', error);
+            }
+          }, 2000);
+        }
       };
 
       recognition.onend = () => {
         console.log('🎤 Speech recognition ended');
         setSpeechRecognitionStatus('stopped');
         
-        // Restart recognition
+        // Only restart if component is still mounted and token is valid
         setTimeout(() => {
           try {
-            recognition.start();
+            if (recognition.state !== 'recording') {
+              recognition.start();
+            }
           } catch (error) {
             console.error('Failed to restart speech recognition:', error);
           }
-        }, 1000);
+        }, 2000);
       };
+
+      // Store the recognition instance
+      setRecognitionInstance(recognition);
 
       try {
         recognition.start();
@@ -262,7 +317,9 @@ function RoomClient({ roomName }: { roomName: string }) {
 
       return () => {
         try {
-          recognition.stop();
+          if (recognition && recognition.state === 'recording') {
+            recognition.stop();
+          }
         } catch (error) {
           console.error('Error stopping speech recognition:', error);
         }
@@ -322,13 +379,17 @@ function RoomClient({ roomName }: { roomName: string }) {
                 
                 // Store in Firestore
                 if (db) {
-                  const callRef = doc(db, 'calls', roomName);
-                  updateDoc(callRef, {
-                    transcription: newTranscription,
-                    lastTranscriptionUpdate: new Date()
-                  }).catch(error => {
-                    console.error('Error storing manual note:', error);
-                  });
+                  try {
+                    const callRef = doc(db, 'calls', roomName);
+                    updateDoc(callRef, {
+                      transcription: newTranscription,
+                      lastTranscriptionUpdate: new Date()
+                    }).catch(error => {
+                      console.error('Error storing manual note:', error);
+                    });
+                  } catch (error) {
+                    console.error('Error with Firestore operation:', error);
+                  }
                 }
                 
                 return newTranscription;
@@ -532,9 +593,9 @@ function RoomClient({ roomName }: { roomName: string }) {
               <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>🔗 Room Link</h3>
               <p style={{ fontSize: '1rem', color: '#6B7280', marginBottom: '1rem' }}>Share this link with your patient:</p>
               <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                <input
-                  value={`https://livekit-frontend-tau.vercel.app/room/${roomName}`}
-                  readOnly
+                                  <input
+                    value={`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
+                    readOnly
                   style={{ 
                     flex: '1', 
                     border: '1px solid #D1D5DB', 
@@ -547,7 +608,7 @@ function RoomClient({ roomName }: { roomName: string }) {
                 />
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}`);
+                    navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
                     alert('Room link copied to clipboard!');
                   }}
                   style={{ 
@@ -724,7 +785,7 @@ function RoomClient({ roomName }: { roomName: string }) {
             }}>
               <input
                 type="text"
-                value={`https://livekit-frontend-tau.vercel.app/room/${roomName}`}
+                value={`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
                 readOnly
                 style={{
                   flex: 1,
@@ -738,7 +799,7 @@ function RoomClient({ roomName }: { roomName: string }) {
               />
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}`);
+                  navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
                   alert('Room link copied to clipboard!');
                 }}
                 style={{

@@ -3,7 +3,7 @@ import { getFirebaseAdmin } from '../../../lib/firebase-admin';
 
 export async function POST(req: Request) {
   try {
-    const { roomName, testData } = await req.json();
+    const { roomName, testData, userId } = await req.json();
     console.log('Test transcription triggered for room:', roomName);
 
     if (!roomName) {
@@ -29,7 +29,13 @@ export async function POST(req: Request) {
         roomName,
         transcription: testTranscription,
         lastTranscriptionUpdate: new Date(),
-        testData: true
+        testData: true,
+        createdBy: userId || 'unknown', // Store user ID
+        metadata: {
+          createdBy: userId || 'unknown',
+          userId: userId || 'unknown',
+          testData: true
+        }
       });
       
       console.log(`✅ Test transcription stored for room: ${roomName}`);
