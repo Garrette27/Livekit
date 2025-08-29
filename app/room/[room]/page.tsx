@@ -62,7 +62,15 @@ function RoomClient({ roomName }: { roomName: string }) {
       };
       checkRoomOwnership();
     }
-  }, [user, roomName]);
+  }, [user, roomName, db]);
+
+  // Check for existing token on page load
+  useEffect(() => {
+    const savedToken = localStorage.getItem(`doctorToken_${roomName}`);
+    if (savedToken) {
+      setToken(savedToken);
+    }
+  }, [roomName]);
 
   // Function to create a new room
   const handleCreateNewRoom = async () => {
@@ -138,6 +146,8 @@ function RoomClient({ roomName }: { roomName: string }) {
         throw new Error(data.error || 'Failed to get token');
       }
 
+      // Save token to localStorage for persistence
+      localStorage.setItem(`doctorToken_${roomName}`, data.token);
       setToken(data.token);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to join room';
@@ -173,6 +183,9 @@ function RoomClient({ roomName }: { roomName: string }) {
 
         const data = await response.json();
         console.log('Token received:', data);
+        
+        // Save token to localStorage for persistence
+        localStorage.setItem(`doctorToken_${roomName}`, data.token);
         setToken(data.token);
         setTokenError(null);
 
@@ -206,7 +219,7 @@ function RoomClient({ roomName }: { roomName: string }) {
     };
 
     getToken();
-  }, [roomName, user, db]);
+  }, [roomName, user]);
 
   // Transcription capture component
   const TranscriptionCapture = () => {
@@ -348,7 +361,7 @@ function RoomClient({ roomName }: { roomName: string }) {
           console.error('Error stopping speech recognition:', error);
         }
       };
-    }, [token, roomName, db]);
+    }, [token, roomName, userInteracted]);
 
     return null;
   };
@@ -487,6 +500,8 @@ function RoomClient({ roomName }: { roomName: string }) {
               justify-content: center !important;
               gap: 0.5rem !important;
               box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important;
+              z-index: 1000 !important;
+              position: relative !important;
             }
             
             /* Force ALL LiveKit icons to be white */
@@ -553,6 +568,35 @@ function RoomClient({ roomName }: { roomName: string }) {
               transform: none !important;
               transition: none !important;
             }
+            
+            /* Ensure control bar is visible */
+            .lk-control-bar {
+              position: fixed !important;
+              bottom: 20px !important;
+              left: 50% !important;
+              transform: translateX(-50%) !important;
+              z-index: 1000 !important;
+              background-color: rgba(0, 0, 0, 0.8) !important;
+              border-radius: 1rem !important;
+              padding: 1rem !important;
+              display: flex !important;
+              gap: 0.5rem !important;
+              align-items: center !important;
+            }
+            
+            /* Ensure video elements are properly sized */
+            .lk-video-conference {
+              width: 100vw !important;
+              height: 100vh !important;
+              position: relative !important;
+            }
+            
+            /* Ensure participant video is visible */
+            .lk-participant-video {
+              width: 100% !important;
+              height: 100% !important;
+              object-fit: cover !important;
+            }
           `;
           document.head.appendChild(style);
 
@@ -593,6 +637,8 @@ function RoomClient({ roomName }: { roomName: string }) {
             element.style.setProperty('justify-content', 'center', 'important');
             element.style.setProperty('gap', '0.5rem', 'important');
             element.style.setProperty('box-shadow', '0 4px 6px -1px rgba(37, 99, 235, 0.2)', 'important');
+            element.style.setProperty('z-index', '1000', 'important');
+            element.style.setProperty('position', 'relative', 'important');
           }
         });
       });
@@ -748,9 +794,11 @@ function RoomClient({ roomName }: { roomName: string }) {
               <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>🔗 Room Link</h3>
               <p style={{ fontSize: '1rem', color: '#6B7280', marginBottom: '1rem' }}>Share this link with your patient:</p>
               <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                                  <input
-                    value={`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
-                    readOnly
+                <input
+                  id="roomUrl"
+                  name="roomUrl"
+                  value={`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
+                  readOnly
                   style={{ 
                     flex: '1', 
                     border: '1px solid #D1D5DB', 
@@ -824,10 +872,12 @@ function RoomClient({ roomName }: { roomName: string }) {
               
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
                 <div style={{ flex: '1' }}>
-                  <label style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                  <label htmlFor="newRoomName" style={{ display: 'block', fontSize: '1rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
                     New Room Name
                   </label>
                   <input
+                    id="newRoomName"
+                    name="newRoomName"
                     value={newRoomName}
                     onChange={(e) => setNewRoomName(e.target.value)}
                     placeholder="e.g., dr-smith-aug16"
@@ -876,6 +926,9 @@ function RoomClient({ roomName }: { roomName: string }) {
         onDisconnected={() => {
           console.log('Disconnected from room');
           setToken(null);
+          
+          // Clear stored token
+          localStorage.removeItem(`doctorToken_${roomName}`);
           
           // Update call status in Firestore - use setDoc with merge to avoid "No document to update" error
           if (db && roomName) {
@@ -953,8 +1006,10 @@ function RoomClient({ roomName }: { roomName: string }) {
             marginBottom: '0.75rem'
             }}>
               <input
+                id="roomUrlDisplay"
+                name="roomUrlDisplay"
                 type="text"
-              value={`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
+                value={`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
                 readOnly
                 style={{
                   flex: 1,
@@ -1039,13 +1094,21 @@ function RoomClient({ roomName }: { roomName: string }) {
               fontSize: '1rem',
               fontWeight: '600'
             }}>
-              📋 Room Information
+              🔗 Room Information
             </h3>
             <p style={{
               margin: '0',
               color: '#6b7280',
               fontSize: '0.875rem',
               marginBottom: '0.5rem'
+            }}>
+              Connected as: {user?.displayName || user?.email || 'Doctor'}
+            </p>
+            <p style={{
+              margin: '0',
+              color: '#6b7280',
+              fontSize: '0.875rem',
+              marginBottom: '0.75rem'
             }}>
               Room: {roomName}
             </p>
@@ -1086,6 +1149,26 @@ function RoomClient({ roomName }: { roomName: string }) {
               }}
             >
               Copy Patient Link
+            </button>
+            
+            {/* Join as Patient Button */}
+            <button
+              onClick={() => {
+                window.open(`/room/${roomName}/patient`, '_blank');
+              }}
+              style={{
+                backgroundColor: '#059669',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.375rem',
+                padding: '0.25rem 0.5rem',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                width: '100%',
+                marginTop: '0.5rem'
+              }}
+            >
+              Join as Patient
             </button>
           </div>
         </div>

@@ -35,21 +35,21 @@ export default function Dashboard() {
   // Handle authentication
   useEffect(() => {
     if (auth) {
-      return onAuthStateChanged(auth, (user) => {
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
         console.log('Dashboard: Auth state changed:', user ? 'User logged in' : 'No user');
         setUser(user);
       });
+      return unsubscribe;
     }
   }, []);
 
   // Fetch summaries from Firestore
   useEffect(() => {
-    if (!user) return;
+    if (!user || !db) return;
 
     console.log('Dashboard: Setting up Firestore listener for call-summaries');
     console.log('Dashboard: Current user ID:', user.uid);
     
-    const db = getFirestore();
     const summariesRef = collection(db, 'call-summaries');
     
     // Use a simpler query that doesn't require a composite index
@@ -96,6 +96,33 @@ export default function Dashboard() {
     }, (error) => {
       console.error('Dashboard: Error fetching summaries:', error);
       setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Also fetch real consultations from the consultations collection for additional tracking
+  useEffect(() => {
+    if (!user || !db) return;
+
+    const consultationsRef = collection(db, 'consultations');
+    const q = query(
+      consultationsRef,
+      where('isRealConsultation', '==', true),
+      orderBy('joinedAt', 'desc'),
+      limit(50)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const realConsultations = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      console.log('Dashboard: Found real consultations:', realConsultations.length);
+      // You can use this data to update statistics or show additional info
+    }, (error) => {
+      console.error('Dashboard: Error fetching consultations:', error);
     });
 
     return () => unsubscribe();
@@ -187,7 +214,9 @@ export default function Dashboard() {
   };
 
   const handleSignOut = () => {
-    auth?.signOut();
+    if (auth) {
+      auth.signOut();
+    }
     window.location.href = '/';
   };
 
@@ -281,33 +310,6 @@ export default function Dashboard() {
   const avgDuration = realSummaries.length > 0 
     ? Math.round(realSummaries.reduce((acc, s) => acc + (s.duration || 0), 0) / realSummaries.length)
     : 0;
-
-  // Also fetch real consultations from the consultations collection for additional tracking
-  useEffect(() => {
-    if (!user || !db) return;
-
-    const consultationsRef = collection(db, 'consultations');
-    const q = query(
-      consultationsRef,
-      where('isRealConsultation', '==', true),
-      orderBy('joinedAt', 'desc'),
-      limit(50)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const realConsultations = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      console.log('Dashboard: Found real consultations:', realConsultations.length);
-      // You can use this data to update statistics or show additional info
-    }, (error) => {
-      console.error('Dashboard: Error fetching consultations:', error);
-    });
-
-    return () => unsubscribe();
-  }, [user, db]);
 
   return (
     <div style={{ 

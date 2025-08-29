@@ -36,9 +36,10 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
   // Check if patient was already in call
   useEffect(() => {
     const wasInCall = localStorage.getItem(`patientInCall_${roomName}`);
-    if (wasInCall === 'true' && patientName) {
+    const savedToken = localStorage.getItem(`patientToken_${roomName}`);
+    if (wasInCall === 'true' && patientName && savedToken) {
       // Auto-rejoin if patient was previously in call
-      handleJoinAsPatient();
+      setToken(savedToken);
     }
   }, [patientName, roomName]);
 
@@ -83,6 +84,8 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         throw new Error(data.error || 'Failed to get token');
       }
 
+      // Save token to localStorage for persistence
+      localStorage.setItem(`patientToken_${roomName}`, data.token);
       setToken(data.token);
 
       // Track patient joining consultation
@@ -144,10 +147,12 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
             
             {/* Patient Name Input */}
             <div style={{ marginBottom: '2rem' }}>
-              <label style={{ display: 'block', fontSize: '1.125rem', fontWeight: '500', color: '#374151', marginBottom: '0.75rem' }}>
+              <label htmlFor="patientName" style={{ display: 'block', fontSize: '1.125rem', fontWeight: '500', color: '#374151', marginBottom: '0.75rem' }}>
                 Your Name
               </label>
               <input
+                id="patientName"
+                name="patientName"
                 value={patientName}
                 onChange={(e) => setPatientName(e.target.value)}
                 placeholder="Enter your full name"
@@ -254,6 +259,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
           setToken(null);
           // Clear the in-call flag when disconnected
           localStorage.removeItem(`patientInCall_${roomName}`);
+          localStorage.removeItem(`patientToken_${roomName}`);
           
           // Track patient leaving consultation
           fetch('/api/track-consultation', {
@@ -276,7 +282,103 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
           setError('Connection error. Please try again.');
         }}
       >
-        {/* Patient-specific overlay - Full screen video interface */}
+        {/* Force blue controls for patient view */}
+        {token && (
+          <div style={{ display: 'none' }}>
+            <style jsx>{`
+              /* Force ALL LiveKit controls to be blue */
+              .lk-control-bar button,
+              .lk-control-bar [data-lk-kind],
+              .lk-button,
+              .lk-button-group button,
+              .lk-focus-toggle,
+              .lk-device-menu,
+              .lk-device-menu button,
+              .lk-device-menu-item,
+              .lk-device-menu-item button,
+              [class*="lk-"] button,
+              button[class*="lk-"],
+              button[aria-label*="microphone"],
+              button[aria-label*="camera"],
+              button[aria-label*="chat"],
+              button[aria-label*="leave"],
+              button[aria-label*="share"] {
+                background-color: #2563eb !important;
+                color: white !important;
+                border-color: #1d4ed8 !important;
+                border-radius: 0.75rem !important;
+                padding: 0.75rem 1rem !important;
+                font-weight: 600 !important;
+                min-width: 80px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 0.5rem !important;
+                box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important;
+                z-index: 1000 !important;
+                position: relative !important;
+              }
+              
+              /* Force ALL LiveKit icons to be white */
+              .lk-control-bar svg,
+              .lk-button svg,
+              [class*="lk-"] svg,
+              button[aria-label*="microphone"] svg,
+              button[aria-label*="camera"] svg,
+              button[aria-label*="chat"] svg,
+              button[aria-label*="leave"] svg,
+              button[aria-label*="share"] svg {
+                color: white !important;
+                fill: white !important;
+                stroke: white !important;
+              }
+              
+              /* Force ALL LiveKit text to be white */
+              .lk-control-bar span,
+              .lk-button span,
+              [class*="lk-"] span,
+              button[aria-label*="microphone"] span,
+              button[aria-label*="camera"] span,
+              button[aria-label*="chat"] span,
+              button[aria-label*="leave"] span,
+              button[aria-label*="share"] span {
+                color: white !important;
+                font-weight: 600 !important;
+              }
+              
+              /* Ensure control bar is visible */
+              .lk-control-bar {
+                position: fixed !important;
+                bottom: 20px !important;
+                left: 50% !important;
+                transform: translateX(-50%) !important;
+                z-index: 1000 !important;
+                background-color: rgba(0, 0, 0, 0.8) !important;
+                border-radius: 1rem !important;
+                padding: 1rem !important;
+                display: flex !important;
+                gap: 0.5rem !important;
+                align-items: center !important;
+              }
+              
+              /* Ensure video elements are properly sized */
+              .lk-video-conference {
+                width: 100vw !important;
+                height: 100vh !important;
+                position: relative !important;
+              }
+              
+              /* Ensure participant video is visible */
+              .lk-participant-video {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: cover !important;
+              }
+            `}</style>
+          </div>
+        )}
+
+        {/* Room URL Display - Always Visible */}
         <div
           style={{
             position: 'fixed',
@@ -298,15 +400,23 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
               fontSize: '1rem',
               fontWeight: '600'
             }}>
-              👤 Patient View
+              🔗 Room Information
             </h3>
+            <p style={{ 
+              margin: '0', 
+              color: '#6b7280', 
+              fontSize: '0.875rem',
+              marginBottom: '0.5rem'
+            }}>
+              Connected as: {patientName}
+            </p>
             <p style={{ 
               margin: '0', 
               color: '#6b7280', 
               fontSize: '0.875rem',
               marginBottom: '0.75rem'
             }}>
-              Connected as: {patientName}
+              Room: {roomName}
             </p>
           </div>
           
@@ -325,7 +435,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
               wordBreak: 'break-all',
               marginBottom: '0.5rem'
             }}>
-              Room: {roomName}
+              {`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
             </div>
             <Link href={`/room/${roomName}/patient`} style={{
               backgroundColor: '#6B7280',
@@ -337,9 +447,28 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
               fontWeight: '600',
               cursor: 'pointer',
               textDecoration: 'none',
-              display: 'inline-block'
+              display: 'inline-block',
+              textAlign: 'center'
             }}>
               Leave Call
+            </Link>
+            
+            {/* Join as Doctor Button */}
+            <Link href={`/room/${roomName}`} style={{
+              backgroundColor: '#2563eb',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.375rem',
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              textDecoration: 'none',
+              display: 'inline-block',
+              textAlign: 'center',
+              marginTop: '0.5rem'
+            }}>
+              Join as Doctor
             </Link>
           </div>
         </div>
