@@ -916,8 +916,30 @@ function RoomClient({ roomName }: { roomName: string }) {
     );
   }
 
+  // Debug logging
+  console.log('Rendering room info panel, token:', !!token, 'user:', !!user, 'roomName:', roomName);
+
   return (
     <>
+      {/* Test Panel - Always Visible */}
+      <div
+        style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          backgroundColor: '#00ff00',
+          border: '3px solid #000',
+          borderRadius: '0.5rem',
+          padding: '1rem',
+          zIndex: 10001,
+          fontSize: '1rem',
+          fontWeight: 'bold',
+          color: 'black'
+        }}
+      >
+        TEST PANEL - ALWAYS VISIBLE
+      </div>
+      
       <TranscriptionCapture />
       
       <LiveKitRoom
@@ -1182,24 +1204,25 @@ function RoomClient({ roomName }: { roomName: string }) {
         <div
           style={{
             position: 'fixed',
-            top: '20px',
+            top: '100px',
             right: '20px',
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            border: '2px solid #2563eb',
+            backgroundColor: '#ff0000',
+            border: '3px solid #2563eb',
             borderRadius: '0.75rem',
             padding: '0.75rem',
-            zIndex: 9999,
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+            zIndex: 10000,
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
             maxWidth: isInfoPanelCollapsed ? '60px' : '280px',
             fontSize: '0.875rem',
-            transition: 'max-width 0.3s ease'
+            transition: 'max-width 0.3s ease',
+            minHeight: '50px'
           }}
         >
           <div style={{ marginBottom: '0.75rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
               <h3 style={{ 
                 margin: '0', 
-                color: '#1e40af', 
+                color: '#ffffff', 
                 fontSize: '1rem',
                 fontWeight: '600'
               }}>
