@@ -917,22 +917,53 @@ function RoomClient({ roomName }: { roomName: string }) {
   }
 
   // Debug logging
+  console.log('=== DOCTOR ROOM DEBUG ===');
   console.log('Rendering room info panel, token:', !!token, 'user:', !!user, 'roomName:', roomName);
+  console.log('isInfoPanelCollapsed:', isInfoPanelCollapsed);
+  console.log('=== END DEBUG ===');
+  
+  // Alert to confirm deployment
+  if (typeof window !== 'undefined') {
+    console.log('Window is defined, showing alert');
+    // Only show alert once per session
+    if (!sessionStorage.getItem('doctorPanelAlertShown')) {
+      alert('Doctor panel changes deployed! Look for red test box and green room info panel.');
+      sessionStorage.setItem('doctorPanelAlertShown', 'true');
+    }
+  }
 
   return (
     <>
+      {/* TEST ELEMENT - ALWAYS VISIBLE */}
+      <div
+        style={{
+          position: 'fixed',
+          top: '10px',
+          left: '10px',
+          backgroundColor: '#ff0000',
+          color: 'white',
+          padding: '10px',
+          zIndex: 10002,
+          fontSize: '16px',
+          fontWeight: 'bold',
+          border: '3px solid black'
+        }}
+      >
+        DOCTOR PANEL TEST - VISIBLE
+      </div>
+      
       {/* Room Information Panel - Always Visible (Outside LiveKitRoom) */}
       <div
         style={{
           position: 'fixed',
           top: '20px',
           right: '20px',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          border: '2px solid #2563eb',
+          backgroundColor: '#00ff00',
+          border: '3px solid #000000',
           borderRadius: '0.75rem',
           padding: '0.75rem',
           zIndex: 10001,
-          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
           maxWidth: isInfoPanelCollapsed ? '60px' : '280px',
           fontSize: '0.875rem',
           transition: 'max-width 0.3s ease',
@@ -941,14 +972,14 @@ function RoomClient({ roomName }: { roomName: string }) {
       >
         <div style={{ marginBottom: '0.75rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <h3 style={{ 
-              margin: '0', 
-              color: '#1e40af', 
-              fontSize: '1rem',
-              fontWeight: '600'
-            }}>
-              🔗 Room Info
-            </h3>
+                          <h3 style={{ 
+                margin: '0', 
+                color: '#000000', 
+                fontSize: '1rem',
+                fontWeight: '600'
+              }}>
+                🔗 Room Info
+              </h3>
             <button
               onClick={() => setIsInfoPanelCollapsed(!isInfoPanelCollapsed)}
               style={{
