@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { LiveKitRoom } from '@livekit/components-react';
+import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import Link from 'next/link';
 import { auth, provider } from '@/lib/firebase';
 import { signInWithPopup, onAuthStateChanged, User, signOut } from 'firebase/auth';
@@ -14,6 +14,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isInfoPanelCollapsed, setIsInfoPanelCollapsed] = useState<boolean>(false);
 
   // Handle authentication
   useEffect(() => {
@@ -313,6 +314,8 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
         connect={true}
+        audio
+        video
         onDisconnected={() => {
           console.log('Patient disconnected from room');
           setToken(null);
@@ -341,6 +344,8 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
           setError('Connection error. Please try again.');
         }}
       >
+        {/* Video Conference Component - This provides the actual video controls */}
+        <VideoConference />
         {/* Force blue controls for patient view */}
         {token && (
           <div style={{ display: 'none' }}>
@@ -437,7 +442,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
           </div>
         )}
 
-        {/* Room URL Display - Always Visible */}
+        {/* Room Information Panel - Collapsible */}
         <div
           style={{
             position: 'fixed',
@@ -446,82 +451,88 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
             backgroundColor: 'rgba(255, 255, 255, 0.95)',
             border: '2px solid #059669',
             borderRadius: '0.75rem',
-            padding: '1rem',
+            padding: '0.75rem',
             zIndex: 9999,
             boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-            maxWidth: '300px'
+            maxWidth: isInfoPanelCollapsed ? '60px' : '280px',
+            fontSize: '0.875rem',
+            transition: 'max-width 0.3s ease'
           }}
         >
           <div style={{ marginBottom: '0.75rem' }}>
-            <h3 style={{ 
-              margin: '0 0 0.5rem 0', 
-              color: '#047857', 
-              fontSize: '1rem',
-              fontWeight: '600'
-            }}>
-              🔗 Room Information
-            </h3>
-            <p style={{ 
-              margin: '0', 
-              color: '#6b7280', 
-              fontSize: '0.875rem',
-              marginBottom: '0.5rem'
-            }}>
-              Connected as: {patientName}
-            </p>
-            <p style={{ 
-              margin: '0', 
-              color: '#6b7280', 
-              fontSize: '0.875rem',
-              marginBottom: '0.75rem'
-            }}>
-              Room: {roomName}
-            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <h3 style={{ 
+                margin: '0', 
+                color: '#047857', 
+                fontSize: '1rem',
+                fontWeight: '600'
+              }}>
+                🔗 Room Info
+              </h3>
+              <button
+                onClick={() => setIsInfoPanelCollapsed(!isInfoPanelCollapsed)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  color: '#047857',
+                  padding: '0.25rem'
+                }}
+              >
+                {isInfoPanelCollapsed ? '▶' : '◀'}
+              </button>
+            </div>
+            {!isInfoPanelCollapsed && (
+              <>
+                <p style={{ 
+                  margin: '0', 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  marginBottom: '0.5rem'
+                }}>
+                  Connected as: {patientName}
+                </p>
+                <p style={{ 
+                  margin: '0', 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  marginBottom: '0.75rem'
+                }}>
+                  Room: {roomName}
+                </p>
+              </>
+            )}
           </div>
           
-          <div style={{
-            display: 'flex',
-            gap: '0.5rem',
-            flexDirection: 'column'
-          }}>
+          {!isInfoPanelCollapsed && (
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem',
+              flexDirection: 'column'
+            }}>
             <div style={{
               backgroundColor: '#f3f4f6',
               border: '1px solid #d1d5db',
               borderRadius: '0.375rem',
-              padding: '0.5rem',
-              fontSize: '0.75rem',
+              padding: '0.375rem',
+              fontSize: '0.7rem',
               color: '#374151',
               wordBreak: 'break-all',
               marginBottom: '0.5rem'
             }}>
               {`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
             </div>
-            <Link href={`/room/${roomName}/patient`} style={{
-              backgroundColor: '#6B7280',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.375rem',
-              padding: '0.5rem 0.75rem',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              textDecoration: 'none',
-              display: 'inline-block',
-              textAlign: 'center'
-            }}>
-              Leave Call
-            </Link>
-            
-            {/* Join as Patient Button */}
             <button
               onClick={() => {
                 // Clear current token and redirect to patient join page
                 localStorage.removeItem(`patientToken_${roomName}`);
                 localStorage.removeItem(`patientInCall_${roomName}`);
+                setToken(null);
                 window.location.href = `/room/${roomName}/patient`;
               }}
               style={{
-                backgroundColor: '#059669',
+                backgroundColor: '#6B7280',
                 color: 'white',
                 border: 'none',
                 borderRadius: '0.375rem',
@@ -531,12 +542,13 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
                 cursor: 'pointer',
                 textDecoration: 'none',
                 display: 'inline-block',
-                textAlign: 'center',
-                marginTop: '0.5rem'
+                textAlign: 'center'
               }}
             >
-              Join as Patient
+              Leave Call
             </button>
+            
+
             
             {/* Join as Doctor Button */}
             <Link href={`/room/${roomName}`} style={{
@@ -555,7 +567,8 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
             }}>
               Join as Doctor
             </Link>
-          </div>
+            </div>
+          )}
         </div>
       </LiveKitRoom>
     </div>

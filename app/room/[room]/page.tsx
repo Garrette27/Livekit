@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { LiveKitRoom, useRoomContext } from '@livekit/components-react';
+import { LiveKitRoom, useRoomContext, VideoConference } from '@livekit/components-react';
 import { Room } from 'livekit-client';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -923,6 +923,8 @@ function RoomClient({ roomName }: { roomName: string }) {
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
         connect={true}
+        audio
+        video
         onDisconnected={() => {
           console.log('Disconnected from room');
           setToken(null);
@@ -949,6 +951,8 @@ function RoomClient({ roomName }: { roomName: string }) {
           console.error('LiveKit error:', error);
         }}
       >
+        {/* Video Conference Component - This provides the actual video controls */}
+        <VideoConference />
         <ManualTranscriptionInput />
         
         {/* Room Link Display - Always Visible */}
