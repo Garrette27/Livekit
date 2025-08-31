@@ -960,7 +960,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         <VideoConference />
         <ManualTranscriptionInput />
         
-        {/* Room Information Panel - Collapsible (Fixed positioning) */}
+        {/* Room Information Panel - Collapsible (Same as Patient Page) */}
         <div
           style={{
             position: 'fixed',
@@ -970,12 +970,11 @@ function RoomClient({ roomName }: { roomName: string }) {
             border: '2px solid #059669',
             borderRadius: '0.75rem',
             padding: '0.75rem',
-            zIndex: 99999,
+            zIndex: 9999,
             boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
             maxWidth: isInfoPanelCollapsed ? '60px' : '280px',
             fontSize: '0.875rem',
-            transition: 'max-width 0.3s ease',
-            backdropFilter: 'blur(10px)'
+            transition: 'max-width 0.3s ease'
           }}
         >
           <div style={{ marginBottom: '0.75rem' }}>
@@ -1084,6 +1083,8 @@ function RoomClient({ roomName }: { roomName: string }) {
             >
               Leave Call
             </button>
+            
+
             
             {/* Join as Patient Button */}
             <Link href={`/room/${roomName}/patient`} style={{
