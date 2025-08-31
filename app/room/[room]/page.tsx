@@ -924,7 +924,7 @@ function RoomClient({ roomName }: { roomName: string }) {
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
-      {/* Room Information Panel - Collapsible (Same as Patient Page) */}
+      {/* Room Information Panel - Collapsible */}
       <div
         style={{
           position: 'fixed',
@@ -1029,28 +1029,24 @@ function RoomClient({ roomName }: { roomName: string }) {
             Leave Call
           </button>
           
+          
           {/* Join as Patient Button */}
-          <button
-            onClick={() => {
-              window.open(`/room/${roomName}/patient`, '_blank');
-            }}
-            style={{
-              backgroundColor: '#2563eb',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.375rem',
-              padding: '0.5rem 0.75rem',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              textDecoration: 'none',
-              display: 'inline-block',
-              textAlign: 'center',
-              marginTop: '0.5rem'
-            }}
-          >
+          <Link href={`/room/${roomName}/patient`} style={{
+            backgroundColor: '#2563eb',
+            color: 'white',
+            border: 'none',
+            borderRadius: '0.375rem',
+            padding: '0.5rem 0.75rem',
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            cursor: 'pointer',
+            textDecoration: 'none',
+            display: 'inline-block',
+            textAlign: 'center',
+            marginTop: '0.5rem'
+          }}>
             Join as Patient
-          </button>
+          </Link>
           </div>
         )}
       </div>
@@ -1093,127 +1089,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         <VideoConference />
         <ManualTranscriptionInput />
         
-        {/* Room Link Display - Top Left */}
-        <div
-          style={{
-            position: 'fixed',
-            top: '20px',
-            left: '20px',
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            border: '2px solid #2563eb',
-            borderRadius: '1rem',
-            padding: '1rem',
-            zIndex: 9998,
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-            maxWidth: '400px'
-          }}
-        >
-          {/* Back to Home Button */}
-          <div style={{ marginBottom: '0.75rem' }}>
-            <Link href="/" style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              color: '#6b7280',
-              textDecoration: 'none',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}>
-              ← Back to Home
-            </Link>
-          </div>
-          
-          <div style={{ marginBottom: '0.75rem' }}>
-            <h3 style={{ 
-              margin: '0 0 0.5rem 0', 
-              color: '#1e40af', 
-              fontSize: '1rem',
-              fontWeight: '600'
-            }}>
-              🔗 Room Link
-            </h3>
-            <p style={{ 
-              margin: '0', 
-              color: '#6b7280', 
-              fontSize: '0.875rem',
-              marginBottom: '0.75rem'
-            }}>
-              Share this link with your patient:
-            </p>
-          </div>
-          
-          <div style={{
-            display: 'flex',
-            gap: '0.5rem',
-            alignItems: 'center',
-            marginBottom: '0.75rem'
-          }}>
-            <input
-              id="roomUrlDisplay"
-              name="roomUrlDisplay"
-              type="text"
-              value={`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
-              readOnly
-              style={{
-                flex: 1,
-                padding: '0.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                backgroundColor: '#f9fafb',
-                color: '#374151'
-              }}
-            />
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
-                alert('Room link copied to clipboard!');
-              }}
-              style={{
-                backgroundColor: '#059669',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                padding: '0.5rem 0.75rem',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              Copy
-            </button>
-          </div>
-          
-          {/* Create New Room Button */}
-          <div style={{
-            display: 'flex',
-            gap: '0.5rem'
-          }}>
-            <button
-              onClick={() => {
-                const newRoomName = prompt('Enter new room name:');
-                if (newRoomName && newRoomName.trim()) {
-                  window.location.href = `/room/${newRoomName.trim()}`;
-                }
-              }}
-              style={{
-                backgroundColor: '#7c3aed',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                padding: '0.5rem 0.75rem',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flex: 1
-              }}
-            >
-              Create New Room
-            </button>
-          </div>
-        </div>
+        
 
 
 
