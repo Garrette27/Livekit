@@ -923,7 +923,7 @@ function RoomClient({ roomName }: { roomName: string }) {
   console.log('=== END DEBUG ===');
 
   return (
-    <>
+    <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       {/* Room Information Panel - Collapsible (Same as Patient Page) */}
       <div
         style={{
@@ -1239,7 +1239,7 @@ function RoomClient({ roomName }: { roomName: string }) {
           </div>
         )}
       </LiveKitRoom>
-    </>
+    </div>
   );
 }
 
