@@ -55,6 +55,9 @@ function RoomClient({ roomName }: { roomName: string }) {
               // This is the doctor who created the room, auto-join
               console.log('Doctor detected, auto-joining room:', roomName);
               handleJoinRoom();
+              
+              // Mark that this doctor has generated a link for this room
+              localStorage.setItem(`doctorGeneratedLink_${roomName}`, 'true');
             }
           }
         } catch (error) {
@@ -753,6 +756,11 @@ function RoomClient({ roomName }: { roomName: string }) {
     };
   }, [token]);
 
+  // Check if fix control panel should be shown
+  const shouldShowFixControlPanel = () => {
+    return localStorage.getItem(`doctorGeneratedLink_${roomName}`) === 'true';
+  };
+
   if (!token) {
     return (
       <div style={{
@@ -918,171 +926,191 @@ function RoomClient({ roomName }: { roomName: string }) {
 
   // Debug logging
   console.log('=== DOCTOR ROOM DEBUG ===');
-  console.log('Rendering room info panel, token:', !!token, 'user:', !!user, 'roomName:', roomName);
+  console.log('Rendering fix control panel, token:', !!token, 'user:', !!user, 'roomName:', roomName);
   console.log('isInfoPanelCollapsed:', isInfoPanelCollapsed);
+  console.log('shouldShowFixControlPanel:', shouldShowFixControlPanel());
   console.log('=== END DEBUG ===');
-  
-  // Alert to confirm deployment
-  if (typeof window !== 'undefined') {
-    console.log('Window is defined, showing alert');
-    // Only show alert once per session
-    if (!sessionStorage.getItem('doctorPanelAlertShown')) {
-      alert('Doctor panel changes deployed! Look for red test box and green room info panel.');
-      sessionStorage.setItem('doctorPanelAlertShown', 'true');
-    }
-  }
 
   return (
     <>
-      {/* TEST ELEMENT - ALWAYS VISIBLE */}
-      <div
-        style={{
-          position: 'fixed',
-          top: '10px',
-          left: '10px',
-          backgroundColor: '#ff0000',
-          color: 'white',
-          padding: '10px',
-          zIndex: 10002,
-          fontSize: '16px',
-          fontWeight: 'bold',
-          border: '3px solid black'
-        }}
-      >
-        DOCTOR PANEL TEST - VISIBLE
-      </div>
-      
-      {/* Room Information Panel - Always Visible (Outside LiveKitRoom) */}
-      <div
-        style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          backgroundColor: '#00ff00',
-          border: '3px solid #000000',
-          borderRadius: '0.75rem',
-          padding: '0.75rem',
-          zIndex: 10001,
-          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
-          maxWidth: isInfoPanelCollapsed ? '60px' : '280px',
-          fontSize: '0.875rem',
-          transition: 'max-width 0.3s ease',
-          minHeight: '50px'
-        }}
-      >
-        <div style={{ marginBottom: '0.75rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                          <h3 style={{ 
+      {/* Fix Control Panel - Only visible when doctor has generated a link */}
+      {shouldShowFixControlPanel() && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            backgroundColor: '#ffffff',
+            border: '2px solid #3b82f6',
+            borderRadius: '0.75rem',
+            padding: '1rem',
+            zIndex: 10001,
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+            maxWidth: isInfoPanelCollapsed ? '60px' : '320px',
+            fontSize: '0.875rem',
+            transition: 'max-width 0.3s ease',
+            minHeight: '50px'
+          }}
+        >
+          <div style={{ marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <h3 style={{ 
                 margin: '0', 
-                color: '#000000', 
+                color: '#1e40af', 
                 fontSize: '1rem',
                 fontWeight: '600'
               }}>
-                🔗 Room Info
+                🛠️ Fix Control Panel
               </h3>
-            <button
-              onClick={() => setIsInfoPanelCollapsed(!isInfoPanelCollapsed)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '1.2rem',
-                color: '#1e40af',
-                padding: '0.25rem'
-              }}
-            >
-              {isInfoPanelCollapsed ? '▶' : '◀'}
-            </button>
+              <button
+                onClick={() => setIsInfoPanelCollapsed(!isInfoPanelCollapsed)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  color: '#3b82f6',
+                  padding: '0.25rem'
+                }}
+              >
+                {isInfoPanelCollapsed ? '▶' : '◀'}
+              </button>
+            </div>
+            {!isInfoPanelCollapsed && (
+              <>
+                <p style={{ 
+                  margin: '0', 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  marginBottom: '0.5rem'
+                }}>
+                  Connected as: {user?.displayName || user?.email || 'Doctor'}
+                </p>
+                <p style={{ 
+                  margin: '0', 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  marginBottom: '0.75rem'
+                }}>
+                  Room: {roomName}
+                </p>
+              </>
+            )}
           </div>
+          
           {!isInfoPanelCollapsed && (
-            <>
-              <p style={{ 
-                margin: '0', 
-                color: '#6b7280', 
-                fontSize: '0.875rem',
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem',
+              flexDirection: 'column'
+            }}>
+              <div style={{
+                backgroundColor: '#f3f4f6',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                padding: '0.5rem',
+                fontSize: '0.75rem',
+                color: '#374151',
+                wordBreak: 'break-all',
                 marginBottom: '0.5rem'
               }}>
-                Connected as: {user?.displayName || user?.email || 'Doctor'}
-              </p>
-              <p style={{ 
-                margin: '0', 
-                color: '#6b7280', 
-                fontSize: '0.875rem',
-                marginBottom: '0.75rem'
-              }}>
-                Room: {roomName}
-              </p>
-            </>
+                <strong>Patient Link:</strong><br />
+                {`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
+              </div>
+              
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
+                  alert('Patient link copied to clipboard!');
+                }}
+                style={{
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                  textAlign: 'center'
+                }}
+              >
+                📋 Copy Patient Link
+              </button>
+              
+              <button
+                onClick={() => {
+                  window.open(`/room/${roomName}/patient`, '_blank');
+                }}
+                style={{
+                  backgroundColor: '#059669',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                  textAlign: 'center'
+                }}
+              >
+                👥 Join as Patient
+              </button>
+              
+              <button
+                onClick={() => {
+                  // Clear current token and redirect to doctor join page
+                  localStorage.removeItem(`doctorToken_${roomName}`);
+                  setToken(null);
+                  window.location.href = `/room/${roomName}`;
+                }}
+                style={{
+                  backgroundColor: '#6B7280',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                  textAlign: 'center'
+                }}
+              >
+                🚪 Leave Call
+              </button>
+              
+              <button
+                onClick={() => {
+                  // Clear the generated link flag
+                  localStorage.removeItem(`doctorGeneratedLink_${roomName}`);
+                  alert('Fix control panel hidden. Refresh to see changes.');
+                }}
+                style={{
+                  backgroundColor: '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                  textAlign: 'center'
+                }}
+              >
+                🗑️ Hide Panel
+              </button>
+            </div>
           )}
         </div>
-        
-        {!isInfoPanelCollapsed && (
-          <div style={{
-            display: 'flex',
-            gap: '0.5rem',
-            flexDirection: 'column'
-          }}>
-            <div style={{
-              backgroundColor: '#f3f4f6',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.375rem',
-              padding: '0.375rem',
-              fontSize: '0.7rem',
-              color: '#374151',
-              wordBreak: 'break-all',
-              marginBottom: '0.5rem'
-            }}>
-              {`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
-            </div>
-            <button
-              onClick={() => {
-                // Clear current token and redirect to doctor join page
-                localStorage.removeItem(`doctorToken_${roomName}`);
-                setToken(null);
-                window.location.href = `/room/${roomName}`;
-              }}
-              style={{
-                backgroundColor: '#6B7280',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                padding: '0.5rem 0.75rem',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                textDecoration: 'none',
-                display: 'inline-block',
-                textAlign: 'center'
-              }}
-            >
-              Leave Call
-            </button>
-            
-            {/* Join as Patient Button */}
-            <button
-              onClick={() => {
-                window.open(`/room/${roomName}/patient`, '_blank');
-              }}
-              style={{
-                backgroundColor: '#059669',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                padding: '0.5rem 0.75rem',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                textDecoration: 'none',
-                display: 'inline-block',
-                textAlign: 'center',
-                marginTop: '0.5rem'
-              }}
-            >
-              Join as Patient
-            </button>
-          </div>
-        )}
-      </div>
+      )}
       
       <TranscriptionCapture />
       

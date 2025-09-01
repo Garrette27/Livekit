@@ -406,6 +406,37 @@ export default function Page() {
                       Create New Room
                     </button>
                   </div>
+                  
+                  {/* Fix Control Panel Trigger */}
+                  <div style={{ 
+                    borderTop: '1px solid #E5E7EB', 
+                    paddingTop: '1.5rem',
+                    marginTop: '1.5rem'
+                  }}>
+                    <h4 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#059669', marginBottom: '0.75rem' }}>
+                      🛠️ Fix Control Panel
+                    </h4>
+                    <p style={{ color: '#059669', marginBottom: '1rem', fontSize: '0.875rem' }}>
+                      The fix control panel is now automatically enabled for this room. Navigate to the doctor room to see it.
+                    </p>
+                    <button
+                      onClick={() => {
+                        window.open(`/room/${roomName}`, '_blank');
+                      }}
+                      style={{
+                        backgroundColor: '#7c3aed',
+                        color: 'white',
+                        padding: '0.75rem 1.5rem',
+                        borderRadius: '0.5rem',
+                        fontWeight: '600',
+                        fontSize: '1rem',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🔧 Open Doctor Room
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

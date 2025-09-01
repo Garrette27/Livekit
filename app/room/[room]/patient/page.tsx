@@ -16,6 +16,11 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isInfoPanelCollapsed, setIsInfoPanelCollapsed] = useState<boolean>(false);
 
+  // Check if fix control panel should be shown (when doctor has generated a link)
+  const shouldShowFixControlPanel = () => {
+    return localStorage.getItem(`doctorGeneratedLink_${roomName}`) === 'true';
+  };
+
   // Handle authentication
   useEffect(() => {
     if (auth) {
@@ -310,6 +315,140 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
+      {/* Fix Control Panel - Only visible when doctor has generated a link */}
+      {shouldShowFixControlPanel() && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            backgroundColor: '#ffffff',
+            border: '2px solid #059669',
+            borderRadius: '0.75rem',
+            padding: '1rem',
+            zIndex: 10001,
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+            maxWidth: isInfoPanelCollapsed ? '60px' : '320px',
+            fontSize: '0.875rem',
+            transition: 'max-width 0.3s ease',
+            minHeight: '50px'
+          }}
+        >
+          <div style={{ marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <h3 style={{ 
+                margin: '0', 
+                color: '#059669', 
+                fontSize: '1rem',
+                fontWeight: '600'
+              }}>
+                🛠️ Fix Control Panel
+              </h3>
+              <button
+                onClick={() => setIsInfoPanelCollapsed(!isInfoPanelCollapsed)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  color: '#059669',
+                  padding: '0.25rem'
+                }}
+              >
+                {isInfoPanelCollapsed ? '▶' : '◀'}
+              </button>
+            </div>
+            {!isInfoPanelCollapsed && (
+              <>
+                <p style={{ 
+                  margin: '0', 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  marginBottom: '0.5rem'
+                }}>
+                  Connected as: {patientName || 'Patient'}
+                </p>
+                <p style={{ 
+                  margin: '0', 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  marginBottom: '0.75rem'
+                }}>
+                  Room: {roomName}
+                </p>
+              </>
+            )}
+          </div>
+          
+          {!isInfoPanelCollapsed && (
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem',
+              flexDirection: 'column'
+            }}>
+              <div style={{
+                backgroundColor: '#f3f4f6',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                padding: '0.5rem',
+                fontSize: '0.75rem',
+                color: '#374151',
+                wordBreak: 'break-all',
+                marginBottom: '0.5rem'
+              }}>
+                <strong>Patient Link:</strong><br />
+                {`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
+              </div>
+              
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
+                  alert('Patient link copied to clipboard!');
+                }}
+                style={{
+                  backgroundColor: '#059669',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                  textAlign: 'center'
+                }}
+              >
+                📋 Copy Patient Link
+              </button>
+              
+              <button
+                onClick={() => {
+                  // Clear the generated link flag
+                  localStorage.removeItem(`doctorGeneratedLink_${roomName}`);
+                  alert('Fix control panel hidden. Refresh to see changes.');
+                }}
+                style={{
+                  backgroundColor: '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                  textAlign: 'center'
+                }}
+              >
+                🗑️ Hide Panel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      
       <LiveKitRoom
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
