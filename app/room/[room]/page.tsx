@@ -404,9 +404,9 @@ function RoomClient({ roomName }: { roomName: string }) {
     return (
       <div style={{
         position: 'fixed',
-        bottom: '120px',
+        bottom: '100px',
         right: '20px',
-        zIndex: 9999
+        zIndex: 999
       }}>
         <button
           onClick={() => {
@@ -699,8 +699,21 @@ function RoomClient({ roomName }: { roomName: string }) {
     const style = document.createElement('style');
     style.id = 'livekit-blue-controls-override';
     style.textContent = `
-      .lk-control-bar,
-      .lk-control-bar *,
+      /* Main control bar styling */
+      .lk-control-bar {
+        background-color: #2563eb !important;
+        border-radius: 0.75rem !important;
+        padding: 1rem !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 1rem !important;
+        box-shadow: 0 8px 25px rgba(37, 99, 235, 0.3) !important;
+        border: 2px solid #1d4ed8 !important;
+      }
+
+      /* Individual control buttons */
+      .lk-control-bar button,
       [data-lk-kind],
       button[data-lk-kind],
       button[aria-label*="microphone"],
@@ -708,33 +721,168 @@ function RoomClient({ roomName }: { roomName: string }) {
       button[aria-label*="chat"],
       button[aria-label*="leave"],
       button[aria-label*="share"] {
-        background-color: #2563eb !important;
+        background-color: #3b82f6 !important;
         color: white !important;
-        border-color: #1d4ed8 !important;
+        border: 2px solid #1d4ed8 !important;
         border-radius: 0.75rem !important;
         padding: 0.75rem 1rem !important;
         font-weight: 600 !important;
-        min-width: 80px !important;
+        min-width: 90px !important;
+        height: 48px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         gap: 0.5rem !important;
-        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25) !important;
+        transition: all 0.2s ease !important;
+        position: relative !important;
       }
 
+      /* Hover effects for buttons */
+      .lk-control-bar button:hover,
+      [data-lk-kind]:hover,
+      button[data-lk-kind]:hover {
+        background-color: #1d4ed8 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4) !important;
+      }
+
+      /* Active/pressed state */
+      .lk-control-bar button:active,
+      [data-lk-kind]:active,
+      button[data-lk-kind]:active {
+        transform: translateY(0) !important;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3) !important;
+      }
+
+      /* Icons styling */
       .lk-control-bar svg,
       [data-lk-kind] svg,
       button[data-lk-kind] svg {
         color: white !important;
         fill: white !important;
         stroke: white !important;
+        width: 20px !important;
+        height: 20px !important;
       }
 
+      /* Text labels */
       .lk-control-bar span,
       [data-lk-kind] span,
       button[data-lk-kind] span {
         color: white !important;
         font-weight: 600 !important;
+        font-size: 0.875rem !important;
+        white-space: nowrap !important;
+      }
+
+      /* Hide the "Start Video" control as it's not standard LiveKit */
+      button[aria-label*="Start Video"],
+      button[aria-label*="start video"],
+      button[aria-label*="StartVideo"] {
+        display: none !important;
+      }
+
+      /* Ensure proper order: Microphone → Camera → Share → Chat → Leave */
+      .lk-control-bar {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 1rem !important;
+      }
+
+      /* Specific button positioning and styling */
+      button[aria-label*="microphone"],
+      button[data-lk-kind="microphone"] {
+        order: 1 !important;
+      }
+
+      button[aria-label*="camera"],
+      button[data-lk-kind="camera"] {
+        order: 2 !important;
+      }
+
+      button[aria-label*="share"],
+      button[aria-label*="Share screen"],
+      button[data-lk-kind="share"] {
+        order: 3 !important;
+      }
+
+      button[aria-label*="chat"],
+      button[data-lk-kind="chat"] {
+        order: 4 !important;
+      }
+
+      button[aria-label*="leave"],
+      button[data-lk-kind="leave"] {
+        order: 5 !important;
+        background-color: #dc2626 !important;
+        border-color: #b91c1c !important;
+      }
+
+      button[aria-label*="leave"]:hover,
+      button[data-lk-kind="leave"]:hover {
+        background-color: #b91c1c !important;
+      }
+
+      /* Remove any floating or misplaced elements */
+      .lk-control-bar > *:not(button) {
+        display: none !important;
+      }
+
+      /* Ensure consistent spacing */
+      .lk-control-bar button + button {
+        margin-left: 0.5rem !important;
+      }
+
+      /* Remove any floating document icons or misplaced elements */
+      .lk-control-bar img,
+      .lk-control-bar svg:not([data-lk-kind] svg),
+      .lk-control-bar *:not(button):not(span) {
+        display: none !important;
+      }
+
+      /* Hide any floating elements that might interfere with controls */
+      div[style*="position: fixed"][style*="bottom: 120px"] {
+        z-index: 999 !important;
+      }
+
+      /* Ensure clean control bar - remove any non-standard elements */
+      .lk-control-bar > *:not(button[data-lk-kind]):not(button[aria-label*="microphone"]):not(button[aria-label*="camera"]):not(button[aria-label*="share"]):not(button[aria-label*="chat"]):not(button[aria-label*="leave"]) {
+        display: none !important;
+      }
+
+      /* Remove any floating icons or misplaced elements in the main area */
+      div[style*="position: fixed"]:not([data-lk-kind]):not(.lk-control-bar) {
+        z-index: 998 !important;
+      }
+
+      /* Ensure the control bar is properly positioned */
+      .lk-control-bar {
+        position: fixed !important;
+        bottom: 20px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 1000 !important;
+        min-width: 600px !important;
+        max-width: 800px !important;
+      }
+
+      /* Mobile responsiveness */
+      @media (max-width: 768px) {
+        .lk-control-bar {
+          min-width: 90vw !important;
+          max-width: 95vw !important;
+          gap: 0.5rem !important;
+          padding: 0.75rem !important;
+        }
+        
+        .lk-control-bar button {
+          min-width: 70px !important;
+          padding: 0.5rem 0.75rem !important;
+          font-size: 0.75rem !important;
+        }
       }
     `;
 
