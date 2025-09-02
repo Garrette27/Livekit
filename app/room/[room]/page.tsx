@@ -761,6 +761,41 @@ function RoomClient({ roomName }: { roomName: string }) {
     return localStorage.getItem(`doctorGeneratedLink_${roomName}`) === 'true';
   };
 
+  // Function to properly leave the call
+  const handleLeaveCall = () => {
+    // Clear current token and redirect to doctor join page
+    localStorage.removeItem(`doctorToken_${roomName}`);
+    setToken(null);
+    
+    // Force page refresh to ensure clean state
+    window.location.href = `/room/${roomName}`;
+  };
+
+  // Function to properly disconnect from LiveKit
+  const handleDisconnect = () => {
+    // Clear stored token
+    localStorage.removeItem(`doctorToken_${roomName}`);
+    setToken(null);
+    
+    // Update call status in Firestore
+    if (db && roomName) {
+      try {
+        const callRef = doc(db, 'calls', roomName);
+        setDoc(callRef, {
+          status: 'completed',
+          endedAt: new Date()
+        }, { merge: true }).catch(error => {
+          console.error('Error updating call status:', error);
+        });
+      } catch (error) {
+        console.error('Error updating call status:', error);
+      }
+    }
+    
+    // Redirect to home page
+    window.location.href = '/';
+  };
+
   if (!token) {
     return (
       <div style={{
@@ -945,11 +980,12 @@ function RoomClient({ roomName }: { roomName: string }) {
             borderRadius: '0.75rem',
             padding: '1rem',
             zIndex: 10001,
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-            maxWidth: isInfoPanelCollapsed ? '60px' : '320px',
+            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.12)',
+            maxWidth: isInfoPanelCollapsed ? '60px' : '300px',
             fontSize: '0.875rem',
-            transition: 'max-width 0.3s ease',
-            minHeight: '50px'
+            transition: 'all 0.3s ease',
+            minHeight: '50px',
+            backdropFilter: 'blur(10px)'
           }}
         >
           <div style={{ marginBottom: '0.75rem' }}>
@@ -998,21 +1034,22 @@ function RoomClient({ roomName }: { roomName: string }) {
             )}
           </div>
           
-          {!isInfoPanelCollapsed && (
+                      {!isInfoPanelCollapsed && (
             <div style={{
               display: 'flex',
-              gap: '0.5rem',
+              gap: '0.75rem',
               flexDirection: 'column'
             }}>
               <div style={{
-                backgroundColor: '#f3f4f6',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                padding: '0.5rem',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                padding: '0.75rem',
                 fontSize: '0.75rem',
-                color: '#374151',
+                color: '#475569',
                 wordBreak: 'break-all',
-                marginBottom: '0.5rem'
+                marginBottom: '0.75rem',
+                borderLeft: '3px solid #3b82f6'
               }}>
                 <strong>Patient Link:</strong><br />
                 {`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
@@ -1027,14 +1064,25 @@ function RoomClient({ roomName }: { roomName: string }) {
                   backgroundColor: '#3b82f6',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '0.375rem',
-                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1rem',
                   fontSize: '0.875rem',
                   fontWeight: '600',
                   cursor: 'pointer',
                   textDecoration: 'none',
                   display: 'inline-block',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  width: '100%',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(59, 130, 246, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.2)';
                 }}
               >
                 📋 Copy Patient Link
@@ -1048,38 +1096,55 @@ function RoomClient({ roomName }: { roomName: string }) {
                   backgroundColor: '#059669',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '0.375rem',
-                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1rem',
                   fontSize: '0.875rem',
                   fontWeight: '600',
                   cursor: 'pointer',
                   textDecoration: 'none',
                   display: 'inline-block',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  width: '100%',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(5, 150, 105, 0.2)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(5, 150, 105, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(5, 150, 105, 0.2)';
                 }}
               >
                 👥 Join as Patient
               </button>
               
               <button
-                onClick={() => {
-                  // Clear current token and redirect to doctor join page
-                  localStorage.removeItem(`doctorToken_${roomName}`);
-                  setToken(null);
-                  window.location.href = `/room/${roomName}`;
-                }}
+                onClick={handleDisconnect}
                 style={{
-                  backgroundColor: '#6B7280',
+                  backgroundColor: '#dc2626',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '0.375rem',
-                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1rem',
                   fontSize: '0.875rem',
                   fontWeight: '600',
                   cursor: 'pointer',
                   textDecoration: 'none',
                   display: 'inline-block',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  width: '100%',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
                 }}
               >
                 🚪 Leave Call
@@ -1092,17 +1157,28 @@ function RoomClient({ roomName }: { roomName: string }) {
                   alert('Fix control panel hidden. Refresh to see changes.');
                 }}
                 style={{
-                  backgroundColor: '#dc2626',
+                  backgroundColor: '#6b7280',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '0.375rem',
-                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1rem',
                   fontSize: '0.875rem',
                   fontWeight: '600',
                   cursor: 'pointer',
                   textDecoration: 'none',
                   display: 'inline-block',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  width: '100%',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(107, 114, 128, 0.2)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(107, 114, 128, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(107, 114, 128, 0.2)';
                 }}
               >
                 🗑️ Hide Panel
@@ -1127,7 +1203,7 @@ function RoomClient({ roomName }: { roomName: string }) {
           // Clear stored token
           localStorage.removeItem(`doctorToken_${roomName}`);
           
-          // Update call status in Firestore - use setDoc with merge to avoid "No document to update" error
+          // Update call status in Firestore
           if (db && roomName) {
             try {
               const callRef = doc(db, 'calls', roomName);
@@ -1141,6 +1217,9 @@ function RoomClient({ roomName }: { roomName: string }) {
               console.error('Error updating call status:', error);
             }
           }
+          
+          // Redirect to home page after disconnection
+          window.location.href = '/';
         }}
         onError={(error) => {
           console.error('LiveKit error:', error);
@@ -1150,246 +1229,58 @@ function RoomClient({ roomName }: { roomName: string }) {
         <VideoConference />
         <ManualTranscriptionInput />
         
-        {/* Room Link Display - Always Visible */}
-          <div
-            style={{
-              position: 'fixed',
-              top: '20px',
-              left: '20px',
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              border: '2px solid #2563eb',
-              borderRadius: '1rem',
-              padding: '1rem',
-              zIndex: 9999,
-              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-              maxWidth: '400px'
-            }}
-          >
-          {/* Back to Home Button */}
-          <div style={{ marginBottom: '0.75rem' }}>
-            <Link href="/" style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              color: '#6b7280',
-              textDecoration: 'none',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}>
-              ← Back to Home
-            </Link>
-          </div>
-            <div style={{ marginBottom: '0.75rem' }}>
-              <h3 style={{ 
-                margin: '0 0 0.5rem 0', 
-                color: '#1e40af', 
-                fontSize: '1rem',
-                fontWeight: '600'
-              }}>
-                🔗 Room Link
-              </h3>
-              <p style={{ 
-                margin: '0', 
-                color: '#6b7280', 
-                fontSize: '0.875rem',
-                marginBottom: '0.75rem'
-              }}>
-                Share this link with your patient:
-              </p>
-            </div>
-            
-            <div style={{
-              display: 'flex',
-              gap: '0.5rem',
-            alignItems: 'center',
-            marginBottom: '0.75rem'
-            }}>
-              <input
-                id="roomUrlDisplay"
-                name="roomUrlDisplay"
-                type="text"
-                value={`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
-                readOnly
-                style={{
-                  flex: 1,
-                  padding: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem',
-                  fontSize: '0.875rem',
-                  backgroundColor: '#f9fafb',
-                  color: '#374151'
-                }}
-              />
-              <button
-                onClick={() => {
-                navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
-                  alert('Room link copied to clipboard!');
-                }}
-                style={{
-                  backgroundColor: '#059669',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
-                  padding: '0.5rem 0.75rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                Copy
-              </button>
-            </div>
-            
-            {/* Create New Room Button */}
-            <div style={{
-              display: 'flex',
-              gap: '0.5rem'
-            }}>
-              <button
-                onClick={() => {
-                  const newRoomName = prompt('Enter new room name:');
-                  if (newRoomName && newRoomName.trim()) {
-                    window.location.href = `/room/${newRoomName.trim()}`;
-                  }
-                }}
-                style={{
-                  backgroundColor: '#7c3aed',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
-                  padding: '0.5rem 0.75rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  flex: 1
-                }}
-              >
-                Create New Room
-              </button>
-            </div>
-          </div>
-
-        {/* Room URL Display - Always Visible */}
+        {/* Back to Home Button - Simple and Clean */}
         <div
           style={{
             position: 'fixed',
             top: '20px',
-            right: '20px',
+            left: '20px',
             backgroundColor: 'rgba(255, 255, 255, 0.95)',
             border: '2px solid #2563eb',
             borderRadius: '0.75rem',
-            padding: '1rem',
-            zIndex: 10000,
-            maxWidth: '400px',
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)'
+            padding: '0.75rem 1rem',
+            zIndex: 9999,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
           }}
         >
-          <div style={{ marginBottom: '0.75rem' }}>
-            <h3 style={{
-              margin: '0 0 0.5rem 0',
-              color: '#1e40af',
-              fontSize: '1rem',
-              fontWeight: '600'
-            }}>
-              🔗 Room Information
-            </h3>
-            <p style={{
-              margin: '0',
-              color: '#6b7280',
-              fontSize: '0.875rem',
-              marginBottom: '0.5rem'
-            }}>
-              Connected as: {user?.displayName || user?.email || 'Doctor'}
-            </p>
-            <p style={{
-              margin: '0',
-              color: '#6b7280',
-              fontSize: '0.875rem',
-              marginBottom: '0.75rem'
-            }}>
-              Room: {roomName}
-            </p>
-            <p style={{
-              margin: '0',
-              color: '#6b7280',
-              fontSize: '0.875rem',
-              marginBottom: '0.75rem'
-            }}>
-              Patient Link:
-            </p>
-            <div style={{
-              backgroundColor: '#f3f4f6',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.375rem',
-              padding: '0.5rem',
-              fontSize: '0.75rem',
-              color: '#374151',
-              wordBreak: 'break-all',
-              marginBottom: '0.5rem'
-            }}>
-              {`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
-            </div>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
-                alert('Patient link copied to clipboard!');
-              }}
-              style={{
-                backgroundColor: '#2563eb',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                padding: '0.25rem 0.5rem',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                width: '100%'
-              }}
-            >
-              Copy Patient Link
-            </button>
-            
-            {/* Join as Patient Button */}
-            <button
-              onClick={() => {
-                window.open(`/room/${roomName}/patient`, '_blank');
-              }}
-              style={{
-                backgroundColor: '#059669',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                padding: '0.25rem 0.5rem',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                width: '100%',
-                marginTop: '0.5rem'
-              }}
-            >
-              Join as Patient
-            </button>
-          </div>
+          <Link href="/" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            color: '#2563eb',
+            textDecoration: 'none',
+            fontSize: '0.875rem',
+            fontWeight: '500'
+          }}>
+            ← Back to Home
+          </Link>
         </div>
 
 
 
-        {/* Debug Info */}
-        {token && (
+
+
+        {/* Debug Info - Only visible in development */}
+        {process.env.NODE_ENV === 'development' && token && (
           <div
             style={{
               position: 'fixed',
               bottom: '20px',
               left: '20px',
-              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
               color: 'white',
-              padding: '0.5rem',
-              borderRadius: '0.25rem',
+              padding: '0.75rem',
+              borderRadius: '0.5rem',
               fontSize: '0.75rem',
               zIndex: 10000,
-              fontFamily: 'monospace'
+              fontFamily: 'monospace',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.1)'
             }}
           >
+            <div style={{ marginBottom: '0.25rem' }}>
+              <strong>Debug Info:</strong>
+            </div>
             Token: {token ? '✅' : '❌'}<br/>
             Room: {roomName}<br/>
             User: {user?.uid || 'none'}
