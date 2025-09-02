@@ -1,0 +1,55 @@
+Current user state: null
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: false
+page-34ccd5633791dc7f.js:1 Current user state: null
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Auth state changed: User logged in
+page-34ccd5633791dc7f.js:1 User details: X
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Generated share URL: https://livekit-frontend-tau.vercel.app/room/asdsadsa/patient
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: null
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+page-34ccd5633791dc7f.js:1 Current user state: X
+page-34ccd5633791dc7f.js:1 Current token state: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJBYm91dCBPbmUiLCJ2aWRlbyI6eyJyb29tSm9pbiI6dHJ1ZSwicm9vbSI6ImFzZHNhZHNhIn0sImlhdCI6MTc1NjYzMTMxMiwiZXhwIjoxNzU2NjM0OTEyLCJpc3MiOiJBUElEbU03Tlc3TG12ZUsifQ.laj70z2X66UF0hwJ-mfo6VtSEf0h_rOc8AmVl8ymesA
+page-34ccd5633791dc7f.js:1 Firebase ready: true
+144d3bae-84e8fe335e125542.js:1 publishing track Object
+144d3bae-84e8fe335e125542.js:1 silence detected on local audio track Object
+(anonymous) @ 144d3bae-84e8fe335e125542.js:1Understand this warning
+144d3bae-84e8fe335e125542.js:1 publishing track Object
