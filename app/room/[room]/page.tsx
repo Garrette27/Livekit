@@ -935,6 +935,13 @@ function RoomClient({ roomName }: { roomName: string }) {
       /* Ensure our custom overlays don't interfere with video */
       .fix-control-panel {
         z-index: 10001 !important;
+        pointer-events: auto !important;
+      }
+
+      .fix-control-panel *,
+      .fix-control-panel button {
+        pointer-events: auto !important;
+        cursor: pointer !important;
       }
 
       .back-to-home {
