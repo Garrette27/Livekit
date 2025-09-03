@@ -884,6 +884,66 @@ function RoomClient({ roomName }: { roomName: string }) {
           font-size: 0.75rem !important;
         }
       }
+
+      /* CRITICAL: Ensure video interface takes full screen */
+      .lk-video-conference,
+      .lk-room-container,
+      .lk-room,
+      [data-lk-kind="room"] {
+        width: 100vw !important;
+        height: 100vh !important;
+        position: relative !important;
+        overflow: hidden !important;
+        background-color: #000 !important;
+      }
+
+      /* Ensure participant video is visible and properly sized */
+      .lk-participant-video,
+      .lk-participant-video video,
+      .lk-participant-video canvas,
+      .lk-participant-video img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        border-radius: 0 !important;
+      }
+
+      /* Remove any margins or padding that might cause layout issues */
+      .lk-video-conference *,
+      .lk-room-container *,
+      .lk-room * {
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+      }
+
+      /* Ensure the main video area is not hidden */
+      .lk-focus-layout,
+      .lk-grid-layout,
+      .lk-participant-tile {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 100vh !important;
+        min-width: 100vw !important;
+      }
+
+      /* Fix any floating elements that might be covering the video */
+      div[style*="position: fixed"]:not(.fix-control-panel):not(.back-to-home):not(.debug-info) {
+        z-index: 999 !important;
+      }
+
+      /* Ensure our custom overlays don't interfere with video */
+      .fix-control-panel {
+        z-index: 10001 !important;
+      }
+
+      .back-to-home {
+        z-index: 9999 !important;
+      }
+
+      .debug-info {
+        z-index: 10000 !important;
+      }
     `;
 
     // Remove existing style if present
@@ -906,6 +966,7 @@ function RoomClient({ roomName }: { roomName: string }) {
 
   // Check if fix control panel should be shown
   const shouldShowFixControlPanel = () => {
+    // Only show the control panel as an overlay, not as a replacement for the video interface
     return localStorage.getItem(`doctorGeneratedLink_${roomName}`) === 'true';
   };
 
@@ -942,6 +1003,14 @@ function RoomClient({ roomName }: { roomName: string }) {
     
     // Redirect to home page
     window.location.href = '/';
+  };
+
+  // Function to force show video interface (for debugging)
+  const forceShowVideoInterface = () => {
+    // Clear the generated link flag to hide the control panel
+    localStorage.removeItem(`doctorGeneratedLink_${roomName}`);
+    // Force re-render
+    window.location.reload();
   };
 
   if (!token) {
@@ -1109,16 +1178,17 @@ function RoomClient({ roomName }: { roomName: string }) {
 
   // Debug logging
   console.log('=== DOCTOR ROOM DEBUG ===');
-  console.log('Rendering fix control panel, token:', !!token, 'user:', !!user, 'roomName:', roomName);
+  console.log('Rendering video interface, token:', !!token, 'user:', !!user, 'roomName:', roomName);
   console.log('isInfoPanelCollapsed:', isInfoPanelCollapsed);
   console.log('shouldShowFixControlPanel:', shouldShowFixControlPanel());
   console.log('=== END DEBUG ===');
 
   return (
     <>
-      {/* Fix Control Panel - Only visible when doctor has generated a link */}
+      {/* Fix Control Panel - Only visible when doctor has generated a link - OVERLAY on top of video */}
       {shouldShowFixControlPanel() && (
         <div
+          className="fix-control-panel"
           style={{
             position: 'fixed',
             top: '20px',
@@ -1331,6 +1401,41 @@ function RoomClient({ roomName }: { roomName: string }) {
               >
                 🗑️ Hide Panel
               </button>
+
+              {/* Debug button to force show video interface */}
+              <button
+                onClick={() => {
+                  // Clear the generated link flag and force reload
+                  localStorage.removeItem(`doctorGeneratedLink_${roomName}`);
+                  window.location.reload();
+                }}
+                style={{
+                  backgroundColor: '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                  textAlign: 'center',
+                  width: '100%',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(245, 158, 11, 0.2)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(245, 158, 11, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(245, 158, 11, 0.2)';
+                }}
+              >
+                🔧 Force Show Video
+              </button>
             </div>
           )}
         </div>
@@ -1338,6 +1443,7 @@ function RoomClient({ roomName }: { roomName: string }) {
       
       <TranscriptionCapture />
       
+      {/* MAIN VIDEO INTERFACE - Always show when token exists */}
       <LiveKitRoom
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
@@ -1379,6 +1485,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         
         {/* Back to Home Button - Simple and Clean */}
         <div
+          className="back-to-home"
           style={{
             position: 'fixed',
             top: '20px',
@@ -1411,6 +1518,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         {/* Debug Info - Only visible in development */}
         {process.env.NODE_ENV === 'development' && token && (
           <div
+            className="debug-info"
             style={{
               position: 'fixed',
               bottom: '20px',
