@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [summaries, setSummaries] = useState<CallSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [testLoading, setTestLoading] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Handle authentication
   useEffect(() => {
@@ -43,12 +44,13 @@ export default function Dashboard() {
     }
   }, []);
 
-  // Fetch summaries from Firestore
+  // Fetch summaries from Firestore (reacts to sortOrder)
   useEffect(() => {
     if (!user || !db) return;
 
     console.log('Dashboard: Setting up Firestore listener for call-summaries');
     console.log('Dashboard: Current user ID:', user.uid);
+    console.log('Dashboard: Sort order:', sortOrder);
     
     const summariesRef = collection(db, 'call-summaries');
     
@@ -56,7 +58,7 @@ export default function Dashboard() {
     // We'll filter by user on the client side for now
     const q = query(
       summariesRef,
-      orderBy('createdAt', 'desc'),
+      orderBy('createdAt', sortOrder),
       limit(100)
     );
 
@@ -91,7 +93,13 @@ export default function Dashboard() {
       
       console.log('Dashboard: Received summaries:', userSummaries.length, 'summaries for user', user.uid);
       console.log('Dashboard: Total summaries in database:', allSummaries.length);
-      setSummaries(userSummaries);
+      // Firestore already orders by createdAt, but keep a defensive client-side reorder
+      const ordered = [...userSummaries].sort((a, b) => {
+        const ad = a.createdAt?.toDate?.() ? a.createdAt.toDate().getTime() : 0;
+        const bd = b.createdAt?.toDate?.() ? b.createdAt.toDate().getTime() : 0;
+        return sortOrder === 'desc' ? bd - ad : ad - bd;
+      });
+      setSummaries(ordered);
       setLoading(false);
     }, (error) => {
       console.error('Dashboard: Error fetching summaries:', error);
@@ -99,7 +107,7 @@ export default function Dashboard() {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, sortOrder]);
 
   // Also fetch real consultations from the consultations collection for additional tracking
   useEffect(() => {
@@ -338,6 +346,34 @@ export default function Dashboard() {
             Welcome, {user.displayName || user.email}
           </p>
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+            {/* Sort control */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              backgroundColor: 'white', border: '1px solid #e5e7eb',
+              padding: '0.5rem 0.75rem', borderRadius: '0.5rem'
+            }}>
+              <span style={{ color: '#1e40af', fontWeight: 600 }}>Sort:</span>
+              <button
+                onClick={() => setSortOrder('desc')}
+                style={{
+                  backgroundColor: sortOrder === 'desc' ? '#2563eb' : '#e5e7eb',
+                  color: sortOrder === 'desc' ? 'white' : '#1e293b',
+                  padding: '0.5rem 0.75rem', borderRadius: '0.375rem',
+                  border: 'none', fontWeight: 600, cursor: 'pointer'
+                }}
+                title="Newest first"
+              >Newest</button>
+              <button
+                onClick={() => setSortOrder('asc')}
+                style={{
+                  backgroundColor: sortOrder === 'asc' ? '#2563eb' : '#e5e7eb',
+                  color: sortOrder === 'asc' ? 'white' : '#1e293b',
+                  padding: '0.5rem 0.75rem', borderRadius: '0.375rem',
+                  border: 'none', fontWeight: 600, cursor: 'pointer'
+                }}
+                title="Oldest first"
+              >Oldest</button>
+            </div>
             <button
               onClick={() => window.location.href = '/'}
               style={{
