@@ -495,7 +495,7 @@ function RoomClient({ roomName }: { roomName: string }) {
             }}
             onKeyPress={(e) => e.key === 'Enter' && addNote()}
           />
-          <button
+        <button
             onClick={addNote}
             style={{
               backgroundColor: '#3b82f6',
@@ -1491,7 +1491,7 @@ function RoomClient({ roomName }: { roomName: string }) {
   return (
     <>
       {/* Fix Control Panel - Always show when token exists for debugging */}
-      {token && (
+      {true && (
         <div
           className="fix-control-panel"
           style={{
@@ -1859,7 +1859,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         <ManualTranscriptionInput />
         
         {/* Custom LiveKit Controls - Always show when token exists */}
-        <LiveKitControls />
+        {true && <LiveKitControls />}
         
         {/* Debug info to show what's happening */}
         <div style={{
@@ -1873,7 +1873,8 @@ function RoomClient({ roomName }: { roomName: string }) {
           fontSize: '0.75rem',
           zIndex: 10000,
           fontFamily: 'monospace',
-          border: '2px solid #ff6b6b'
+          border: '2px solid #ff6b6b',
+          minWidth: '250px'
         }}>
           <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', color: '#ff6b6b' }}>DEBUG INFO</div>
           <div>Token: {token ? '✅' : '❌'}</div>
@@ -1882,6 +1883,10 @@ function RoomClient({ roomName }: { roomName: string }) {
           <div>Controls: Always Show</div>
           <div>Fix Panel: Always Show</div>
           <div>Speech: DISABLED</div>
+          <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '0.25rem' }}>
+            <div>Timestamp: {new Date().toLocaleTimeString()}</div>
+            <div>Render Count: {Math.random().toFixed(3)}</div>
+          </div>
         </div>
         
         {/* Back to Home Button - Simple and Clean */}
@@ -1938,6 +1943,44 @@ function RoomClient({ roomName }: { roomName: string }) {
           }}>
             📊 Dashboard
           </Link>
+        </div>
+        
+        {/* Force Show Controls Button */}
+        <div
+          className="force-show-controls"
+          style={{
+            position: 'fixed',
+            top: '20px',
+            left: '380px',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #dc2626',
+            borderRadius: '0.75rem',
+            padding: '0.75rem 1rem',
+            zIndex: 9999,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+          }}
+        >
+          <button
+            onClick={() => {
+              // Force show all controls
+              localStorage.setItem(`forceShowControls_${roomName}`, 'true');
+              window.location.reload();
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              color: '#dc2626',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            🎛️ Force Show Controls
+          </button>
         </div>
 
 

@@ -408,15 +408,15 @@ export default function Dashboard() {
                         userName: user.displayName
                       }
                     }).then(() => {
-                      // Navigate to the room creation page
-                      window.location.href = `/room/${roomName.trim()}`;
+                      // Navigate to the room creation page (not the room itself)
+                      window.location.href = `/create-room/${roomName.trim()}`;
                     }).catch((error: any) => {
                       console.error('Error creating room:', error);
                       alert('Error creating room. Please try again.');
                     });
                   } else {
                     // Fallback if Firestore not available
-                    window.location.href = `/room/${roomName.trim()}`;
+                    window.location.href = `/create-room/${roomName.trim()}`;
                   }
                 }
               }}
