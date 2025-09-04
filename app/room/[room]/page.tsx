@@ -14,6 +14,7 @@ declare global {
     SpeechRecognition: any;
     webkitSpeechRecognition: any;
     debugLogged?: boolean;
+    speechRecognitionActive?: boolean;
   }
 }
 
@@ -231,6 +232,7 @@ function RoomClient({ roomName }: { roomName: string }) {
     const [recognitionInstance, setRecognitionInstance] = useState<any>(null);
     const [userInteracted, setUserInteracted] = useState<boolean>(false);
     const [hasStarted, setHasStarted] = useState<boolean>(false);
+    const [isInitialized, setIsInitialized] = useState<boolean>(false);
     
     useEffect(() => {
       if (!token || !roomName) return;
@@ -258,7 +260,7 @@ function RoomClient({ roomName }: { roomName: string }) {
       if (!token || !roomName || !userInteracted) return;
       
       // Prevent multiple speech recognition instances
-      if (recognitionInstance || hasStarted) {
+      if (recognitionInstance || hasStarted || isInitialized) {
         return;
       }
 
@@ -346,6 +348,7 @@ function RoomClient({ roomName }: { roomName: string }) {
       try {
         recognition.start();
         setHasStarted(true);
+        setIsInitialized(true);
         console.log('✅ Speech recognition started successfully');
       } catch (error) {
         console.error('Failed to start speech recognition:', error);
@@ -354,7 +357,7 @@ function RoomClient({ roomName }: { roomName: string }) {
       return () => {
         try {
           if (recognition && recognition.state === 'recording') {
-            recognition.stop();
+          recognition.stop();
             recognition.abort();
           }
         } catch (error) {
@@ -380,10 +383,22 @@ function RoomClient({ roomName }: { roomName: string }) {
 
     // Prevent multiple speech recognition setups
     useEffect(() => {
-      if (recognitionInstance || hasStarted) {
+      if (recognitionInstance || hasStarted || isInitialized) {
         return;
       }
-    }, [recognitionInstance, hasStarted]);
+    }, [recognitionInstance, hasStarted, isInitialized]);
+
+    // Global flag to prevent multiple instances across renders
+    useEffect(() => {
+      if (window.speechRecognitionActive) {
+        return;
+      }
+      window.speechRecognitionActive = true;
+      
+      return () => {
+        window.speechRecognitionActive = false;
+      };
+    }, []);
 
     // Reset hasStarted when component unmounts or token changes
     useEffect(() => {
@@ -600,9 +615,10 @@ function RoomClient({ roomName }: { roomName: string }) {
         display: 'flex',
         gap: '1rem',
         alignItems: 'center',
-        zIndex: 1000,
+        zIndex: 10000,
         boxShadow: '0 8px 25px rgba(37, 99, 235, 0.3)',
-        border: '2px solid #1d4ed8'
+        border: '2px solid #1d4ed8',
+        minWidth: '600px'
       }}>
         <button
           onClick={toggleAudio}
@@ -710,10 +726,10 @@ function RoomClient({ roomName }: { roomName: string }) {
         return;
       }
       
-      // Inject CSS to force blue controls - More aggressive approach
-      const style = document.createElement('style');
+          // Inject CSS to force blue controls - More aggressive approach
+          const style = document.createElement('style');
       style.id = 'livekit-force-blue-controls';
-      style.textContent = `
+          style.textContent = `
             /* Force ALL LiveKit controls to be blue */
             .lk-control-bar button,
             .lk-control-bar [data-lk-kind],
@@ -1220,8 +1236,9 @@ function RoomClient({ roomName }: { roomName: string }) {
 
   // Check if fix control panel should be shown
   const shouldShowFixControlPanel = () => {
-    // Only show the control panel as an overlay, not as a replacement for the video interface
-    return localStorage.getItem(`doctorGeneratedLink_${roomName}`) === 'true';
+    // Show the control panel for doctors who have generated a link
+    // Also show it if the user is in a room (for debugging)
+    return localStorage.getItem(`doctorGeneratedLink_${roomName}`) === 'true' || !!token;
   };
 
   // Function to properly leave the call
@@ -1447,11 +1464,11 @@ function RoomClient({ roomName }: { roomName: string }) {
 
   // Debug logging - only in development and only once
   if (process.env.NODE_ENV === 'development' && !window.debugLogged) {
-    console.log('=== DOCTOR ROOM DEBUG ===');
-    console.log('Rendering video interface, token:', !!token, 'user:', !!user, 'roomName:', roomName);
-    console.log('isInfoPanelCollapsed:', isInfoPanelCollapsed);
-    console.log('shouldShowFixControlPanel:', shouldShowFixControlPanel());
-    console.log('=== END DEBUG ===');
+  console.log('=== DOCTOR ROOM DEBUG ===');
+  console.log('Rendering video interface, token:', !!token, 'user:', !!user, 'roomName:', roomName);
+  console.log('isInfoPanelCollapsed:', isInfoPanelCollapsed);
+  console.log('shouldShowFixControlPanel:', shouldShowFixControlPanel());
+  console.log('=== END DEBUG ===');
     window.debugLogged = true;
   }
 
@@ -1708,6 +1725,41 @@ function RoomClient({ roomName }: { roomName: string }) {
               >
                 🔧 Force Show Video
               </button>
+              
+              {/* Debug button to show controls */}
+              <button
+                onClick={() => {
+                  // Force show controls by setting a flag
+                  localStorage.setItem(`showControls_${roomName}`, 'true');
+                  window.location.reload();
+                }}
+                style={{
+                  backgroundColor: '#8b5cf6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                  textAlign: 'center',
+                  width: '100%',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(139, 92, 246, 0.2)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(139, 92, 246, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(139, 246, 0.2)';
+                }}
+              >
+                🎛️ Show Controls
+              </button>
             </div>
           )}
         </div>
@@ -1722,6 +1774,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         connect={true}
         audio
         video
+        style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}
         onDisconnected={() => {
           console.log('Disconnected from room');
           setToken(null);
@@ -1755,8 +1808,29 @@ function RoomClient({ roomName }: { roomName: string }) {
         <VideoConference />
         <ManualTranscriptionInput />
         
-        {/* Custom LiveKit Controls */}
-        <LiveKitControls />
+        {/* Custom LiveKit Controls - Always show when token exists */}
+        {token && <LiveKitControls />}
+        
+        {/* Debug info to show what's happening */}
+        {process.env.NODE_ENV === 'development' && (
+          <div style={{
+            position: 'fixed',
+            top: '100px',
+            left: '20px',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            color: 'white',
+            padding: '1rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.75rem',
+            zIndex: 10000,
+            fontFamily: 'monospace'
+          }}>
+            <div>Token: {token ? '✅' : '❌'}</div>
+            <div>Room: {roomName}</div>
+            <div>User: {user?.uid || 'none'}</div>
+            <div>Controls: {token ? 'Should show' : 'Hidden'}</div>
+          </div>
+        )}
         
         {/* Back to Home Button - Simple and Clean */}
         <div
@@ -1783,6 +1857,34 @@ function RoomClient({ roomName }: { roomName: string }) {
             fontWeight: '500'
           }}>
             ← Back to Home
+          </Link>
+        </div>
+        
+        {/* Back to Dashboard Button */}
+        <div
+          className="back-to-dashboard"
+          style={{
+            position: 'fixed',
+            top: '20px',
+            left: '200px',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #059669',
+            borderRadius: '0.75rem',
+            padding: '0.75rem 1rem',
+            zIndex: 9999,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+          }}
+        >
+          <Link href="/dashboard" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            color: '#059669',
+            textDecoration: 'none',
+            fontSize: '0.875rem',
+            fontWeight: '500'
+          }}>
+            📊 Dashboard
           </Link>
         </div>
 

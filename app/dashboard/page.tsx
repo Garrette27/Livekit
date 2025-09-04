@@ -391,6 +391,26 @@ export default function Dashboard() {
             </button>
             <button
               onClick={() => {
+                const roomName = prompt('Enter room name to create:');
+                if (roomName && roomName.trim()) {
+                  window.location.href = `/room/${roomName.trim()}`;
+                }
+              }}
+              style={{
+                backgroundColor: '#059669',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}
+            >
+              Create Room
+            </button>
+            <button
+              onClick={() => {
                 const roomName = prompt('Enter room name to join:');
                 if (roomName && roomName.trim()) {
                   window.location.href = `/room/${roomName.trim()}/patient`;
