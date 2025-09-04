@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { LiveKitRoom, useRoomContext, VideoConference } from '@livekit/components-react';
+import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import { Room } from 'livekit-client';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -13,6 +13,7 @@ declare global {
   interface Window {
     SpeechRecognition: any;
     webkitSpeechRecognition: any;
+    debugLogged?: boolean;
   }
 }
 
@@ -229,6 +230,7 @@ function RoomClient({ roomName }: { roomName: string }) {
   const TranscriptionCapture = () => {
     const [recognitionInstance, setRecognitionInstance] = useState<any>(null);
     const [userInteracted, setUserInteracted] = useState<boolean>(false);
+    const [hasStarted, setHasStarted] = useState<boolean>(false);
     
     useEffect(() => {
       if (!token || !roomName) return;
@@ -254,6 +256,11 @@ function RoomClient({ roomName }: { roomName: string }) {
 
     useEffect(() => {
       if (!token || !roomName || !userInteracted) return;
+      
+      // Prevent multiple speech recognition instances
+      if (recognitionInstance || hasStarted) {
+        return;
+      }
 
       console.log('Setting up transcription for room:', roomName);
       
@@ -263,11 +270,14 @@ function RoomClient({ roomName }: { roomName: string }) {
         return;
       }
 
-      // Create a single recognition instance
+      // Create a single recognition instance and store it
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
+
+      // Store the instance to prevent recreation
+      setRecognitionInstance(recognition);
 
       recognition.onstart = () => {
         console.log('🎤 Speech recognition started');
@@ -314,36 +324,20 @@ function RoomClient({ roomName }: { roomName: string }) {
 
       recognition.onerror = (event: any) => {
         console.error('🎤 Speech recognition error:', event.error);
-        setSpeechRecognitionStatus('error');
+        setSpeechRecognitionStatus('idle');
         
-        // Only restart if it's not an aborted error
-        if (event.error !== 'aborted') {
-        setTimeout(() => {
-          try {
-              if (recognition.state !== 'recording') {
-            recognition.start();
-              }
-          } catch (error) {
-            console.error('Failed to restart speech recognition:', error);
-          }
-          }, 2000);
+        // Don't auto-restart on errors to prevent infinite loops
+        if (event.error === 'aborted') {
+          console.log('🎤 Speech recognition aborted - this is normal');
         }
       };
 
       recognition.onend = () => {
         console.log('🎤 Speech recognition ended');
-        setSpeechRecognitionStatus('stopped');
+        setSpeechRecognitionStatus('idle');
         
-        // Only restart if component is still mounted and token is valid
-        setTimeout(() => {
-          try {
-            if (recognition.state !== 'recording') {
-            recognition.start();
-            }
-          } catch (error) {
-            console.error('Failed to restart speech recognition:', error);
-          }
-        }, 2000);
+        // Don't auto-restart to prevent excessive re-rendering
+        // Let the user manually restart if needed
       };
 
       // Store the recognition instance
@@ -351,6 +345,7 @@ function RoomClient({ roomName }: { roomName: string }) {
 
       try {
         recognition.start();
+        setHasStarted(true);
         console.log('✅ Speech recognition started successfully');
       } catch (error) {
         console.error('Failed to start speech recognition:', error);
@@ -359,13 +354,62 @@ function RoomClient({ roomName }: { roomName: string }) {
       return () => {
         try {
           if (recognition && recognition.state === 'recording') {
-          recognition.stop();
+            recognition.stop();
+            recognition.abort();
           }
         } catch (error) {
           console.error('Error stopping speech recognition:', error);
         }
       };
     }, [token, roomName, userInteracted]);
+
+    // Cleanup on unmount and prevent multiple instances
+    useEffect(() => {
+      return () => {
+        if (recognitionInstance) {
+          try {
+            recognitionInstance.stop();
+            recognitionInstance.abort();
+          } catch (error) {
+            console.error('Error cleaning up speech recognition:', error);
+          }
+        }
+        setHasStarted(false);
+      };
+    }, [recognitionInstance]);
+
+    // Prevent multiple speech recognition setups
+    useEffect(() => {
+      if (recognitionInstance || hasStarted) {
+        return;
+      }
+    }, [recognitionInstance, hasStarted]);
+
+    // Reset hasStarted when component unmounts or token changes
+    useEffect(() => {
+      return () => {
+        setHasStarted(false);
+        setRecognitionInstance(null);
+      };
+    }, [token]);
+
+    // Reset hasStarted when room changes
+    useEffect(() => {
+      setHasStarted(false);
+      setRecognitionInstance(null);
+    }, [roomName]);
+
+    // Reset hasStarted when user changes
+    useEffect(() => {
+      setHasStarted(false);
+      setRecognitionInstance(null);
+    }, [user?.uid]);
+
+    // Reset hasStarted when user changes
+    useEffect(() => {
+      setHasStarted(false);
+      setRecognitionInstance(null);
+    }, [user?.uid]);
 
     return null;
   };
@@ -459,14 +503,217 @@ function RoomClient({ roomName }: { roomName: string }) {
     );
   };
 
-  // Force blue controls
+  // Custom LiveKit Controls Component
+  const LiveKitControls = () => {
+    const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+    const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+    const [isScreenSharing, setIsScreenSharing] = useState(false);
+
+    const toggleAudio = async () => {
+      try {
+        if (isAudioEnabled) {
+          // Use browser APIs to mute audio
+          const audioTracks = document.querySelectorAll('audio, video');
+          audioTracks.forEach(track => {
+            if (track instanceof HTMLMediaElement) {
+              track.muted = true;
+            }
+          });
+          setIsAudioEnabled(false);
+        } else {
+          // Use browser APIs to unmute audio
+          const audioTracks = document.querySelectorAll('audio, video');
+          audioTracks.forEach(track => {
+            if (track instanceof HTMLMediaElement) {
+              track.muted = false;
+            }
+          });
+          setIsAudioEnabled(true);
+        }
+      } catch (error) {
+        console.error('Error toggling audio:', error);
+      }
+    };
+
+    const toggleVideo = async () => {
+      try {
+        if (isVideoEnabled) {
+          // Use browser APIs to disable video
+          const videoTracks = document.querySelectorAll('video');
+          videoTracks.forEach(track => {
+            if (track instanceof HTMLVideoElement) {
+              track.style.display = 'none';
+            }
+          });
+          setIsVideoEnabled(false);
+        } else {
+          // Use browser APIs to enable video
+          const videoTracks = document.querySelectorAll('video');
+          videoTracks.forEach(track => {
+            if (track instanceof HTMLVideoElement) {
+              track.style.display = 'block';
+            }
+          });
+          setIsVideoEnabled(true);
+        }
+      } catch (error) {
+        console.error('Error toggling video:', error);
+      }
+    };
+
+    const toggleScreenShare = async () => {
+      try {
+        if (isScreenSharing) {
+          // Stop screen sharing
+          setIsScreenSharing(false);
+        } else {
+          // Start screen sharing using browser API
+          if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            setIsScreenSharing(true);
+            // The stream will be handled by LiveKit automatically
+          }
+        }
+      } catch (error) {
+        console.error('Error toggling screen share:', error);
+      }
+    };
+
+    const leaveRoom = async () => {
+      try {
+        handleLeaveCall();
+      } catch (error) {
+        console.error('Error leaving room:', error);
+        handleLeaveCall();
+      }
+    };
+
+    return (
+      <div style={{
+        position: 'fixed',
+        bottom: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        backgroundColor: '#2563eb',
+        borderRadius: '0.75rem',
+        padding: '1rem',
+        display: 'flex',
+        gap: '1rem',
+        alignItems: 'center',
+        zIndex: 1000,
+        boxShadow: '0 8px 25px rgba(37, 99, 235, 0.3)',
+        border: '2px solid #1d4ed8'
+      }}>
+        <button
+          onClick={toggleAudio}
+          style={{
+            backgroundColor: isAudioEnabled ? '#3b82f6' : '#dc2626',
+            color: 'white',
+            border: '2px solid #1d4ed8',
+            borderRadius: '0.75rem',
+            padding: '0.75rem 1rem',
+            fontWeight: '600',
+            minWidth: '90px',
+            height: '48px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          {isAudioEnabled ? '🎤' : '🔇'} {isAudioEnabled ? 'Mute' : 'Unmute'}
+        </button>
+
+        <button
+          onClick={toggleVideo}
+          style={{
+            backgroundColor: isVideoEnabled ? '#3b82f6' : '#dc2626',
+            color: 'fix',
+            border: '2px solid #1d4ed8',
+            borderRadius: '0.75rem',
+            padding: '0.75rem 1rem',
+            fontWeight: '600',
+            minWidth: '90px',
+            height: '48px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          {isVideoEnabled ? '📹' : '🚫'} {isVideoEnabled ? 'Video' : 'No Video'}
+        </button>
+
+        <button
+          onClick={toggleScreenShare}
+          style={{
+            backgroundColor: isScreenSharing ? '#f59e0b' : '#3b82f6',
+            color: 'white',
+            border: '2px solid #1d4ed8',
+            borderRadius: '0.75rem',
+            padding: '0.75rem 1rem',
+            fontWeight: '600',
+            minWidth: '90px',
+            height: '48px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          {isScreenSharing ? '🖥️' : '🖥️'} {isScreenSharing ? 'Stop Share' : 'Share Screen'}
+        </button>
+
+        <button
+          onClick={leaveRoom}
+          style={{
+            backgroundColor: '#dc2626',
+            color: 'white',
+            border: '2px solid #b91c1c',
+            borderRadius: '0.75rem',
+            padding: '0.75rem 1rem',
+            fontWeight: '600',
+            minWidth: '90px',
+            height: '48px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          🚪 Leave
+        </button>
+      </div>
+    );
+  };
+
+  // Force blue controls - only once
   useEffect(() => {
     if (!token) return;
+    
+    // Check if CSS is already injected
+    if (document.getElementById('livekit-force-blue-controls')) {
+      return;
+    }
 
     const forceBlueControls = () => {
-          // Inject CSS to force blue controls - More aggressive approach
-          const style = document.createElement('style');
-          style.textContent = `
+      // Check if already injected
+      if (document.getElementById('livekit-force-blue-controls')) {
+        return;
+      }
+      
+      // Inject CSS to force blue controls - More aggressive approach
+      const style = document.createElement('style');
+      style.id = 'livekit-force-blue-controls';
+      style.textContent = `
             /* Force ALL LiveKit controls to be blue */
             .lk-control-bar button,
             .lk-control-bar [data-lk-kind],
@@ -681,20 +928,20 @@ function RoomClient({ roomName }: { roomName: string }) {
     // Apply immediately
     forceBlueControls();
 
-    // Set up interval to apply every 2 seconds
-    const interval = setInterval(forceBlueControls, 2000);
-
-      // Also apply immediately
-      forceBlueControls();
-
+    // No need for interval - apply once and let CSS handle the rest
     return () => {
-      clearInterval(interval);
+      // Cleanup if needed
     };
   }, [token]);
 
-  // Inject global CSS override
+  // Inject global CSS override - only once
   useEffect(() => {
     if (!token) return;
+    
+    // Check if CSS is already injected
+    if (document.getElementById('livekit-blue-controls-override')) {
+      return;
+    }
 
     const style = document.createElement('style');
     style.id = 'livekit-blue-controls-override';
@@ -979,12 +1226,27 @@ function RoomClient({ roomName }: { roomName: string }) {
 
   // Function to properly leave the call
   const handleLeaveCall = () => {
-    // Clear current token and redirect to doctor join page
+    // Clear stored token
     localStorage.removeItem(`doctorToken_${roomName}`);
     setToken(null);
     
-    // Force page refresh to ensure clean state
-    window.location.href = `/room/${roomName}`;
+    // Update call status in Firestore
+    if (db && roomName) {
+      try {
+        const callRef = doc(db, 'calls', roomName);
+        setDoc(callRef, {
+          status: 'completed',
+          endedAt: new Date()
+        }, { merge: true }).catch(error => {
+          console.error('Error updating call status:', error);
+        });
+      } catch (error) {
+        console.error('Error updating call status:', error);
+      }
+    }
+    
+    // Redirect to home page
+    window.location.href = '/';
   };
 
   // Function to properly disconnect from LiveKit
@@ -1183,12 +1445,15 @@ function RoomClient({ roomName }: { roomName: string }) {
     );
   }
 
-  // Debug logging
-  console.log('=== DOCTOR ROOM DEBUG ===');
-  console.log('Rendering video interface, token:', !!token, 'user:', !!user, 'roomName:', roomName);
-  console.log('isInfoPanelCollapsed:', isInfoPanelCollapsed);
-  console.log('shouldShowFixControlPanel:', shouldShowFixControlPanel());
-  console.log('=== END DEBUG ===');
+  // Debug logging - only in development and only once
+  if (process.env.NODE_ENV === 'development' && !window.debugLogged) {
+    console.log('=== DOCTOR ROOM DEBUG ===');
+    console.log('Rendering video interface, token:', !!token, 'user:', !!user, 'roomName:', roomName);
+    console.log('isInfoPanelCollapsed:', isInfoPanelCollapsed);
+    console.log('shouldShowFixControlPanel:', shouldShowFixControlPanel());
+    console.log('=== END DEBUG ===');
+    window.debugLogged = true;
+  }
 
   return (
     <>
@@ -1346,7 +1611,7 @@ function RoomClient({ roomName }: { roomName: string }) {
               </button>
               
               <button
-                onClick={handleDisconnect}
+                onClick={handleLeaveCall}
                 style={{
                   backgroundColor: '#dc2626',
                   color: 'white',
@@ -1489,6 +1754,9 @@ function RoomClient({ roomName }: { roomName: string }) {
         {/* Video Conference Component - This provides the actual video controls */}
         <VideoConference />
         <ManualTranscriptionInput />
+        
+        {/* Custom LiveKit Controls */}
+        <LiveKitControls />
         
         {/* Back to Home Button - Simple and Clean */}
         <div
