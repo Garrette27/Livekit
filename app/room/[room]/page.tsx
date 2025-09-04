@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import { Room } from 'livekit-client';
 import { auth, db } from '@/lib/firebase';
@@ -1490,8 +1491,8 @@ function RoomClient({ roomName }: { roomName: string }) {
 
   return (
     <>
-      {/* Fix Control Panel - Always show when token exists for debugging */}
-      {true && (
+      {/* Fix Control Panel - Rendered in a portal so it never gets hidden by LiveKit */}
+      {createPortal(
         <div
           className="fix-control-panel"
           style={{
@@ -1502,7 +1503,7 @@ function RoomClient({ roomName }: { roomName: string }) {
             border: '2px solid #3b82f6',
             borderRadius: '0.75rem',
             padding: '1rem',
-            zIndex: 10001,
+            zIndex: 100000, // keep above LiveKit overlays
             boxShadow: '0 8px 25px rgba(0, 0, 0, 0.12)',
             maxWidth: isInfoPanelCollapsed ? '60px' : '300px',
             fontSize: '0.875rem',
@@ -1812,7 +1813,8 @@ function RoomClient({ roomName }: { roomName: string }) {
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        typeof window !== 'undefined' ? document.body : ({} as any)
       )}
       
       <TranscriptionCapture />
