@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, getFirestore } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, getFirestore, doc, setDoc } from 'firebase/firestore';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -393,7 +393,31 @@ export default function Dashboard() {
               onClick={() => {
                 const roomName = prompt('Enter room name to create:');
                 if (roomName && roomName.trim()) {
-                  window.location.href = `/room/${roomName.trim()}`;
+                  // Create the room in Firestore first
+                  if (db && user) {
+                    const roomRef = doc(db, 'rooms', roomName.trim());
+                    setDoc(roomRef, {
+                      roomName: roomName.trim(),
+                      createdBy: user.uid,
+                      createdAt: new Date(),
+                      status: 'active',
+                      metadata: {
+                        createdBy: user.uid,
+                        userId: user.uid,
+                        userEmail: user.email,
+                        userName: user.displayName
+                      }
+                    }).then(() => {
+                      // Navigate to the room creation page
+                      window.location.href = `/room/${roomName.trim()}`;
+                    }).catch((error: any) => {
+                      console.error('Error creating room:', error);
+                      alert('Error creating room. Please try again.');
+                    });
+                  } else {
+                    // Fallback if Firestore not available
+                    window.location.href = `/room/${roomName.trim()}`;
+                  }
                 }
               }}
               style={{

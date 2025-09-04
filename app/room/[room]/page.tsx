@@ -227,8 +227,11 @@ function RoomClient({ roomName }: { roomName: string }) {
     getToken();
   }, [roomName, user]);
 
-  // Transcription capture component
+  // Transcription capture component - DISABLED to prevent loops
   const TranscriptionCapture = () => {
+    // Temporarily disable speech recognition to prevent loops
+    return null;
+    
     const [recognitionInstance, setRecognitionInstance] = useState<any>(null);
     const [userInteracted, setUserInteracted] = useState<boolean>(false);
     const [hasStarted, setHasStarted] = useState<boolean>(false);
@@ -465,55 +468,68 @@ function RoomClient({ roomName }: { roomName: string }) {
         position: 'fixed',
         bottom: '100px',
         right: '20px',
-        zIndex: 999
+        zIndex: 999,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        border: '2px solid #3b82f6',
+        borderRadius: '0.75rem',
+        padding: '1rem',
+        minWidth: '300px',
+        maxWidth: '400px'
       }}>
-        <button
-          onClick={() => {
-            const note = prompt('Add a conversation note:');
-            if (note && note.trim()) {
-              const timestamp = new Date().toISOString();
-              const entry = `[Manual Note] (${timestamp}): ${note}`;
-              
-              setTranscription(prev => {
-                const newTranscription = [...prev, entry];
-                
-                // Store in Firestore
-                if (db) {
-                  try {
-                  const callRef = doc(db, 'calls', roomName);
-                  updateDoc(callRef, {
-                    transcription: newTranscription,
-                    lastTranscriptionUpdate: new Date()
-                  }).catch(error => {
-                    console.error('Error storing manual note:', error);
-                  });
-                  } catch (error) {
-                    console.error('Error with Firestore operation:', error);
-                  }
-                }
-                
-                return newTranscription;
-              });
-            }
-          }}
-          style={{
-            backgroundColor: '#2563eb',
-            color: 'white',
-            border: 'none',
-            borderRadius: '50%',
-            width: '70px',
-            height: '70px',
-            fontSize: '28px',
-            cursor: 'pointer',
-            boxShadow: '0 8px 25px rgba(37, 99, 235, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-          title="Add conversation note"
-        >
-          📝
-        </button>
+        <h4 style={{ margin: '0 0 0.75rem 0', color: '#1e40af', fontSize: '1rem', fontWeight: '600' }}>
+          📝 Manual Notes
+        </h4>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Enter a note..."
+            style={{
+              flex: '1',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.875rem',
+              minWidth: '0' // Prevent overflow
+            }}
+            onKeyPress={(e) => e.key === 'Enter' && addNote()}
+          />
+          <button
+            onClick={addNote}
+            style={{
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap' // Prevent text wrapping
+            }}
+          >
+            Send
+          </button>
+        </div>
+        {manualNotes.length > 0 && (
+          <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+            {manualNotes.map((note, index) => (
+              <div key={index} style={{
+                padding: '0.5rem',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.375rem',
+                marginBottom: '0.5rem',
+                fontSize: '0.75rem',
+                color: '#475569',
+                wordBreak: 'break-word' // Handle long text properly
+              }}>
+                {note}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -1474,8 +1490,8 @@ function RoomClient({ roomName }: { roomName: string }) {
 
   return (
     <>
-      {/* Fix Control Panel - Only visible when doctor has generated a link - OVERLAY on top of video */}
-      {shouldShowFixControlPanel() && (
+      {/* Fix Control Panel - Always show when token exists for debugging */}
+      {token && (
         <div
           className="fix-control-panel"
           style={{
@@ -1760,6 +1776,40 @@ function RoomClient({ roomName }: { roomName: string }) {
               >
                 🎛️ Show Controls
               </button>
+              
+              {/* Force refresh button */}
+              <button
+                onClick={() => {
+                  // Force refresh the page
+                  window.location.reload();
+                }}
+                style={{
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                  textAlign: 'center',
+                  width: '100%',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(239, 68, 68, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.2)';
+                }}
+              >
+                🔄 Force Refresh
+              </button>
             </div>
           )}
         </div>
@@ -1809,28 +1859,30 @@ function RoomClient({ roomName }: { roomName: string }) {
         <ManualTranscriptionInput />
         
         {/* Custom LiveKit Controls - Always show when token exists */}
-        {token && <LiveKitControls />}
+        <LiveKitControls />
         
         {/* Debug info to show what's happening */}
-        {process.env.NODE_ENV === 'development' && (
-          <div style={{
-            position: 'fixed',
-            top: '100px',
-            left: '20px',
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            color: 'white',
-            padding: '1rem',
-            borderRadius: '0.5rem',
-            fontSize: '0.75rem',
-            zIndex: 10000,
-            fontFamily: 'monospace'
-          }}>
-            <div>Token: {token ? '✅' : '❌'}</div>
-            <div>Room: {roomName}</div>
-            <div>User: {user?.uid || 'none'}</div>
-            <div>Controls: {token ? 'Should show' : 'Hidden'}</div>
-          </div>
-        )}
+        <div style={{
+          position: 'fixed',
+          top: '100px',
+          left: '20px',
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          color: 'white',
+          padding: '1rem',
+          borderRadius: '0.5rem',
+          fontSize: '0.75rem',
+          zIndex: 10000,
+          fontFamily: 'monospace',
+          border: '2px solid #ff6b6b'
+        }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', color: '#ff6b6b' }}>DEBUG INFO</div>
+          <div>Token: {token ? '✅' : '❌'}</div>
+          <div>Room: {roomName}</div>
+          <div>User: {user?.uid || 'none'}</div>
+          <div>Controls: Always Show</div>
+          <div>Fix Panel: Always Show</div>
+          <div>Speech: DISABLED</div>
+        </div>
         
         {/* Back to Home Button - Simple and Clean */}
         <div
