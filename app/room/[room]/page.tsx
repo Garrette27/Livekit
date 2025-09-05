@@ -1258,6 +1258,9 @@ function RoomClient({ roomName }: { roomName: string }) {
     return localStorage.getItem(`doctorGeneratedLink_${roomName}`) === 'true' || !!token;
   };
 
+  // State for control panel visibility
+  const [showControlPanel, setShowControlPanel] = useState(true);
+
   // Function to properly leave the call
   const handleLeaveCall = () => {
     // Clear stored token
