@@ -804,11 +804,66 @@ function RoomClient({ roomName }: { roomName: string }) {
         justify-content: center !important;
         gap: 6px !important;
         transition: all 0.2s ease !important;
+        position: relative !important;
       }
 
       .lk-control-bar button:hover {
         background-color: rgba(255, 255, 255, 0.2) !important;
         transform: translateY(-1px) !important;
+      }
+
+      /* Fix dropdown menus - ensure they can be closed */
+      .lk-device-menu,
+      .lk-device-menu-item,
+      .lk-dropdown,
+      .lk-menu {
+        position: absolute !important;
+        z-index: 1001 !important;
+        background-color: rgba(0, 0, 0, 0.9) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 8px !important;
+        padding: 8px 0 !important;
+        min-width: 200px !important;
+        max-width: 300px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        backdrop-filter: blur(10px) !important;
+      }
+
+      .lk-device-menu-item {
+        padding: 8px 16px !important;
+        color: white !important;
+        cursor: pointer !important;
+        border: none !important;
+        background: transparent !important;
+        width: 100% !important;
+        text-align: left !important;
+        font-size: 14px !important;
+        transition: background-color 0.2s ease !important;
+      }
+
+      .lk-device-menu-item:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+      }
+
+      /* Ensure dropdowns close when clicking outside */
+      .lk-device-menu[aria-expanded="false"],
+      .lk-dropdown[aria-expanded="false"] {
+        display: none !important;
+      }
+
+      .lk-device-menu[aria-expanded="true"],
+      .lk-dropdown[aria-expanded="true"] {
+        display: block !important;
+      }
+
+      /* Fix overlapping text in dropdown items */
+      .lk-device-menu-item span,
+      .lk-device-menu-item div {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 100% !important;
+        display: block !important;
       }
 
       /* Fix chat background to be white */
@@ -906,14 +961,77 @@ function RoomClient({ roomName }: { roomName: string }) {
         controlBar.style.setProperty('transform', 'translateX(-50%)', 'important');
         controlBar.style.setProperty('z-index', '1000', 'important');
       }
+
+      // Fix dropdown positioning and ensure they can be closed
+      const dropdowns = document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu');
+      dropdowns.forEach(dropdown => {
+        const element = dropdown as HTMLElement;
+        element.style.setProperty('position', 'absolute', 'important');
+        element.style.setProperty('z-index', '1001', 'important');
+        element.style.setProperty('background-color', 'rgba(0, 0, 0, 0.9)', 'important');
+        element.style.setProperty('border', '1px solid rgba(255, 255, 255, 0.2)', 'important');
+        element.style.setProperty('border-radius', '8px', 'important');
+        element.style.setProperty('box-shadow', '0 4px 12px rgba(0, 0, 0, 0.3)', 'important');
+        element.style.setProperty('backdrop-filter', 'blur(10px)', 'important');
+      });
+
+      // Fix dropdown items
+      const dropdownItems = document.querySelectorAll('.lk-device-menu-item');
+      dropdownItems.forEach(item => {
+        const element = item as HTMLElement;
+        element.style.setProperty('padding', '8px 16px', 'important');
+        element.style.setProperty('color', 'white', 'important');
+        element.style.setProperty('cursor', 'pointer', 'important');
+        element.style.setProperty('border', 'none', 'important');
+        element.style.setProperty('background', 'transparent', 'important');
+        element.style.setProperty('width', '100%', 'important');
+        element.style.setProperty('text-align', 'left', 'important');
+        element.style.setProperty('font-size', '14px', 'important');
+        element.style.setProperty('white-space', 'nowrap', 'important');
+        element.style.setProperty('overflow', 'hidden', 'important');
+        element.style.setProperty('text-overflow', 'ellipsis', 'important');
+      });
     };
 
     // Apply immediately and then periodically
     forceShowControls();
     const interval = setInterval(forceShowControls, 1000);
 
+    // Add click outside handler to close dropdowns
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const isDropdown = target.closest('.lk-device-menu, .lk-dropdown, .lk-menu');
+      const isControlButton = target.closest('.lk-control-bar button');
+      
+      if (!isDropdown && !isControlButton) {
+        // Close all open dropdowns
+        const openDropdowns = document.querySelectorAll('.lk-device-menu[aria-expanded="true"], .lk-dropdown[aria-expanded="true"]');
+        openDropdowns.forEach(dropdown => {
+          dropdown.setAttribute('aria-expanded', 'false');
+          (dropdown as HTMLElement).style.display = 'none';
+        });
+      }
+    };
+
+    // Add escape key handler to close dropdowns
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        const openDropdowns = document.querySelectorAll('.lk-device-menu[aria-expanded="true"], .lk-dropdown[aria-expanded="true"]');
+        openDropdowns.forEach(dropdown => {
+          dropdown.setAttribute('aria-expanded', 'false');
+          (dropdown as HTMLElement).style.display = 'none';
+        });
+      }
+    };
+
+    // Add event listeners
+    document.addEventListener('click', handleClickOutside);
+    document.addEventListener('keydown', handleEscapeKey);
+
     return () => {
       clearInterval(interval);
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
       const styleToRemove = document.getElementById('livekit-controls-fix');
       if (styleToRemove) {
         styleToRemove.remove();
@@ -1142,123 +1260,123 @@ function RoomClient({ roomName }: { roomName: string }) {
           }}
         >
           <div style={{ marginBottom: '0.75rem' }}>
-            <h3 style={{ 
-              margin: '0', 
-              color: '#1e40af', 
-              fontSize: '1rem',
-              fontWeight: '600'
-            }}>
-              🛠️ Fix Control Panel
-            </h3>
-            <p style={{ 
-              margin: '0', 
-              color: '#6b7280', 
-              fontSize: '0.875rem',
-              marginBottom: '0.5rem'
-            }}>
-              Connected as: {user?.displayName || user?.email || 'Doctor'}
-            </p>
-            <p style={{ 
-              margin: '0', 
-              color: '#6b7280', 
-              fontSize: '0.875rem',
-              marginBottom: '0.75rem'
-            }}>
-              Room: {roomName}
-            </p>
+              <h3 style={{ 
+                margin: '0', 
+                color: '#1e40af', 
+                fontSize: '1rem',
+                fontWeight: '600'
+              }}>
+                🛠️ Fix Control Panel
+              </h3>
+                <p style={{ 
+                  margin: '0', 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  marginBottom: '0.5rem'
+                }}>
+                  Connected as: {user?.displayName || user?.email || 'Doctor'}
+                </p>
+                <p style={{ 
+                  margin: '0', 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem',
+                  marginBottom: '0.75rem'
+                }}>
+                  Room: {roomName}
+                </p>
           </div>
           
-          <div style={{
-            display: 'flex',
-            gap: '0.75rem',
-            flexDirection: 'column'
-          }}>
             <div style={{
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '0.5rem',
-              padding: '0.75rem',
-              fontSize: '0.75rem',
-              color: '#475569',
-              wordBreak: 'break-all',
-              marginBottom: '0.75rem',
-              borderLeft: '3px solid #3b82f6'
+              display: 'flex',
+              gap: '0.75rem',
+              flexDirection: 'column'
             }}>
-              <strong>Patient Link:</strong><br />
-              {`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
+              <div style={{
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                padding: '0.75rem',
+                fontSize: '0.75rem',
+                color: '#475569',
+                wordBreak: 'break-all',
+                marginBottom: '0.75rem',
+                borderLeft: '3px solid #3b82f6'
+              }}>
+                <strong>Patient Link:</strong><br />
+                {`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
+              </div>
+              
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
+                  alert('Patient link copied to clipboard!');
+                }}
+                style={{
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                  textAlign: 'center',
+                  width: '100%',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
+                }}
+              >
+                📋 Copy Patient Link
+              </button>
+              
+              <button
+                onClick={() => {
+                  window.open(`/room/${roomName}/patient`, '_blank');
+                }}
+                style={{
+                  backgroundColor: '#059669',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                  textAlign: 'center',
+                  width: '100%',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(5, 150, 105, 0.2)'
+                }}
+              >
+                👥 Join as Patient
+              </button>
+              
+              <button
+                onClick={handleLeaveCall}
+                style={{
+                  backgroundColor: '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                  textAlign: 'center',
+                  width: '100%',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)'
+                }}
+              >
+                🚪 Leave Call
+              </button>
             </div>
-            
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
-                alert('Patient link copied to clipboard!');
-              }}
-              style={{
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                padding: '0.75rem 1rem',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                textDecoration: 'none',
-                display: 'inline-block',
-                textAlign: 'center',
-                width: '100%',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
-              }}
-            >
-              📋 Copy Patient Link
-            </button>
-            
-            <button
-              onClick={() => {
-                window.open(`/room/${roomName}/patient`, '_blank');
-              }}
-              style={{
-                backgroundColor: '#059669',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                padding: '0.75rem 1rem',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                textDecoration: 'none',
-                display: 'inline-block',
-                textAlign: 'center',
-                width: '100%',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 4px rgba(5, 150, 105, 0.2)'
-              }}
-            >
-              👥 Join as Patient
-            </button>
-            
-            <button
-              onClick={handleLeaveCall}
-              style={{
-                backgroundColor: '#dc2626',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                padding: '0.75rem 1rem',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                textDecoration: 'none',
-                display: 'inline-block',
-                textAlign: 'center',
-                width: '100%',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)'
-              }}
-            >
-              🚪 Leave Call
-            </button>
-          </div>
         </div>,
         typeof window !== 'undefined' ? document.body : ({} as any)
       )}
