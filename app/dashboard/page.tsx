@@ -77,13 +77,22 @@ export default function Dashboard() {
     // This ensures existing summaries are still visible
     const isLegacySummary = !summaryUserId;
     
-    // Exclude test data
-    const isTestData = (summary.metadata as any)?.testData || (summary as any).testData || (summary.metadata as any)?.source === 'test';
+    // Exclude test data - be more comprehensive in detecting test data
+    const isTestData = (summary.metadata as any)?.testData || 
+                      (summary as any).testData || 
+                      (summary.metadata as any)?.source === 'test' ||
+                      (summary.metadata as any)?.test === true ||
+                      summary.roomName?.includes('test-') ||
+                      summary.roomName?.includes('test_');
     
     if (isUserSummary && !isTestData) {
-      console.log('Dashboard: Found user summary:', summary.roomName);
+      console.log('Dashboard: Found user summary:', summary.roomName, 'User ID:', summaryUserId);
     } else if (isLegacySummary && !isTestData) {
       console.log('Dashboard: Found legacy summary (no user ID):', summary.roomName);
+    } else if (isTestData) {
+      console.log('Dashboard: Excluding test data:', summary.roomName);
+    } else {
+      console.log('Dashboard: Excluding summary for different user:', summary.roomName, 'Summary User ID:', summaryUserId, 'Current User ID:', user.uid);
     }
     
     return (isUserSummary || isLegacySummary) && !isTestData; // Show user summaries and legacy summaries, exclude test data
@@ -93,6 +102,8 @@ export default function Dashboard() {
       
       console.log('Dashboard: Received summaries:', userSummaries.length, 'summaries for user', user.uid);
       console.log('Dashboard: Total summaries in database:', allSummaries.length);
+      console.log('Dashboard: User ID:', user.uid);
+      console.log('Dashboard: All summaries user IDs:', allSummaries.map(s => ({ room: s.roomName, userId: s.createdBy || s.metadata?.createdBy })));
       // Firestore already orders by createdAt, but keep a defensive client-side reorder
       const ordered = [...userSummaries].sort((a, b) => {
         const ad = a.createdAt?.toDate?.() ? a.createdAt.toDate().getTime() : 0;
@@ -302,9 +313,14 @@ export default function Dashboard() {
     );
   }
 
-  // Filter out test data for statistics
+  // Filter out test data for statistics - use same logic as main filtering
   const realSummaries = summaries.filter(summary => {
-    const isTestData = (summary.metadata as any)?.testData || (summary as any).testData || (summary.metadata as any)?.source === 'test';
+    const isTestData = (summary.metadata as any)?.testData || 
+                      (summary as any).testData || 
+                      (summary.metadata as any)?.source === 'test' ||
+                      (summary.metadata as any)?.test === true ||
+                      summary.roomName?.includes('test-') ||
+                      summary.roomName?.includes('test_');
     return !isTestData;
   });
 
