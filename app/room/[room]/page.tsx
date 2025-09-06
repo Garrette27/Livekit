@@ -755,6 +755,172 @@ function RoomClient({ roomName }: { roomName: string }) {
     window.location.href = '/';
   };
 
+  // Ensure LiveKit controls are always visible and fix chat background
+  useEffect(() => {
+    if (!token) return;
+    
+    // Check if CSS is already injected
+    if (document.getElementById('livekit-controls-fix')) {
+      return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'livekit-controls-fix';
+    style.textContent = `
+      /* Ensure LiveKit controls are always visible */
+      .lk-control-bar {
+        position: fixed !important;
+        bottom: 20px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 1000 !important;
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        background-color: rgba(0, 0, 0, 0.8) !important;
+        border-radius: 12px !important;
+        padding: 12px !important;
+        gap: 8px !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-width: 400px !important;
+        max-width: 90vw !important;
+      }
+
+      /* Ensure control buttons are visible */
+      .lk-control-bar button {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 8px !important;
+        padding: 8px 12px !important;
+        color: white !important;
+        font-size: 14px !important;
+        min-width: 60px !important;
+        height: 40px !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        transition: all 0.2s ease !important;
+      }
+
+      .lk-control-bar button:hover {
+        background-color: rgba(255, 255, 255, 0.2) !important;
+        transform: translateY(-1px) !important;
+      }
+
+      /* Fix chat background to be white */
+      .lk-chat {
+        background-color: white !important;
+        color: black !important;
+      }
+
+      .lk-chat-message {
+        background-color: #f8f9fa !important;
+        color: black !important;
+        border: 1px solid #e9ecef !important;
+        border-radius: 8px !important;
+        padding: 8px 12px !important;
+        margin: 4px 0 !important;
+      }
+
+      .lk-chat-input {
+        background-color: white !important;
+        color: black !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 8px !important;
+        padding: 8px 12px !important;
+      }
+
+      .lk-chat-input::placeholder {
+        color: #6c757d !important;
+      }
+
+      /* Ensure video conference takes full screen */
+      .lk-video-conference {
+        width: 100vw !important;
+        height: 100vh !important;
+        position: relative !important;
+        background-color: #000 !important;
+      }
+
+      /* Ensure participant video is properly sized */
+      .lk-participant-video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+      }
+
+      /* Fix any layout issues */
+      .lk-room-container {
+        width: 100vw !important;
+        height: 100vh !important;
+        position: relative !important;
+        overflow: hidden !important;
+      }
+
+      /* Ensure our custom panels don't interfere */
+      .fix-control-panel {
+        z-index: 10001 !important;
+        pointer-events: auto !important;
+      }
+
+      .back-to-home,
+      .back-to-dashboard {
+        z-index: 9999 !important;
+        pointer-events: auto !important;
+      }
+
+      /* Mobile responsiveness */
+      @media (max-width: 768px) {
+        .lk-control-bar {
+          min-width: 90vw !important;
+          padding: 8px !important;
+          gap: 4px !important;
+        }
+        
+        .lk-control-bar button {
+          min-width: 50px !important;
+          padding: 6px 8px !important;
+          font-size: 12px !important;
+          height: 36px !important;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+    console.log('✅ LiveKit controls fix applied');
+
+    // Force show controls periodically to ensure they're always visible
+    const forceShowControls = () => {
+      const controlBar = document.querySelector('.lk-control-bar') as HTMLElement;
+      if (controlBar) {
+        controlBar.style.setProperty('display', 'flex', 'important');
+        controlBar.style.setProperty('visibility', 'visible', 'important');
+        controlBar.style.setProperty('opacity', '1', 'important');
+        controlBar.style.setProperty('position', 'fixed', 'important');
+        controlBar.style.setProperty('bottom', '20px', 'important');
+        controlBar.style.setProperty('left', '50%', 'important');
+        controlBar.style.setProperty('transform', 'translateX(-50%)', 'important');
+        controlBar.style.setProperty('z-index', '1000', 'important');
+      }
+    };
+
+    // Apply immediately and then periodically
+    forceShowControls();
+    const interval = setInterval(forceShowControls, 1000);
+
+    return () => {
+      clearInterval(interval);
+      const styleToRemove = document.getElementById('livekit-controls-fix');
+      if (styleToRemove) {
+        styleToRemove.remove();
+      }
+    };
+  }, [token]);
+
   // Function to properly disconnect from LiveKit
   const handleDisconnect = () => {
     // Clear stored token
