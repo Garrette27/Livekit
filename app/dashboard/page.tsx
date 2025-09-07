@@ -26,6 +26,20 @@ interface CallSummary {
   createdBy?: string; // Added for client-side filtering
 }
 
+interface Consultation {
+  id: string;
+  roomName: string;
+  patientName?: string;
+  duration?: number;
+  status?: string;
+  joinedAt?: any;
+  leftAt?: any;
+  createdBy?: string;
+  metadata?: {
+    createdBy?: string;
+  };
+}
+
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [summaries, setSummaries] = useState<CallSummary[]>([]);
@@ -120,7 +134,7 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, [user, sortOrder]);
 
-  // Also fetch real consultations from the consultations collection for additional tracking
+  // Also fetch real consultations from the consultations collection and merge with summaries
   useEffect(() => {
     if (!user || !db) return;
 
@@ -136,16 +150,65 @@ export default function Dashboard() {
       const realConsultations = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as Consultation[];
       
       console.log('Dashboard: Found real consultations:', realConsultations.length);
-      // You can use this data to update statistics or show additional info
+      
+      // Convert consultations to summary format and merge with existing summaries
+      const consultationSummaries = realConsultations
+        .filter(consultation => {
+          const consultationUserId = consultation.createdBy || consultation.metadata?.createdBy;
+          const isUserConsultation = consultationUserId === user.uid;
+          const isLegacyConsultation = !consultationUserId;
+          return (isUserConsultation || isLegacyConsultation) && consultation.status === 'completed';
+        })
+        .map(consultation => ({
+          id: consultation.id,
+          roomName: consultation.roomName,
+          summary: `Consultation completed with ${consultation.patientName || 'Unknown Patient'}. Duration: ${consultation.duration || 0} minutes.`,
+          keyPoints: [
+            `Patient: ${consultation.patientName || 'Unknown Patient'}`,
+            `Duration: ${consultation.duration || 0} minutes`,
+            `Status: ${consultation.status}`,
+            'No AI analysis available'
+          ],
+          recommendations: ['Follow up as needed', 'Review consultation notes if available'],
+          followUpActions: ['Schedule follow-up if required', 'Document consultation outcomes'],
+          riskLevel: 'Low',
+          category: 'General Consultation',
+          participants: [consultation.patientName || 'Unknown Patient'],
+          duration: consultation.duration || 0,
+          createdAt: consultation.leftAt || consultation.joinedAt || new Date(),
+          createdBy: consultation.createdBy || consultation.metadata?.createdBy,
+          metadata: {
+            totalParticipants: 1,
+            createdBy: consultation.createdBy || consultation.metadata?.createdBy,
+            source: 'consultation_tracking',
+            hasTranscriptionData: false,
+            consultationData: true
+          }
+        }));
+
+      // Merge with existing summaries and remove duplicates
+      setSummaries(prevSummaries => {
+        const allSummaries = [...prevSummaries, ...consultationSummaries];
+        const uniqueSummaries = allSummaries.filter((summary, index, self) => 
+          index === self.findIndex(s => s.roomName === summary.roomName)
+        );
+        
+        // Sort by creation date
+        return uniqueSummaries.sort((a, b) => {
+          const ad = a.createdAt?.toDate?.() ? a.createdAt.toDate().getTime() : 0;
+          const bd = b.createdAt?.toDate?.() ? b.createdAt.toDate().getTime() : 0;
+          return sortOrder === 'desc' ? bd - ad : ad - bd;
+        });
+      });
     }, (error) => {
       console.error('Dashboard: Error fetching consultations:', error);
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, sortOrder]);
 
   const handleTestWebhook = async () => {
     try {
@@ -226,6 +289,40 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Test transcription error:', error);
+      alert('❌ Test failed: ' + error);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const handleTestConsultationSummary = async () => {
+    try {
+      setTestLoading(true);
+      const roomName = 'test-consultation-' + Date.now();
+      const patientName = 'Test Patient';
+      const duration = Math.floor(Math.random() * 30) + 5; // Random duration between 5-35 minutes
+      
+      const response = await fetch('/api/test-consultation-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          roomName,
+          patientName,
+          duration,
+          userId: user?.uid // Include user ID
+        })
+      });
+      
+      const result = await response.json();
+      console.log('Test consultation summary result:', result);
+      
+      if (result.success) {
+        alert(`✅ Test consultation summary created successfully! Room: ${roomName}, Duration: ${duration} minutes. Check the dashboard to see the generated summary.`);
+      } else {
+        alert('❌ Test failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Test consultation summary error:', error);
       alert('❌ Test failed: ' + error);
     } finally {
       setTestLoading(false);
@@ -502,6 +599,23 @@ export default function Dashboard() {
               }}
             >
               {testLoading ? 'Testing...' : 'Test Transcription'}
+            </button>
+            <button
+              onClick={handleTestConsultationSummary}
+              disabled={testLoading}
+              style={{
+                backgroundColor: '#dc2626',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: testLoading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                opacity: testLoading ? 0.7 : 1
+              }}
+            >
+              {testLoading ? 'Testing...' : 'Test Consultation Summary'}
             </button>
             <button
               onClick={handleSignOut}

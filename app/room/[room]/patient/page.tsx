@@ -109,7 +109,8 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
           body: JSON.stringify({
             roomName,
             action: 'join',
-            patientName
+            patientName,
+            userId: user?.uid || 'anonymous' // Pass user ID for tracking
           }),
         });
       } catch (error) {
@@ -469,7 +470,8 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
             body: JSON.stringify({
               roomName,
               action: 'leave',
-              patientName
+              patientName,
+              userId: user?.uid || 'anonymous' // Pass user ID for tracking
             }),
           }).catch(error => {
             console.error('Error tracking consultation leave:', error);
