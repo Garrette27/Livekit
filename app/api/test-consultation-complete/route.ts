@@ -3,11 +3,13 @@ import { getFirebaseAdmin } from '../../../lib/firebase-admin';
 
 export async function POST(req: Request) {
   try {
-    const { roomName, action, patientName, duration, userId } = await req.json();
-    console.log(`Track consultation: ${action} for room: ${roomName}, user: ${userId}`);
+    const { roomName, patientName, duration, userId } = await req.json();
+    console.log(`Test consultation complete for room: ${roomName}, patient: ${patientName}, duration: ${duration}, user: ${userId}`);
 
-    if (!roomName || !action) {
-      return NextResponse.json({ error: 'Room name and action are required' }, { status: 400 });
+    if (!roomName || !patientName || !duration || !userId) {
+      return NextResponse.json({ 
+        error: 'Room name, patient name, duration, and user ID are required' 
+      }, { status: 400 });
     }
 
     const db = getFirebaseAdmin();
@@ -19,92 +21,50 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
-    // Look up the room creator (doctor) to link the consultation to them
-    let doctorUserId = userId || 'unknown';
-    try {
-      const roomRef = db.collection('rooms').doc(roomName);
-      const roomDoc = await roomRef.get();
-      if (roomDoc.exists) {
-        const roomData = roomDoc.data();
-        doctorUserId = roomData?.createdBy || roomData?.metadata?.createdBy || userId || 'unknown';
-        console.log(`Found room creator: ${doctorUserId} for room: ${roomName}`);
-      } else {
-        console.log(`Room ${roomName} not found in rooms collection, using provided userId: ${userId}`);
-      }
-    } catch (error) {
-      console.error('Error looking up room creator:', error);
-      console.log(`Using provided userId: ${userId}`);
-    }
-
+    // Create a completed consultation record
     const consultationRef = db.collection('consultations').doc(roomName);
-    
-    if (action === 'join') {
-      // Track when patient joins
-      await consultationRef.set({
-        roomName,
-        patientName: patientName || 'Unknown Patient',
-        joinedAt: new Date(),
-        status: 'active',
-        isRealConsultation: true, // Mark as real consultation, not test
-        createdBy: doctorUserId, // Store doctor's user ID
-        metadata: {
-          source: 'patient_join',
-          trackedAt: new Date(),
-          createdBy: doctorUserId,
-          patientUserId: userId || 'anonymous' // Store patient's user ID if available
-        }
-      }, { merge: true });
-      
-      console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}`);
-      
-    } else if (action === 'leave') {
-      // Track when patient leaves and calculate duration
-      const consultationDoc = await consultationRef.get();
-      if (consultationDoc.exists) {
-        const data = consultationDoc.data();
-        const joinedAt = data?.joinedAt?.toDate() || new Date();
-        const leftAt = new Date();
-        const durationMinutes = Math.round((leftAt.getTime() - joinedAt.getTime()) / (1000 * 60));
-        
-        await consultationRef.update({
-          leftAt,
-          duration: durationMinutes,
-          status: 'completed',
-          isRealConsultation: true,
-          createdBy: doctorUserId, // Ensure doctor's user ID is preserved
-          metadata: {
-            ...data?.metadata,
-            source: 'patient_leave',
-            durationMinutes,
-            trackedAt: new Date(),
-            createdBy: doctorUserId,
-            patientUserId: userId || 'anonymous'
-          }
-        });
-        
-        console.log(`✅ Patient left consultation: ${roomName}, duration: ${durationMinutes} minutes, linked to doctor: ${doctorUserId}`);
-        
-        // Generate AI summary for completed consultation
-        try {
-          console.log(`Generating AI summary for room: ${roomName}, patient: ${data?.patientName || 'Unknown Patient'}, duration: ${durationMinutes}, doctor: ${doctorUserId}`);
-          await generateConsultationSummary(roomName, data?.patientName || 'Unknown Patient', durationMinutes, doctorUserId);
-        } catch (error) {
-          console.error('❌ Error generating consultation summary:', error);
-        }
+    const joinedAt = new Date();
+    const leftAt = new Date(joinedAt.getTime() + (parseInt(duration) * 60 * 1000)); // Add duration in milliseconds
+
+    await consultationRef.set({
+      roomName,
+      patientName,
+      joinedAt,
+      leftAt,
+      duration: parseInt(duration),
+      status: 'completed',
+      isRealConsultation: true,
+      createdBy: userId,
+      metadata: {
+        source: 'patient_leave',
+        durationMinutes: parseInt(duration),
+        trackedAt: new Date(),
+        createdBy: userId
       }
+    });
+
+    console.log(`✅ Test consultation created: ${roomName}, duration: ${duration} minutes, user: ${userId}`);
+
+    // Generate AI summary for the consultation
+    try {
+      await generateConsultationSummary(roomName, patientName, parseInt(duration), userId);
+    } catch (error) {
+      console.error('❌ Error generating consultation summary:', error);
     }
 
     return NextResponse.json({ 
       success: true, 
-      message: `Consultation ${action} tracked successfully`,
+      message: `Test consultation completed successfully`,
       roomName,
-      action
+      duration: parseInt(duration),
+      patientName,
+      userId
     });
 
   } catch (error) {
-    console.error('❌ Track consultation error:', error);
+    console.error('❌ Test consultation complete error:', error);
     return NextResponse.json({ 
-      error: 'Failed to track consultation',
+      error: 'Failed to complete test consultation',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
@@ -112,7 +72,7 @@ export async function POST(req: Request) {
 
 async function generateConsultationSummary(roomName: string, patientName: string, durationMinutes: number, userId: string) {
   try {
-    console.log('Generating AI summary for consultation:', roomName, 'with user ID:', userId);
+    console.log('Generating AI summary for test consultation:', roomName, 'with user ID:', userId);
     
     const db = getFirebaseAdmin();
     if (!db) {
@@ -127,12 +87,12 @@ async function generateConsultationSummary(roomName: string, patientName: string
       // Store fallback summary
       const summaryData = {
         roomName,
-        summary: `Consultation completed with ${patientName}. Duration: ${durationMinutes} minutes. No AI analysis available - OpenAI not configured.`,
-        keyPoints: ['Consultation completed', 'Duration recorded', 'No AI analysis available'],
+        summary: `Test consultation completed with ${patientName}. Duration: ${durationMinutes} minutes. No AI analysis available - OpenAI not configured.`,
+        keyPoints: ['Test consultation completed', 'Duration recorded', 'No AI analysis available'],
         recommendations: ['Please configure OpenAI API for enhanced summaries'],
         followUpActions: ['Manual review required'],
-        riskLevel: 'Unknown',
-        category: 'General Consultation',
+        riskLevel: 'Low',
+        category: 'Test Consultation',
         participants: [patientName],
         duration: durationMinutes,
         createdAt: new Date(),
@@ -140,7 +100,7 @@ async function generateConsultationSummary(roomName: string, patientName: string
         metadata: {
           totalParticipants: 1,
           createdBy: userId,
-          source: 'consultation_tracking',
+          source: 'test_consultation_complete',
           hasTranscriptionData: false,
           summaryGeneratedAt: new Date()
         }
@@ -148,8 +108,7 @@ async function generateConsultationSummary(roomName: string, patientName: string
 
       const summaryRef = db.collection('call-summaries').doc(roomName);
       await summaryRef.set(summaryData);
-      console.log('✅ Fallback summary stored successfully with user ID:', userId);
-      console.log('Fallback summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
+      console.log('✅ Test consultation fallback summary stored successfully with user ID:', userId);
       return;
     }
 
@@ -158,29 +117,29 @@ async function generateConsultationSummary(roomName: string, patientName: string
     // Create a comprehensive prompt for medical consultation summarization
     const prompt = `You are a medical AI assistant specializing in summarizing telehealth consultations. 
     
-    Generate a comprehensive, structured summary for a medical consultation that took place in room: ${roomName}.
+    Generate a comprehensive, structured summary for a TEST consultation that took place in room: ${roomName}.
     
     Consultation details:
     - Duration: ${durationMinutes} minutes
     - Patient: ${patientName}
-    - No conversation transcript available (this may be a video-only consultation or transcription was not enabled)
+    - This is a TEST consultation (no actual conversation transcript available)
     
     Please provide the following structured response in JSON format:
     
     {
-      "summary": "A concise 2-3 sentence overview of the consultation. Since no transcript is available, indicate this was a video consultation and mention the duration.",
-      "keyPoints": ["Video consultation completed", "Duration: ${durationMinutes} minutes", "Patient: ${patientName}", "No transcript available"],
+      "summary": "A concise 2-3 sentence overview of this test consultation. Mention it was a test consultation and the duration.",
+      "keyPoints": ["Test consultation completed", "Duration: ${durationMinutes} minutes", "Patient: ${patientName}", "No transcript available"],
       "recommendations": ["Follow up as needed", "Review consultation notes if available"],
       "followUpActions": ["Schedule follow-up if required", "Document consultation outcomes"],
-      "riskLevel": "Low (based on available information)",
-      "category": "General Consultation"
+      "riskLevel": "Low (test consultation)",
+      "category": "Test Consultation"
     }
     
-    IMPORTANT: Since no conversation transcript is available, focus on the consultation structure and indicate this was a video consultation.
+    IMPORTANT: This is a TEST consultation, so indicate that clearly in the summary.
     
     Focus on medical accuracy, patient privacy, and actionable insights.`;
 
-    console.log('Calling OpenAI API for consultation summary...');
+    console.log('Calling OpenAI API for test consultation summary...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -234,8 +193,8 @@ async function generateConsultationSummary(roomName: string, patientName: string
         keyPoints: parsedSummary.keyPoints || ['No key points available'],
         recommendations: parsedSummary.recommendations || ['No recommendations available'],
         followUpActions: parsedSummary.followUpActions || ['No follow-up actions specified'],
-        riskLevel: parsedSummary.riskLevel || 'Unknown',
-        category: parsedSummary.category || 'General Consultation',
+        riskLevel: parsedSummary.riskLevel || 'Low',
+        category: parsedSummary.category || 'Test Consultation',
         participants: [patientName],
         duration: durationMinutes,
         createdAt: new Date(),
@@ -243,7 +202,7 @@ async function generateConsultationSummary(roomName: string, patientName: string
         metadata: {
           totalParticipants: 1,
           createdBy: userId,
-          source: 'consultation_tracking',
+          source: 'test_consultation_complete',
           hasTranscriptionData: false,
           summaryGeneratedAt: new Date()
         }
@@ -251,8 +210,8 @@ async function generateConsultationSummary(roomName: string, patientName: string
 
       const summaryRef = db.collection('call-summaries').doc(roomName);
       await summaryRef.set(summaryData);
-      console.log('✅ AI summary stored successfully in Firestore with user ID:', userId);
-      console.log('Summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
+      console.log('✅ Test consultation AI summary stored successfully in Firestore with user ID:', userId);
+      console.log('Test consultation summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
       
     } catch (parseError) {
       console.error('❌ Error parsing AI response:', parseError);
@@ -264,8 +223,8 @@ async function generateConsultationSummary(roomName: string, patientName: string
         keyPoints: ['Unable to parse structured data'],
         recommendations: ['Manual review recommended'],
         followUpActions: ['Contact support if needed'],
-        riskLevel: 'Unknown',
-        category: 'General Consultation',
+        riskLevel: 'Low',
+        category: 'Test Consultation',
         participants: [patientName],
         duration: durationMinutes,
         createdAt: new Date(),
@@ -273,7 +232,7 @@ async function generateConsultationSummary(roomName: string, patientName: string
         metadata: {
           totalParticipants: 1,
           createdBy: userId,
-          source: 'consultation_tracking',
+          source: 'test_consultation_complete',
           hasTranscriptionData: false,
           summaryGeneratedAt: new Date()
         }
@@ -281,12 +240,11 @@ async function generateConsultationSummary(roomName: string, patientName: string
 
       const summaryRef = db.collection('call-summaries').doc(roomName);
       await summaryRef.set(summaryData);
-      console.log('✅ Parse error fallback summary stored successfully with user ID:', userId);
-      console.log('Parse error fallback summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
+      console.log('✅ Test consultation parse error fallback summary stored successfully with user ID:', userId);
     }
     
   } catch (error) {
-    console.error('❌ Error generating consultation summary:', error);
+    console.error('❌ Error generating test consultation summary:', error);
     
     // Store error summary
     try {
@@ -298,8 +256,8 @@ async function generateConsultationSummary(roomName: string, patientName: string
           keyPoints: ['Summary generation failed'],
           recommendations: ['Manual review required'],
           followUpActions: ['Contact technical support'],
-          riskLevel: 'Unknown',
-          category: 'General Consultation',
+          riskLevel: 'Low',
+          category: 'Test Consultation',
           participants: [patientName],
           duration: durationMinutes,
           createdAt: new Date(),
@@ -307,7 +265,7 @@ async function generateConsultationSummary(roomName: string, patientName: string
           metadata: {
             totalParticipants: 1,
             createdBy: userId,
-            source: 'consultation_tracking',
+            source: 'test_consultation_complete',
             hasTranscriptionData: false,
             summaryGeneratedAt: new Date(),
             error: error instanceof Error ? error.message : 'Unknown error'
@@ -316,11 +274,10 @@ async function generateConsultationSummary(roomName: string, patientName: string
 
         const summaryRef = db.collection('call-summaries').doc(roomName);
         await summaryRef.set(summaryData);
-        console.log('✅ Error summary stored successfully with user ID:', userId);
-        console.log('Error summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
+        console.log('✅ Test consultation error summary stored successfully with user ID:', userId);
       }
     } catch (storeError) {
-      console.error('❌ Error storing error summary:', storeError);
+      console.error('❌ Error storing test consultation error summary:', storeError);
     }
   }
 }

@@ -430,6 +430,40 @@ export default function Dashboard() {
     }
   };
 
+  const handleTestConsultationComplete = async () => {
+    try {
+      setTestLoading(true);
+      const roomName = 'test-complete-' + Date.now();
+      const patientName = 'Test Patient Complete';
+      const duration = Math.floor(Math.random() * 30) + 5; // Random duration between 5-35 minutes
+      
+      const response = await fetch('/api/test-consultation-complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          roomName,
+          patientName,
+          duration,
+          userId: user?.uid
+        })
+      });
+      
+      const result = await response.json();
+      console.log('Test consultation complete result:', result);
+      
+      if (result.success) {
+        alert(`✅ Test consultation completed successfully!\nRoom: ${roomName}\nDuration: ${duration} minutes\nUser: ${user?.uid}\nCheck the dashboard to see the generated summary.`);
+      } else {
+        alert('❌ Test failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Test consultation complete error:', error);
+      alert('❌ Test failed: ' + error);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   const handleSignOut = () => {
     if (auth) {
       auth.signOut();
@@ -753,6 +787,23 @@ export default function Dashboard() {
               }}
             >
               {testLoading ? 'Testing...' : 'Test Room Lookup'}
+            </button>
+            <button
+              onClick={handleTestConsultationComplete}
+              disabled={testLoading}
+              style={{
+                backgroundColor: '#1f2937',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: testLoading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                opacity: testLoading ? 0.7 : 1
+              }}
+            >
+              {testLoading ? 'Testing...' : 'Test Complete Consultation'}
             </button>
             <button
               onClick={handleSignOut}

@@ -23,7 +23,9 @@ export async function POST(req: Request) {
 
     // Look up the room creator (doctor)
     try {
-      const roomRef = db.collection('rooms').doc(roomName);
+      // Sanitize room name to prevent Firestore path errors
+      const sanitizedRoomName = roomName.replace(/[\/\\]/g, '_');
+      const roomRef = db.collection('rooms').doc(sanitizedRoomName);
       const roomDoc = await roomRef.get();
       
       if (roomDoc.exists) {
