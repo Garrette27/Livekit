@@ -175,6 +175,20 @@ export default function Dashboard() {
           const isLegacyConsultation = !consultationUserId;
           const isRealConsultation = consultation.isRealConsultation === true;
           const isCompleted = consultation.status === 'completed';
+          
+          // Debug logging for consultation filtering
+          if (consultationUserId !== user.uid) {
+            console.log('Dashboard: Consultation not for current user:', {
+              roomName: consultation.roomName,
+              consultationUserId,
+              currentUserId: user.uid,
+              isUserConsultation,
+              isLegacyConsultation,
+              isRealConsultation,
+              isCompleted
+            });
+          }
+          
           return (isUserConsultation || isLegacyConsultation) && isRealConsultation && isCompleted;
         })
         .map(consultation => ({
@@ -377,6 +391,39 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Test real consultation error:', error);
+      alert('❌ Test failed: ' + error);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const handleTestRoomLookup = async () => {
+    try {
+      setTestLoading(true);
+      const roomName = prompt('Enter room name to lookup:');
+      if (!roomName || !roomName.trim()) {
+        alert('Please enter a room name');
+        return;
+      }
+      
+      const response = await fetch('/api/test-room-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          roomName: roomName.trim()
+        })
+      });
+      
+      const result = await response.json();
+      console.log('Test room lookup result:', result);
+      
+      if (result.success) {
+        alert(`✅ Room lookup successful!\nRoom: ${result.roomName}\nDoctor User ID: ${result.doctorUserId}\nCreated By: ${result.roomData.createdBy}`);
+      } else {
+        alert('❌ Room not found: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Test room lookup error:', error);
       alert('❌ Test failed: ' + error);
     } finally {
       setTestLoading(false);
@@ -689,6 +736,23 @@ export default function Dashboard() {
               }}
             >
               {testLoading ? 'Testing...' : 'Test Real Consultation'}
+            </button>
+            <button
+              onClick={handleTestRoomLookup}
+              disabled={testLoading}
+              style={{
+                backgroundColor: '#7c2d12',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: testLoading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                opacity: testLoading ? 0.7 : 1
+              }}
+            >
+              {testLoading ? 'Testing...' : 'Test Room Lookup'}
             </button>
             <button
               onClick={handleSignOut}

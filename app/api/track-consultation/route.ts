@@ -19,6 +19,23 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
+    // Look up the room creator (doctor) to link the consultation to them
+    let doctorUserId = userId || 'unknown';
+    try {
+      const roomRef = db.collection('rooms').doc(roomName);
+      const roomDoc = await roomRef.get();
+      if (roomDoc.exists) {
+        const roomData = roomDoc.data();
+        doctorUserId = roomData?.createdBy || roomData?.metadata?.createdBy || userId || 'unknown';
+        console.log(`Found room creator: ${doctorUserId} for room: ${roomName}`);
+      } else {
+        console.log(`Room ${roomName} not found in rooms collection, using provided userId: ${userId}`);
+      }
+    } catch (error) {
+      console.error('Error looking up room creator:', error);
+      console.log(`Using provided userId: ${userId}`);
+    }
+
     const consultationRef = db.collection('consultations').doc(roomName);
     
     if (action === 'join') {
@@ -29,15 +46,16 @@ export async function POST(req: Request) {
         joinedAt: new Date(),
         status: 'active',
         isRealConsultation: true, // Mark as real consultation, not test
-        createdBy: userId || 'unknown', // Store user ID
+        createdBy: doctorUserId, // Store doctor's user ID
         metadata: {
           source: 'patient_join',
           trackedAt: new Date(),
-          createdBy: userId || 'unknown'
+          createdBy: doctorUserId,
+          patientUserId: userId || 'anonymous' // Store patient's user ID if available
         }
       }, { merge: true });
       
-      console.log(`✅ Patient joined consultation: ${roomName}`);
+      console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}`);
       
     } else if (action === 'leave') {
       // Track when patient leaves and calculate duration
@@ -53,21 +71,22 @@ export async function POST(req: Request) {
           duration: durationMinutes,
           status: 'completed',
           isRealConsultation: true,
-          createdBy: userId || data?.createdBy || 'unknown', // Ensure user ID is preserved
+          createdBy: doctorUserId, // Ensure doctor's user ID is preserved
           metadata: {
             ...data?.metadata,
             source: 'patient_leave',
             durationMinutes,
             trackedAt: new Date(),
-            createdBy: userId || data?.createdBy || 'unknown'
+            createdBy: doctorUserId,
+            patientUserId: userId || 'anonymous'
           }
         });
         
-        console.log(`✅ Patient left consultation: ${roomName}, duration: ${durationMinutes} minutes`);
+        console.log(`✅ Patient left consultation: ${roomName}, duration: ${durationMinutes} minutes, linked to doctor: ${doctorUserId}`);
         
         // Generate AI summary for completed consultation
         try {
-          await generateConsultationSummary(roomName, data?.patientName || 'Unknown Patient', durationMinutes, userId || data?.createdBy || 'unknown');
+          await generateConsultationSummary(roomName, data?.patientName || 'Unknown Patient', durationMinutes, doctorUserId);
         } catch (error) {
           console.error('❌ Error generating consultation summary:', error);
         }
