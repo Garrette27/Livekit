@@ -35,6 +35,7 @@ interface Consultation {
   joinedAt?: any;
   leftAt?: any;
   createdBy?: string;
+  isRealConsultation?: boolean;
   metadata?: {
     createdBy?: string;
   };
@@ -92,24 +93,31 @@ export default function Dashboard() {
     const isLegacySummary = !summaryUserId;
     
     // Exclude test data - be more comprehensive in detecting test data
+    // But allow test-consultation summaries to be shown for testing purposes
     const isTestData = (summary.metadata as any)?.testData || 
                       (summary as any).testData || 
                       (summary.metadata as any)?.source === 'test' ||
                       (summary.metadata as any)?.test === true ||
-                      summary.roomName?.includes('test-') ||
+                      summary.roomName?.includes('test-room-') ||
+                      summary.roomName?.includes('test-transcription-') ||
                       summary.roomName?.includes('test_');
+    
+    // Allow test-consultation summaries to be shown (they have source: 'test_consultation')
+    const isTestConsultation = (summary.metadata as any)?.source === 'test_consultation';
     
     if (isUserSummary && !isTestData) {
       console.log('Dashboard: Found user summary:', summary.roomName, 'User ID:', summaryUserId);
     } else if (isLegacySummary && !isTestData) {
       console.log('Dashboard: Found legacy summary (no user ID):', summary.roomName);
+    } else if (isTestConsultation && isUserSummary) {
+      console.log('Dashboard: Found test consultation summary:', summary.roomName, 'User ID:', summaryUserId);
     } else if (isTestData) {
       console.log('Dashboard: Excluding test data:', summary.roomName);
     } else {
       console.log('Dashboard: Excluding summary for different user:', summary.roomName, 'Summary User ID:', summaryUserId, 'Current User ID:', user.uid);
     }
     
-    return (isUserSummary || isLegacySummary) && !isTestData; // Show user summaries and legacy summaries, exclude test data
+    return (isUserSummary || isLegacySummary) && (!isTestData || isTestConsultation); // Show user summaries, legacy summaries, and test consultations
   });
 
 
@@ -139,11 +147,10 @@ export default function Dashboard() {
     if (!user || !db) return;
 
     const consultationsRef = collection(db, 'consultations');
+    // Remove the composite query that requires an index - just get all consultations and filter client-side
     const q = query(
       consultationsRef,
-      where('isRealConsultation', '==', true),
-      orderBy('joinedAt', 'desc'),
-      limit(50)
+      limit(100)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -153,6 +160,12 @@ export default function Dashboard() {
       })) as Consultation[];
       
       console.log('Dashboard: Found real consultations:', realConsultations.length);
+      console.log('Dashboard: All consultations:', realConsultations.map(c => ({ 
+        roomName: c.roomName, 
+        createdBy: c.createdBy, 
+        status: c.status, 
+        isRealConsultation: c.isRealConsultation 
+      })));
       
       // Convert consultations to summary format and merge with existing summaries
       const consultationSummaries = realConsultations
@@ -160,7 +173,9 @@ export default function Dashboard() {
           const consultationUserId = consultation.createdBy || consultation.metadata?.createdBy;
           const isUserConsultation = consultationUserId === user.uid;
           const isLegacyConsultation = !consultationUserId;
-          return (isUserConsultation || isLegacyConsultation) && consultation.status === 'completed';
+          const isRealConsultation = consultation.isRealConsultation === true;
+          const isCompleted = consultation.status === 'completed';
+          return (isUserConsultation || isLegacyConsultation) && isRealConsultation && isCompleted;
         })
         .map(consultation => ({
           id: consultation.id,
@@ -188,6 +203,13 @@ export default function Dashboard() {
             consultationData: true
           }
         }));
+
+      console.log('Dashboard: Generated consultation summaries:', consultationSummaries.length);
+      console.log('Dashboard: Consultation summaries:', consultationSummaries.map(s => ({ 
+        roomName: s.roomName, 
+        createdBy: s.createdBy, 
+        duration: s.duration 
+      })));
 
       // Merge with existing summaries and remove duplicates
       setSummaries(prevSummaries => {
@@ -329,6 +351,38 @@ export default function Dashboard() {
     }
   };
 
+  const handleTestRealConsultation = async () => {
+    try {
+      setTestLoading(true);
+      const patientName = 'Real Patient';
+      const duration = Math.floor(Math.random() * 30) + 5; // Random duration between 5-35 minutes
+      
+      const response = await fetch('/api/test-real-consultation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          userId: user?.uid,
+          patientName,
+          duration
+        })
+      });
+      
+      const result = await response.json();
+      console.log('Test real consultation result:', result);
+      
+      if (result.success) {
+        alert(`✅ Real consultation created successfully! Room: ${result.roomName}, Duration: ${duration} minutes. Check the dashboard to see the generated summary.`);
+      } else {
+        alert('❌ Test failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Test real consultation error:', error);
+      alert('❌ Test failed: ' + error);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   const handleSignOut = () => {
     if (auth) {
       auth.signOut();
@@ -416,9 +470,11 @@ export default function Dashboard() {
                       (summary as any).testData || 
                       (summary.metadata as any)?.source === 'test' ||
                       (summary.metadata as any)?.test === true ||
-                      summary.roomName?.includes('test-') ||
+                      summary.roomName?.includes('test-room-') ||
+                      summary.roomName?.includes('test-transcription-') ||
                       summary.roomName?.includes('test_');
-    return !isTestData;
+    const isTestConsultation = (summary.metadata as any)?.source === 'test_consultation';
+    return !isTestData || isTestConsultation; // Include test consultations in statistics
   });
 
   const totalCalls = realSummaries.length;
@@ -616,6 +672,23 @@ export default function Dashboard() {
               }}
             >
               {testLoading ? 'Testing...' : 'Test Consultation Summary'}
+            </button>
+            <button
+              onClick={handleTestRealConsultation}
+              disabled={testLoading}
+              style={{
+                backgroundColor: '#059669',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: testLoading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                opacity: testLoading ? 0.7 : 1
+              }}
+            >
+              {testLoading ? 'Testing...' : 'Test Real Consultation'}
             </button>
             <button
               onClick={handleSignOut}
