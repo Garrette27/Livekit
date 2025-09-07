@@ -50,6 +50,69 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
     }
   }, [patientName, roomName]);
 
+  // Handle page unload to track patient leaving
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (token) {
+        console.log('Patient page unload detected, tracking leave for room:', roomName);
+        // Use sendBeacon for reliable tracking on page unload
+        const data = JSON.stringify({
+          roomName,
+          action: 'leave',
+          patientName,
+          userId: user?.uid || 'anonymous'
+        });
+        
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon('/api/track-consultation', data);
+        } else {
+          // Fallback for browsers that don't support sendBeacon
+          fetch('/api/track-consultation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: data,
+            keepalive: true
+          }).catch(error => {
+            console.error('Error tracking consultation leave on unload:', error);
+          });
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [token, roomName, patientName, user?.uid]);
+
+  // Handle visibility change to track when patient switches tabs or minimizes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && token) {
+        console.log('Patient tab hidden, tracking leave for room:', roomName);
+        // Track patient leaving when tab becomes hidden
+        fetch('/api/track-consultation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            roomName,
+            action: 'leave',
+            patientName,
+            userId: user?.uid || 'anonymous'
+          }),
+        }).then(response => {
+          console.log('Patient leave tracking response (visibility change):', response.status);
+          return response.json();
+        }).then(data => {
+          console.log('Patient leave tracking result (visibility change):', data);
+        }).catch(error => {
+          console.error('Error tracking consultation leave (visibility change):', error);
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [token, roomName, patientName, user?.uid]);
+
   // Function to handle Google sign-in
   const handleGoogleSignIn = async () => {
     try {
@@ -450,20 +513,75 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         </div>
       )}
       
+      {/* Manual Leave Button - Only show when patient is in call */}
+      {token && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            left: '20px',
+            zIndex: 10001,
+            backgroundColor: '#dc2626',
+            color: 'white',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '0.5rem',
+            border: 'none',
+            fontWeight: '600',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            boxShadow: '0 4px 6px -1px rgba(220, 38, 38, 0.2)'
+          }}
+          onClick={() => {
+            console.log('Manual leave button clicked for room:', roomName);
+            // Manually trigger the disconnect logic
+            setToken(null);
+            localStorage.removeItem(`patientInCall_${roomName}`);
+            localStorage.removeItem(`patientToken_${roomName}`);
+            
+            // Track patient leaving consultation
+            console.log('Manually tracking patient leave for room:', roomName, 'patient:', patientName, 'user:', user?.uid);
+            fetch('/api/track-consultation', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                roomName,
+                action: 'leave',
+                patientName,
+                userId: user?.uid || 'anonymous'
+              }),
+            }).then(response => {
+              console.log('Manual patient leave tracking response:', response.status);
+              return response.json();
+            }).then(data => {
+              console.log('Manual patient leave tracking result:', data);
+              // Redirect to patient join page
+              window.location.href = `/room/${roomName}/patient`;
+            }).catch(error => {
+              console.error('Error manually tracking consultation leave:', error);
+              // Still redirect even if tracking fails
+              window.location.href = `/room/${roomName}/patient`;
+            });
+          }}
+        >
+          🚪 Leave Consultation
+        </div>
+      )}
+      
       <LiveKitRoom
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
         connect={true}
         audio
         video
-        onDisconnected={() => {
-          console.log('Patient disconnected from room');
+        onDisconnected={(reason) => {
+          console.log('Patient disconnected from room:', roomName, 'reason:', reason);
           setToken(null);
           // Clear the in-call flag when disconnected
           localStorage.removeItem(`patientInCall_${roomName}`);
           localStorage.removeItem(`patientToken_${roomName}`);
           
           // Track patient leaving consultation
+          console.log('Tracking patient leave for room:', roomName, 'patient:', patientName, 'user:', user?.uid);
           fetch('/api/track-consultation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -473,6 +591,11 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
               patientName,
               userId: user?.uid || 'anonymous' // Pass user ID for tracking
             }),
+          }).then(response => {
+            console.log('Patient leave tracking response:', response.status);
+            return response.json();
+          }).then(data => {
+            console.log('Patient leave tracking result:', data);
           }).catch(error => {
             console.error('Error tracking consultation leave:', error);
           });

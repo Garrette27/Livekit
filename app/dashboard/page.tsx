@@ -88,9 +88,9 @@ export default function Dashboard() {
     const summaryUserId = summary.createdBy || summary.metadata?.createdBy;
     const isUserSummary = summaryUserId === user.uid;
     
-    // For legacy summaries without user ID, include them for now
-    // This ensures existing summaries are still visible
-    const isLegacySummary = !summaryUserId;
+    // Only show summaries that belong to the current user
+    // Remove legacy summary logic that was showing summaries from other users
+    const isLegacySummary = false; // Disabled to prevent showing other users' summaries
     
     // Exclude test data - be more comprehensive in detecting test data
     // But allow test-consultation summaries to be shown for testing purposes
@@ -107,8 +107,6 @@ export default function Dashboard() {
     
     if (isUserSummary && !isTestData) {
       console.log('Dashboard: Found user summary:', summary.roomName, 'User ID:', summaryUserId);
-    } else if (isLegacySummary && !isTestData) {
-      console.log('Dashboard: Found legacy summary (no user ID):', summary.roomName);
     } else if (isTestConsultation && isUserSummary) {
       console.log('Dashboard: Found test consultation summary:', summary.roomName, 'User ID:', summaryUserId);
     } else if (isTestData) {
@@ -172,24 +170,27 @@ export default function Dashboard() {
         .filter(consultation => {
           const consultationUserId = consultation.createdBy || consultation.metadata?.createdBy;
           const isUserConsultation = consultationUserId === user.uid;
-          const isLegacyConsultation = !consultationUserId;
           const isRealConsultation = consultation.isRealConsultation === true;
           const isCompleted = consultation.status === 'completed';
           
+          // Only show consultations that belong to the current user
+          // Remove the legacy consultation logic that was showing sessions from other users
+          const shouldShow = isUserConsultation && isRealConsultation && isCompleted;
+          
           // Debug logging for consultation filtering
-          if (consultationUserId !== user.uid) {
-            console.log('Dashboard: Consultation not for current user:', {
+          if (!shouldShow) {
+            console.log('Dashboard: Consultation filtered out:', {
               roomName: consultation.roomName,
               consultationUserId,
               currentUserId: user.uid,
               isUserConsultation,
-              isLegacyConsultation,
               isRealConsultation,
-              isCompleted
+              isCompleted,
+              shouldShow
             });
           }
           
-          return (isUserConsultation || isLegacyConsultation) && isRealConsultation && isCompleted;
+          return shouldShow;
         })
         .map(consultation => ({
           id: consultation.id,
@@ -459,6 +460,145 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Test consultation complete error:', error);
       alert('❌ Test failed: ' + error);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const handleTestPatientLeave = async () => {
+    try {
+      setTestLoading(true);
+      const roomName = prompt('Enter room name to simulate patient leave:');
+      if (!roomName || !roomName.trim()) {
+        alert('Please enter a room name');
+        return;
+      }
+      
+      const patientName = prompt('Enter patient name:') || 'Test Patient';
+      
+      const response = await fetch('/api/track-consultation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomName: roomName.trim(),
+          action: 'leave',
+          patientName,
+          userId: user?.uid || 'anonymous'
+        })
+      });
+      
+      const result = await response.json();
+      console.log('Test patient leave result:', result);
+      
+      if (result.success) {
+        alert(`✅ Patient leave simulated successfully!\nRoom: ${roomName}\nPatient: ${patientName}\nCheck the dashboard to see if the summary was generated.`);
+      } else {
+        alert('❌ Test failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Test patient leave error:', error);
+      alert('❌ Test failed: ' + error);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const handleTestPatientLeaveComplete = async () => {
+    try {
+      setTestLoading(true);
+      const roomName = prompt('Enter room name to complete patient leave:');
+      if (!roomName || !roomName.trim()) {
+        alert('Please enter a room name');
+        return;
+      }
+      
+      const patientName = prompt('Enter patient name:') || 'Test Patient';
+      
+      const response = await fetch('/api/test-patient-leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomName: roomName.trim(),
+          patientName,
+          userId: user?.uid || 'anonymous'
+        })
+      });
+      
+      const result = await response.json();
+      console.log('Test patient leave complete result:', result);
+      
+      if (result.success) {
+        alert(`✅ Patient leave completed successfully!\nRoom: ${roomName}\nPatient: ${patientName}\nDuration: ${result.duration} minutes\nDoctor: ${result.doctorUserId}\nCheck the dashboard to see the generated summary.`);
+      } else {
+        alert('❌ Test failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Test patient leave complete error:', error);
+      alert('❌ Test failed: ' + error);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const handleCleanupSessions = async (action: string) => {
+    try {
+      setTestLoading(true);
+      
+      let confirmMessage = '';
+      switch (action) {
+        case 'delete_others':
+          confirmMessage = 'This will delete ALL sessions that don\'t belong to you. Are you sure?';
+          break;
+        case 'fix_ownership':
+          confirmMessage = 'This will try to fix session ownership by linking them to room creators. Continue?';
+          break;
+        case 'delete_all':
+          confirmMessage = '⚠️ WARNING: This will delete ALL sessions from the database! Are you absolutely sure?';
+          break;
+        default:
+          alert('Invalid cleanup action');
+          return;
+      }
+      
+      if (!confirm(confirmMessage)) {
+        return;
+      }
+      
+      const response = await fetch('/api/cleanup-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.uid,
+          action
+        })
+      });
+      
+      const result = await response.json();
+      console.log('Cleanup sessions result:', result);
+      
+      if (result.success) {
+        const results = result.results;
+        let message = `✅ Cleanup completed successfully!\n\n`;
+        message += `Call Summaries: ${results.callSummariesDeleted} deleted, ${results.callSummariesFixed} fixed\n`;
+        message += `Consultations: ${results.consultationsDeleted} deleted, ${results.consultationsFixed} fixed\n`;
+        
+        if (results.errors.length > 0) {
+          message += `\nErrors: ${results.errors.length}\n`;
+          results.errors.forEach((error: string) => {
+            message += `- ${error}\n`;
+          });
+        }
+        
+        alert(message);
+        
+        // Refresh the dashboard to show updated data
+        window.location.reload();
+      } else {
+        alert('❌ Cleanup failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Cleanup sessions error:', error);
+      alert('❌ Cleanup failed: ' + error);
     } finally {
       setTestLoading(false);
     }
@@ -804,6 +944,91 @@ export default function Dashboard() {
               }}
             >
               {testLoading ? 'Testing...' : 'Test Complete Consultation'}
+            </button>
+            <button
+              onClick={handleTestPatientLeave}
+              disabled={testLoading}
+              style={{
+                backgroundColor: '#dc2626',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: testLoading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                opacity: testLoading ? 0.7 : 1
+              }}
+            >
+              {testLoading ? 'Testing...' : 'Test Patient Leave'}
+            </button>
+            <button
+              onClick={handleTestPatientLeaveComplete}
+              disabled={testLoading}
+              style={{
+                backgroundColor: '#7c3aed',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: testLoading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                opacity: testLoading ? 0.7 : 1
+              }}
+            >
+              {testLoading ? 'Testing...' : 'Test Patient Leave Complete'}
+            </button>
+            <button
+              onClick={() => handleCleanupSessions('delete_others')}
+              disabled={testLoading}
+              style={{
+                backgroundColor: '#f59e0b',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: testLoading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                opacity: testLoading ? 0.7 : 1
+              }}
+            >
+              {testLoading ? 'Cleaning...' : 'Delete Others\' Sessions'}
+            </button>
+            <button
+              onClick={() => handleCleanupSessions('fix_ownership')}
+              disabled={testLoading}
+              style={{
+                backgroundColor: '#10b981',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: testLoading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                opacity: testLoading ? 0.7 : 1
+              }}
+            >
+              {testLoading ? 'Fixing...' : 'Fix Session Ownership'}
+            </button>
+            <button
+              onClick={() => handleCleanupSessions('delete_all')}
+              disabled={testLoading}
+              style={{
+                backgroundColor: '#ef4444',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: testLoading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                opacity: testLoading ? 0.7 : 1
+              }}
+            >
+              {testLoading ? 'Deleting...' : 'Delete ALL Sessions'}
             </button>
             <button
               onClick={handleSignOut}
