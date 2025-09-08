@@ -35,9 +35,12 @@ interface Consultation {
   joinedAt?: any;
   leftAt?: any;
   createdBy?: string;
+  patientUserId?: string;
   isRealConsultation?: boolean;
   metadata?: {
     createdBy?: string;
+    patientUserId?: string;
+    visibleToUsers?: string[];
   };
 }
 
@@ -169,21 +172,32 @@ export default function Dashboard() {
       const consultationSummaries = realConsultations
         .filter(consultation => {
           const consultationUserId = consultation.createdBy || consultation.metadata?.createdBy;
-          const isUserConsultation = consultationUserId === user.uid;
+          const patientUserId = consultation.patientUserId || consultation.metadata?.patientUserId;
+          const visibleToUsers = consultation.metadata?.visibleToUsers || [];
+          
+          // Show consultations if:
+          // 1. User is the doctor (createdBy matches)
+          // 2. User is the patient (patientUserId matches)
+          // 3. User is in the visibleToUsers array
+          const isDoctorConsultation = consultationUserId === user.uid;
+          const isPatientConsultation = patientUserId === user.uid;
+          const isVisibleToUser = visibleToUsers.includes(user.uid);
           const isRealConsultation = consultation.isRealConsultation === true;
           const isCompleted = consultation.status === 'completed';
           
-          // Only show consultations that belong to the current user
-          // Remove the legacy consultation logic that was showing sessions from other users
-          const shouldShow = isUserConsultation && isRealConsultation && isCompleted;
+          const shouldShow = (isDoctorConsultation || isPatientConsultation || isVisibleToUser) && isRealConsultation && isCompleted;
           
           // Debug logging for consultation filtering
           if (!shouldShow) {
             console.log('Dashboard: Consultation filtered out:', {
               roomName: consultation.roomName,
               consultationUserId,
+              patientUserId,
+              visibleToUsers,
               currentUserId: user.uid,
-              isUserConsultation,
+              isDoctorConsultation,
+              isPatientConsultation,
+              isVisibleToUser,
               isRealConsultation,
               isCompleted,
               shouldShow
@@ -604,6 +618,38 @@ export default function Dashboard() {
     }
   };
 
+  const handleCleanupTestSessions = async () => {
+    try {
+      setTestLoading(true);
+      
+      if (!confirm('This will delete only test sessions (those with "test-" prefix) that belong to you. Real consultations will be preserved. Continue?')) {
+        setTestLoading(false);
+        return;
+      }
+      
+      const response = await fetch('/api/cleanup-test-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user?.uid })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(`✅ ${result.message}\n\nResults:\n- Test Call Summaries: ${result.results.testSummariesDeleted} deleted\n- Test Consultations: ${result.results.testConsultationsDeleted} deleted`);
+        // Refresh the dashboard to show updated data
+        window.location.reload();
+      } else {
+        alert('❌ Test cleanup failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Cleanup test sessions error:', error);
+      alert('❌ Test cleanup failed: ' + error);
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   const handleSignOut = () => {
     if (auth) {
       auth.signOut();
@@ -1012,6 +1058,23 @@ export default function Dashboard() {
               }}
             >
               {testLoading ? 'Fixing...' : 'Fix Session Ownership'}
+            </button>
+            <button
+              onClick={handleCleanupTestSessions}
+              disabled={testLoading}
+              style={{
+                backgroundColor: '#8b5cf6',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: testLoading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                opacity: testLoading ? 0.7 : 1
+              }}
+            >
+              {testLoading ? 'Cleaning...' : 'Delete Test Sessions Only'}
             </button>
             <button
               onClick={() => handleCleanupSessions('delete_all')}

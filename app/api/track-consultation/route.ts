@@ -46,19 +46,22 @@ export async function POST(req: Request) {
         joinedAt: new Date(),
         status: 'active',
         isRealConsultation: true, // Mark as real consultation, not test
-        createdBy: doctorUserId, // Store doctor's user ID
+        createdBy: doctorUserId, // Store doctor's user ID for doctor's view
+        patientUserId: userId || 'anonymous', // Store patient's user ID for patient's view
         metadata: {
           source: 'patient_join',
           trackedAt: new Date(),
           createdBy: doctorUserId,
           patientUserId: userId || 'anonymous', // Store patient's user ID if available
-          doctorUserId: doctorUserId // Explicitly store doctor's user ID
+          doctorUserId: doctorUserId, // Explicitly store doctor's user ID
+          // Add both user IDs so both can see the consultation
+          visibleToUsers: [doctorUserId, userId || 'anonymous'].filter(id => id !== 'anonymous')
         }
       };
       
       await consultationRef.set(consultationData, { merge: true });
       
-      console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}`);
+      console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}, patient: ${userId}`);
       console.log('Consultation data stored:', consultationData);
       
     } else if (action === 'leave') {
@@ -76,13 +79,16 @@ export async function POST(req: Request) {
           status: 'completed',
           isRealConsultation: true,
           createdBy: doctorUserId, // Ensure doctor's user ID is preserved
+          patientUserId: userId || 'anonymous', // Ensure patient's user ID is preserved
           metadata: {
             ...data?.metadata,
             source: 'patient_leave',
             durationMinutes,
             trackedAt: new Date(),
             createdBy: doctorUserId,
-            patientUserId: userId || 'anonymous'
+            patientUserId: userId || 'anonymous',
+            // Add both user IDs so both can see the consultation
+            visibleToUsers: [doctorUserId, userId || 'anonymous'].filter(id => id !== 'anonymous')
           }
         });
         
