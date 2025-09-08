@@ -227,10 +227,9 @@ function RoomClient({ roomName }: { roomName: string }) {
     getToken();
   }, [roomName, user]);
 
-  // Transcription capture component - DISABLED to prevent loops
+  // Transcription capture component - ENABLED with improved error handling
   const TranscriptionCapture = () => {
-    // Temporarily disable speech recognition to prevent loops
-    return null;
+    // Re-enabled speech recognition with better error handling
     
     const [recognitionInstance, setRecognitionInstance] = useState<any>(null);
     const [userInteracted, setUserInteracted] = useState<boolean>(false);
@@ -296,23 +295,26 @@ function RoomClient({ roomName }: { roomName: string }) {
           const result = event.results[i];
           const transcript = result[0].transcript.trim();
           const isFinal = result.isFinal;
+          const confidence = result[0].confidence || 0;
           
-          console.log(`Result ${i}: "${transcript}" (confidence: ${result[0].confidence}, isFinal: ${isFinal})`);
+          console.log(`Result ${i}: "${transcript}" (confidence: ${confidence}, isFinal: ${isFinal})`);
           
-          if (transcript && isFinal) {
+          // Accept both final results and high-confidence interim results for short conversations
+          if (transcript && (isFinal || confidence > 0.7)) {
             const timestamp = new Date().toISOString();
             const entry = `[${timestamp}] ${transcript}`;
             
             setTranscription(prev => {
               const newTranscription = [...prev, entry];
               
-              // Store in Firestore
+              // Store in Firestore immediately for short conversations
               if (db) {
                 try {
                 const callRef = doc(db, 'calls', roomName);
                 updateDoc(callRef, {
                   transcription: newTranscription,
-                  lastTranscriptionUpdate: new Date()
+                  lastTranscriptionUpdate: new Date(),
+                  transcriptionCount: newTranscription.length
                 }).catch(error => {
                   console.error('Error storing transcription:', error);
                 });

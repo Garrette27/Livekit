@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     
     if (action === 'join') {
       // Track when patient joins
-      await consultationRef.set({
+      const consultationData = {
         roomName,
         patientName: patientName || 'Unknown Patient',
         joinedAt: new Date(),
@@ -51,11 +51,15 @@ export async function POST(req: Request) {
           source: 'patient_join',
           trackedAt: new Date(),
           createdBy: doctorUserId,
-          patientUserId: userId || 'anonymous' // Store patient's user ID if available
+          patientUserId: userId || 'anonymous', // Store patient's user ID if available
+          doctorUserId: doctorUserId // Explicitly store doctor's user ID
         }
-      }, { merge: true });
+      };
+      
+      await consultationRef.set(consultationData, { merge: true });
       
       console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}`);
+      console.log('Consultation data stored:', consultationData);
       
     } else if (action === 'leave') {
       // Track when patient leaves and calculate duration
