@@ -7,6 +7,7 @@ export async function POST(req: Request) {
     console.log('Webhook received:', JSON.stringify(event, null, 2));
 
     if (event.event === 'room_finished') {
+      console.log('✅ Processing room_finished event');
       const roomName = event.room?.name;
       console.log(`Room ${roomName} ended, processing...`);
 
@@ -50,7 +51,9 @@ export async function POST(req: Request) {
         // 2. Generate comprehensive AI summary using actual conversation data
         try {
           console.log('Starting AI summary generation with transcription data...');
+          console.log('Transcription data length:', transcriptionData ? transcriptionData.length : 0);
           const summary = await generateComprehensiveSummary(roomName, participants, duration, transcriptionData);
+          console.log('✅ AI summary generated successfully');
           
                      // Store the summary in Firestore
            const summaryData = {
