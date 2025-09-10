@@ -6,12 +6,25 @@ export async function POST(req: Request) {
     const event = await req.json();
     console.log('Webhook received:', JSON.stringify(event, null, 2));
 
-    if (event.event === 'room_finished') {
-      console.log('✅ Processing room_finished event');
+    if (event.event === 'room_finished' || event.event === 'participant_left') {
+      console.log(event.event === 'participant_left' ? '✅ Processing participant_left event (early summary mode)' : '✅ Processing room_finished event');
       const roomName = event.room?.name;
       console.log(`Room ${roomName} ended, processing...`);
 
       if (roomName) {
+        // Idempotency: skip if we already have a summary for this room
+        try {
+          const db = getFirebaseAdmin();
+          if (db) {
+            const existing = await db.collection('call-summaries').doc(roomName).get();
+            if (existing.exists) {
+              console.log('ℹ️ Summary already exists for room, skipping duplicate generation:', roomName);
+              return NextResponse.json({ success: true, skipped: true });
+            }
+          }
+        } catch (e) {
+          console.log('Idempotency check failed (continuing):', e);
+        }
         // Extract participant information from LiveKit format
         const participants = event.room?.participants || [];
         const participantNames = participants.map((p: any) => p.identity || p.name || 'Unknown');
@@ -42,6 +55,23 @@ export async function POST(req: Request) {
               console.log('Call created by:', createdBy);
             } else {
               console.log('No call document found in Firestore');
+            }
+            // Fallbacks for createdBy from rooms/consultations if still unknown
+            if (createdBy === 'unknown') {
+              try {
+                const roomDoc = await db.collection('rooms').doc(roomName).get();
+                const roomData = roomDoc.exists ? roomDoc.data() : undefined;
+                const consultationDoc = await db.collection('consultations').doc(roomName).get();
+                const consultationData = consultationDoc.exists ? consultationDoc.data() : undefined;
+                createdBy = roomData?.createdBy
+                  || roomData?.metadata?.createdBy
+                  || consultationData?.createdBy
+                  || consultationData?.metadata?.createdBy
+                  || 'unknown';
+                console.log('createdBy resolved from rooms/consultations:', createdBy);
+              } catch (lookupErr) {
+                console.log('Lookup rooms/consultations failed:', lookupErr);
+              }
             }
           }
         } catch (error) {

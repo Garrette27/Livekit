@@ -733,7 +733,7 @@ function RoomClient({ roomName }: { roomName: string }) {
 
 
   // Function to properly leave the call
-  const handleLeaveCall = () => {
+  const handleLeaveCall = async () => {
     // Clear stored token
     localStorage.removeItem(`doctorToken_${roomName}`);
     setToken(null);
@@ -753,9 +753,40 @@ function RoomClient({ roomName }: { roomName: string }) {
       }
     }
     
+    // Proactively record consultation completion for the doctor side
+    try {
+      if (roomName && user?.uid) {
+        await fetch('/api/track-consultation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomName, action: 'leave', userId: user.uid })
+        }).catch((e) => console.error('track-consultation leave failed:', e));
+      }
+    } catch (e) {
+      console.error('Error calling track-consultation leave:', e);
+    }
+    
     // Redirect to home page
     window.location.href = '/';
   };
+
+  // Ensure leave is tracked on tab/window close as a fallback
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        if (roomName && user?.uid) {
+          navigator.sendBeacon?.(
+            '/api/track-consultation',
+            new Blob([
+              JSON.stringify({ roomName, action: 'leave', userId: user.uid })
+            ], { type: 'application/json' })
+          );
+        }
+      } catch {}
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [roomName, user?.uid]);
 
   // Ensure LiveKit controls are always visible and fix chat background
   useEffect(() => {
