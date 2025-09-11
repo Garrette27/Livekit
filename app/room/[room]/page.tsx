@@ -289,6 +289,13 @@ function RoomClient({ roomName }: { roomName: string }) {
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
+      
+      // Make it more sensitive to speech
+      if ('webkitSpeechRecognition' in window) {
+        (recognition as any).continuous = true;
+        (recognition as any).interimResults = true;
+      }
 
       // Store the instance to prevent recreation
       setRecognitionInstance(recognition);
@@ -309,8 +316,8 @@ function RoomClient({ roomName }: { roomName: string }) {
           
           console.log(`Result ${i}: "${transcript}" (confidence: ${confidence}, isFinal: ${isFinal})`);
           
-          // Accept both final results and high-confidence interim results for short conversations
-          if (transcript && (isFinal || confidence > 0.7)) {
+          // Accept both final results and interim results with lower confidence threshold
+          if (transcript && (isFinal || confidence > 0.3)) {
             const timestamp = new Date().toISOString();
             const entry = `[${timestamp}] ${transcript}`;
             
@@ -368,8 +375,17 @@ function RoomClient({ roomName }: { roomName: string }) {
         console.log('🎤 Speech recognition ended');
         setSpeechRecognitionStatus('idle');
         
-        // Don't auto-restart to prevent excessive re-rendering
-        // Let the user manually restart if needed
+        // Auto-restart speech recognition to keep it running
+        setTimeout(() => {
+          try {
+            if (recognition && recognition.state !== 'recording') {
+              console.log('🔄 Restarting speech recognition...');
+              recognition.start();
+            }
+          } catch (error) {
+            console.log('Failed to restart recognition:', error);
+          }
+        }, 1000);
       };
 
       // Store the recognition instance
@@ -480,6 +496,8 @@ function RoomClient({ roomName }: { roomName: string }) {
           onClick={() => {
             console.log('Current transcription data:', transcription);
             console.log('Transcription length:', transcription.length);
+            console.log('Speech recognition status:', speechRecognitionStatus);
+            console.log('Recognition instance:', recognitionInstance);
           }}
           style={{
             marginTop: '0.25rem',
@@ -493,6 +511,45 @@ function RoomClient({ roomName }: { roomName: string }) {
           }}
         >
           Debug
+        </button>
+        <button
+          onClick={() => {
+            // Test adding a manual transcription entry
+            const testEntry = `[${new Date().toISOString()}] Test transcription entry - operating systems discussion`;
+            setTranscription(prev => {
+              const newTranscription = [...prev, testEntry];
+              console.log('Added test transcription entry:', testEntry);
+              
+              // Also store in Firestore
+              if (db) {
+                const callRef = doc(db, 'calls', roomName);
+                updateDoc(callRef, {
+                  transcription: newTranscription,
+                  lastTranscriptionUpdate: new Date(),
+                  transcriptionCount: newTranscription.length,
+                  hasTranscriptionData: newTranscription.length > 0
+                }).then(() => {
+                  console.log('✅ Test transcription stored in Firestore');
+                }).catch(error => {
+                  console.error('Error storing test transcription:', error);
+                });
+              }
+              
+              return newTranscription;
+            });
+          }}
+          style={{
+            marginTop: '0.25rem',
+            padding: '0.25rem 0.5rem',
+            fontSize: '0.625rem',
+            backgroundColor: '#10b981',
+            color: 'white',
+            border: 'none',
+            borderRadius: '0.25rem',
+            cursor: 'pointer'
+          }}
+        >
+          Test Add
         </button>
       </div>
     );
