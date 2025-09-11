@@ -53,6 +53,7 @@ export async function POST(req: Request) {
               createdBy = callData?.createdBy || callData?.metadata?.createdBy || 'unknown';
               console.log('Transcription data found:', transcriptionData.length, 'entries');
               console.log('Call created by:', createdBy);
+              console.log('Transcription entries:', transcriptionData);
             } else {
               console.log('No call document found in Firestore');
             }

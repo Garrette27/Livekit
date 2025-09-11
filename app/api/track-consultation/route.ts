@@ -97,7 +97,22 @@ export async function POST(req: Request) {
         // Generate AI summary for completed consultation
         try {
           console.log(`Generating AI summary for room: ${roomName}, patient: ${data?.patientName || 'Unknown Patient'}, duration: ${durationMinutes}, doctor: ${doctorUserId}`);
-          await generateConsultationSummary(roomName, data?.patientName || 'Unknown Patient', durationMinutes, doctorUserId);
+          
+          // Try to get transcription data from the calls collection
+          let transcriptionData = null;
+          try {
+            const callRef = db.collection('calls').doc(roomName);
+            const callDoc = await callRef.get();
+            if (callDoc.exists) {
+              const callData = callDoc.data();
+              transcriptionData = callData?.transcription || [];
+              console.log('Found transcription data for summary:', transcriptionData.length, 'entries');
+            }
+          } catch (transcriptionError) {
+            console.log('Could not fetch transcription data:', transcriptionError);
+          }
+          
+          await generateConsultationSummary(roomName, data?.patientName || 'Unknown Patient', durationMinutes, doctorUserId, transcriptionData);
         } catch (error) {
           console.error('❌ Error generating consultation summary:', error);
         }
@@ -120,7 +135,7 @@ export async function POST(req: Request) {
   }
 }
 
-async function generateConsultationSummary(roomName: string, patientName: string, durationMinutes: number, userId: string) {
+async function generateConsultationSummary(roomName: string, patientName: string, durationMinutes: number, userId: string, transcriptionData: any[] = null) {
   try {
     console.log('Generating AI summary for consultation:', roomName, 'with user ID:', userId);
     
@@ -151,7 +166,8 @@ async function generateConsultationSummary(roomName: string, patientName: string
           totalParticipants: 1,
           createdBy: userId,
           source: 'consultation_tracking',
-          hasTranscriptionData: false,
+          hasTranscriptionData: transcriptionData && transcriptionData.length > 0,
+          transcriptionEntries: transcriptionData ? transcriptionData.length : 0,
           summaryGeneratedAt: new Date()
         }
       };
@@ -165,6 +181,14 @@ async function generateConsultationSummary(roomName: string, patientName: string
 
     console.log('✅ OpenAI API key found, generating AI summary...');
 
+    // Prepare conversation context for AI
+    let conversationContext = '';
+    if (transcriptionData && transcriptionData.length > 0) {
+      conversationContext = `\n\nActual conversation transcript:\n${transcriptionData.join('\n')}`;
+    } else {
+      conversationContext = '\n\nNo conversation transcript available. This may be a video-only consultation or transcription was not enabled.';
+    }
+
     // Create a comprehensive prompt for medical consultation summarization
     const prompt = `You are a medical AI assistant specializing in summarizing telehealth consultations. 
     
@@ -173,20 +197,20 @@ async function generateConsultationSummary(roomName: string, patientName: string
     Consultation details:
     - Duration: ${durationMinutes} minutes
     - Patient: ${patientName}
-    - No conversation transcript available (this may be a video-only consultation or transcription was not enabled)
+    ${conversationContext}
     
     Please provide the following structured response in JSON format:
     
     {
-      "summary": "A concise 2-3 sentence overview of the consultation. Since no transcript is available, indicate this was a video consultation and mention the duration.",
-      "keyPoints": ["Video consultation completed", "Duration: ${durationMinutes} minutes", "Patient: ${patientName}", "No transcript available"],
-      "recommendations": ["Follow up as needed", "Review consultation notes if available"],
-      "followUpActions": ["Schedule follow-up if required", "Document consultation outcomes"],
-      "riskLevel": "Low (based on available information)",
-      "category": "General Consultation"
+      "summary": "A concise 2-3 sentence overview of the consultation based on the actual conversation content",
+      "keyPoints": ["List of 3-5 main topics discussed", "Important symptoms mentioned", "Key findings from the conversation"],
+      "recommendations": ["List of 2-4 recommendations made by the doctor", "Prescriptions if any", "Lifestyle advice"],
+      "followUpActions": ["List of 2-3 follow-up actions needed", "Appointment scheduling", "Tests required"],
+      "riskLevel": "Low/Medium/High based on the consultation content",
+      "category": "Primary Care/Specialist/Emergency/Follow-up/General Consultation"
     }
     
-    IMPORTANT: Since no conversation transcript is available, focus on the consultation structure and indicate this was a video consultation.
+    IMPORTANT: Base your summary on the actual conversation content provided. If no conversation transcript is available, indicate this clearly in the summary.
     
     Focus on medical accuracy, patient privacy, and actionable insights.`;
 
@@ -254,7 +278,8 @@ async function generateConsultationSummary(roomName: string, patientName: string
           totalParticipants: 1,
           createdBy: userId,
           source: 'consultation_tracking',
-          hasTranscriptionData: false,
+          hasTranscriptionData: transcriptionData && transcriptionData.length > 0,
+          transcriptionEntries: transcriptionData ? transcriptionData.length : 0,
           summaryGeneratedAt: new Date()
         }
       };
@@ -284,7 +309,8 @@ async function generateConsultationSummary(roomName: string, patientName: string
           totalParticipants: 1,
           createdBy: userId,
           source: 'consultation_tracking',
-          hasTranscriptionData: false,
+          hasTranscriptionData: transcriptionData && transcriptionData.length > 0,
+          transcriptionEntries: transcriptionData ? transcriptionData.length : 0,
           summaryGeneratedAt: new Date()
         }
       };
@@ -318,7 +344,8 @@ async function generateConsultationSummary(roomName: string, patientName: string
             totalParticipants: 1,
             createdBy: userId,
             source: 'consultation_tracking',
-            hasTranscriptionData: false,
+            hasTranscriptionData: transcriptionData && transcriptionData.length > 0,
+            transcriptionEntries: transcriptionData ? transcriptionData.length : 0,
             summaryGeneratedAt: new Date(),
             error: error instanceof Error ? error.message : 'Unknown error'
           }

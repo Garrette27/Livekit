@@ -212,6 +212,16 @@ function RoomClient({ roomName }: { roomName: string }) {
               }
           }, { merge: true });
             console.log('Call data stored in Firestore with user ID:', user.uid);
+            
+            // Load existing transcription data if available
+            const callDoc = await getDoc(callRef);
+            if (callDoc.exists()) {
+              const callData = callDoc.data();
+              if (callData.transcription && callData.transcription.length > 0) {
+                setTranscription(callData.transcription);
+                console.log('✅ Loaded existing transcription data:', callData.transcription.length, 'entries');
+              }
+            }
           } catch (error) {
             console.error('Error storing call data:', error);
           }
@@ -314,7 +324,10 @@ function RoomClient({ roomName }: { roomName: string }) {
                 updateDoc(callRef, {
                   transcription: newTranscription,
                   lastTranscriptionUpdate: new Date(),
-                  transcriptionCount: newTranscription.length
+                  transcriptionCount: newTranscription.length,
+                  hasTranscriptionData: newTranscription.length > 0
+                }).then(() => {
+                  console.log('✅ Transcription stored successfully:', newTranscription.length, 'entries');
                 }).catch(error => {
                   console.error('Error storing transcription:', error);
                 });
@@ -336,6 +349,18 @@ function RoomClient({ roomName }: { roomName: string }) {
         // Don't auto-restart on errors to prevent infinite loops
         if (event.error === 'aborted') {
           console.log('🎤 Speech recognition aborted - this is normal');
+        } else if (event.error === 'no-speech') {
+          console.log('🎤 No speech detected - continuing to listen');
+          // Restart recognition after a brief delay for no-speech errors
+          setTimeout(() => {
+            try {
+              if (recognition && recognition.state !== 'recording') {
+                recognition.start();
+              }
+            } catch (error) {
+              console.log('Failed to restart recognition after no-speech:', error);
+            }
+          }, 1000);
         }
       };
 
@@ -431,7 +456,46 @@ function RoomClient({ roomName }: { roomName: string }) {
       setRecognitionInstance(null);
     }, [user?.uid]);
 
-    return null;
+    return (
+      <div style={{
+        position: 'fixed',
+        top: '10px',
+        right: '10px',
+        zIndex: 999,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        color: 'white',
+        padding: '0.5rem',
+        borderRadius: '0.5rem',
+        fontSize: '0.75rem',
+        maxWidth: '200px'
+      }}>
+        <div>🎤 Status: {speechRecognitionStatus}</div>
+        <div>📝 Entries: {transcription.length}</div>
+        {transcription.length > 0 && (
+          <div style={{ marginTop: '0.25rem', fontSize: '0.625rem' }}>
+            Latest: {transcription[transcription.length - 1]?.substring(0, 50)}...
+          </div>
+        )}
+        <button
+          onClick={() => {
+            console.log('Current transcription data:', transcription);
+            console.log('Transcription length:', transcription.length);
+          }}
+          style={{
+            marginTop: '0.25rem',
+            padding: '0.25rem 0.5rem',
+            fontSize: '0.625rem',
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '0.25rem',
+            cursor: 'pointer'
+          }}
+        >
+          Debug
+        </button>
+      </div>
+    );
   };
 
   // Manual transcription input component
@@ -452,7 +516,11 @@ function RoomClient({ roomName }: { roomName: string }) {
             const callRef = doc(db, 'calls', roomName);
             updateDoc(callRef, {
               transcription: newTranscription,
-              lastTranscriptionUpdate: new Date()
+              lastTranscriptionUpdate: new Date(),
+              transcriptionCount: newTranscription.length,
+              hasTranscriptionData: newTranscription.length > 0
+            }).then(() => {
+              console.log('✅ Manual note stored successfully:', newTranscription.length, 'entries');
             }).catch(error => {
               console.error('Error storing manual note:', error);
             });
