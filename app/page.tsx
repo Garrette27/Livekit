@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import { auth, db } from '@/lib/firebase';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
 import { collection, doc, serverTimestamp, setDoc, updateDoc, getFirestore } from 'firebase/firestore';
@@ -12,7 +11,6 @@ export const dynamic = 'force-dynamic';
 export default function Page() {
   const [user, setUser] = useState<User | null>(null);
   const [roomName, setRoomName] = useState<string>('');
-  const [token, setToken] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [isJoining, setIsJoining] = useState<boolean>(false);
@@ -35,7 +33,6 @@ export default function Page() {
 
   // Debug logging
   console.log('Current user state:', user);
-  console.log('Current token state:', token);
   console.log('Firebase ready:', isFirebaseReady);
 
   const provider = useMemo(() => new GoogleAuthProvider(), []);
@@ -67,7 +64,6 @@ export default function Page() {
 
     try {
       await signOut(auth);
-      setToken(null);
       setShareUrl('');
       setError(null);
     } catch (err: unknown) {
@@ -140,21 +136,8 @@ export default function Page() {
       setIsJoining(true);
       setError(null);
 
-      const identity = user.displayName || user.email || user.uid;
-
-      // Get LiveKit token from API route
-      const res = await fetch('/api/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomName, participantName: identity }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to get token');
-      }
-
-      setToken(data.token);
+      // Redirect to the new doctor room control interface
+      window.location.href = `/room/${roomName}`;
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to join room';
       setError(errorMessage);
@@ -164,23 +147,6 @@ export default function Page() {
     }
   }
 
-  async function onDisconnected() {
-    setToken(null);
-    if (roomName && db) {
-      try {
-        await updateDoc(doc(db, 'calls', roomName), { 
-          status: 'ended', 
-          endedAt: serverTimestamp() 
-        });
-      } catch (err: unknown) {
-        if (err instanceof Error) {
-          console.error('Error updating call status:', err.message);
-        } else {
-          console.error('Error updating call status:', err);
-        }
-      }
-    }
-  }
 
   // Loading state while Firebase initializes
   if (!isFirebaseReady) {
@@ -226,9 +192,8 @@ export default function Page() {
     );
   }
 
-  // Pre-join view
-  if (!token) {
-    return (
+  // Main view (always show since we redirect instead of showing LiveKit interface)
+  return (
       <div style={{ minHeight: '100vh', backgroundColor: '#F9FAFB' }}>
         {/* Header */}
         <div style={{ backgroundColor: 'white', borderBottom: '1px solid #E5E7EB', padding: '1rem 2rem' }}>
@@ -444,20 +409,4 @@ export default function Page() {
         </div>
       </div>
     );
-  }
-
-  // In-call view
-  return (
-    <LiveKitRoom
-      token={token}
-      serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
-      connect
-      audio
-      video
-      onDisconnected={onDisconnected}
-      className="min-h-screen"
-    >
-      <VideoConference />
-    </LiveKitRoom>
-  );
 }
