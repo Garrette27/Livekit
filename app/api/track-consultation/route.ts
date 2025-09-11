@@ -135,7 +135,7 @@ export async function POST(req: Request) {
   }
 }
 
-async function generateConsultationSummary(roomName: string, patientName: string, durationMinutes: number, userId: string, transcriptionData: any[] = null) {
+async function generateConsultationSummary(roomName: string, patientName: string, durationMinutes: number, userId: string, transcriptionData: any[] | null = null) {
   try {
     console.log('Generating AI summary for consultation:', roomName, 'with user ID:', userId);
     
