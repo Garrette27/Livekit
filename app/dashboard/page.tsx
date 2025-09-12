@@ -90,9 +90,16 @@ export default function Dashboard() {
     const summaryUserId = summary.createdBy || summary.metadata?.createdBy;
     const isUserSummary = summaryUserId === user.uid;
     
-    // Only show summaries that belong to the current user
-    // Remove legacy summary logic that was showing summaries from other users
-    const isLegacySummary = false; // Disabled to prevent showing other users' summaries
+    // Check for legacy summaries that might have different field structures
+    // Look for user email, display name, or other identifying fields
+    const userEmail = user.email;
+    const userDisplayName = user.displayName;
+    const isLegacySummary = !summaryUserId && (
+      (summary.metadata as any)?.userEmail === userEmail ||
+      (summary.metadata as any)?.userName === userDisplayName ||
+      (summary as any)?.userEmail === userEmail ||
+      (summary as any)?.userName === userDisplayName
+    );
     
     // Exclude test data - be more comprehensive in detecting test data
     // But allow test-consultation summaries to be shown for testing purposes
@@ -107,17 +114,24 @@ export default function Dashboard() {
     // Allow test-consultation summaries to be shown (they have source: 'test_consultation')
     const isTestConsultation = (summary.metadata as any)?.source === 'test_consultation';
     
+    // If no user ID is found, show it as a legacy summary (for consultation history)
+    const isLegacyConsultation = !summaryUserId && !isTestData;
+    
     if (isUserSummary && !isTestData) {
       console.log('Dashboard: Found user summary:', summary.roomName, 'User ID:', summaryUserId);
     } else if (isTestConsultation && isUserSummary) {
       console.log('Dashboard: Found test consultation summary:', summary.roomName, 'User ID:', summaryUserId);
+    } else if (isLegacySummary) {
+      console.log('Dashboard: Found legacy summary:', summary.roomName, 'User Email/Name match');
+    } else if (isLegacyConsultation) {
+      console.log('Dashboard: Found legacy consultation (no user ID):', summary.roomName);
     } else if (isTestData) {
       console.log('Dashboard: Excluding test data:', summary.roomName);
     } else {
       console.log('Dashboard: Excluding summary for different user:', summary.roomName, 'Summary User ID:', summaryUserId, 'Current User ID:', user.uid);
     }
     
-    return (isUserSummary || isLegacySummary) && (!isTestData || isTestConsultation); // Show user summaries, legacy summaries, and test consultations
+    return (isUserSummary || isLegacySummary || isLegacyConsultation) && (!isTestData || isTestConsultation); // Show user summaries, legacy summaries, legacy consultations, and test consultations
   });
 
 
@@ -164,8 +178,15 @@ export default function Dashboard() {
         roomName: c.roomName, 
         createdBy: c.createdBy, 
         status: c.status, 
-        isRealConsultation: c.isRealConsultation 
+        isRealConsultation: c.isRealConsultation,
+        patientUserId: c.patientUserId,
+        metadata: c.metadata
       })));
+      console.log('Dashboard: Current user for consultation filtering:', {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName
+      });
       
       // Convert consultations to summary format and merge with existing summaries
       const consultationSummaries = realConsultations
@@ -178,13 +199,23 @@ export default function Dashboard() {
           // 1. User is the doctor (createdBy matches)
           // 2. User is the patient (patientUserId matches)
           // 3. User is in the visibleToUsers array
+          // 4. Legacy consultations without specific fields (for consultation history)
           const isDoctorConsultation = consultationUserId === user.uid;
           const isPatientConsultation = patientUserId === user.uid;
           const isVisibleToUser = visibleToUsers.includes(user.uid);
           const isRealConsultation = consultation.isRealConsultation === true;
           const isCompleted = consultation.status === 'completed';
           
-          const shouldShow = (isDoctorConsultation || isPatientConsultation || isVisibleToUser) && isRealConsultation && isCompleted;
+          // For legacy consultations, be more lenient - show if user matches and it's not explicitly test data
+          const isLegacyConsultation = !consultationUserId && !consultation.patientUserId && !consultation.isRealConsultation;
+          const isTestConsultation = consultation.roomName?.includes('test') || consultation.roomName?.includes('Test');
+          
+          const shouldShow = (
+            (isDoctorConsultation || isPatientConsultation || isVisibleToUser) && 
+            (isRealConsultation || isLegacyConsultation) && 
+            (isCompleted || isLegacyConsultation) &&
+            !isTestConsultation
+          );
           
           // Debug logging for consultation filtering
           if (!shouldShow) {
