@@ -90,23 +90,33 @@ export default function Page() {
       return;
     }
 
+    if (!user) {
+      alert('Please sign in to create a room.');
+      return;
+    }
+
     try {
       setIsCreating(true);
+      setError(null);
+      
+      console.log('Creating room with user:', user.uid);
       
       // Store room creation with user ID
       const roomRef = doc(db, 'rooms', roomName);
       await setDoc(roomRef, {
         roomName,
-        createdBy: user?.uid || 'anonymous',
+        createdBy: user.uid,
         createdAt: new Date(),
         status: 'active',
         metadata: {
-          createdBy: user?.uid || 'anonymous',
-          userId: user?.uid || 'anonymous',
-          userEmail: user?.email,
-          userName: user?.displayName
+          createdBy: user.uid,
+          userId: user.uid,
+          userEmail: user.email,
+          userName: user.displayName
         }
       });
+
+      console.log('Room created successfully in Firestore');
 
       // Generate share URL
       const shareUrl = `${window.location.origin}/room/${roomName}/patient`;
@@ -124,6 +134,7 @@ export default function Page() {
       
     } catch (error) {
       console.error('Error creating room:', error);
+      setError(`Error creating room: ${error instanceof Error ? error.message : 'Unknown error'}`);
       alert('Error creating room. Please try again.');
     } finally {
       setIsCreating(false);
