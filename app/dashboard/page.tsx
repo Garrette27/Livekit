@@ -442,6 +442,10 @@ export default function Dashboard() {
                 if (roomName && roomName.trim()) {
                   // Create the room in Firestore first
                   if (db && user) {
+                    console.log('Creating room with user:', user.uid);
+                    console.log('Firebase ready:', !!db);
+                    console.log('User authenticated:', !!user);
+                    
                     const roomRef = doc(db, 'rooms', roomName.trim());
                     setDoc(roomRef, {
                       roomName: roomName.trim(),
@@ -455,13 +459,17 @@ export default function Dashboard() {
                         userName: user.displayName
                       }
                     }).then(() => {
+                      console.log('Room created successfully:', roomName.trim());
                       // Navigate to the room creation page (not the room itself)
                       window.location.href = `/create-room/${roomName.trim()}`;
                     }).catch((error: any) => {
                       console.error('Error creating room:', error);
-                      alert('Error creating room. Please try again.');
+                      console.error('Error code:', error.code);
+                      console.error('Error message:', error.message);
+                      alert(`Error creating room: ${error.message}. Please check console for details.`);
                     });
                   } else {
+                    console.log('Firestore or user not available, using fallback');
                     // Fallback if Firestore not available
                     window.location.href = `/create-room/${roomName.trim()}`;
                   }
