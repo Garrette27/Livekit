@@ -55,7 +55,7 @@ export async function POST(req: Request) {
           patientUserId: userId || 'anonymous', // Store patient's user ID if available
           doctorUserId: doctorUserId, // Explicitly store doctor's user ID
           // Add both user IDs so both can see the consultation
-          visibleToUsers: [doctorUserId, userId || 'anonymous'].filter(id => id !== 'anonymous')
+          visibleToUsers: [doctorUserId, userId || 'anonymous']
         }
       };
       
@@ -88,7 +88,7 @@ export async function POST(req: Request) {
             createdBy: doctorUserId,
             patientUserId: userId || 'anonymous',
             // Add both user IDs so both can see the consultation
-            visibleToUsers: [doctorUserId, userId || 'anonymous'].filter(id => id !== 'anonymous')
+            visibleToUsers: [doctorUserId, userId || 'anonymous']
           }
         });
         

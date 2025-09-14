@@ -178,13 +178,15 @@ export default function Dashboard() {
           // 1. User is the doctor (createdBy matches)
           // 2. User is the patient (patientUserId matches)
           // 3. User is in the visibleToUsers array
+          // 4. User is anonymous and consultation has anonymous patient
           const isDoctorConsultation = consultationUserId === user.uid;
           const isPatientConsultation = patientUserId === user.uid;
           const isVisibleToUser = visibleToUsers.includes(user.uid);
+          const isAnonymousPatient = !user.uid && patientUserId === 'anonymous';
           const isRealConsultation = consultation.isRealConsultation === true;
           const isCompleted = consultation.status === 'completed';
           
-          const shouldShow = (isDoctorConsultation || isPatientConsultation || isVisibleToUser) && isRealConsultation && isCompleted;
+          const shouldShow = (isDoctorConsultation || isPatientConsultation || isVisibleToUser || isAnonymousPatient) && isRealConsultation && isCompleted;
           
           // Debug logging for consultation filtering
           if (!shouldShow) {

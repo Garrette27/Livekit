@@ -513,59 +513,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         </div>
       )}
       
-      {/* Manual Leave Button - Only show when patient is in call */}
-      {token && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '20px',
-            left: '20px',
-            zIndex: 10001,
-            backgroundColor: '#dc2626',
-            color: 'white',
-            padding: '0.75rem 1.5rem',
-            borderRadius: '0.5rem',
-            border: 'none',
-            fontWeight: '600',
-            cursor: 'pointer',
-            fontSize: '1rem',
-            boxShadow: '0 4px 6px -1px rgba(220, 38, 38, 0.2)'
-          }}
-          onClick={() => {
-            console.log('Manual leave button clicked for room:', roomName);
-            // Manually trigger the disconnect logic
-            setToken(null);
-            localStorage.removeItem(`patientInCall_${roomName}`);
-            localStorage.removeItem(`patientToken_${roomName}`);
-            
-            // Track patient leaving consultation
-            console.log('Manually tracking patient leave for room:', roomName, 'patient:', patientName, 'user:', user?.uid);
-            fetch('/api/track-consultation', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                roomName,
-                action: 'leave',
-                patientName,
-                userId: user?.uid || 'anonymous'
-              }),
-            }).then(response => {
-              console.log('Manual patient leave tracking response:', response.status);
-              return response.json();
-            }).then(data => {
-              console.log('Manual patient leave tracking result:', data);
-              // Redirect to patient join page
-              window.location.href = `/room/${roomName}/patient`;
-            }).catch(error => {
-              console.error('Error manually tracking consultation leave:', error);
-              // Still redirect even if tracking fails
-              window.location.href = `/room/${roomName}/patient`;
-            });
-          }}
-        >
-          🚪 Leave Consultation
-        </div>
-      )}
+      {/* Manual Leave Button removed - using only the working leave button in Room Info panel */}
       
       <LiveKitRoom
         token={token}
