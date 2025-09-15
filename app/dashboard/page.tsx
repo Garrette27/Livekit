@@ -24,6 +24,7 @@ interface CallSummary {
     createdBy?: string;
   };
   createdBy?: string; // Added for client-side filtering
+  _logged?: boolean; // Internal flag for one-time logging during render
 }
 
 interface Consultation {
@@ -79,67 +80,91 @@ export default function Dashboard() {
       limit(100)
     );
 
+    // Add debouncing to prevent excessive re-renders
+    let timeoutId: NodeJS.Timeout;
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const allSummaries = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as CallSummary[];
+      // Clear previous timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       
-        // Filter by user on the client side - show summaries for current user and exclude test data
-  const userSummaries = allSummaries.filter(summary => {
-    const summaryUserId = summary.createdBy || summary.metadata?.createdBy;
-    const isUserSummary = summaryUserId === user.uid;
-    
-    // Only show summaries that belong to the current user
-    // Remove legacy summary logic that was showing summaries from other users
-    const isLegacySummary = false; // Disabled to prevent showing other users' summaries
-    
-    // Exclude test data - be more comprehensive in detecting test data
-    // But allow test-consultation summaries to be shown for testing purposes
-    const isTestData = (summary.metadata as any)?.testData || 
-                      (summary as any).testData || 
-                      (summary.metadata as any)?.source === 'test' ||
-                      (summary.metadata as any)?.test === true ||
-                      summary.roomName?.includes('test-room-') ||
-                      summary.roomName?.includes('test-transcription-') ||
-                      summary.roomName?.includes('test_');
-    
-    // Allow test-consultation summaries to be shown (they have source: 'test_consultation')
-    const isTestConsultation = (summary.metadata as any)?.source === 'test_consultation';
-    
-    if (isUserSummary && !isTestData) {
-      console.log('Dashboard: Found user summary:', summary.roomName, 'User ID:', summaryUserId);
-    } else if (isTestConsultation && isUserSummary) {
-      console.log('Dashboard: Found test consultation summary:', summary.roomName, 'User ID:', summaryUserId);
-    } else if (isTestData) {
-      console.log('Dashboard: Excluding test data:', summary.roomName);
-    } else {
-      console.log('Dashboard: Excluding summary for different user:', summary.roomName, 'Summary User ID:', summaryUserId, 'Current User ID:', user.uid);
-    }
-    
-    return (isUserSummary || isLegacySummary) && (!isTestData || isTestConsultation); // Show user summaries, legacy summaries, and test consultations
-  });
+      // Debounce the processing by 500ms
+      timeoutId = setTimeout(() => {
+        const allSummaries = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as CallSummary[];
+        
+          // Filter by user on the client side - show summaries for current user and exclude test data
+    const userSummaries = allSummaries.filter(summary => {
+      const summaryUserId = summary.createdBy || summary.metadata?.createdBy;
+      const isUserSummary = summaryUserId === user.uid;
+      
+      // Only show summaries that belong to the current user
+      // Remove legacy summary logic that was showing summaries from other users
+      const isLegacySummary = false; // Disabled to prevent showing other users' summaries
+      
+      // Exclude test data - be more comprehensive in detecting test data
+      // But allow test-consultation summaries to be shown for testing purposes
+      const isTestData = (summary.metadata as any)?.testData || 
+                        (summary as any).testData || 
+                        (summary.metadata as any)?.source === 'test' ||
+                        (summary.metadata as any)?.test === true ||
+                        summary.roomName?.includes('test-room-') ||
+                        summary.roomName?.includes('test-transcription-') ||
+                        summary.roomName?.includes('test_');
+      
+      // Allow test-consultation summaries to be shown (they have source: 'test_consultation')
+      const isTestConsultation = (summary.metadata as any)?.source === 'test_consultation';
+      
+      // Reduced logging to prevent console spam
+      if (isUserSummary && !isTestData) {
+        // Only log once per summary to reduce noise
+        if (!summary._logged) {
+          console.log('Dashboard: Found user summary:', summary.roomName, 'User ID:', summaryUserId);
+          summary._logged = true;
+        }
+      } else if (isTestConsultation && isUserSummary) {
+        if (!summary._logged) {
+          console.log('Dashboard: Found test consultation summary:', summary.roomName, 'User ID:', summaryUserId);
+          summary._logged = true;
+        }
+      } else if (isTestData) {
+        // Skip logging test data exclusions to reduce noise
+      } else {
+        // Skip logging different user exclusions to reduce noise
+      }
+      
+      return (isUserSummary || isLegacySummary) && (!isTestData || isTestConsultation); // Show user summaries, legacy summaries, and test consultations
+    });
 
 
-      
-      console.log('Dashboard: Received summaries:', userSummaries.length, 'summaries for user', user.uid);
-      console.log('Dashboard: Total summaries in database:', allSummaries.length);
-      console.log('Dashboard: User ID:', user.uid);
-      console.log('Dashboard: All summaries user IDs:', allSummaries.map(s => ({ room: s.roomName, userId: s.createdBy || s.metadata?.createdBy })));
-      // Firestore already orders by createdAt, but keep a defensive client-side reorder
-      const ordered = [...userSummaries].sort((a, b) => {
-        const ad = a.createdAt?.toDate?.() ? a.createdAt.toDate().getTime() : 0;
-        const bd = b.createdAt?.toDate?.() ? b.createdAt.toDate().getTime() : 0;
-        return sortOrder === 'desc' ? bd - ad : ad - bd;
-      });
-      setSummaries(ordered);
-      setLoading(false);
+        
+        console.log('Dashboard: Received summaries:', userSummaries.length, 'summaries for user', user.uid);
+        console.log('Dashboard: Total summaries in database:', allSummaries.length);
+        console.log('Dashboard: User ID:', user.uid);
+        console.log('Dashboard: All summaries user IDs:', allSummaries.map(s => ({ room: s.roomName, userId: s.createdBy || s.metadata?.createdBy })));
+        // Firestore already orders by createdAt, but keep a defensive client-side reorder
+        const ordered = [...userSummaries].sort((a, b) => {
+          const ad = a.createdAt?.toDate?.() ? a.createdAt.toDate().getTime() : 0;
+          const bd = b.createdAt?.toDate?.() ? b.createdAt.toDate().getTime() : 0;
+          return sortOrder === 'desc' ? bd - ad : ad - bd;
+        });
+        setSummaries(ordered);
+        setLoading(false);
+      }, 500); // 500ms debounce
     }, (error) => {
       console.error('Dashboard: Error fetching summaries:', error);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      unsubscribe();
+    };
   }, [user, sortOrder]);
 
   // Also fetch real consultations from the consultations collection and merge with summaries
@@ -153,22 +178,27 @@ export default function Dashboard() {
       limit(100)
     );
 
+    // Add debouncing to prevent excessive re-renders
+    let timeoutId: NodeJS.Timeout;
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const realConsultations = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Consultation[];
+      // Clear previous timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       
-      console.log('Dashboard: Found real consultations:', realConsultations.length);
-      console.log('Dashboard: All consultations:', realConsultations.map(c => ({ 
-        roomName: c.roomName, 
-        createdBy: c.createdBy, 
-        status: c.status, 
-        isRealConsultation: c.isRealConsultation 
-      })));
-      
-      // Convert consultations to summary format and merge with existing summaries
-      const consultationSummaries = realConsultations
+      // Debounce the processing by 500ms
+      timeoutId = setTimeout(() => {
+        const realConsultations = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Consultation[];
+        
+        // Reduced logging to prevent console spam
+        console.log('Dashboard: Found real consultations:', realConsultations.length);
+        
+        // Convert consultations to summary format and merge with existing summaries
+        const consultationSummaries = realConsultations
         .filter(consultation => {
           const consultationUserId = consultation.createdBy || consultation.metadata?.createdBy;
           const patientUserId = consultation.patientUserId || consultation.metadata?.patientUserId;
@@ -188,21 +218,10 @@ export default function Dashboard() {
           
           const shouldShow = (isDoctorConsultation || isPatientConsultation || isVisibleToUser || isAnonymousPatient) && isRealConsultation && isCompleted;
           
-          // Debug logging for consultation filtering
-          if (!shouldShow) {
-            console.log('Dashboard: Consultation filtered out:', {
-              roomName: consultation.roomName,
-              consultationUserId,
-              patientUserId,
-              visibleToUsers,
-              currentUserId: user.uid,
-              isDoctorConsultation,
-              isPatientConsultation,
-              isVisibleToUser,
-              isRealConsultation,
-              isCompleted,
-              shouldShow
-            });
+          // Reduced logging to prevent console spam
+          // Only log filtered consultations in debug mode
+          if (!shouldShow && process.env.NODE_ENV === 'development') {
+            console.log('Dashboard: Consultation filtered out:', consultation.roomName);
           }
           
           return shouldShow;
@@ -234,12 +253,8 @@ export default function Dashboard() {
           }
         }));
 
+      // Reduced logging to prevent console spam
       console.log('Dashboard: Generated consultation summaries:', consultationSummaries.length);
-      console.log('Dashboard: Consultation summaries:', consultationSummaries.map(s => ({ 
-        roomName: s.roomName, 
-        createdBy: s.createdBy, 
-        duration: s.duration 
-      })));
 
       // Merge with existing summaries and remove duplicates
       setSummaries(prevSummaries => {
@@ -255,11 +270,17 @@ export default function Dashboard() {
           return sortOrder === 'desc' ? bd - ad : ad - bd;
         });
       });
+      }, 500); // 500ms debounce
     }, (error) => {
       console.error('Dashboard: Error fetching consultations:', error);
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      unsubscribe();
+    };
   }, [user, sortOrder]);
 
 

@@ -142,37 +142,13 @@ export default function Page() {
   };
 
   async function joinRoom() {
-    if (!user || !roomName) {
+    if (!roomName) {
       setError('Please create a room first');
       return;
     }
 
-    try {
-      setIsJoining(true);
-      setError(null);
-
-      const identity = user.displayName || user.email || user.uid;
-
-      // Get LiveKit token from API route
-      const res = await fetch('/api/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomName, participantName: identity }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to get token');
-      }
-
-      setToken(data.token);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to join room';
-      setError(errorMessage);
-      console.error('Room join error:', err);
-    } finally {
-      setIsJoining(false);
-    }
+    // Route to the dedicated doctor room interface which handles token generation
+    window.location.href = `/room/${roomName}`;
   }
 
   async function onDisconnected() {
