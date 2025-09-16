@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import { Room } from 'livekit-client';
@@ -558,6 +558,9 @@ function RoomClient({ roomName }: { roomName: string }) {
   // Manual transcription input component
   const ManualTranscriptionInput = () => {
     const [note, setNote] = useState('');
+    const [position, setPosition] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 420 : 800, y: typeof window !== 'undefined' ? window.innerHeight - 300 : 400 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
     const addNote = () => {
       if (note.trim()) {
@@ -590,22 +593,88 @@ function RoomClient({ roomName }: { roomName: string }) {
       }
     };
 
+    const handleMouseDown = (e: React.MouseEvent) => {
+      setIsDragging(true);
+      setDragStart({
+        x: e.clientX - position.x,
+        y: e.clientY - position.y
+      });
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        const newX = e.clientX - dragStart.x;
+        const newY = e.clientY - dragStart.y;
+        
+        // Keep within viewport bounds
+        const maxX = window.innerWidth - 400; // Component width
+        const maxY = window.innerHeight - 200; // Component height
+        const minX = 0;
+        const minY = 0;
+        
+        setPosition({
+          x: Math.max(minX, Math.min(maxX, newX)),
+          y: Math.max(minY, Math.min(maxY, newY))
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    // Add event listeners for mouse move and up
+    React.useEffect(() => {
+      if (isDragging) {
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        return () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+        };
+      }
+    }, [isDragging, dragStart]);
+
     return (
-      <div style={{
-        position: 'fixed',
-        bottom: '100px',
-        right: '20px',
-        zIndex: 999,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        border: '2px solid #3b82f6',
-        borderRadius: '0.75rem',
-        padding: '1rem',
-        minWidth: '300px',
-        maxWidth: '400px'
-      }}>
-        <h4 style={{ margin: '0 0 0.75rem 0', color: '#1e40af', fontSize: '1rem', fontWeight: '600' }}>
-          📝 Manual Notes
-        </h4>
+      <div 
+        style={{
+          position: 'fixed',
+          left: position.x,
+          top: position.y,
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          border: '2px solid #3b82f6',
+          borderRadius: '0.75rem',
+          padding: '1rem',
+          minWidth: '300px',
+          maxWidth: '400px',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          userSelect: 'none',
+          zIndex: 1000,
+          boxShadow: isDragging ? '0 15px 35px rgba(0, 0, 0, 0.25)' : '0 10px 25px rgba(0, 0, 0, 0.15)',
+          transition: isDragging ? 'none' : 'box-shadow 0.2s ease'
+        }}
+      >
+        {/* Drag handle */}
+        <div
+          onMouseDown={handleMouseDown}
+          style={{
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            padding: '0.5rem',
+            margin: '-1rem -1rem 0.75rem -1rem',
+            borderRadius: '0.75rem 0.75rem 0 0',
+            cursor: 'grab',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '0.875rem',
+            fontWeight: '600'
+          }}
+        >
+          <span>📝 Manual Notes</span>
+          <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>⋮⋮</span>
+        </div>
+        
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
           <input
             type="text"
