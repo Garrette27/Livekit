@@ -72,10 +72,10 @@ export default function Dashboard() {
     
     const summariesRef = collection(db, 'call-summaries');
     
-    // Use a simpler query that doesn't require a composite index
-    // We'll filter by user on the client side for now
+    // Filter by user to comply with security rules
     const q = query(
       summariesRef,
+      where('createdBy', '==', user.uid),
       orderBy('createdAt', sortOrder),
       limit(100)
     );
@@ -172,9 +172,10 @@ export default function Dashboard() {
     if (!user || !db) return;
 
     const consultationsRef = collection(db, 'consultations');
-    // Remove the composite query that requires an index - just get all consultations and filter client-side
+    // Filter by user to comply with security rules
     const q = query(
       consultationsRef,
+      where('createdBy', '==', user.uid),
       limit(100)
     );
 
