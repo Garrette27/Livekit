@@ -1,10 +1,70 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../lib/firebase-admin';
+import { withRateLimit, RateLimitConfigs } from '../../../lib/rate-limit';
+import crypto from 'crypto';
 
-export async function POST(req: Request) {
+/**
+ * Verify webhook signature to ensure request authenticity
+ */
+function verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
+  if (!signature || !secret) {
+    return false;
+  }
+  
   try {
-    const event = await req.json();
-    console.log('Webhook received:', JSON.stringify(event, null, 2));
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(payload)
+      .digest('hex');
+    
+    // Use timing-safe comparison to prevent timing attacks
+    return crypto.timingSafeEqual(
+      Buffer.from(signature, 'hex'),
+      Buffer.from(expectedSignature, 'hex')
+    );
+  } catch (error) {
+    console.error('Webhook signature verification error:', error);
+    return false;
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    // Apply rate limiting
+    const rateLimitResponse = withRateLimit(RateLimitConfigs.WEBHOOK)(req);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
+    // Get the raw body for signature verification
+    const body = await req.text();
+    const signature = req.headers.get('x-livekit-signature') || req.headers.get('x-signature');
+    const webhookSecret = process.env.LIVEKIT_WEBHOOK_SECRET;
+    
+    let event;
+    
+    // Verify webhook signature if secret is configured
+    if (webhookSecret && signature) {
+      if (!verifyWebhookSignature(body, signature, webhookSecret)) {
+        console.error('Invalid webhook signature');
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      console.log('Webhook signature verified successfully');
+    } else {
+      // If no secret is configured, log a warning but continue (for development)
+      if (!webhookSecret) {
+        console.warn('LIVEKIT_WEBHOOK_SECRET not configured - webhook signature verification disabled');
+      }
+    }
+    
+    // Parse the body
+    try {
+      event = JSON.parse(body);
+      console.log('Webhook received:', JSON.stringify(event, null, 2));
+    } catch (error) {
+      console.error('Invalid JSON in webhook body:', error);
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
 
     if (event.event === 'room_finished' || event.event === 'participant_left') {
       console.log(event.event === 'participant_left' ? '✅ Processing participant_left event (early summary mode)' : '✅ Processing room_finished event');

@@ -1,26 +1,48 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
+import { withRateLimit, RateLimitConfigs } from "../../../lib/rate-limit";
+import { validateRoomName, validateParticipantName, sanitizeInput } from "../../../lib/validation";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    // Apply rate limiting
+    const rateLimitResponse = withRateLimit(RateLimitConfigs.TOKEN_GENERATION)(req);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const { roomName, participantName } = await req.json();
 
-    // Log all environment variables for debugging
+    // Input validation and sanitization
+    if (!roomName || !participantName) {
+      return NextResponse.json(
+        { error: 'Room name and participant name are required' },
+        { status: 400 }
+      );
+    }
+
+    const sanitizedRoomName = sanitizeInput(roomName);
+    const sanitizedParticipantName = sanitizeInput(participantName);
+
+    if (!validateRoomName(sanitizedRoomName)) {
+      return NextResponse.json(
+        { error: 'Invalid room name. Must be 3-50 characters, alphanumeric with hyphens/underscores only' },
+        { status: 400 }
+      );
+    }
+
+    if (!validateParticipantName(sanitizedParticipantName)) {
+      return NextResponse.json(
+        { error: 'Invalid participant name. Must be 2-100 characters, letters, numbers, spaces, and basic punctuation only' },
+        { status: 400 }
+      );
+    }
+
+    // Log environment variables (without exposing sensitive data)
     console.log('Environment variables check:');
     console.log('LIVEKIT_API_KEY exists:', !!process.env.LIVEKIT_API_KEY);
     console.log('LIVEKIT_API_SECRET exists:', !!process.env.LIVEKIT_API_SECRET);
     console.log('NEXT_PUBLIC_LIVEKIT_URL exists:', !!process.env.NEXT_PUBLIC_LIVEKIT_URL);
-    console.log('LIVEKIT_URL exists:', !!process.env.LIVEKIT_URL);
-    
-    // Log partial values for debugging (first 4 and last 4 characters)
-    if (process.env.LIVEKIT_API_KEY) {
-      const key = process.env.LIVEKIT_API_KEY;
-      console.log('API Key preview:', key.substring(0, 4) + '...' + key.substring(key.length - 4));
-    }
-    if (process.env.LIVEKIT_API_SECRET) {
-      const secret = process.env.LIVEKIT_API_SECRET;
-      console.log('API Secret preview:', secret.substring(0, 4) + '...' + secret.substring(secret.length - 4));
-    }
 
     // Validate required environment variables
     if (!process.env.LIVEKIT_API_KEY) {
@@ -55,15 +77,15 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log('Generating token for:', { roomName, participantName });
+    console.log('Generating token for:', { roomName: sanitizedRoomName, participantName: sanitizedParticipantName });
 
     // Create JWT token manually with explicit HS256 algorithm
     const token = jwt.sign(
       {
-        sub: participantName,
+        sub: sanitizedParticipantName,
         video: {
           roomJoin: true,
-          room: roomName,
+          room: sanitizedRoomName,
         },
       },
       process.env.LIVEKIT_API_SECRET,
