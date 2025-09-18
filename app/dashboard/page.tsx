@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, getFirestore, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -474,7 +474,7 @@ export default function Dashboard() {
                     setDoc(roomRef, {
                       roomName: roomName.trim(),
                       createdBy: user.uid,
-                      createdAt: new Date(),
+                      createdAt: serverTimestamp(),
                       status: 'active',
                       metadata: {
                         createdBy: user.uid,
