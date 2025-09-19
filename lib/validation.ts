@@ -36,7 +36,8 @@ export function validateParticipantName(name: string): boolean {
   }
   
   const sanitized = sanitizeInput(name);
-  const nameRegex = /^[a-zA-Z0-9\s\-_\.]{2,100}$/;
+  // Allow letters, numbers, spaces, and common punctuation including !, ?, @, #, etc.
+  const nameRegex = /^[a-zA-Z0-9\s\-_\.!?@#$%^&*()+={}[\]|\\:";'<>,\/]{2,100}$/;
   
   return nameRegex.test(sanitized) && sanitized.length >= 2 && sanitized.length <= 100;
 }

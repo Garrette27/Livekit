@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import { auth, db } from '@/lib/firebase';
-import { serverTimestamp } from 'firebase/firestore';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
 import { collection, doc, serverTimestamp, setDoc, updateDoc, getFirestore } from 'firebase/firestore';
 import Link from 'next/link';
