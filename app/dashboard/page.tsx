@@ -172,60 +172,42 @@ export default function Dashboard() {
     if (!user || !db) return;
 
     const consultationsRef = collection(db, 'consultations');
-    // Filter by user to comply with security rules
-    const q = query(
+
+    // Query A: consultations created by the current user (doctor view)
+    const byCreator = query(
       consultationsRef,
       where('createdBy', '==', user.uid),
       limit(100)
     );
 
-    // Add debouncing to prevent excessive re-renders
-    let timeoutId: NodeJS.Timeout;
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      // Clear previous timeout
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      
-      // Debounce the processing by 500ms
-      timeoutId = setTimeout(() => {
-        const realConsultations = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Consultation[];
-        
-        // Reduced logging to prevent console spam
-        console.log('Dashboard: Found real consultations:', realConsultations.length);
-        
-        // Convert consultations to summary format and merge with existing summaries
-        const consultationSummaries = realConsultations
+    // Query B: consultations visible to the current user (patient view)
+    const visibleToUser = query(
+      consultationsRef,
+      where('metadata.visibleToUsers', 'array-contains', user.uid),
+      limit(100)
+    );
+
+    // Debounce timers for both listeners
+    let timeoutA: NodeJS.Timeout | undefined;
+    let timeoutB: NodeJS.Timeout | undefined;
+
+    // Helper to process a snapshot into summaries and merge
+    const processAndMerge = (consultations: Consultation[]) => {
+      console.log('Dashboard: Found real consultations:', consultations.length);
+
+      const consultationSummaries = consultations
         .filter(consultation => {
           const consultationUserId = consultation.createdBy || consultation.metadata?.createdBy;
           const patientUserId = consultation.patientUserId || consultation.metadata?.patientUserId;
           const visibleToUsers = consultation.metadata?.visibleToUsers || [];
-          
-          // Show consultations if:
-          // 1. User is the doctor (createdBy matches)
-          // 2. User is the patient (patientUserId matches)
-          // 3. User is in the visibleToUsers array
-          // 4. User is anonymous and consultation has anonymous patient
+
           const isDoctorConsultation = consultationUserId === user.uid;
           const isPatientConsultation = patientUserId === user.uid;
           const isVisibleToUser = visibleToUsers.includes(user.uid);
-          const isAnonymousPatient = !user.uid && patientUserId === 'anonymous';
           const isRealConsultation = consultation.isRealConsultation === true;
           const isCompleted = consultation.status === 'completed';
-          
-          const shouldShow = (isDoctorConsultation || isPatientConsultation || isVisibleToUser || isAnonymousPatient) && isRealConsultation && isCompleted;
-          
-          // Reduced logging to prevent console spam
-          // Only log filtered consultations in debug mode
-          if (!shouldShow && process.env.NODE_ENV === 'development') {
-            console.log('Dashboard: Consultation filtered out:', consultation.roomName);
-          }
-          
-          return shouldShow;
+
+          return (isDoctorConsultation || isPatientConsultation || isVisibleToUser) && isRealConsultation && isCompleted;
         })
         .map(consultation => ({
           id: consultation.id,
@@ -254,33 +236,43 @@ export default function Dashboard() {
           }
         }));
 
-      // Reduced logging to prevent console spam
       console.log('Dashboard: Generated consultation summaries:', consultationSummaries.length);
 
-      // Merge with existing summaries and remove duplicates
       setSummaries(prevSummaries => {
         const allSummaries = [...prevSummaries, ...consultationSummaries];
-        const uniqueSummaries = allSummaries.filter((summary, index, self) => 
+        const uniqueSummaries = allSummaries.filter((summary, index, self) =>
           index === self.findIndex(s => s.roomName === summary.roomName)
         );
-        
-        // Sort by creation date
+
         return uniqueSummaries.sort((a, b) => {
           const ad = a.createdAt?.toDate?.() ? a.createdAt.toDate().getTime() : 0;
           const bd = b.createdAt?.toDate?.() ? b.createdAt.toDate().getTime() : 0;
           return sortOrder === 'desc' ? bd - ad : ad - bd;
         });
       });
-      }, 500); // 500ms debounce
-    }, (error) => {
-      console.error('Dashboard: Error fetching consultations:', error);
-    });
+    };
+
+    const unsubA = onSnapshot(byCreator, (snapshot) => {
+      if (timeoutA) clearTimeout(timeoutA);
+      timeoutA = setTimeout(() => {
+        const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Consultation[];
+        processAndMerge(docs);
+      }, 500);
+    }, (error) => console.error('Dashboard: Error fetching consultations by creator:', error));
+
+    const unsubB = onSnapshot(visibleToUser, (snapshot) => {
+      if (timeoutB) clearTimeout(timeoutB);
+      timeoutB = setTimeout(() => {
+        const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Consultation[];
+        processAndMerge(docs);
+      }, 500);
+    }, (error) => console.error('Dashboard: Error fetching consultations visible to user:', error));
 
     return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      unsubscribe();
+      if (timeoutA) clearTimeout(timeoutA);
+      if (timeoutB) clearTimeout(timeoutB);
+      unsubA();
+      unsubB();
     };
   }, [user, sortOrder]);
 
