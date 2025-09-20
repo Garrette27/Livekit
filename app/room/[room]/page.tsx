@@ -1039,37 +1039,51 @@ function RoomClient({ roomName }: { roomName: string }) {
         transform: translateY(-1px) !important;
       }
 
-      /* Fix dropdown menus - ensure they can be closed */
+      /* Fix dropdown menus - ensure they can be closed with better visibility */
       .lk-device-menu,
       .lk-device-menu-item,
       .lk-dropdown,
       .lk-menu {
         position: absolute !important;
         z-index: 1001 !important;
-        background-color: rgba(0, 0, 0, 0.9) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        background-color: #ffffff !important;
+        border: 1px solid #d1d5db !important;
         border-radius: 8px !important;
         padding: 8px 0 !important;
         min-width: 200px !important;
         max-width: 300px !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
         backdrop-filter: blur(10px) !important;
       }
 
       .lk-device-menu-item {
-        padding: 8px 16px !important;
-        color: white !important;
+        padding: 12px 16px !important;
+        color: #374151 !important;
         cursor: pointer !important;
         border: none !important;
         background: transparent !important;
         width: 100% !important;
         text-align: left !important;
         font-size: 14px !important;
+        font-weight: 500 !important;
         transition: background-color 0.2s ease !important;
+        border-bottom: 1px solid #f3f4f6 !important;
+      }
+
+      .lk-device-menu-item:last-child {
+        border-bottom: none !important;
       }
 
       .lk-device-menu-item:hover {
-        background-color: rgba(255, 255, 255, 0.1) !important;
+        background-color: #f3f4f6 !important;
+        color: #111827 !important;
+      }
+
+      .lk-device-menu-item:focus {
+        background-color: #dbeafe !important;
+        color: #1e40af !important;
+        outline: 2px solid #3b82f6 !important;
+        outline-offset: -2px !important;
       }
 
       /* Hide dropdowns by default - only show when explicitly opened */
@@ -1093,7 +1107,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         display: none !important;
       }
 
-      /* Fix overlapping text in dropdown items */
+      /* Fix overlapping text in dropdown items with better visibility */
       .lk-device-menu-item span,
       .lk-device-menu-item div {
         white-space: nowrap !important;
@@ -1101,6 +1115,64 @@ function RoomClient({ roomName }: { roomName: string }) {
         text-overflow: ellipsis !important;
         max-width: 100% !important;
         display: block !important;
+        color: #374151 !important;
+        font-weight: 500 !important;
+      }
+
+      .lk-device-menu-item:hover span,
+      .lk-device-menu-item:hover div {
+        color: #111827 !important;
+      }
+
+      .lk-device-menu-item:focus span,
+      .lk-device-menu-item:focus div {
+        color: #1e40af !important;
+      }
+
+      /* Additional theme compatibility and inline style overrides */
+      .lk-device-menu[style*="background"],
+      .lk-dropdown[style*="background"],
+      .lk-menu[style*="background"] {
+        background-color: #ffffff !important;
+      }
+
+      .lk-device-menu-item[style*="color"],
+      .lk-dropdown-item[style*="color"],
+      .lk-menu-item[style*="color"] {
+        color: #374151 !important;
+      }
+
+      /* Ensure dropdown buttons are also visible */
+      .lk-device-menu button,
+      .lk-dropdown button {
+        background-color: #ffffff !important;
+        color: #374151 !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 6px !important;
+        padding: 8px 12px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        transition: all 0.2s ease !important;
+      }
+
+      .lk-device-menu button:hover,
+      .lk-dropdown button:hover {
+        background-color: #f3f4f6 !important;
+        color: #111827 !important;
+        border-color: #9ca3af !important;
+      }
+
+      /* Ensure dropdown arrows are visible */
+      .lk-device-menu button svg,
+      .lk-dropdown button svg {
+        color: #6b7280 !important;
+        fill: #6b7280 !important;
+      }
+
+      .lk-device-menu button:hover svg,
+      .lk-dropdown button:hover svg {
+        color: #374151 !important;
+        fill: #374151 !important;
       }
 
       /* Fix chat background to be white */
