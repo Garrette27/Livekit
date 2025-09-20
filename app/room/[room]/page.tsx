@@ -245,6 +245,7 @@ function RoomClient({ roomName }: { roomName: string }) {
     const [userInteracted, setUserInteracted] = useState<boolean>(false);
     const [hasStarted, setHasStarted] = useState<boolean>(false);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
+    const [lastRestartTime, setLastRestartTime] = useState<number>(0);
     
     useEffect(() => {
       if (!token || !roomName) return;
@@ -353,21 +354,37 @@ function RoomClient({ roomName }: { roomName: string }) {
         console.error('🎤 Speech recognition error:', event.error);
         setSpeechRecognitionStatus('idle');
         
-        // Don't auto-restart on errors to prevent infinite loops
+        // Improved error handling to prevent UI interference
         if (event.error === 'aborted') {
           console.log('🎤 Speech recognition aborted - this is normal');
+          // Don't restart on abort to prevent interference
         } else if (event.error === 'no-speech') {
           console.log('🎤 No speech detected - continuing to listen');
-          // Restart recognition after a brief delay for no-speech errors
+          // Restart recognition after a longer delay to reduce interference
           setTimeout(() => {
             try {
-              if (recognition && recognition.state !== 'recording') {
+              const now = Date.now();
+              if (now - lastRestartTime > 3000 && recognition && recognition.state !== 'recording') {
+                setLastRestartTime(now);
                 recognition.start();
               }
             } catch (error) {
               console.log('Failed to restart recognition after no-speech:', error);
             }
-          }, 1000);
+          }, 3000); // Increased from 1000ms to 3000ms
+        } else {
+          // For other errors, wait longer before restarting
+          setTimeout(() => {
+            try {
+              const now = Date.now();
+              if (now - lastRestartTime > 5000 && recognition && recognition.state !== 'recording') {
+                setLastRestartTime(now);
+                recognition.start();
+              }
+            } catch (error) {
+              console.log('Failed to restart recognition after error:', error);
+            }
+          }, 5000); // Wait 5 seconds for other errors
         }
       };
 
@@ -375,17 +392,20 @@ function RoomClient({ roomName }: { roomName: string }) {
         console.log('🎤 Speech recognition ended');
         setSpeechRecognitionStatus('idle');
         
-        // Auto-restart speech recognition to keep it running
+        // Auto-restart speech recognition with longer delay to reduce interference
         setTimeout(() => {
           try {
-            if (recognition && recognition.state !== 'recording') {
+            const now = Date.now();
+            // Throttle restarts to prevent interference with UI
+            if (now - lastRestartTime > 3000 && recognition && recognition.state !== 'recording') {
               console.log('🔄 Restarting speech recognition...');
+              setLastRestartTime(now);
               recognition.start();
             }
           } catch (error) {
             console.log('Failed to restart recognition:', error);
           }
-        }, 1000);
+        }, 2000); // Increased from 1000ms to 2000ms to reduce interference
       };
 
       // Store the recognition instance
