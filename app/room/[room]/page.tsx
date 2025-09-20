@@ -1271,17 +1271,19 @@ function RoomClient({ roomName }: { roomName: string }) {
         controlBar.style.setProperty('z-index', '1000', 'important');
       }
 
-      // Fix dropdown positioning and ensure they can be closed
+      // Fix dropdown positioning and ensure they can be closed with better visibility
       const dropdowns = document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu');
       dropdowns.forEach(dropdown => {
         const element = dropdown as HTMLElement;
         element.style.setProperty('position', 'absolute', 'important');
         element.style.setProperty('z-index', '1001', 'important');
-        element.style.setProperty('background-color', 'rgba(0, 0, 0, 0.9)', 'important');
-        element.style.setProperty('border', '1px solid rgba(255, 255, 255, 0.2)', 'important');
+        element.style.setProperty('background-color', '#ffffff', 'important');
+        element.style.setProperty('border', '1px solid #d1d5db', 'important');
         element.style.setProperty('border-radius', '8px', 'important');
-        element.style.setProperty('box-shadow', '0 4px 12px rgba(0, 0, 0, 0.3)', 'important');
+        element.style.setProperty('box-shadow', '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', 'important');
         element.style.setProperty('backdrop-filter', 'blur(10px)', 'important');
+        element.style.setProperty('min-width', '200px', 'important');
+        element.style.setProperty('max-width', '300px', 'important');
         
         // Hide dropdowns by default unless they're explicitly opened
         if (!element.getAttribute('aria-expanded') || element.getAttribute('aria-expanded') === 'false') {
@@ -1289,21 +1291,35 @@ function RoomClient({ roomName }: { roomName: string }) {
         }
       });
 
-      // Fix dropdown items
+      // Fix dropdown items with better visibility
       const dropdownItems = document.querySelectorAll('.lk-device-menu-item');
       dropdownItems.forEach(item => {
         const element = item as HTMLElement;
-        element.style.setProperty('padding', '8px 16px', 'important');
-        element.style.setProperty('color', 'white', 'important');
+        element.style.setProperty('padding', '12px 16px', 'important');
+        element.style.setProperty('color', '#374151', 'important');
         element.style.setProperty('cursor', 'pointer', 'important');
         element.style.setProperty('border', 'none', 'important');
         element.style.setProperty('background', 'transparent', 'important');
         element.style.setProperty('width', '100%', 'important');
         element.style.setProperty('text-align', 'left', 'important');
         element.style.setProperty('font-size', '14px', 'important');
+        element.style.setProperty('font-weight', '500', 'important');
         element.style.setProperty('white-space', 'nowrap', 'important');
         element.style.setProperty('overflow', 'hidden', 'important');
         element.style.setProperty('text-overflow', 'ellipsis', 'important');
+        element.style.setProperty('border-bottom', '1px solid #f3f4f6', 'important');
+        element.style.setProperty('transition', 'background-color 0.2s ease', 'important');
+        
+        // Add hover effect
+        element.addEventListener('mouseenter', () => {
+          element.style.setProperty('background-color', '#f3f4f6', 'important');
+          element.style.setProperty('color', '#111827', 'important');
+        });
+        
+        element.addEventListener('mouseleave', () => {
+          element.style.setProperty('background-color', 'transparent', 'important');
+          element.style.setProperty('color', '#374151', 'important');
+        });
       });
     };
 
@@ -1311,27 +1327,34 @@ function RoomClient({ roomName }: { roomName: string }) {
     forceShowControls();
     const interval = setInterval(forceShowControls, 1000);
 
-    // Hide all dropdowns on initial load
-    const hideAllDropdowns = () => {
+    // Initialize dropdowns properly without interfering with LiveKit functionality
+    const initializeDropdowns = () => {
       const allDropdowns = document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu');
       allDropdowns.forEach(dropdown => {
         const element = dropdown as HTMLElement;
-        element.setAttribute('aria-expanded', 'false');
-        element.style.setProperty('display', 'none', 'important');
+        // Only set aria-expanded if it's not already set by LiveKit
+        if (!element.getAttribute('aria-expanded')) {
+          element.setAttribute('aria-expanded', 'false');
+        }
+        // Only hide if not explicitly opened
+        if (element.getAttribute('aria-expanded') === 'false') {
+          element.style.setProperty('display', 'none', 'important');
+        }
       });
     };
 
-    // Hide dropdowns immediately and periodically
-    hideAllDropdowns();
-    const hideInterval = setInterval(hideAllDropdowns, 500);
+    // Initialize dropdowns immediately
+    initializeDropdowns();
 
-    // Add click outside handler to close dropdowns
+    // Add click outside handler to close dropdowns (less aggressive)
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       const isDropdown = target.closest('.lk-device-menu, .lk-dropdown, .lk-menu');
       const isControlButton = target.closest('.lk-control-bar button');
+      const isDropdownButton = target.closest('.lk-control-bar button[aria-haspopup="true"]');
       
-      if (!isDropdown && !isControlButton) {
+      // Only close dropdowns if clicking outside the control bar entirely
+      if (!isDropdown && !isControlButton && !isDropdownButton) {
         // Close all open dropdowns
         const openDropdowns = document.querySelectorAll('.lk-device-menu[aria-expanded="true"], .lk-dropdown[aria-expanded="true"]');
         openDropdowns.forEach(dropdown => {
@@ -1356,42 +1379,11 @@ function RoomClient({ roomName }: { roomName: string }) {
     document.addEventListener('click', handleClickOutside);
     document.addEventListener('keydown', handleEscapeKey);
 
-    // Add specific event listeners for dropdown buttons to ensure proper toggle behavior
-    const addDropdownButtonListeners = () => {
-      const microphoneButton = document.querySelector('.lk-control-bar button[aria-haspopup="true"]');
-      const cameraButton = document.querySelector('.lk-control-bar button[aria-haspopup="true"]:nth-child(2)');
-      
-      if (microphoneButton) {
-        microphoneButton.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const dropdown = document.querySelector('.lk-device-menu');
-          if (dropdown) {
-            const isOpen = dropdown.getAttribute('aria-expanded') === 'true';
-            dropdown.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
-            (dropdown as HTMLElement).style.display = isOpen ? 'none' : 'block';
-          }
-        });
-      }
-
-      if (cameraButton) {
-        cameraButton.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const dropdown = document.querySelector('.lk-device-menu:nth-child(2)');
-          if (dropdown) {
-            const isOpen = dropdown.getAttribute('aria-expanded') === 'true';
-            dropdown.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
-            (dropdown as HTMLElement).style.display = isOpen ? 'none' : 'block';
-          }
-        });
-      }
-    };
-
-    // Add listeners after a short delay to ensure LiveKit has rendered
-    setTimeout(addDropdownButtonListeners, 1000);
+    // Let LiveKit handle dropdown interactions natively - we just style them
+    // No custom event listeners needed as they interfere with LiveKit's functionality
 
     return () => {
       clearInterval(interval);
-      clearInterval(hideInterval);
       document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleEscapeKey);
       const styleToRemove = document.getElementById('livekit-controls-fix');
