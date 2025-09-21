@@ -1232,36 +1232,13 @@ function RoomClient({ roomName }: { roomName: string }) {
         outline-offset: -2px !important;
       }
 
-      /* Let LiveKit handle dropdown visibility - only style them when visible */
+      /* Completely remove all dropdown styling - let LiveKit handle everything */
       .lk-device-menu,
       .lk-dropdown,
       .lk-menu {
-        /* Don't force display - let LiveKit control it */
-        background-color: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 8px !important;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
-        backdrop-filter: blur(10px) !important;
+        /* Remove all forced styling - let LiveKit control everything */
         pointer-events: auto !important;
         z-index: 1001 !important;
-      }
-
-      /* Only style dropdowns when they're actually visible (LiveKit controls this) */
-      .lk-device-menu[style*="display: block"],
-      .lk-dropdown[style*="display: block"],
-      .lk-menu[style*="display: block"] {
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-      }
-
-      /* Hide dropdowns when they should be closed */
-      .lk-device-menu[style*="display: none"],
-      .lk-dropdown[style*="display: none"],
-      .lk-menu[style*="display: none"] {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
       }
 
       /* Fix overlapping text in dropdown items with better visibility */
@@ -1442,20 +1419,19 @@ function RoomClient({ roomName }: { roomName: string }) {
         element.style.setProperty('min-width', '200px', 'important');
         element.style.setProperty('max-width', '300px', 'important');
         
-        // Only apply styling, let LiveKit handle display logic
-        element.style.setProperty('background-color', '#ffffff', 'important');
-        element.style.setProperty('border', '1px solid #d1d5db', 'important');
-        element.style.setProperty('border-radius', '8px', 'important');
-        element.style.setProperty('box-shadow', '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', 'important');
-        element.style.setProperty('backdrop-filter', 'blur(10px)', 'important');
+        // Only set essential properties - let LiveKit handle everything else
         element.style.setProperty('pointer-events', 'auto', 'important');
         element.style.setProperty('z-index', '1001', 'important');
         
-        // Don't force display - let LiveKit control it
         // Remove any forced display properties
         element.style.removeProperty('display');
         element.style.removeProperty('visibility');
         element.style.removeProperty('opacity');
+        element.style.removeProperty('background-color');
+        element.style.removeProperty('border');
+        element.style.removeProperty('border-radius');
+        element.style.removeProperty('box-shadow');
+        element.style.removeProperty('backdrop-filter');
       });
 
       // Fix dropdown items with better visibility
@@ -1499,11 +1475,22 @@ function RoomClient({ roomName }: { roomName: string }) {
           element.style.setProperty('color', '#111827', 'important');
         });
         
-        // Add click handler to close dropdown after selection
+        // Add click handler to force close dropdown after selection
         element.addEventListener('click', () => {
-          console.log('🎤 Dropdown item selected - closing dropdown');
-          // Let LiveKit handle the closing naturally
-          // The MutationObserver will detect the change and resume speech recognition
+          console.log('🎤 Dropdown item selected - forcing dropdown to close');
+          
+          // Force close all dropdowns after a short delay
+          setTimeout(() => {
+            const allDropdowns = document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu');
+            allDropdowns.forEach(dropdown => {
+              const dropdownElement = dropdown as HTMLElement;
+              dropdownElement.style.setProperty('display', 'none', 'important');
+              dropdownElement.style.setProperty('visibility', 'hidden', 'important');
+              dropdownElement.style.setProperty('opacity', '0', 'important');
+              dropdownElement.setAttribute('aria-expanded', 'false');
+            });
+            console.log('🎤 All dropdowns force closed');
+          }, 100);
         });
       });
     };
@@ -1512,24 +1499,48 @@ function RoomClient({ roomName }: { roomName: string }) {
     forceShowControls();
     const interval = setInterval(forceShowControls, 1000);
 
+    // Add periodic check to force close persistent dropdowns
+    const forceCloseDropdowns = () => {
+      const allDropdowns = document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu');
+      allDropdowns.forEach(dropdown => {
+        const element = dropdown as HTMLElement;
+        const display = element.style.display || getComputedStyle(element).display;
+        
+        // If dropdown is visible but shouldn't be, force close it
+        if (display === 'block' || display === 'flex') {
+          const ariaExpanded = element.getAttribute('aria-expanded');
+          if (ariaExpanded !== 'true') {
+            console.log('🎤 Force closing persistent dropdown');
+            element.style.setProperty('display', 'none', 'important');
+            element.style.setProperty('visibility', 'hidden', 'important');
+            element.style.setProperty('opacity', '0', 'important');
+            element.setAttribute('aria-expanded', 'false');
+          }
+        }
+      });
+    };
+
+    // Check for persistent dropdowns every 2 seconds
+    const dropdownCheckInterval = setInterval(forceCloseDropdowns, 2000);
+
     // Initialize dropdowns with minimal interference - let LiveKit handle the logic
     const initializeDropdowns = () => {
       const allDropdowns = document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu');
       allDropdowns.forEach(dropdown => {
         const element = dropdown as HTMLElement;
-        // Only apply styling, don't interfere with LiveKit's display logic
-        element.style.setProperty('background-color', '#ffffff', 'important');
-        element.style.setProperty('border', '1px solid #d1d5db', 'important');
-        element.style.setProperty('border-radius', '8px', 'important');
-        element.style.setProperty('box-shadow', '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', 'important');
-        element.style.setProperty('backdrop-filter', 'blur(10px)', 'important');
+        // Only set essential properties - let LiveKit handle everything else
         element.style.setProperty('pointer-events', 'auto', 'important');
         element.style.setProperty('z-index', '1001', 'important');
         
-        // Don't force display - let LiveKit control it
+        // Remove any forced display properties
         element.style.removeProperty('display');
         element.style.removeProperty('visibility');
         element.style.removeProperty('opacity');
+        element.style.removeProperty('background-color');
+        element.style.removeProperty('border');
+        element.style.removeProperty('border-radius');
+        element.style.removeProperty('box-shadow');
+        element.style.removeProperty('backdrop-filter');
       });
     };
 
@@ -1566,6 +1577,7 @@ function RoomClient({ roomName }: { roomName: string }) {
 
     return () => {
       clearInterval(interval);
+      clearInterval(dropdownCheckInterval);
       document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleEscapeKey);
       const styleToRemove = document.getElementById('livekit-controls-fix');
