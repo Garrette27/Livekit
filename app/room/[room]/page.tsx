@@ -543,37 +543,51 @@ function RoomClient({ roomName }: { roomName: string }) {
         console.log('🎤 UI interaction ended, speech recognition can resume');
       };
 
-      // Detect LiveKit control interactions
+      // Detect LiveKit control interactions more specifically
       const controlBar = document.querySelector('.lk-control-bar');
       if (controlBar) {
-        controlBar.addEventListener('mousedown', handleUIActivity);
-        controlBar.addEventListener('mouseup', () => {
-          setTimeout(handleUIInactivity, 1000); // Resume after 1 second
+        // Only pause speech recognition for dropdown buttons, not all buttons
+        controlBar.addEventListener('click', (event) => {
+          const target = event.target as HTMLElement;
+          const button = target.closest('button');
+          if (button && (button.querySelector('[aria-haspopup="true"]') || button.getAttribute('aria-haspopup') === 'true')) {
+            console.log('🎤 Dropdown button clicked - pausing speech recognition');
+            handleUIActivity();
+            // Resume after dropdown interaction
+            setTimeout(handleUIInactivity, 3000); // Resume after 3 seconds
+          }
         });
-        controlBar.addEventListener('click', handleUIActivity);
       }
 
-      // Detect dropdown interactions
-      const handleDropdownInteraction = (event: Event) => {
-        const target = event.target as HTMLElement;
-        if (target.closest('.lk-device-menu, .lk-dropdown, .lk-menu, .lk-control-bar button')) {
-          handleUIActivity();
-          // Resume after dropdown interaction
-          setTimeout(handleUIInactivity, 2000); // Resume after 2 seconds
-        }
-      };
+      // Detect when dropdowns are actually opened
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'aria-expanded') {
+            const element = mutation.target as HTMLElement;
+            if (element.classList.contains('lk-device-menu') || element.classList.contains('lk-dropdown')) {
+              if (element.getAttribute('aria-expanded') === 'true') {
+                console.log('🎤 Dropdown opened - pausing speech recognition');
+                handleUIActivity();
+              } else {
+                console.log('🎤 Dropdown closed - resuming speech recognition');
+                setTimeout(handleUIInactivity, 1000); // Resume after 1 second
+              }
+            }
+          }
+        });
+      });
 
-      document.addEventListener('click', handleDropdownInteraction);
-      document.addEventListener('mousedown', handleDropdownInteraction);
+      // Observe dropdown elements for aria-expanded changes
+      const dropdowns = document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu');
+      dropdowns.forEach(dropdown => {
+        observer.observe(dropdown, { attributes: true, attributeFilter: ['aria-expanded'] });
+      });
 
       return () => {
         if (controlBar) {
-          controlBar.removeEventListener('mousedown', handleUIActivity);
-          controlBar.removeEventListener('mouseup', handleUIInactivity);
           controlBar.removeEventListener('click', handleUIActivity);
         }
-        document.removeEventListener('click', handleDropdownInteraction);
-        document.removeEventListener('mousedown', handleDropdownInteraction);
+        observer.disconnect();
       };
     }, [token, recognitionInstance]);
 
@@ -1200,35 +1214,24 @@ function RoomClient({ roomName }: { roomName: string }) {
         outline-offset: -2px !important;
       }
 
-      /* Hide dropdowns by default - only show when explicitly opened */
+      /* Let LiveKit handle dropdown visibility - only style them when visible */
       .lk-device-menu,
       .lk-dropdown,
       .lk-menu {
-        display: none !important;
+        /* Don't force display - let LiveKit control it */
+        background-color: #ffffff !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 8px !important;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+        backdrop-filter: blur(10px) !important;
+        pointer-events: auto !important;
+        z-index: 1001 !important;
       }
 
-      /* Only show dropdowns when they have the correct aria-expanded attribute */
-      .lk-device-menu[aria-expanded="true"],
-      .lk-dropdown[aria-expanded="true"],
-      .lk-menu[aria-expanded="true"] {
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-      }
-
-      /* Ensure dropdowns are hidden when not explicitly opened */
-      .lk-device-menu[aria-expanded="false"],
-      .lk-dropdown[aria-expanded="false"],
-      .lk-menu[aria-expanded="false"] {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-      }
-
-      /* Force dropdown visibility when opened */
-      .lk-device-menu:not([aria-expanded="false"]),
-      .lk-dropdown:not([aria-expanded="false"]),
-      .lk-menu:not([aria-expanded="false"]) {
+      /* Only style dropdowns when they're actually visible (LiveKit controls this) */
+      .lk-device-menu[style*="display: block"],
+      .lk-dropdown[style*="display: block"],
+      .lk-menu[style*="display: block"] {
         display: block !important;
         visibility: visible !important;
         opacity: 1 !important;
@@ -1412,16 +1415,14 @@ function RoomClient({ roomName }: { roomName: string }) {
         element.style.setProperty('min-width', '200px', 'important');
         element.style.setProperty('max-width', '300px', 'important');
         
-        // Hide dropdowns by default unless they're explicitly opened
-        if (!element.getAttribute('aria-expanded') || element.getAttribute('aria-expanded') === 'false') {
-          element.style.setProperty('display', 'none', 'important');
-          element.style.setProperty('visibility', 'hidden', 'important');
-          element.style.setProperty('opacity', '0', 'important');
-        } else {
-          element.style.setProperty('display', 'block', 'important');
-          element.style.setProperty('visibility', 'visible', 'important');
-          element.style.setProperty('opacity', '1', 'important');
-        }
+        // Only apply styling, let LiveKit handle display logic
+        element.style.setProperty('background-color', '#ffffff', 'important');
+        element.style.setProperty('border', '1px solid #d1d5db', 'important');
+        element.style.setProperty('border-radius', '8px', 'important');
+        element.style.setProperty('box-shadow', '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', 'important');
+        element.style.setProperty('backdrop-filter', 'blur(10px)', 'important');
+        element.style.setProperty('pointer-events', 'auto', 'important');
+        element.style.setProperty('z-index', '1001', 'important');
       });
 
       // Fix dropdown items with better visibility
@@ -1471,59 +1472,43 @@ function RoomClient({ roomName }: { roomName: string }) {
     forceShowControls();
     const interval = setInterval(forceShowControls, 1000);
 
-    // Initialize dropdowns properly without interfering with LiveKit functionality
+    // Initialize dropdowns with minimal interference - let LiveKit handle the logic
     const initializeDropdowns = () => {
       const allDropdowns = document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu');
       allDropdowns.forEach(dropdown => {
         const element = dropdown as HTMLElement;
-        // Only set aria-expanded if it's not already set by LiveKit
-        if (!element.getAttribute('aria-expanded')) {
-          element.setAttribute('aria-expanded', 'false');
-        }
-        // Only hide if not explicitly opened
-        if (element.getAttribute('aria-expanded') === 'false') {
-          element.style.setProperty('display', 'none', 'important');
-          element.style.setProperty('visibility', 'hidden', 'important');
-          element.style.setProperty('opacity', '0', 'important');
-        } else {
-          element.style.setProperty('display', 'block', 'important');
-          element.style.setProperty('visibility', 'visible', 'important');
-          element.style.setProperty('opacity', '1', 'important');
-        }
+        // Only apply styling, don't interfere with LiveKit's display logic
+        element.style.setProperty('background-color', '#ffffff', 'important');
+        element.style.setProperty('border', '1px solid #d1d5db', 'important');
+        element.style.setProperty('border-radius', '8px', 'important');
+        element.style.setProperty('box-shadow', '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', 'important');
+        element.style.setProperty('backdrop-filter', 'blur(10px)', 'important');
+        element.style.setProperty('pointer-events', 'auto', 'important');
+        element.style.setProperty('z-index', '1001', 'important');
       });
     };
 
     // Initialize dropdowns immediately
     initializeDropdowns();
 
-    // Add click outside handler to close dropdowns (less aggressive)
+    // Minimal click outside handler - let LiveKit handle most of the logic
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      const isDropdown = target.closest('.lk-device-menu, .lk-dropdown, .lk-menu');
-      const isControlButton = target.closest('.lk-control-bar button');
-      const isDropdownButton = target.closest('.lk-control-bar button[aria-haspopup="true"]');
-      const isDropdownItem = target.closest('.lk-device-menu-item');
+      const isControlBar = target.closest('.lk-control-bar');
       
-      // Only close dropdowns if clicking outside the control bar entirely
-      // Don't close if clicking on dropdown items
-      if (!isDropdown && !isControlButton && !isDropdownButton && !isDropdownItem) {
-        // Close all open dropdowns
-        const openDropdowns = document.querySelectorAll('.lk-device-menu[aria-expanded="true"], .lk-dropdown[aria-expanded="true"]');
-        openDropdowns.forEach(dropdown => {
-          dropdown.setAttribute('aria-expanded', 'false');
-          (dropdown as HTMLElement).style.display = 'none';
-        });
+      // Only handle clicks completely outside the control bar
+      if (!isControlBar) {
+        // Let LiveKit handle dropdown closing naturally
+        // We just ensure our UI interaction detection works
+        console.log('🎤 Click outside control bar detected');
       }
     };
 
-    // Add escape key handler to close dropdowns
+    // Minimal escape key handler - let LiveKit handle dropdown closing
     const handleEscapeKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        const openDropdowns = document.querySelectorAll('.lk-device-menu[aria-expanded="true"], .lk-dropdown[aria-expanded="true"]');
-        openDropdowns.forEach(dropdown => {
-          dropdown.setAttribute('aria-expanded', 'false');
-          (dropdown as HTMLElement).style.display = 'none';
-        });
+        // Let LiveKit handle dropdown closing naturally
+        console.log('🎤 Escape key pressed - LiveKit will handle dropdown closing');
       }
     };
 
