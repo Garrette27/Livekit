@@ -559,28 +559,46 @@ function RoomClient({ roomName }: { roomName: string }) {
         });
       }
 
-      // Detect when dropdowns are actually opened
+      // Detect when dropdowns are actually opened/closed
       const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
-          if (mutation.type === 'attributes' && mutation.attributeName === 'aria-expanded') {
+          if (mutation.type === 'attributes') {
             const element = mutation.target as HTMLElement;
-            if (element.classList.contains('lk-device-menu') || element.classList.contains('lk-dropdown')) {
-              if (element.getAttribute('aria-expanded') === 'true') {
-                console.log('🎤 Dropdown opened - pausing speech recognition');
-                handleUIActivity();
-              } else {
-                console.log('🎤 Dropdown closed - resuming speech recognition');
-                setTimeout(handleUIInactivity, 1000); // Resume after 1 second
+            
+            // Check for aria-expanded changes
+            if (mutation.attributeName === 'aria-expanded') {
+              if (element.classList.contains('lk-device-menu') || element.classList.contains('lk-dropdown')) {
+                if (element.getAttribute('aria-expanded') === 'true') {
+                  console.log('🎤 Dropdown opened - pausing speech recognition');
+                  handleUIActivity();
+                } else {
+                  console.log('🎤 Dropdown closed - resuming speech recognition');
+                  setTimeout(handleUIInactivity, 1000); // Resume after 1 second
+                }
+              }
+            }
+            
+            // Check for style changes (display property)
+            if (mutation.attributeName === 'style') {
+              if (element.classList.contains('lk-device-menu') || element.classList.contains('lk-dropdown')) {
+                const display = element.style.display;
+                if (display === 'block' || display === 'flex') {
+                  console.log('🎤 Dropdown visible - pausing speech recognition');
+                  handleUIActivity();
+                } else if (display === 'none') {
+                  console.log('🎤 Dropdown hidden - resuming speech recognition');
+                  setTimeout(handleUIInactivity, 1000); // Resume after 1 second
+                }
               }
             }
           }
         });
       });
 
-      // Observe dropdown elements for aria-expanded changes
+      // Observe dropdown elements for aria-expanded and style changes
       const dropdowns = document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu');
       dropdowns.forEach(dropdown => {
-        observer.observe(dropdown, { attributes: true, attributeFilter: ['aria-expanded'] });
+        observer.observe(dropdown, { attributes: true, attributeFilter: ['aria-expanded', 'style'] });
       });
 
       return () => {
@@ -1237,6 +1255,15 @@ function RoomClient({ roomName }: { roomName: string }) {
         opacity: 1 !important;
       }
 
+      /* Hide dropdowns when they should be closed */
+      .lk-device-menu[style*="display: none"],
+      .lk-dropdown[style*="display: none"],
+      .lk-menu[style*="display: none"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+      }
+
       /* Fix overlapping text in dropdown items with better visibility */
       .lk-device-menu-item span,
       .lk-device-menu-item div {
@@ -1423,6 +1450,12 @@ function RoomClient({ roomName }: { roomName: string }) {
         element.style.setProperty('backdrop-filter', 'blur(10px)', 'important');
         element.style.setProperty('pointer-events', 'auto', 'important');
         element.style.setProperty('z-index', '1001', 'important');
+        
+        // Don't force display - let LiveKit control it
+        // Remove any forced display properties
+        element.style.removeProperty('display');
+        element.style.removeProperty('visibility');
+        element.style.removeProperty('opacity');
       });
 
       // Fix dropdown items with better visibility
@@ -1465,6 +1498,13 @@ function RoomClient({ roomName }: { roomName: string }) {
           element.style.setProperty('background-color', '#f3f4f6', 'important');
           element.style.setProperty('color', '#111827', 'important');
         });
+        
+        // Add click handler to close dropdown after selection
+        element.addEventListener('click', () => {
+          console.log('🎤 Dropdown item selected - closing dropdown');
+          // Let LiveKit handle the closing naturally
+          // The MutationObserver will detect the change and resume speech recognition
+        });
       });
     };
 
@@ -1485,6 +1525,11 @@ function RoomClient({ roomName }: { roomName: string }) {
         element.style.setProperty('backdrop-filter', 'blur(10px)', 'important');
         element.style.setProperty('pointer-events', 'auto', 'important');
         element.style.setProperty('z-index', '1001', 'important');
+        
+        // Don't force display - let LiveKit control it
+        element.style.removeProperty('display');
+        element.style.removeProperty('visibility');
+        element.style.removeProperty('opacity');
       });
     };
 
