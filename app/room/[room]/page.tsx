@@ -246,6 +246,8 @@ function RoomClient({ roomName }: { roomName: string }) {
     const [hasStarted, setHasStarted] = useState<boolean>(false);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
     const [lastRestartTime, setLastRestartTime] = useState<number>(0);
+    const [restartCount, setRestartCount] = useState<number>(0);
+    const [isThrottled, setIsThrottled] = useState<boolean>(false);
     
     useEffect(() => {
       if (!token || !roomName) return;
@@ -357,34 +359,39 @@ function RoomClient({ roomName }: { roomName: string }) {
         // Improved error handling to prevent UI interference
         if (event.error === 'aborted') {
           console.log('🎤 Speech recognition aborted - this is normal');
-          // Don't restart on abort to prevent interference
+          // Don't restart on abort to prevent interference with UI interactions
+          return;
         } else if (event.error === 'no-speech') {
           console.log('🎤 No speech detected - continuing to listen');
           // Restart recognition after a longer delay to reduce interference
           setTimeout(() => {
             try {
               const now = Date.now();
-              if (now - lastRestartTime > 3000 && recognition && recognition.state !== 'recording') {
+              // Add throttle to prevent too many restarts and UI interference
+              if (now - lastRestartTime > 5000 && recognition && recognition.state !== 'recording' && !isThrottled) {
                 setLastRestartTime(now);
+                setRestartCount(prev => prev + 1);
                 recognition.start();
               }
             } catch (error) {
               console.log('Failed to restart recognition after no-speech:', error);
             }
-          }, 3000); // Increased from 1000ms to 3000ms
+          }, 5000); // Increased to 5 seconds to reduce interference
         } else {
-          // For other errors, wait longer before restarting
+          // For other errors, wait much longer before restarting
           setTimeout(() => {
             try {
               const now = Date.now();
-              if (now - lastRestartTime > 5000 && recognition && recognition.state !== 'recording') {
+              // Add throttle to prevent too many restarts and UI interference
+              if (now - lastRestartTime > 10000 && recognition && recognition.state !== 'recording' && !isThrottled) {
                 setLastRestartTime(now);
+                setRestartCount(prev => prev + 1);
                 recognition.start();
               }
             } catch (error) {
               console.log('Failed to restart recognition after error:', error);
             }
-          }, 5000); // Wait 5 seconds for other errors
+          }, 10000); // Wait 10 seconds for other errors to prevent UI interference
         }
       };
 
@@ -396,16 +403,17 @@ function RoomClient({ roomName }: { roomName: string }) {
         setTimeout(() => {
           try {
             const now = Date.now();
-            // Throttle restarts to prevent interference with UI
-            if (now - lastRestartTime > 3000 && recognition && recognition.state !== 'recording') {
+            // Add throttle to prevent interference with UI interactions
+            if (now - lastRestartTime > 5000 && recognition && recognition.state !== 'recording' && !isThrottled) {
               console.log('🔄 Restarting speech recognition...');
               setLastRestartTime(now);
+              setRestartCount(prev => prev + 1);
               recognition.start();
             }
           } catch (error) {
             console.log('Failed to restart recognition:', error);
           }
-        }, 2000); // Increased from 1000ms to 2000ms to reduce interference
+        }, 3000); // Increased to 3 seconds to reduce interference with UI
       };
 
       // Store the recognition instance
@@ -486,11 +494,18 @@ function RoomClient({ roomName }: { roomName: string }) {
       setRecognitionInstance(null);
     }, [user?.uid]);
 
-    // Reset hasStarted when user changes
+    // Throttle mechanism to prevent too many restarts
     useEffect(() => {
-      setHasStarted(false);
-      setRecognitionInstance(null);
-    }, [user?.uid]);
+      if (restartCount > 10) {
+        console.log('🛑 Too many speech recognition restarts, throttling for 30 seconds');
+        setIsThrottled(true);
+        setTimeout(() => {
+          setIsThrottled(false);
+          setRestartCount(0);
+          console.log('✅ Speech recognition throttle lifted');
+        }, 30000); // Throttle for 30 seconds
+      }
+    }, [restartCount]);
 
     return (
       <div style={{
@@ -507,6 +522,8 @@ function RoomClient({ roomName }: { roomName: string }) {
       }}>
         <div>🎤 Status: {speechRecognitionStatus}</div>
         <div>📝 Entries: {transcription.length}</div>
+        <div>🔄 Restarts: {restartCount}</div>
+        {isThrottled && <div>🛑 Throttled</div>}
         {transcription.length > 0 && (
           <div style={{ marginTop: '0.25rem', fontSize: '0.625rem' }}>
             Latest: {transcription[transcription.length - 1]?.substring(0, 50)}...
@@ -1052,6 +1069,8 @@ function RoomClient({ roomName }: { roomName: string }) {
         gap: 6px !important;
         transition: all 0.2s ease !important;
         position: relative !important;
+        pointer-events: auto !important;
+        cursor: pointer !important;
       }
 
       .lk-control-bar button:hover {
@@ -1074,6 +1093,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         max-width: 300px !important;
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
         backdrop-filter: blur(10px) !important;
+        pointer-events: auto !important;
       }
 
       .lk-device-menu-item {
@@ -1088,6 +1108,8 @@ function RoomClient({ roomName }: { roomName: string }) {
         font-weight: 500 !important;
         transition: background-color 0.2s ease !important;
         border-bottom: 1px solid #f3f4f6 !important;
+        pointer-events: auto !important;
+        user-select: none !important;
       }
 
       .lk-device-menu-item:last-child {
@@ -1340,6 +1362,17 @@ function RoomClient({ roomName }: { roomName: string }) {
           element.style.setProperty('background-color', 'transparent', 'important');
           element.style.setProperty('color', '#374151', 'important');
         });
+
+        // Add click effect
+        element.addEventListener('mousedown', () => {
+          element.style.setProperty('background-color', '#dbeafe', 'important');
+          element.style.setProperty('color', '#1e40af', 'important');
+        });
+        
+        element.addEventListener('mouseup', () => {
+          element.style.setProperty('background-color', '#f3f4f6', 'important');
+          element.style.setProperty('color', '#111827', 'important');
+        });
       });
     };
 
@@ -1372,9 +1405,11 @@ function RoomClient({ roomName }: { roomName: string }) {
       const isDropdown = target.closest('.lk-device-menu, .lk-dropdown, .lk-menu');
       const isControlButton = target.closest('.lk-control-bar button');
       const isDropdownButton = target.closest('.lk-control-bar button[aria-haspopup="true"]');
+      const isDropdownItem = target.closest('.lk-device-menu-item');
       
       // Only close dropdowns if clicking outside the control bar entirely
-      if (!isDropdown && !isControlButton && !isDropdownButton) {
+      // Don't close if clicking on dropdown items
+      if (!isDropdown && !isControlButton && !isDropdownButton && !isDropdownItem) {
         // Close all open dropdowns
         const openDropdowns = document.querySelectorAll('.lk-device-menu[aria-expanded="true"], .lk-dropdown[aria-expanded="true"]');
         openDropdowns.forEach(dropdown => {
