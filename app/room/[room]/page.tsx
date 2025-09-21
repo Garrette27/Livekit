@@ -248,6 +248,8 @@ function RoomClient({ roomName }: { roomName: string }) {
     const [lastRestartTime, setLastRestartTime] = useState<number>(0);
     const [restartCount, setRestartCount] = useState<number>(0);
     const [isThrottled, setIsThrottled] = useState<boolean>(false);
+    const [isUIActive, setIsUIActive] = useState<boolean>(false);
+    const [speechPaused, setSpeechPaused] = useState<boolean>(false);
     
     useEffect(() => {
       if (!token || !roomName) return;
@@ -368,10 +370,13 @@ function RoomClient({ roomName }: { roomName: string }) {
             try {
               const now = Date.now();
               // Add throttle to prevent too many restarts and UI interference
-              if (now - lastRestartTime > 5000 && recognition && recognition.state !== 'recording' && !isThrottled) {
+              // Don't restart if UI is active or speech is paused
+              if (now - lastRestartTime > 5000 && recognition && recognition.state !== 'recording' && !isThrottled && !isUIActive && !speechPaused) {
                 setLastRestartTime(now);
                 setRestartCount(prev => prev + 1);
                 recognition.start();
+              } else if (isUIActive || speechPaused) {
+                console.log('🎤 Speech recognition restart skipped - UI interaction in progress');
               }
             } catch (error) {
               console.log('Failed to restart recognition after no-speech:', error);
@@ -383,10 +388,13 @@ function RoomClient({ roomName }: { roomName: string }) {
             try {
               const now = Date.now();
               // Add throttle to prevent too many restarts and UI interference
-              if (now - lastRestartTime > 10000 && recognition && recognition.state !== 'recording' && !isThrottled) {
+              // Don't restart if UI is active or speech is paused
+              if (now - lastRestartTime > 10000 && recognition && recognition.state !== 'recording' && !isThrottled && !isUIActive && !speechPaused) {
                 setLastRestartTime(now);
                 setRestartCount(prev => prev + 1);
                 recognition.start();
+              } else if (isUIActive || speechPaused) {
+                console.log('🎤 Speech recognition restart skipped - UI interaction in progress');
               }
             } catch (error) {
               console.log('Failed to restart recognition after error:', error);
@@ -404,11 +412,14 @@ function RoomClient({ roomName }: { roomName: string }) {
           try {
             const now = Date.now();
             // Add throttle to prevent interference with UI interactions
-            if (now - lastRestartTime > 5000 && recognition && recognition.state !== 'recording' && !isThrottled) {
+            // Don't restart if UI is active or speech is paused
+            if (now - lastRestartTime > 5000 && recognition && recognition.state !== 'recording' && !isThrottled && !isUIActive && !speechPaused) {
               console.log('🔄 Restarting speech recognition...');
               setLastRestartTime(now);
               setRestartCount(prev => prev + 1);
               recognition.start();
+            } else if (isUIActive || speechPaused) {
+              console.log('🎤 Speech recognition restart skipped - UI interaction in progress');
             }
           } catch (error) {
             console.log('Failed to restart recognition:', error);
@@ -507,6 +518,65 @@ function RoomClient({ roomName }: { roomName: string }) {
       }
     }, [restartCount]);
 
+    // UI interaction detection to pause speech recognition
+    useEffect(() => {
+      if (!token) return;
+
+      const handleUIActivity = () => {
+        setIsUIActive(true);
+        setSpeechPaused(true);
+        
+        // Pause speech recognition when UI is active
+        if (recognitionInstance && recognitionInstance.state === 'recording') {
+          try {
+            recognitionInstance.stop();
+            console.log('🎤 Speech recognition paused for UI interaction');
+          } catch (error) {
+            console.log('Error pausing speech recognition:', error);
+          }
+        }
+      };
+
+      const handleUIInactivity = () => {
+        setIsUIActive(false);
+        setSpeechPaused(false);
+        console.log('🎤 UI interaction ended, speech recognition can resume');
+      };
+
+      // Detect LiveKit control interactions
+      const controlBar = document.querySelector('.lk-control-bar');
+      if (controlBar) {
+        controlBar.addEventListener('mousedown', handleUIActivity);
+        controlBar.addEventListener('mouseup', () => {
+          setTimeout(handleUIInactivity, 1000); // Resume after 1 second
+        });
+        controlBar.addEventListener('click', handleUIActivity);
+      }
+
+      // Detect dropdown interactions
+      const handleDropdownInteraction = (event: Event) => {
+        const target = event.target as HTMLElement;
+        if (target.closest('.lk-device-menu, .lk-dropdown, .lk-menu, .lk-control-bar button')) {
+          handleUIActivity();
+          // Resume after dropdown interaction
+          setTimeout(handleUIInactivity, 2000); // Resume after 2 seconds
+        }
+      };
+
+      document.addEventListener('click', handleDropdownInteraction);
+      document.addEventListener('mousedown', handleDropdownInteraction);
+
+      return () => {
+        if (controlBar) {
+          controlBar.removeEventListener('mousedown', handleUIActivity);
+          controlBar.removeEventListener('mouseup', handleUIInactivity);
+          controlBar.removeEventListener('click', handleUIActivity);
+        }
+        document.removeEventListener('click', handleDropdownInteraction);
+        document.removeEventListener('mousedown', handleDropdownInteraction);
+      };
+    }, [token, recognitionInstance]);
+
     return (
       <div style={{
         position: 'fixed',
@@ -524,6 +594,8 @@ function RoomClient({ roomName }: { roomName: string }) {
         <div>📝 Entries: {transcription.length}</div>
         <div>🔄 Restarts: {restartCount}</div>
         {isThrottled && <div>🛑 Throttled</div>}
+        {isUIActive && <div>🖱️ UI Active</div>}
+        {speechPaused && <div>⏸️ Speech Paused</div>}
         {transcription.length > 0 && (
           <div style={{ marginTop: '0.25rem', fontSize: '0.625rem' }}>
             Latest: {transcription[transcription.length - 1]?.substring(0, 50)}...
@@ -1140,6 +1212,8 @@ function RoomClient({ roomName }: { roomName: string }) {
       .lk-dropdown[aria-expanded="true"],
       .lk-menu[aria-expanded="true"] {
         display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
       }
 
       /* Ensure dropdowns are hidden when not explicitly opened */
@@ -1147,6 +1221,17 @@ function RoomClient({ roomName }: { roomName: string }) {
       .lk-dropdown[aria-expanded="false"],
       .lk-menu[aria-expanded="false"] {
         display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+      }
+
+      /* Force dropdown visibility when opened */
+      .lk-device-menu:not([aria-expanded="false"]),
+      .lk-dropdown:not([aria-expanded="false"]),
+      .lk-menu:not([aria-expanded="false"]) {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
       }
 
       /* Fix overlapping text in dropdown items with better visibility */
@@ -1330,6 +1415,12 @@ function RoomClient({ roomName }: { roomName: string }) {
         // Hide dropdowns by default unless they're explicitly opened
         if (!element.getAttribute('aria-expanded') || element.getAttribute('aria-expanded') === 'false') {
           element.style.setProperty('display', 'none', 'important');
+          element.style.setProperty('visibility', 'hidden', 'important');
+          element.style.setProperty('opacity', '0', 'important');
+        } else {
+          element.style.setProperty('display', 'block', 'important');
+          element.style.setProperty('visibility', 'visible', 'important');
+          element.style.setProperty('opacity', '1', 'important');
         }
       });
 
@@ -1392,6 +1483,12 @@ function RoomClient({ roomName }: { roomName: string }) {
         // Only hide if not explicitly opened
         if (element.getAttribute('aria-expanded') === 'false') {
           element.style.setProperty('display', 'none', 'important');
+          element.style.setProperty('visibility', 'hidden', 'important');
+          element.style.setProperty('opacity', '0', 'important');
+        } else {
+          element.style.setProperty('display', 'block', 'important');
+          element.style.setProperty('visibility', 'visible', 'important');
+          element.style.setProperty('opacity', '1', 'important');
         }
       });
     };
