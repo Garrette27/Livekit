@@ -1446,6 +1446,22 @@ function RoomClient({ roomName }: { roomName: string }) {
         element.style.removeProperty('border-radius');
         element.style.removeProperty('box-shadow');
         element.style.removeProperty('backdrop-filter');
+
+        // Attach a one-time graceful close handler: when the pointer leaves
+        // the menu for a short period, dispatch Escape to let LiveKit close.
+        if (!element.getAttribute('data-escape-handler')) {
+          element.setAttribute('data-escape-handler', 'true');
+          let hoverTimeout: any;
+          element.addEventListener('mouseleave', () => {
+            clearTimeout(hoverTimeout);
+            hoverTimeout = setTimeout(() => {
+              if (!element.matches(':hover')) {
+                document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+                console.log('🎛️ Requested dropdown close via Escape (mouseleave)');
+              }
+            }, 600);
+          });
+        }
       });
     };
 
@@ -1456,12 +1472,13 @@ function RoomClient({ roomName }: { roomName: string }) {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       const isControlBar = target.closest('.lk-control-bar');
+      const isMenu = target.closest('.lk-device-menu, .lk-dropdown, .lk-menu');
       
       // Only handle clicks completely outside the control bar
-      if (!isControlBar) {
-        // Let LiveKit handle dropdown closing naturally
-        // We just ensure our UI interaction detection works
-        console.log('🎤 Click outside control bar detected');
+      if (!isControlBar && !isMenu) {
+        // Ask LiveKit to close any open menus without forcing styles
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        console.log('🎛️ Requested dropdown close via Escape (outside click)');
       }
     };
 
