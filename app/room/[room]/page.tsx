@@ -571,9 +571,11 @@ function RoomClient({ roomName }: { roomName: string }) {
                 if (element.getAttribute('aria-expanded') === 'true') {
                   console.log('🎤 Dropdown opened - pausing speech recognition');
                   handleUIActivity();
+                  (element as any).dataset.openedAt = String(Date.now());
                 } else {
                   console.log('🎤 Dropdown closed - resuming speech recognition');
                   setTimeout(handleUIInactivity, 1000); // Resume after 1 second
+                  delete (element as any).dataset.openedAt;
                 }
               }
             }
@@ -585,9 +587,11 @@ function RoomClient({ roomName }: { roomName: string }) {
                 if (display === 'block' || display === 'flex') {
                   console.log('🎤 Dropdown visible - pausing speech recognition');
                   handleUIActivity();
+                  (element as any).dataset.openedAt = String(Date.now());
                 } else if (display === 'none') {
                   console.log('🎤 Dropdown hidden - resuming speech recognition');
                   setTimeout(handleUIInactivity, 1000); // Resume after 1 second
+                  delete (element as any).dataset.openedAt;
                 }
               }
             }
@@ -601,11 +605,38 @@ function RoomClient({ roomName }: { roomName: string }) {
         observer.observe(dropdown, { attributes: true, attributeFilter: ['aria-expanded', 'style'] });
       });
 
+      // Watchdog: if a menu sits open without hover/focus for too long, request close via Escape
+      const watchdogInterval = window.setInterval(() => {
+        document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu').forEach((menu) => {
+          const el = menu as HTMLElement;
+          const rect = el.getBoundingClientRect();
+          const visible = rect.width > 0 && rect.height > 0 && getComputedStyle(el).display !== 'none';
+          const openedAt = Number((el as any).dataset.openedAt || 0);
+          const age = Date.now() - openedAt;
+          const hovered = el.matches(':hover');
+          const hasFocusInside = el.contains(document.activeElement);
+          if (visible && openedAt && age > 1500 && !hovered && !hasFocusInside) {
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            console.log('🎛️ Requested dropdown close via Escape (watchdog)');
+            delete (el as any).dataset.openedAt;
+          }
+        });
+      }, 800);
+
+      // Scroll/wheel closes menus gently
+      const handleWheel = () => {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        console.log('🎛️ Requested dropdown close via Escape (wheel)');
+      };
+      window.addEventListener('wheel', handleWheel, { passive: true });
+
       return () => {
         if (controlBar) {
           controlBar.removeEventListener('click', handleUIActivity);
         }
         observer.disconnect();
+        window.clearInterval(watchdogInterval);
+        window.removeEventListener('wheel', handleWheel);
       };
     }, [token, recognitionInstance]);
 
