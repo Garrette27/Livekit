@@ -566,17 +566,9 @@ function RoomClient({ roomName }: { roomName: string }) {
           (btn as HTMLElement).click();
           didClose = true;
         });
-        document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu').forEach((menu) => {
-          const el = menu as HTMLElement;
-          const isVisible = (el.offsetParent !== null) || getComputedStyle(el).display !== 'none';
-          if (isVisible) {
-            el.style.display = 'none';
-            didClose = true;
-          }
-        });
-        if (didClose) {
-          console.log('🎛️ Closed LiveKit menus (programmatic)');
-        }
+        // Send Escape to let LiveKit close any open popovers
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        if (didClose) console.log('🎛️ Requested LiveKit menu close');
       };
 
       // Detect when dropdowns are actually opened/closed
@@ -1560,6 +1552,14 @@ function RoomClient({ roomName }: { roomName: string }) {
     // Initialize dropdowns immediately
     initializeDropdowns();
 
+    // Local helper here too (scoped to this effect)
+    const closeLiveKitMenus = () => {
+      document.querySelectorAll('.lk-control-bar [aria-expanded="true"]').forEach((btn) => {
+        (btn as HTMLElement).click();
+      });
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    };
+
     // Minimal click outside handler - let LiveKit handle most of the logic
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -1568,11 +1568,7 @@ function RoomClient({ roomName }: { roomName: string }) {
       
       // Only handle clicks completely outside the control bar
       if (!isControlBar && !isMenu) {
-        // Programmatically close any open menus
-        const expanded = document.querySelector('.lk-control-bar [aria-expanded="true"]') as HTMLElement | null;
-        if (expanded) expanded.click();
-        document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu').forEach((m) => ((m as HTMLElement).style.display = 'none'));
-        console.log('🎛️ Closed dropdown via outside click');
+        closeLiveKitMenus();
       }
     };
 
