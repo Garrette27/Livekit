@@ -582,7 +582,10 @@ function RoomClient({ roomName }: { roomName: string }) {
           const age = Date.now() - openedAt;
           const hovered = el.matches(':hover');
           const hasFocusInside = el.contains(document.activeElement);
-          if (visible && !hovered && !hasFocusInside && age > 1800 && !anyExpanded) {
+          // Remove if: visible, not hovered/focused, no expanded toggle.
+          // Immediate removal if it never recorded an openedAt (likely stray at load),
+          // or if it has aged beyond 1.8s.
+          if (visible && !hovered && !hasFocusInside && !anyExpanded && (openedAt === 0 || age > 1800)) {
             console.log('🧹 Removing stale LiveKit menu node');
             el.remove();
           }
@@ -702,6 +705,16 @@ function RoomClient({ roomName }: { roomName: string }) {
       };
       window.addEventListener('wheel', handleWheel, { passive: true });
 
+      // Initial cleanup loop for first few seconds after join to catch any stray menus
+      const start = Date.now();
+      const initialCleanup = setInterval(() => {
+        closeLiveKitMenus();
+        removeStaleMenus();
+        if (Date.now() - start > 4000) {
+          clearInterval(initialCleanup);
+        }
+      }, 300);
+
       return () => {
         if (controlBar) {
           controlBar.removeEventListener('click', handleUIActivity);
@@ -709,6 +722,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         observer.disconnect();
         subtreeObserver.disconnect();
         window.clearInterval(watchdogInterval);
+        clearInterval(initialCleanup);
         window.removeEventListener('wheel', handleWheel);
       };
     }, [token, recognitionInstance]);
