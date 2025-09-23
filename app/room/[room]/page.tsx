@@ -571,6 +571,24 @@ function RoomClient({ roomName }: { roomName: string }) {
         if (didClose) console.log('🎛️ Requested LiveKit menu close');
       };
 
+      // Remove orphaned/stale menus that remain visible without any expanded control
+      const removeStaleMenus = () => {
+        const anyExpanded = !!document.querySelector('.lk-control-bar [aria-expanded="true"]');
+        document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu').forEach((menu) => {
+          const el = menu as HTMLElement;
+          const rect = el.getBoundingClientRect();
+          const visible = rect.width > 0 && rect.height > 0 && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden';
+          const openedAt = Number((el as any).dataset.openedAt || 0);
+          const age = Date.now() - openedAt;
+          const hovered = el.matches(':hover');
+          const hasFocusInside = el.contains(document.activeElement);
+          if (visible && !hovered && !hasFocusInside && age > 1800 && !anyExpanded) {
+            console.log('🧹 Removing stale LiveKit menu node');
+            el.remove();
+          }
+        });
+      };
+
       // Detect when dropdowns are actually opened/closed
       const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
@@ -674,11 +692,13 @@ function RoomClient({ roomName }: { roomName: string }) {
             delete (el as any).dataset.openedAt;
           }
         });
+        removeStaleMenus();
       }, 800);
 
       // Scroll/wheel closes menus gently
       const handleWheel = () => {
         closeLiveKitMenus();
+        removeStaleMenus();
       };
       window.addEventListener('wheel', handleWheel, { passive: true });
 
@@ -1568,7 +1588,22 @@ function RoomClient({ roomName }: { roomName: string }) {
       
       // Only handle clicks completely outside the control bar
       if (!isControlBar && !isMenu) {
+        (document.activeElement as HTMLElement | null)?.blur?.();
         closeLiveKitMenus();
+        // As a final guard, clear any stale visible menus not tied to an expanded button
+        setTimeout(() => {
+          document.querySelectorAll('.lk-control-bar [aria-expanded="true"]').forEach((btn) => (btn as HTMLElement).click());
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu').forEach((menu) => {
+            const el = menu as HTMLElement;
+            const rect = el.getBoundingClientRect();
+            const visible = rect.width > 0 && rect.height > 0 && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden';
+            if (visible && !document.querySelector('.lk-control-bar [aria-expanded="true"]')) {
+              console.log('🧹 Removing stale LiveKit menu node (outside click)');
+              el.remove();
+            }
+          });
+        }, 50);
       }
     };
 
