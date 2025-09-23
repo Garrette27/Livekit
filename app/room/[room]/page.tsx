@@ -559,6 +559,26 @@ function RoomClient({ roomName }: { roomName: string }) {
         });
       }
 
+      // Helper: robustly close any LiveKit menus
+      const closeLiveKitMenus = () => {
+        let didClose = false;
+        document.querySelectorAll('.lk-control-bar [aria-expanded="true"]').forEach((btn) => {
+          (btn as HTMLElement).click();
+          didClose = true;
+        });
+        document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu').forEach((menu) => {
+          const el = menu as HTMLElement;
+          const isVisible = (el.offsetParent !== null) || getComputedStyle(el).display !== 'none';
+          if (isVisible) {
+            el.style.display = 'none';
+            didClose = true;
+          }
+        });
+        if (didClose) {
+          console.log('🎛️ Closed LiveKit menus (programmatic)');
+        }
+      };
+
       // Detect when dropdowns are actually opened/closed
       const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
@@ -605,6 +625,48 @@ function RoomClient({ roomName }: { roomName: string }) {
         observer.observe(dropdown, { attributes: true, attributeFilter: ['aria-expanded', 'style'] });
       });
 
+      // Subtree observer to attach handlers for dynamically created menus
+      const attachHandlersToMenu = (el: HTMLElement) => {
+        (el as any).dataset.openedAt = String(Date.now());
+        if (!(el as any)._lkBound) {
+          (el as any)._lkBound = true;
+          let hoverTimeout: any;
+          el.addEventListener('mouseleave', () => {
+            clearTimeout(hoverTimeout);
+            hoverTimeout = setTimeout(() => {
+              if (!el.matches(':hover')) {
+                closeLiveKitMenus();
+              }
+            }, 600);
+          });
+        }
+        el.querySelectorAll('.lk-device-menu-item, .lk-menu-item, [role="menuitem"], [role="option"]').forEach((item) => {
+          const it = item as HTMLElement;
+          if (!(it as any)._lkClick) {
+            (it as any)._lkClick = true;
+            it.addEventListener('click', () => {
+              setTimeout(() => closeLiveKitMenus(), 0);
+            });
+          }
+        });
+      };
+
+      const subtreeObserver = new MutationObserver((muts) => {
+        muts.forEach((m) => {
+          m.addedNodes.forEach((node) => {
+            if (!(node instanceof HTMLElement)) return;
+            if (node.matches('.lk-device-menu, .lk-dropdown, .lk-menu')) {
+              observer.observe(node, { attributes: true, attributeFilter: ['aria-expanded', 'style'] });
+              attachHandlersToMenu(node);
+            } else {
+              const inner = node.querySelectorAll?.('.lk-device-menu, .lk-dropdown, .lk-menu');
+              inner?.forEach((menu) => attachHandlersToMenu(menu as HTMLElement));
+            }
+          });
+        });
+      });
+      subtreeObserver.observe(document.body, { childList: true, subtree: true });
+
       // Watchdog: if a menu sits open without hover/focus for too long, request close via Escape
       const watchdogInterval = window.setInterval(() => {
         document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu').forEach((menu) => {
@@ -616,8 +678,7 @@ function RoomClient({ roomName }: { roomName: string }) {
           const hovered = el.matches(':hover');
           const hasFocusInside = el.contains(document.activeElement);
           if (visible && openedAt && age > 1500 && !hovered && !hasFocusInside) {
-            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-            console.log('🎛️ Requested dropdown close via Escape (watchdog)');
+            closeLiveKitMenus();
             delete (el as any).dataset.openedAt;
           }
         });
@@ -625,8 +686,7 @@ function RoomClient({ roomName }: { roomName: string }) {
 
       // Scroll/wheel closes menus gently
       const handleWheel = () => {
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-        console.log('🎛️ Requested dropdown close via Escape (wheel)');
+        closeLiveKitMenus();
       };
       window.addEventListener('wheel', handleWheel, { passive: true });
 
@@ -635,6 +695,7 @@ function RoomClient({ roomName }: { roomName: string }) {
           controlBar.removeEventListener('click', handleUIActivity);
         }
         observer.disconnect();
+        subtreeObserver.disconnect();
         window.clearInterval(watchdogInterval);
         window.removeEventListener('wheel', handleWheel);
       };
@@ -1507,9 +1568,11 @@ function RoomClient({ roomName }: { roomName: string }) {
       
       // Only handle clicks completely outside the control bar
       if (!isControlBar && !isMenu) {
-        // Ask LiveKit to close any open menus without forcing styles
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-        console.log('🎛️ Requested dropdown close via Escape (outside click)');
+        // Programmatically close any open menus
+        const expanded = document.querySelector('.lk-control-bar [aria-expanded="true"]') as HTMLElement | null;
+        if (expanded) expanded.click();
+        document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu').forEach((m) => ((m as HTMLElement).style.display = 'none'));
+        console.log('🎛️ Closed dropdown via outside click');
       }
     };
 
