@@ -557,6 +557,10 @@ function RoomClient({ roomName }: { roomName: string }) {
             setTimeout(handleUIInactivity, 3000); // Resume after 3 seconds
           }
         });
+        // Close menus when leaving the control bar area
+        controlBar.addEventListener('mouseleave', () => {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        });
       }
 
       // Helper: robustly close any LiveKit menus
@@ -1271,6 +1275,25 @@ function RoomClient({ roomName }: { roomName: string }) {
         justify-content: center !important;
         min-width: 400px !important;
         max-width: 90vw !important;
+      }
+
+      /* Auto-hide any LiveKit dropdown if control bar isn't hovered */
+      .lk-control-bar:not(:hover) .lk-device-menu,
+      .lk-control-bar:not(:hover) .lk-dropdown,
+      .lk-control-bar:not(:hover) .lk-menu {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
+      /* If LiveKit renders menus outside of the control bar (e.g., at document.body),
+         hide them whenever the control bar isn't hovered. Requires Chrome's :has support. */
+      body:not(:has(.lk-control-bar:hover)) .lk-device-menu,
+      body:not(:has(.lk-control-bar:hover)) .lk-dropdown,
+      body:not(:has(.lk-control-bar:hover)) .lk-menu {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
       }
 
       /* Ensure control buttons are visible */
