@@ -31,6 +31,25 @@ function RoomClient({ roomName }: { roomName: string }) {
   const [newRoomName, setNewRoomName] = useState<string>('');
   const [isCreatingRoom, setIsCreatingRoom] = useState<boolean>(false);
 
+  // Shared cleanup function for orphaned menus
+  const cleanupOrphanedMenus = () => {
+    // Only run cleanup if no button is currently expanded
+    const anyExpanded = !!document.querySelector('.lk-control-bar [aria-expanded="true"]');
+    if (!anyExpanded) {
+      document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu').forEach((menu) => {
+        const el = menu as HTMLElement;
+        const rect = el.getBoundingClientRect();
+        const visible = rect.width > 0 && rect.height > 0;
+        const hovered = el.matches(':hover');
+        
+        // Only remove if visible, not hovered, and no expanded button
+        if (visible && !hovered) {
+          el.remove();
+        }
+      });
+    }
+  };
+
   // Handle authentication
   useEffect(() => {
     if (auth) {
@@ -518,6 +537,7 @@ function RoomClient({ roomName }: { roomName: string }) {
       }
     }, [restartCount]);
 
+
     // UI interaction detection to pause speech recognition
     useEffect(() => {
       if (!token) return;
@@ -563,38 +583,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         });
       }
 
-      // Helper: robustly close any LiveKit menus
-      const closeLiveKitMenus = () => {
-        let didClose = false;
-        document.querySelectorAll('.lk-control-bar [aria-expanded="true"]').forEach((btn) => {
-          (btn as HTMLElement).click();
-          didClose = true;
-        });
-        // Send Escape to let LiveKit close any open popovers
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-        if (didClose) console.log('🎛️ Requested LiveKit menu close');
-      };
 
-      // Remove orphaned/stale menus that remain visible without any expanded control
-      const removeStaleMenus = () => {
-        const anyExpanded = !!document.querySelector('.lk-control-bar [aria-expanded="true"]');
-        document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu').forEach((menu) => {
-          const el = menu as HTMLElement;
-          const rect = el.getBoundingClientRect();
-          const visible = rect.width > 0 && rect.height > 0 && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden';
-          const openedAt = Number((el as any).dataset.openedAt || 0);
-          const age = Date.now() - openedAt;
-          const hovered = el.matches(':hover');
-          const hasFocusInside = el.contains(document.activeElement);
-          // Remove if: visible, not hovered/focused, no expanded toggle.
-          // Immediate removal if it never recorded an openedAt (likely stray at load),
-          // or if it has aged beyond 1.8s.
-          if (visible && !hovered && !hasFocusInside && !anyExpanded && (openedAt === 0 || age > 1800)) {
-            console.log('🧹 Removing stale LiveKit menu node');
-            el.remove();
-          }
-        });
-      };
 
       // Detect when dropdowns are actually opened/closed
       const observer = new MutationObserver((mutations) => {
@@ -652,7 +641,7 @@ function RoomClient({ roomName }: { roomName: string }) {
             clearTimeout(hoverTimeout);
             hoverTimeout = setTimeout(() => {
               if (!el.matches(':hover')) {
-                closeLiveKitMenus();
+                cleanupOrphanedMenus();
               }
             }, 600);
           });
@@ -662,7 +651,7 @@ function RoomClient({ roomName }: { roomName: string }) {
           if (!(it as any)._lkClick) {
             (it as any)._lkClick = true;
             it.addEventListener('click', () => {
-              setTimeout(() => closeLiveKitMenus(), 0);
+              setTimeout(() => cleanupOrphanedMenus(), 0);
             });
           }
         });
@@ -686,34 +675,19 @@ function RoomClient({ roomName }: { roomName: string }) {
 
       // Watchdog: if a menu sits open without hover/focus for too long, request close via Escape
       const watchdogInterval = window.setInterval(() => {
-        document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu').forEach((menu) => {
-          const el = menu as HTMLElement;
-          const rect = el.getBoundingClientRect();
-          const visible = rect.width > 0 && rect.height > 0 && getComputedStyle(el).display !== 'none';
-          const openedAt = Number((el as any).dataset.openedAt || 0);
-          const age = Date.now() - openedAt;
-          const hovered = el.matches(':hover');
-          const hasFocusInside = el.contains(document.activeElement);
-          if (visible && openedAt && age > 1500 && !hovered && !hasFocusInside) {
-            closeLiveKitMenus();
-            delete (el as any).dataset.openedAt;
-          }
-        });
-        removeStaleMenus();
-      }, 800);
+        cleanupOrphanedMenus();
+      }, 2000);
 
       // Scroll/wheel closes menus gently
       const handleWheel = () => {
-        closeLiveKitMenus();
-        removeStaleMenus();
+        cleanupOrphanedMenus();
       };
       window.addEventListener('wheel', handleWheel, { passive: true });
 
       // Initial cleanup loop for first few seconds after join to catch any stray menus
       const start = Date.now();
       const initialCleanup = setInterval(() => {
-        closeLiveKitMenus();
-        removeStaleMenus();
+        cleanupOrphanedMenus();
         if (Date.now() - start > 4000) {
           clearInterval(initialCleanup);
         }
@@ -1319,22 +1293,7 @@ function RoomClient({ roomName }: { roomName: string }) {
         max-width: 90vw !important;
       }
 
-      /* Allow LiveKit's native dropdown behavior - only hide when no expanded button */
-      body:not(:has(.lk-control-bar [aria-expanded="true"])) .lk-device-menu,
-      body:not(:has(.lk-control-bar [aria-expanded="true"])) .lk-dropdown,
-      body:not(:has(.lk-control-bar [aria-expanded="true"])) .lk-menu {
-        opacity: 0 !important;
-        pointer-events: none !important;
-        transition: opacity 0.2s ease;
-      }
-      
-      /* Show menus when button is expanded */
-      body:has(.lk-control-bar [aria-expanded="true"]) .lk-device-menu,
-      body:has(.lk-control-bar [aria-expanded="true"]) .lk-dropdown,
-      body:has(.lk-control-bar [aria-expanded="true"]) .lk-menu {
-        opacity: 1 !important;
-        pointer-events: auto !important;
-      }
+      /* Let LiveKit handle all dropdown behavior naturally - no interference */
 
       /* Ensure control buttons are visible */
       .lk-control-bar button {
@@ -1649,13 +1608,6 @@ function RoomClient({ roomName }: { roomName: string }) {
     // Initialize dropdowns immediately
     initializeDropdowns();
 
-    // Local helper here too (scoped to this effect)
-    const closeLiveKitMenus = () => {
-      document.querySelectorAll('.lk-control-bar [aria-expanded="true"]').forEach((btn) => {
-        (btn as HTMLElement).click();
-      });
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    };
 
     // Minimal click outside handler - let LiveKit handle most of the logic
     const handleClickOutside = (event: MouseEvent) => {
@@ -1666,21 +1618,10 @@ function RoomClient({ roomName }: { roomName: string }) {
       // Only handle clicks completely outside the control bar
       if (!isControlBar && !isMenu) {
         (document.activeElement as HTMLElement | null)?.blur?.();
-        closeLiveKitMenus();
-        // As a final guard, clear any stale visible menus not tied to an expanded button
+        // Let LiveKit handle the closing naturally
         setTimeout(() => {
-          document.querySelectorAll('.lk-control-bar [aria-expanded="true"]').forEach((btn) => (btn as HTMLElement).click());
-          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-          document.querySelectorAll('.lk-device-menu, .lk-dropdown, .lk-menu').forEach((menu) => {
-            const el = menu as HTMLElement;
-            const rect = el.getBoundingClientRect();
-            const visible = rect.width > 0 && rect.height > 0 && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden';
-            if (visible && !document.querySelector('.lk-control-bar [aria-expanded="true"]')) {
-              console.log('🧹 Removing stale LiveKit menu node (outside click)');
-              el.remove();
-            }
-          });
-        }, 50);
+          cleanupOrphanedMenus();
+        }, 100);
       }
     };
 
