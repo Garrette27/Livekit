@@ -561,19 +561,6 @@ function RoomClient({ roomName }: { roomName: string }) {
         controlBar.addEventListener('mouseleave', () => {
           document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
         });
-        // Prevent hover-triggered visibility by ensuring aria-expanded is only toggled on the dedicated caret buttons
-        controlBar.addEventListener('mouseover', (e) => {
-          const target = e.target as HTMLElement;
-          const isMenu = target.closest('.lk-device-menu, .lk-dropdown, .lk-menu');
-          if (!isMenu) {
-            // Ensure no stray expanded state remains on hover of other controls
-            document.querySelectorAll('.lk-control-bar [aria-expanded="true"]').forEach((btn) => {
-              if (!(btn as HTMLElement).matches('[aria-haspopup="true"]')) {
-                (btn as HTMLElement).setAttribute('aria-expanded', 'false');
-              }
-            });
-          }
-        });
       }
 
       // Helper: robustly close any LiveKit menus
@@ -1332,13 +1319,21 @@ function RoomClient({ roomName }: { roomName: string }) {
         max-width: 90vw !important;
       }
 
-      /* Only allow menus to be visible when some control button is expanded. */
+      /* Allow LiveKit's native dropdown behavior - only hide when no expanded button */
       body:not(:has(.lk-control-bar [aria-expanded="true"])) .lk-device-menu,
       body:not(:has(.lk-control-bar [aria-expanded="true"])) .lk-dropdown,
       body:not(:has(.lk-control-bar [aria-expanded="true"])) .lk-menu {
-        display: none !important;
-        visibility: hidden !important;
+        opacity: 0 !important;
         pointer-events: none !important;
+        transition: opacity 0.2s ease;
+      }
+      
+      /* Show menus when button is expanded */
+      body:has(.lk-control-bar [aria-expanded="true"]) .lk-device-menu,
+      body:has(.lk-control-bar [aria-expanded="true"]) .lk-dropdown,
+      body:has(.lk-control-bar [aria-expanded="true"]) .lk-menu {
+        opacity: 1 !important;
+        pointer-events: auto !important;
       }
 
       /* Ensure control buttons are visible */
