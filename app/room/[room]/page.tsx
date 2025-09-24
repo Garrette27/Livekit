@@ -1258,6 +1258,48 @@ function RoomClient({ roomName }: { roomName: string }) {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [roomName, user?.uid]);
 
+  // Populate device dropdowns
+  useEffect(() => {
+    if (!token) return;
+    
+    const populateDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(device => device.kind === 'audioinput');
+        const videoInputs = devices.filter(device => device.kind === 'videoinput');
+        
+        const micSelect = document.getElementById('microphone-select') as HTMLSelectElement;
+        const camSelect = document.getElementById('camera-select') as HTMLSelectElement;
+        
+        if (micSelect) {
+          micSelect.innerHTML = '<option value="">Select Microphone</option>';
+          audioInputs.forEach(device => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.textContent = device.label || `Microphone ${device.deviceId.slice(0, 8)}`;
+            micSelect.appendChild(option);
+          });
+        }
+        
+        if (camSelect) {
+          camSelect.innerHTML = '<option value="">Select Camera</option>';
+          videoInputs.forEach(device => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.textContent = device.label || `Camera ${device.deviceId.slice(0, 8)}`;
+            camSelect.appendChild(option);
+          });
+        }
+        
+        console.log('🎛️ Device dropdowns populated:', { audio: audioInputs.length, video: videoInputs.length });
+      } catch (error) {
+        console.error('Error populating devices:', error);
+      }
+    };
+    
+    populateDevices();
+  }, [token]);
+
   // Ensure LiveKit controls are always visible and fix chat background
   useEffect(() => {
     if (!token) return;
@@ -1925,6 +1967,87 @@ function RoomClient({ roomName }: { roomName: string }) {
               gap: '0.75rem',
               flexDirection: 'column'
             }}>
+              {/* Custom Device Selection - Bypass LiveKit dropdowns */}
+              <div style={{
+                backgroundColor: '#f0f9ff',
+                border: '1px solid #0ea5e9',
+                borderRadius: '0.5rem',
+                padding: '0.75rem',
+                marginBottom: '0.75rem'
+              }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: '#0c4a6e' }}>
+                  🎛️ Device Controls
+                </h4>
+                <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+                  <select
+                    id="microphone-select"
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.75rem',
+                      backgroundColor: 'white'
+                    }}
+                    onChange={async (e) => {
+                      const deviceId = e.target.value;
+                      if (deviceId && navigator.mediaDevices) {
+                        try {
+                          const stream = await navigator.mediaDevices.getUserMedia({ 
+                            audio: { deviceId: { exact: deviceId } },
+                            video: false 
+                          });
+                          // Apply to LiveKit audio tracks
+                          document.querySelectorAll('audio').forEach(audio => {
+                            if (audio.srcObject) {
+                              (audio.srcObject as MediaStream).getAudioTracks().forEach(track => track.stop());
+                            }
+                            audio.srcObject = stream;
+                          });
+                          console.log('🎤 Microphone changed to:', deviceId);
+                        } catch (error) {
+                          console.error('Error changing microphone:', error);
+                        }
+                      }
+                    }}
+                  >
+                    <option value="">Select Microphone</option>
+                  </select>
+                  <select
+                    id="camera-select"
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.75rem',
+                      backgroundColor: 'white'
+                    }}
+                    onChange={async (e) => {
+                      const deviceId = e.target.value;
+                      if (deviceId && navigator.mediaDevices) {
+                        try {
+                          const stream = await navigator.mediaDevices.getUserMedia({ 
+                            audio: false,
+                            video: { deviceId: { exact: deviceId } }
+                          });
+                          // Apply to LiveKit video tracks
+                          document.querySelectorAll('video').forEach(video => {
+                            if (video.srcObject) {
+                              (video.srcObject as MediaStream).getVideoTracks().forEach(track => track.stop());
+                            }
+                            video.srcObject = stream;
+                          });
+                          console.log('📹 Camera changed to:', deviceId);
+                        } catch (error) {
+                          console.error('Error changing camera:', error);
+                        }
+                      }
+                    }}
+                  >
+                    <option value="">Select Camera</option>
+                  </select>
+                </div>
+              </div>
+              
               <div style={{
                 backgroundColor: '#f8fafc',
                 border: '1px solid #e2e8f0',
