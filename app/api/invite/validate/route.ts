@@ -202,6 +202,36 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Validate IP allowlist if provided
+    if (invitation.allowedIpAddresses && invitation.allowedIpAddresses.length > 0) {
+      const ipAllowed = invitation.allowedIpAddresses.some(ip => ip.trim() === clientIP);
+      if (!ipAllowed) {
+        violations.push({
+          timestamp: new Date() as any,
+          type: 'wrong_ip',
+          details: `IP ${clientIP} not in allowlist`,
+          ip: clientIP,
+          userAgent,
+        });
+      }
+    }
+
+    // Validate device ID allowlist if provided (raw visitorId or hash)
+    if (invitation.allowedDeviceIds && invitation.allowedDeviceIds.length > 0 && deviceFingerprint) {
+      const deviceHash = generateDeviceFingerprintHash(deviceFingerprint);
+      const rawId = deviceFingerprint.hash || '';
+      const deviceAllowed = invitation.allowedDeviceIds.some(id => id === rawId || id === deviceHash);
+      if (!deviceAllowed) {
+        violations.push({
+          timestamp: new Date() as any,
+          type: 'wrong_device',
+          details: 'Device ID not in allowlist',
+          ip: clientIP,
+          userAgent,
+        });
+      }
+    }
+
     // Validate device fingerprint (if device binding is enabled)
     if (invitation.metadata.security.deviceRestricted && deviceFingerprint) {
       const deviceHash = generateDeviceFingerprintHash(deviceFingerprint);

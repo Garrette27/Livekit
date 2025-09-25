@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body: CreateInvitationRequest = await req.json();
-    const { roomName, emailAllowed, countryAllowlist, browserAllowlist, deviceBinding, expiresInHours } = body;
+    const { roomName, emailAllowed, countryAllowlist, browserAllowlist, deviceBinding, expiresInHours, allowedIpAddresses, allowedDeviceIds } = body;
 
     // Input validation
     if (!roomName || !emailAllowed || !countryAllowlist || !browserAllowlist) {
@@ -63,6 +63,8 @@ export async function POST(req: NextRequest) {
     const sanitizedEmail = sanitizeInput(emailAllowed);
     const sanitizedCountries = countryAllowlist.map(c => sanitizeInput(c));
     const sanitizedBrowsers = browserAllowlist.map(b => sanitizeInput(b));
+    const sanitizedAllowedIps = (allowedIpAddresses || []).map(ip => sanitizeInput(ip));
+    const sanitizedAllowedDevices = (allowedDeviceIds || []).map(id => sanitizeInput(id));
 
     // Validate expiration time (1-168 hours = 1 hour to 1 week)
     const validExpirationHours = Math.max(1, Math.min(168, expiresInHours || 24));
@@ -86,6 +88,8 @@ export async function POST(req: NextRequest) {
       emailAllowed: sanitizedEmail,
       countryAllowlist: sanitizedCountries,
       browserAllowlist: sanitizedBrowsers,
+      allowedIpAddresses: sanitizedAllowedIps.length ? sanitizedAllowedIps : undefined,
+      allowedDeviceIds: sanitizedAllowedDevices.length ? sanitizedAllowedDevices : undefined,
       deviceFingerprintHash: deviceBinding ? undefined : undefined, // Will be set on first access
       expiresAt: expiresAt as any, // Firestore Timestamp
       maxUses: 1, // Single use

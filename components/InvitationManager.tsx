@@ -25,6 +25,8 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
     browsers: ['Chrome', 'Firefox', 'Safari', 'Edge'],
     deviceBinding: false,
     expiresInHours: 24,
+    ipAllowlist: [],
+    deviceIdAllowlist: [],
   });
 
   const countryOptions = [
@@ -48,6 +50,7 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
     { code: 'PT', name: 'Portugal' },
     { code: 'GR', name: 'Greece' },
     { code: 'PL', name: 'Poland' },
+    { code: 'PH', name: 'Philippines' },
     { code: 'CZ', name: 'Czech Republic' },
     { code: 'HU', name: 'Hungary' },
     { code: 'SK', name: 'Slovakia' },
@@ -184,6 +187,8 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
         browserAllowlist: formData.browsers,
         deviceBinding: formData.deviceBinding,
         expiresInHours: formData.expiresInHours,
+        allowedIpAddresses: formData.ipAllowlist?.filter(Boolean),
+        allowedDeviceIds: formData.deviceIdAllowlist?.filter(Boolean),
       };
 
       const response = await fetch('/api/invite/create', {
@@ -419,7 +424,7 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
               height: '80px'
             }}
           >
-            {countryOptions.slice(0, 20).map(country => (
+            {countryOptions.map(country => (
               <option key={country.code} value={country.code}>
                 {country.name}
               </option>
@@ -478,6 +483,70 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
               </label>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Optional Allowlists */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem',
+        marginBottom: '1rem'
+      }}>
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '0.75rem',
+            fontWeight: '500',
+            color: '#374151',
+            marginBottom: '0.5rem'
+          }}>
+            Allowed IP Addresses (comma-separated)
+          </label>
+          <input
+            type="text"
+            placeholder="e.g., 203.0.113.10, 198.51.100.25"
+            value={(formData.ipAllowlist || []).join(', ')}
+            onChange={(e) => setFormData({ ...formData, ipAllowlist: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+            style={{
+              width: '100%',
+              padding: '0.5rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.375rem',
+              fontSize: '0.8rem'
+            }}
+          />
+          <p style={{ fontSize: '0.65rem', color: '#6b7280', marginTop: '0.25rem' }}>
+            Optional. If set, only these IPs can use the invite.
+          </p>
+        </div>
+
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '0.75rem',
+            fontWeight: '500',
+            color: '#374151',
+            marginBottom: '0.5rem'
+          }}>
+            Allowed Device IDs (comma-separated)
+          </label>
+          <input
+            type="text"
+            placeholder="Fingerprint visitorId(s) or hashes"
+            value={(formData.deviceIdAllowlist || []).join(', ')}
+            onChange={(e) => setFormData({ ...formData, deviceIdAllowlist: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+            style={{
+              width: '100%',
+              padding: '0.5rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.375rem',
+              fontSize: '0.8rem'
+            }}
+          />
+          <p style={{ fontSize: '0.65rem', color: '#6b7280', marginTop: '0.25rem' }}>
+            Optional. If set, only these devices can use the invite.
+          </p>
         </div>
       </div>
 

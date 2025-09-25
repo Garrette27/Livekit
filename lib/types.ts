@@ -52,6 +52,9 @@ export interface Invitation {
   countryAllowlist: string[];
   browserAllowlist: string[];
   deviceFingerprintHash?: string;
+  // Optional allowlists for stricter access control
+  allowedIpAddresses?: string[]; // e.g., ["203.0.113.10", "198.51.100.25"]
+  allowedDeviceIds?: string[];   // raw device IDs (e.g., FingerprintJS visitorId) or precomputed hashes
   expiresAt: Timestamp;
   maxUses: number;
   usedAt?: Timestamp;
@@ -97,7 +100,7 @@ export interface AccessAttempt {
 
 export interface SecurityViolation {
   timestamp: Timestamp;
-  type: 'wrong_email' | 'wrong_country' | 'wrong_browser' | 'wrong_device' | 'expired' | 'already_used';
+  type: 'wrong_email' | 'wrong_country' | 'wrong_browser' | 'wrong_device' | 'wrong_ip' | 'expired' | 'already_used';
   details: string;
   ip: string;
   userAgent: string;
@@ -141,6 +144,8 @@ export interface CreateInvitationRequest {
   browserAllowlist: string[];
   deviceBinding: boolean;
   expiresInHours: number;
+  allowedIpAddresses?: string[];
+  allowedDeviceIds?: string[];
 }
 
 export interface CreateInvitationResponse {
@@ -172,6 +177,8 @@ export interface InvitationFormData {
   browsers: string[];
   deviceBinding: boolean;
   expiresInHours: number;
+  ipAllowlist?: string[];
+  deviceIdAllowlist?: string[];
 }
 
 export interface InvitationListItem {
