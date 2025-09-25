@@ -505,6 +505,21 @@ export default function Dashboard() {
               Create Room
             </button>
             <button
+              onClick={() => window.location.href = '/invitations'}
+              style={{
+                backgroundColor: '#7C3AED',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}
+            >
+              Manage Invitations
+            </button>
+            <button
               onClick={handleSignOut}
               style={{
                 backgroundColor: 'transparent',

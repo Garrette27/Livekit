@@ -1856,6 +1856,77 @@ function RoomClient({ roomName }: { roomName: string }) {
 
   return (
     <>
+      {/* Invitation Manager Sidebar - Always visible when user is authenticated */}
+      {user && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            left: '20px',
+            width: '350px',
+            maxHeight: 'calc(100vh - 40px)',
+            backgroundColor: '#ffffff',
+            border: '2px solid #059669',
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            zIndex: 100000,
+            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.12)',
+            fontSize: '0.875rem',
+            overflowY: 'auto',
+            backdropFilter: 'blur(10px)'
+          }}
+        >
+          <div style={{ marginBottom: '1rem' }}>
+            <h3 style={{ 
+              margin: '0 0 0.5rem 0', 
+              color: '#059669', 
+              fontSize: '1.1rem',
+              fontWeight: '600'
+            }}>
+              🔒 Secure Patient Invitations
+            </h3>
+            <p style={{ 
+              margin: '0', 
+              color: '#6b7280', 
+              fontSize: '0.8rem',
+              marginBottom: '1rem'
+            }}>
+              Create secure, restricted access links for patients
+            </p>
+          </div>
+          
+          <InvitationManager user={user} roomName={roomName} />
+          
+          <div style={{ 
+            marginTop: '1rem', 
+            paddingTop: '1rem', 
+            borderTop: '1px solid #e5e7eb' 
+          }}>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
+                alert('Legacy patient link copied to clipboard!');
+              }}
+              style={{
+                backgroundColor: '#6b7280',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                padding: '0.5rem 1rem',
+                fontSize: '0.8rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                width: '100%',
+                marginBottom: '0.5rem'
+              }}
+            >
+              📋 Copy Legacy Link
+            </button>
+          </div>
+        </div>,
+        typeof window !== 'undefined' ? document.body : ({} as any)
+      )}
+
       {/* Fix Control Panel - Rendered in a portal so it never gets hidden by LiveKit */}
       {createPortal(
         <div

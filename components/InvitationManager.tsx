@@ -228,29 +228,21 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
 
   return (
     <div style={{
-      backgroundColor: 'white',
-      borderRadius: '1rem',
-      padding: '2rem',
-      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-      marginBottom: '2rem'
+      backgroundColor: 'transparent',
+      borderRadius: '0.5rem',
+      padding: '0',
+      marginBottom: '0'
     }}>
-      <h3 style={{
-        fontSize: '1.5rem',
-        fontWeight: 'bold',
-        color: '#1e40af',
-        marginBottom: '1.5rem'
-      }}>
-        🔐 Create Secure Patient Invitation
-      </h3>
 
       {error && (
         <div style={{
           backgroundColor: '#fef2f2',
           border: '1px solid #fecaca',
           borderRadius: '0.5rem',
-          padding: '1rem',
-          marginBottom: '1.5rem',
-          color: '#dc2626'
+          padding: '0.75rem',
+          marginBottom: '1rem',
+          color: '#dc2626',
+          fontSize: '0.8rem'
         }}>
           <strong>Error:</strong> {error}
         </div>
@@ -261,22 +253,22 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
           backgroundColor: '#f0fdf4',
           border: '1px solid #bbf7d0',
           borderRadius: '0.5rem',
-          padding: '1.5rem',
-          marginBottom: '1.5rem'
+          padding: '1rem',
+          marginBottom: '1rem'
         }}>
           <h4 style={{
-            fontSize: '1.125rem',
+            fontSize: '0.9rem',
             fontWeight: '600',
             color: '#166534',
-            marginBottom: '1rem'
+            marginBottom: '0.75rem'
           }}>
-            ✅ Invitation Created Successfully!
+            ✅ Invitation Created!
           </h4>
           
-          <div style={{ marginBottom: '1rem' }}>
+          <div style={{ marginBottom: '0.75rem' }}>
             <label style={{
               display: 'block',
-              fontSize: '0.875rem',
+              fontSize: '0.75rem',
               fontWeight: '500',
               color: '#374151',
               marginBottom: '0.5rem'
@@ -294,10 +286,10 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
                 readOnly
                 style={{
                   flex: '1',
-                  padding: '0.75rem',
+                  padding: '0.5rem',
                   border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.7rem',
                   backgroundColor: '#f9fafb'
                 }}
               />
@@ -306,45 +298,45 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
                 style={{
                   backgroundColor: '#059669',
                   color: 'white',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '0.5rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.375rem',
                   border: 'none',
                   fontWeight: '600',
                   cursor: 'pointer',
-                  fontSize: '0.875rem'
+                  fontSize: '0.7rem'
                 }}
               >
-                📋 Copy
+                📋
               </button>
             </div>
           </div>
 
           <div style={{
-            fontSize: '0.875rem',
+            fontSize: '0.7rem',
             color: '#6b7280'
           }}>
             <p><strong>Expires:</strong> {new Date(createdInvitation.expiresAt).toLocaleString()}</p>
-            <p><strong>Invitation ID:</strong> {createdInvitation.invitationId}</p>
+            <p><strong>ID:</strong> {createdInvitation.invitationId}</p>
           </div>
         </div>
       )}
 
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '1.5rem',
-        marginBottom: '1.5rem'
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem',
+        marginBottom: '1rem'
       }}>
         {/* Email Input */}
         <div>
           <label style={{
             display: 'block',
-            fontSize: '0.875rem',
+            fontSize: '0.75rem',
             fontWeight: '500',
             color: '#374151',
             marginBottom: '0.5rem'
           }}>
-            Patient Email Address *
+            Patient Email *
           </label>
           <input
             type="email"
@@ -353,10 +345,10 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
             placeholder="patient@example.com"
             style={{
               width: '100%',
-              padding: '0.75rem',
+              padding: '0.5rem',
               border: '1px solid #d1d5db',
-              borderRadius: '0.5rem',
-              fontSize: '1rem'
+              borderRadius: '0.375rem',
+              fontSize: '0.8rem'
             }}
           />
         </div>
@@ -365,22 +357,22 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
         <div>
           <label style={{
             display: 'block',
-            fontSize: '0.875rem',
+            fontSize: '0.75rem',
             fontWeight: '500',
             color: '#374151',
             marginBottom: '0.5rem'
           }}>
-            Expires In (Hours)
+            Expires In
           </label>
           <select
             value={formData.expiresInHours}
             onChange={(e) => setFormData({ ...formData, expiresInHours: parseInt(e.target.value) })}
             style={{
               width: '100%',
-              padding: '0.75rem',
+              padding: '0.5rem',
               border: '1px solid #d1d5db',
-              borderRadius: '0.5rem',
-              fontSize: '1rem'
+              borderRadius: '0.375rem',
+              fontSize: '0.8rem'
             }}
           >
             <option value={1}>1 Hour</option>
@@ -395,16 +387,16 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
       </div>
 
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '1.5rem',
-        marginBottom: '1.5rem'
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem',
+        marginBottom: '1rem'
       }}>
         {/* Country Selection */}
         <div>
           <label style={{
             display: 'block',
-            fontSize: '0.875rem',
+            fontSize: '0.75rem',
             fontWeight: '500',
             color: '#374151',
             marginBottom: '0.5rem'
@@ -420,25 +412,25 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
             }}
             style={{
               width: '100%',
-              padding: '0.75rem',
+              padding: '0.5rem',
               border: '1px solid #d1d5db',
-              borderRadius: '0.5rem',
-              fontSize: '1rem',
-              height: '120px'
+              borderRadius: '0.375rem',
+              fontSize: '0.7rem',
+              height: '80px'
             }}
           >
-            {countryOptions.map(country => (
+            {countryOptions.slice(0, 20).map(country => (
               <option key={country.code} value={country.code}>
                 {country.name}
               </option>
             ))}
           </select>
           <p style={{
-            fontSize: '0.75rem',
+            fontSize: '0.65rem',
             color: '#6b7280',
             marginTop: '0.25rem'
           }}>
-            Hold Ctrl/Cmd to select multiple countries
+            Hold Ctrl/Cmd for multiple
           </p>
         </div>
 
@@ -446,7 +438,7 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
         <div>
           <label style={{
             display: 'block',
-            fontSize: '0.875rem',
+            fontSize: '0.75rem',
             fontWeight: '500',
             color: '#374151',
             marginBottom: '0.5rem'
@@ -456,14 +448,14 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.5rem'
+            gap: '0.25rem'
           }}>
             {browserOptions.map(browser => (
               <label key={browser.value} style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
-                fontSize: '0.875rem'
+                fontSize: '0.7rem'
               }}>
                 <input
                   type="checkbox"
@@ -491,17 +483,17 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
 
       {/* Device Binding */}
       <div style={{
-        marginBottom: '1.5rem',
-        padding: '1rem',
+        marginBottom: '1rem',
+        padding: '0.75rem',
         backgroundColor: '#f8fafc',
         border: '1px solid #e2e8f0',
-        borderRadius: '0.5rem'
+        borderRadius: '0.375rem'
       }}>
         <label style={{
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
-          fontSize: '0.875rem',
+          fontSize: '0.7rem',
           fontWeight: '500',
           color: '#374151',
           cursor: 'pointer'
@@ -511,15 +503,15 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
             checked={formData.deviceBinding}
             onChange={(e) => setFormData({ ...formData, deviceBinding: e.target.checked })}
           />
-          <span>Enable Device Binding (Bind invitation to first device that accesses it)</span>
+          <span>Enable Device Binding</span>
         </label>
         <p style={{
-          fontSize: '0.75rem',
+          fontSize: '0.65rem',
           color: '#6b7280',
           marginTop: '0.5rem',
           marginLeft: '1.5rem'
         }}>
-          When enabled, the invitation will only work on the first device that accesses it. This provides additional security but may cause issues if the patient needs to switch devices.
+          Bind to first device for extra security
         </p>
       </div>
 
@@ -528,19 +520,19 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
         onClick={handleCreateInvitation}
         disabled={isCreating}
         style={{
-          backgroundColor: isCreating ? '#9ca3af' : '#2563eb',
+          backgroundColor: isCreating ? '#9ca3af' : '#059669',
           color: 'white',
-          padding: '1rem 2rem',
-          borderRadius: '0.5rem',
+          padding: '0.75rem 1rem',
+          borderRadius: '0.375rem',
           border: 'none',
           fontWeight: '600',
-          fontSize: '1rem',
+          fontSize: '0.8rem',
           cursor: isCreating ? 'not-allowed' : 'pointer',
           width: '100%',
           transition: 'background-color 0.2s ease'
         }}
       >
-        {isCreating ? 'Creating Invitation...' : '🔐 Create Secure Invitation'}
+        {isCreating ? 'Creating...' : '🔐 Create Invitation'}
       </button>
     </div>
   );
