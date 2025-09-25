@@ -8,6 +8,7 @@ import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
+import InvitationManager from '@/components/InvitationManager';
 
 // Type definitions for Web Speech API
 declare global {
@@ -1714,10 +1715,15 @@ function RoomClient({ roomName }: { roomName: string }) {
             <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>Consultation Room</h2>
             <p style={{ fontSize: '1.125rem', color: '#4B5563', marginBottom: '2rem' }}>Room "{roomName}" is ready. Share the link below with your patient or join the call.</p>
             
-            {/* Room URL Display */}
+            {/* Secure Invitation Manager */}
+            {user && (
+              <InvitationManager user={user} roomName={roomName} />
+            )}
+
+            {/* Legacy Room URL Display (for backward compatibility) */}
             <div style={{ marginBottom: '2rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>🔗 Room Link</h3>
-              <p style={{ fontSize: '1rem', color: '#6B7280', marginBottom: '1rem' }}>Share this link with your patient:</p>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>🔗 Legacy Room Link (Unsecured)</h3>
+              <p style={{ fontSize: '1rem', color: '#6B7280', marginBottom: '1rem' }}>⚠️ This is an unsecured link. Use the secure invitation system above for better security:</p>
               <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
                 <input
                   id="roomUrl"
