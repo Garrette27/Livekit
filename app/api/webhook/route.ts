@@ -111,11 +111,19 @@ export async function POST(req: NextRequest) {
               const callData = callDoc.data();
               transcriptionData = callData?.transcription || [];
               createdBy = callData?.createdBy || callData?.metadata?.createdBy || 'unknown';
-              console.log('Transcription data found:', transcriptionData.length, 'entries');
-              console.log('Call created by:', createdBy);
-              console.log('Transcription entries:', transcriptionData);
+              console.log('✅ Transcription data found:', transcriptionData.length, 'entries');
+              console.log('✅ Call created by:', createdBy);
+              console.log('✅ Transcription entries:', transcriptionData);
+              
+              // Debug: Log the actual transcription content
+              if (transcriptionData && transcriptionData.length > 0) {
+                console.log('✅ First transcription entry:', transcriptionData[0]);
+                console.log('✅ Last transcription entry:', transcriptionData[transcriptionData.length - 1]);
+              } else {
+                console.log('⚠️ No transcription entries found in call data');
+              }
             } else {
-              console.log('No call document found in Firestore');
+              console.log('❌ No call document found in Firestore for room:', roomName);
             }
             // Fallbacks for createdBy from rooms/consultations if still unknown
             if (createdBy === 'unknown') {
@@ -143,6 +151,16 @@ export async function POST(req: NextRequest) {
         try {
           console.log('Starting AI summary generation with transcription data...');
           console.log('Transcription data length:', transcriptionData ? transcriptionData.length : 0);
+          
+          // Debug: Log transcription data details
+          if (transcriptionData && transcriptionData.length > 0) {
+            console.log('✅ Transcription data available for AI processing:');
+            console.log('✅ Total entries:', transcriptionData.length);
+            console.log('✅ Sample entries:', transcriptionData.slice(0, 3));
+          } else {
+            console.log('⚠️ No transcription data available for AI processing');
+          }
+          
           const summary = await generateComprehensiveSummary(roomName, participants, duration, transcriptionData);
           console.log('✅ AI summary generated successfully');
           
@@ -277,8 +295,11 @@ async function generateComprehensiveSummary(roomName: string, participants: any[
     // Prepare conversation context for AI
     let conversationContext = '';
     if (transcriptionData && transcriptionData.length > 0) {
+      console.log('✅ Preparing conversation context for AI with', transcriptionData.length, 'entries');
       conversationContext = `\n\nActual conversation transcript:\n${transcriptionData.join('\n')}`;
+      console.log('✅ Conversation context length:', conversationContext.length, 'characters');
     } else {
+      console.log('⚠️ No transcription data available, using fallback context');
       conversationContext = '\n\nNo conversation transcript available. This may be a test call or the transcription feature was not enabled.';
     }
 

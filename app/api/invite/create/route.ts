@@ -118,6 +118,13 @@ export async function POST(req: NextRequest) {
       },
     };
 
+    // Debug logging
+    console.log('Creating invitation with data:', {
+      sanitizedAllowedIps: sanitizedAllowedIps,
+      sanitizedAllowedDevices: sanitizedAllowedDevices,
+      deviceBinding: deviceBinding
+    });
+
     // Only add optional fields if they have values
     if (sanitizedAllowedIps.length > 0) {
       invitation.allowedIpAddresses = sanitizedAllowedIps;
@@ -132,7 +139,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Store invitation in Firestore
-    await db.collection('invitations').doc(invitationId).set(invitation);
+    try {
+      await db.collection('invitations').doc(invitationId).set(invitation);
+      console.log('Invitation stored successfully in Firestore');
+    } catch (firestoreError) {
+      console.error('Firestore error:', firestoreError);
+      const errorMessage = firestoreError instanceof Error ? firestoreError.message : 'Unknown Firestore error';
+      throw new Error(`Failed to store invitation: ${errorMessage}`);
+    }
 
     // Generate JWT token for the invitation
     const tokenPayload: InvitationToken = {

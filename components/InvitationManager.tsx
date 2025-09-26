@@ -346,7 +346,10 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
           <input
             type="email"
             value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            onChange={(e) => {
+              const newEmail = e.target.value;
+              setFormData(prev => ({ ...prev, email: newEmail }));
+            }}
             placeholder="patient@example.com"
             style={{
               width: '100%',
@@ -355,6 +358,7 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
               borderRadius: '0.375rem',
               fontSize: '0.8rem'
             }}
+            autoComplete="email"
           />
         </div>
 
@@ -413,7 +417,7 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
             value={formData.countries}
             onChange={(e) => {
               const selected = Array.from(e.target.selectedOptions, option => option.value);
-              setFormData({ ...formData, countries: selected });
+              setFormData(prev => ({ ...prev, countries: selected }));
             }}
             style={{
               width: '100%',
@@ -423,6 +427,8 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
               fontSize: '0.7rem',
               height: '80px'
             }}
+            onFocus={(e) => e.target.style.outline = '2px solid #059669'}
+            onBlur={(e) => e.target.style.outline = 'none'}
           >
             {countryOptions.map(country => (
               <option key={country.code} value={country.code}>
@@ -467,15 +473,15 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
                   checked={formData.browsers.includes(browser.value)}
                   onChange={(e) => {
                     if (e.target.checked) {
-                      setFormData({
-                        ...formData,
-                        browsers: [...formData.browsers, browser.value]
-                      });
+                      setFormData(prev => ({
+                        ...prev,
+                        browsers: [...prev.browsers, browser.value]
+                      }));
                     } else {
-                      setFormData({
-                        ...formData,
-                        browsers: formData.browsers.filter(b => b !== browser.value)
-                      });
+                      setFormData(prev => ({
+                        ...prev,
+                        browsers: prev.browsers.filter(b => b !== browser.value)
+                      }));
                     }
                   }}
                 />
@@ -507,7 +513,10 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
             type="text"
             placeholder="e.g., 203.0.113.10, 198.51.100.25"
             value={(formData.ipAllowlist || []).join(', ')}
-            onChange={(e) => setFormData({ ...formData, ipAllowlist: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+            onChange={(e) => {
+              const newIps = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+              setFormData(prev => ({ ...prev, ipAllowlist: newIps }));
+            }}
             style={{
               width: '100%',
               padding: '0.5rem',
@@ -535,7 +544,10 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
             type="text"
             placeholder="Fingerprint visitorId(s) or hashes"
             value={(formData.deviceIdAllowlist || []).join(', ')}
-            onChange={(e) => setFormData({ ...formData, deviceIdAllowlist: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+            onChange={(e) => {
+              const newDevices = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+              setFormData(prev => ({ ...prev, deviceIdAllowlist: newDevices }));
+            }}
             style={{
               width: '100%',
               padding: '0.5rem',
@@ -570,7 +582,7 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
           <input
             type="checkbox"
             checked={formData.deviceBinding}
-            onChange={(e) => setFormData({ ...formData, deviceBinding: e.target.checked })}
+            onChange={(e) => setFormData(prev => ({ ...prev, deviceBinding: e.target.checked }))}
           />
           <span>Enable Device Binding</span>
         </label>
