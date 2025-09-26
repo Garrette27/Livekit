@@ -187,8 +187,8 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
         browserAllowlist: formData.browsers,
         deviceBinding: formData.deviceBinding,
         expiresInHours: formData.expiresInHours,
-        allowedIpAddresses: formData.ipAllowlist?.filter(Boolean),
-        allowedDeviceIds: formData.deviceIdAllowlist?.filter(Boolean),
+        allowedIpAddresses: formData.ipAllowlist?.filter(Boolean) || [],
+        allowedDeviceIds: formData.deviceIdAllowlist?.filter(Boolean) || [],
       };
 
       const response = await fetch('/api/invite/create', {

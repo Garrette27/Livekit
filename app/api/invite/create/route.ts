@@ -82,15 +82,12 @@ export async function POST(req: NextRequest) {
     // Generate unique invitation ID
     const invitationId = `invite_${sanitizedRoomName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Create invitation document
-    const invitation: Omit<Invitation, 'id'> = {
+    // Create invitation document - only include fields that have values
+    const invitation: any = {
       roomName: sanitizedRoomName,
       emailAllowed: sanitizedEmail,
       countryAllowlist: sanitizedCountries,
       browserAllowlist: sanitizedBrowsers,
-      allowedIpAddresses: sanitizedAllowedIps.length ? sanitizedAllowedIps : undefined,
-      allowedDeviceIds: sanitizedAllowedDevices.length ? sanitizedAllowedDevices : undefined,
-      deviceFingerprintHash: deviceBinding ? undefined : undefined, // Will be set on first access
       expiresAt: expiresAt as any, // Firestore Timestamp
       maxUses: 1, // Single use
       createdBy: 'system', // TODO: Get from auth context
@@ -120,6 +117,19 @@ export async function POST(req: NextRequest) {
         violations: [],
       },
     };
+
+    // Only add optional fields if they have values
+    if (sanitizedAllowedIps.length > 0) {
+      invitation.allowedIpAddresses = sanitizedAllowedIps;
+    }
+    
+    if (sanitizedAllowedDevices.length > 0) {
+      invitation.allowedDeviceIds = sanitizedAllowedDevices;
+    }
+    
+    if (deviceBinding) {
+      invitation.deviceFingerprintHash = null; // Will be set on first access
+    }
 
     // Store invitation in Firestore
     await db.collection('invitations').doc(invitationId).set(invitation);
