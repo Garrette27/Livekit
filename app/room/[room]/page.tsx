@@ -9,6 +9,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import InvitationManager from '@/components/InvitationManager';
+import CollapsibleSidebar from '@/components/CollapsibleSidebar';
 
 // Type definitions for Web Speech API
 declare global {
@@ -796,9 +797,6 @@ function RoomClient({ roomName }: { roomName: string }) {
   // Manual transcription input component
   const ManualTranscriptionInput = () => {
     const [note, setNote] = useState('');
-    const [position, setPosition] = useState({ x: typeof window !== 'undefined' ? window.innerWidth - 420 : 800, y: typeof window !== 'undefined' ? window.innerHeight - 300 : 400 });
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
     const addNote = () => {
       if (note.trim()) {
@@ -831,139 +829,39 @@ function RoomClient({ roomName }: { roomName: string }) {
       }
     };
 
-    const handleMouseDown = (e: React.MouseEvent) => {
-      setIsDragging(true);
-      setDragStart({
-        x: e.clientX - position.x,
-        y: e.clientY - position.y
-      });
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging) {
-        const newX = e.clientX - dragStart.x;
-        const newY = e.clientY - dragStart.y;
-        
-        // Keep within viewport bounds
-        const maxX = window.innerWidth - 400; // Component width
-        const maxY = window.innerHeight - 200; // Component height
-        const minX = 0;
-        const minY = 0;
-        
-        setPosition({
-          x: Math.max(minX, Math.min(maxX, newX)),
-          y: Math.max(minY, Math.min(maxY, newY))
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    // Add event listeners for mouse move and up
-    React.useEffect(() => {
-      if (isDragging) {
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-        return () => {
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
-        };
-      }
-    }, [isDragging, dragStart]);
-
     return (
-      <div 
-        style={{
-          position: 'fixed',
-          left: position.x,
-          top: position.y,
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          border: '2px solid #3b82f6',
-          borderRadius: '0.75rem',
-          padding: '1rem',
-          minWidth: '300px',
-          maxWidth: '400px',
-          cursor: isDragging ? 'grabbing' : 'grab',
-          userSelect: 'none',
-          zIndex: 1000,
-          boxShadow: isDragging ? '0 15px 35px rgba(0, 0, 0, 0.25)' : '0 10px 25px rgba(0, 0, 0, 0.15)',
-          transition: isDragging ? 'none' : 'box-shadow 0.2s ease'
-        }}
-      >
-        {/* Drag handle */}
-        <div
-          onMouseDown={handleMouseDown}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Enter a note..."
+          style={{
+            flex: '1',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.5rem',
+            padding: '0.5rem 0.75rem',
+            fontSize: '0.875rem',
+            minWidth: '0' // Prevent overflow
+          }}
+          onKeyPress={(e) => e.key === 'Enter' && addNote()}
+        />
+        <button
+          onClick={addNote}
           style={{
             backgroundColor: '#3b82f6',
             color: 'white',
-            padding: '0.5rem',
-            margin: '-1rem -1rem 0.75rem -1rem',
-            borderRadius: '0.75rem 0.75rem 0 0',
-            cursor: 'grab',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            border: 'none',
+            borderRadius: '0.5rem',
+            padding: '0.5rem 0.75rem',
             fontSize: '0.875rem',
-            fontWeight: '600'
+            fontWeight: '600',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap' // Prevent text wrapping
           }}
         >
-          <span>📝 Manual Notes</span>
-          <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>⋮⋮</span>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-          <input
-            type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Enter a note..."
-            style={{
-              flex: '1',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              fontSize: '0.875rem',
-              minWidth: '0' // Prevent overflow
-            }}
-            onKeyPress={(e) => e.key === 'Enter' && addNote()}
-          />
-        <button
-            onClick={addNote}
-            style={{
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap' // Prevent text wrapping
-            }}
-          >
-            Send
-          </button>
-        </div>
-        {manualNotes.length > 0 && (
-          <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-            {manualNotes.map((note, index) => (
-              <div key={index} style={{
-                padding: '0.5rem',
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '0.375rem',
-                marginBottom: '0.5rem',
-                fontSize: '0.75rem',
-                color: '#475569',
-                wordBreak: 'break-word' // Handle long text properly
-              }}>
-                {note}
-              </div>
-            ))}
-          </div>
-        )}
+          Send
+        </button>
       </div>
     );
   };
@@ -1858,33 +1756,15 @@ function RoomClient({ roomName }: { roomName: string }) {
     <>
       {/* Invitation Manager Sidebar - Always visible when user is authenticated */}
       {user && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            top: '20px',
-            left: '20px',
-            width: '350px',
-            maxHeight: 'calc(100vh - 40px)',
-            backgroundColor: '#ffffff',
-            border: '2px solid #059669',
-            borderRadius: '0.75rem',
-            padding: '1.5rem',
-            zIndex: 100000,
-            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.12)',
-            fontSize: '0.875rem',
-            overflowY: 'auto',
-            backdropFilter: 'blur(10px)'
-          }}
+        <CollapsibleSidebar
+          title="Secure Patient Invitations"
+          icon="🔒"
+          position="left"
+          defaultCollapsed={false}
+          width={350}
+          collapsedWidth={60}
         >
           <div style={{ marginBottom: '1rem' }}>
-            <h3 style={{ 
-              margin: '0 0 0.5rem 0', 
-              color: '#059669', 
-              fontSize: '1.1rem',
-              fontWeight: '600'
-            }}>
-              🔒 Secure Patient Invitations
-            </h3>
             <p style={{ 
               margin: '0', 
               color: '#6b7280', 
@@ -1923,231 +1803,254 @@ function RoomClient({ roomName }: { roomName: string }) {
               📋 Copy Legacy Link
             </button>
           </div>
-        </div>,
+        </CollapsibleSidebar>,
         typeof window !== 'undefined' ? document.body : ({} as any)
       )}
 
       {/* Fix Control Panel - Rendered in a portal so it never gets hidden by LiveKit */}
       {createPortal(
-        <div
-          className="fix-control-panel"
-          style={{
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            backgroundColor: '#ffffff',
-            border: '2px solid #3b82f6',
-            borderRadius: '0.75rem',
-            padding: '1rem',
-            zIndex: 100000, // keep above LiveKit overlays
-            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.12)',
-            maxWidth: '300px',
-            fontSize: '0.875rem',
-            transition: 'all 0.3s ease',
-            minHeight: '50px',
-            backdropFilter: 'blur(10px)'
-          }}
+        <CollapsibleSidebar
+          title="Fix Control Panel"
+          icon="🛠️"
+          position="right"
+          defaultCollapsed={false}
+          width={300}
+          collapsedWidth={60}
         >
           <div style={{ marginBottom: '0.75rem' }}>
-              <h3 style={{ 
-                margin: '0', 
-                color: '#1e40af', 
-                fontSize: '1rem',
-                fontWeight: '600'
-              }}>
-                🛠️ Fix Control Panel
-              </h3>
-                <p style={{ 
-                  margin: '0', 
-                  color: '#6b7280', 
-                  fontSize: '0.875rem',
-                  marginBottom: '0.5rem'
-                }}>
-                  Connected as: {user?.displayName || user?.email || 'Doctor'}
-                </p>
-                <p style={{ 
-                  margin: '0', 
-                  color: '#6b7280', 
-                  fontSize: '0.875rem',
-                  marginBottom: '0.75rem'
-                }}>
-                  Room: {roomName}
-                </p>
+            <p style={{ 
+              margin: '0', 
+              color: '#6b7280', 
+              fontSize: '0.875rem',
+              marginBottom: '0.5rem'
+            }}>
+              Connected as: {user?.displayName || user?.email || 'Doctor'}
+            </p>
+            <p style={{ 
+              margin: '0', 
+              color: '#6b7280', 
+              fontSize: '0.875rem',
+              marginBottom: '0.75rem'
+            }}>
+              Room: {roomName}
+            </p>
           </div>
           
+          <div style={{
+            display: 'flex',
+            gap: '0.75rem',
+            flexDirection: 'column'
+          }}>
+            {/* Custom Device Selection - Bypass LiveKit dropdowns */}
             <div style={{
-              display: 'flex',
-              gap: '0.75rem',
-              flexDirection: 'column'
+              backgroundColor: '#f0f9ff',
+              border: '1px solid #0ea5e9',
+              borderRadius: '0.5rem',
+              padding: '0.75rem',
+              marginBottom: '0.75rem'
             }}>
-              {/* Custom Device Selection - Bypass LiveKit dropdowns */}
-              <div style={{
-                backgroundColor: '#f0f9ff',
-                border: '1px solid #0ea5e9',
-                borderRadius: '0.5rem',
-                padding: '0.75rem',
-                marginBottom: '0.75rem'
-              }}>
-                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: '#0c4a6e' }}>
-                  🎛️ Device Controls
-                </h4>
-                <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
-                  <select
-                    id="microphone-select"
-                    style={{
-                      padding: '0.5rem',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.75rem',
-                      backgroundColor: 'white'
-                    }}
-                    onChange={async (e) => {
-                      const deviceId = e.target.value;
-                      if (deviceId && navigator.mediaDevices) {
-                        try {
-                          const stream = await navigator.mediaDevices.getUserMedia({ 
-                            audio: { deviceId: { exact: deviceId } },
-                            video: false 
-                          });
-                          // Apply to LiveKit audio tracks
-                          document.querySelectorAll('audio').forEach(audio => {
-                            if (audio.srcObject) {
-                              (audio.srcObject as MediaStream).getAudioTracks().forEach(track => track.stop());
-                            }
-                            audio.srcObject = stream;
-                          });
-                          console.log('🎤 Microphone changed to:', deviceId);
-                        } catch (error) {
-                          console.error('Error changing microphone:', error);
-                        }
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: '#0c4a6e' }}>
+                🎛️ Device Controls
+              </h4>
+              <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+                <select
+                  id="microphone-select"
+                  style={{
+                    padding: '0.5rem',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.75rem',
+                    backgroundColor: 'white'
+                  }}
+                  onChange={async (e) => {
+                    const deviceId = e.target.value;
+                    if (deviceId && navigator.mediaDevices) {
+                      try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ 
+                          audio: { deviceId: { exact: deviceId } },
+                          video: false 
+                        });
+                        // Apply to LiveKit audio tracks
+                        document.querySelectorAll('audio').forEach(audio => {
+                          if (audio.srcObject) {
+                            (audio.srcObject as MediaStream).getAudioTracks().forEach(track => track.stop());
+                          }
+                          audio.srcObject = stream;
+                        });
+                        console.log('🎤 Microphone changed to:', deviceId);
+                      } catch (error) {
+                        console.error('Error changing microphone:', error);
                       }
-                    }}
-                  >
-                    <option value="">Select Microphone</option>
-                  </select>
-                  <select
-                    id="camera-select"
-                    style={{
-                      padding: '0.5rem',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.75rem',
-                      backgroundColor: 'white'
-                    }}
-                    onChange={async (e) => {
-                      const deviceId = e.target.value;
-                      if (deviceId && navigator.mediaDevices) {
-                        try {
-                          const stream = await navigator.mediaDevices.getUserMedia({ 
-                            audio: false,
-                            video: { deviceId: { exact: deviceId } }
-                          });
-                          // Apply to LiveKit video tracks
-                          document.querySelectorAll('video').forEach(video => {
-                            if (video.srcObject) {
-                              (video.srcObject as MediaStream).getVideoTracks().forEach(track => track.stop());
-                            }
-                            video.srcObject = stream;
-                          });
-                          console.log('📹 Camera changed to:', deviceId);
-                        } catch (error) {
-                          console.error('Error changing camera:', error);
-                        }
+                    }
+                  }}
+                >
+                  <option value="">Select Microphone</option>
+                </select>
+                <select
+                  id="camera-select"
+                  style={{
+                    padding: '0.5rem',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.75rem',
+                    backgroundColor: 'white'
+                  }}
+                  onChange={async (e) => {
+                    const deviceId = e.target.value;
+                    if (deviceId && navigator.mediaDevices) {
+                      try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ 
+                          audio: false,
+                          video: { deviceId: { exact: deviceId } }
+                        });
+                        // Apply to LiveKit video tracks
+                        document.querySelectorAll('video').forEach(video => {
+                          if (video.srcObject) {
+                            (video.srcObject as MediaStream).getVideoTracks().forEach(track => track.stop());
+                          }
+                          video.srcObject = stream;
+                        });
+                        console.log('📹 Camera changed to:', deviceId);
+                      } catch (error) {
+                        console.error('Error changing camera:', error);
                       }
-                    }}
-                  >
-                    <option value="">Select Camera</option>
-                  </select>
-                </div>
+                    }
+                  }}
+                >
+                  <option value="">Select Camera</option>
+                </select>
               </div>
-              
-              <div style={{
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '0.5rem',
-                padding: '0.75rem',
-                fontSize: '0.75rem',
-                color: '#475569',
-                wordBreak: 'break-all',
-                marginBottom: '0.75rem',
-                borderLeft: '3px solid #3b82f6'
-              }}>
-                <strong>Patient Link:</strong><br />
-                {`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
-              </div>
-              
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
-                  alert('Patient link copied to clipboard!');
-                }}
-                style={{
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  padding: '0.75rem 1rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  textDecoration: 'none',
-                  display: 'inline-block',
-                  textAlign: 'center',
-                  width: '100%',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
-                }}
-              >
-                📋 Copy Patient Link
-              </button>
-              
-              <button
-                onClick={() => {
-                  window.open(`/room/${roomName}/patient`, '_blank');
-                }}
-                style={{
-                  backgroundColor: '#059669',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  padding: '0.75rem 1rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  textDecoration: 'none',
-                  display: 'inline-block',
-                  textAlign: 'center',
-                  width: '100%',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 2px 4px rgba(5, 150, 105, 0.2)'
-                }}
-              >
-                👥 Join as Patient
-              </button>
-              
-              <button
-                onClick={handleLeaveCall}
-                style={{
-                  backgroundColor: '#dc2626',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  padding: '0.75rem 1rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  textDecoration: 'none',
-                  display: 'inline-block',
-                  textAlign: 'center',
-                  width: '100%',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)'
-                }}
-              >
-                🚪 Leave Call
-              </button>
             </div>
-        </div>,
+            
+            <div style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '0.5rem',
+              padding: '0.75rem',
+              fontSize: '0.75rem',
+              color: '#475569',
+              wordBreak: 'break-all',
+              marginBottom: '0.75rem',
+              borderLeft: '3px solid #3b82f6'
+            }}>
+              <strong>Patient Link:</strong><br />
+              {`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
+            </div>
+            
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
+                alert('Patient link copied to clipboard!');
+              }}
+              style={{
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                padding: '0.75rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'inline-block',
+                textAlign: 'center',
+                width: '100%',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
+              }}
+            >
+              📋 Copy Patient Link
+            </button>
+            
+            <button
+              onClick={() => {
+                window.open(`/room/${roomName}/patient`, '_blank');
+              }}
+              style={{
+                backgroundColor: '#059669',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                padding: '0.75rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'inline-block',
+                textAlign: 'center',
+                width: '100%',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 4px rgba(5, 150, 105, 0.2)'
+              }}
+            >
+              👥 Join as Patient
+            </button>
+            
+            <button
+              onClick={handleLeaveCall}
+              style={{
+                backgroundColor: '#dc2626',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                padding: '0.75rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'inline-block',
+                textAlign: 'center',
+                width: '100%',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)'
+              }}
+            >
+              🚪 Leave Call
+            </button>
+          </div>
+        </CollapsibleSidebar>,
+        typeof window !== 'undefined' ? document.body : ({} as any)
+      )}
+
+      {/* Manual Notes Sidebar */}
+      {createPortal(
+        <CollapsibleSidebar
+          title="Manual Notes"
+          icon="📝"
+          position="right"
+          defaultCollapsed={true}
+          width={350}
+          collapsedWidth={60}
+          style={{ top: '100px' }} // Position below the Fix Control Panel
+        >
+          <ManualTranscriptionInput />
+          {manualNotes.length > 0 && (
+            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              <h4 style={{ 
+                margin: '0 0 0.5rem 0', 
+                fontSize: '0.875rem', 
+                fontWeight: '600', 
+                color: '#374151' 
+              }}>
+                Recent Notes:
+              </h4>
+              {manualNotes.map((note, index) => (
+                <div key={index} style={{
+                  padding: '0.5rem',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.375rem',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.75rem',
+                  color: '#475569',
+                  wordBreak: 'break-word' // Handle long text properly
+                }}>
+                  {note}
+                </div>
+              ))}
+            </div>
+          )}
+        </CollapsibleSidebar>,
         typeof window !== 'undefined' ? document.body : ({} as any)
       )}
       
@@ -2192,7 +2095,6 @@ function RoomClient({ roomName }: { roomName: string }) {
       >
         {/* Video Conference Component - This provides the actual video controls */}
         <VideoConference />
-        <ManualTranscriptionInput />
         
         {/* Back to Home Button - Simple and Clean */}
         <div
