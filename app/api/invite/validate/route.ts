@@ -191,6 +191,20 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Debug logging for validation
+    console.log('Validation debug info:', {
+      invitationId: tokenPayload.invitationId,
+      clientIP,
+      geolocation: geolocation ? {
+        country: geolocation.country,
+        countryCode: geolocation.countryCode
+      } : null,
+      detectedBrowser,
+      countryAllowlist: invitation.countryAllowlist,
+      browserAllowlist: invitation.browserAllowlist,
+      userAgent
+    });
+
     // Validate browser
     if (!invitation.browserAllowlist.includes(detectedBrowser)) {
       violations.push({
@@ -254,6 +268,11 @@ export async function POST(req: NextRequest) {
 
     // If there are violations, record them and deny access
     if (violations.length > 0) {
+      console.log('Security violations detected:', violations.map(v => ({
+        type: v.type,
+        details: v.details
+      })));
+      
       accessAttempt.reason = `Violations: ${violations.map(v => v.type).join(', ')}`;
       
       // Update invitation with access attempt and violations
