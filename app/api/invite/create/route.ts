@@ -79,6 +79,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check if email already has an account (optional - for informational purposes)
+    let existingAccount = null;
+    try {
+      const existingUserQuery = await db.collection('users').where('email', '==', sanitizedEmail).limit(1).get();
+      if (!existingUserQuery.empty) {
+        existingAccount = {
+          exists: true,
+          uid: existingUserQuery.docs[0].id,
+          userData: existingUserQuery.docs[0].data()
+        };
+        console.log('Email already has an account:', existingAccount);
+      }
+    } catch (error) {
+      console.log('Could not check for existing account:', error);
+      // Continue with invitation creation even if we can't check
+    }
+
     // Generate unique invitation ID
     const invitationId = `invite_${sanitizedRoomName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -182,6 +199,10 @@ export async function POST(req: NextRequest) {
       invitationId,
       inviteUrl,
       expiresAt: expiresAt.toISOString(),
+      existingAccount: existingAccount ? {
+        exists: true,
+        message: 'This email already has an account. The invitation will still work for joining the consultation.'
+      } : null,
     };
 
     console.log('Invitation created successfully:', {

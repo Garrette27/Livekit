@@ -160,9 +160,26 @@ export default function InvitationsPage() {
           <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>
             Create New Invitation
           </h2>
-          <p style={{ color: '#6B7280', marginBottom: '1.5rem' }}>
+          <p style={{ color: '#6B7280', marginBottom: '1rem' }}>
             Create a secure invitation for a specific room
           </p>
+          
+          <div style={{
+            backgroundColor: '#f0f9ff',
+            border: '1px solid #bae6fd',
+            borderRadius: '0.5rem',
+            padding: '1rem',
+            marginBottom: '1.5rem'
+          }}>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#0369a1', marginBottom: '0.5rem' }}>
+              💡 How it works:
+            </h3>
+            <ul style={{ fontSize: '0.8rem', color: '#0369a1', margin: 0, paddingLeft: '1rem' }}>
+              <li><strong>Patient:</strong> Uses the invitation link to join</li>
+              <li><strong>Doctor:</strong> Uses the "Join as Doctor" button (no invitation needed)</li>
+              <li><strong>Security:</strong> Invitation validates country, browser, and device</li>
+            </ul>
+          </div>
           
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
@@ -269,23 +286,44 @@ export default function InvitationsPage() {
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {invitation.status === 'active' && (
-                      <button
-                        onClick={() => revokeInvitation(invitation.id)}
-                        style={{
-                          backgroundColor: '#dc2626',
-                          color: 'white',
-                          padding: '0.5rem 1rem',
-                          borderRadius: '0.375rem',
-                          border: 'none',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Revoke
-                      </button>
+                      <>
+                        <button
+                          onClick={() => {
+                            // Generate doctor join URL
+                            const doctorJoinUrl = `/room/${invitation.roomName}/doctor`;
+                            window.open(doctorJoinUrl, '_blank');
+                          }}
+                          style={{
+                            backgroundColor: '#059669',
+                            color: 'white',
+                            padding: '0.5rem 1rem',
+                            borderRadius: '0.375rem',
+                            border: 'none',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🩺 Join as Doctor
+                        </button>
+                        <button
+                          onClick={() => revokeInvitation(invitation.id)}
+                          style={{
+                            backgroundColor: '#dc2626',
+                            color: 'white',
+                            padding: '0.5rem 1rem',
+                            borderRadius: '0.375rem',
+                            border: 'none',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Revoke
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={() => {

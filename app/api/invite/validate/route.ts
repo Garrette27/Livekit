@@ -180,15 +180,121 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Validate country
-    if (geolocation && !invitation.countryAllowlist.includes(geolocation.country)) {
-      violations.push({
-        timestamp: new Date() as any,
-        type: 'wrong_country',
-        details: `Expected: ${invitation.countryAllowlist.join(', ')}, Got: ${geolocation.country}`,
-        ip: clientIP,
-        userAgent,
-      });
+    // Validate country - check both country name and country code
+    if (geolocation) {
+      const countryAllowed = invitation.countryAllowlist.some(allowedCountry => 
+        allowedCountry === geolocation.country || 
+        allowedCountry === geolocation.countryCode ||
+        // Handle case where allowlist has country codes but geolocation has full names
+        (allowedCountry === 'PH' && geolocation.country === 'Philippines') ||
+        (allowedCountry === 'US' && geolocation.country === 'United States') ||
+        (allowedCountry === 'GB' && geolocation.country === 'United Kingdom') ||
+        (allowedCountry === 'CA' && geolocation.country === 'Canada') ||
+        (allowedCountry === 'AU' && geolocation.country === 'Australia') ||
+        (allowedCountry === 'DE' && geolocation.country === 'Germany') ||
+        (allowedCountry === 'FR' && geolocation.country === 'France') ||
+        (allowedCountry === 'IT' && geolocation.country === 'Italy') ||
+        (allowedCountry === 'ES' && geolocation.country === 'Spain') ||
+        (allowedCountry === 'NL' && geolocation.country === 'Netherlands') ||
+        (allowedCountry === 'SE' && geolocation.country === 'Sweden') ||
+        (allowedCountry === 'NO' && geolocation.country === 'Norway') ||
+        (allowedCountry === 'DK' && geolocation.country === 'Denmark') ||
+        (allowedCountry === 'FI' && geolocation.country === 'Finland') ||
+        (allowedCountry === 'CH' && geolocation.country === 'Switzerland') ||
+        (allowedCountry === 'AT' && geolocation.country === 'Austria') ||
+        (allowedCountry === 'BE' && geolocation.country === 'Belgium') ||
+        (allowedCountry === 'IE' && geolocation.country === 'Ireland') ||
+        (allowedCountry === 'PT' && geolocation.country === 'Portugal') ||
+        (allowedCountry === 'GR' && geolocation.country === 'Greece') ||
+        (allowedCountry === 'PL' && geolocation.country === 'Poland') ||
+        (allowedCountry === 'CZ' && geolocation.country === 'Czech Republic') ||
+        (allowedCountry === 'HU' && geolocation.country === 'Hungary') ||
+        (allowedCountry === 'SK' && geolocation.country === 'Slovakia') ||
+        (allowedCountry === 'SI' && geolocation.country === 'Slovenia') ||
+        (allowedCountry === 'HR' && geolocation.country === 'Croatia') ||
+        (allowedCountry === 'RO' && geolocation.country === 'Romania') ||
+        (allowedCountry === 'BG' && geolocation.country === 'Bulgaria') ||
+        (allowedCountry === 'LT' && geolocation.country === 'Lithuania') ||
+        (allowedCountry === 'LV' && geolocation.country === 'Latvia') ||
+        (allowedCountry === 'EE' && geolocation.country === 'Estonia') ||
+        (allowedCountry === 'JP' && geolocation.country === 'Japan') ||
+        (allowedCountry === 'KR' && geolocation.country === 'South Korea') ||
+        (allowedCountry === 'CN' && geolocation.country === 'China') ||
+        (allowedCountry === 'IN' && geolocation.country === 'India') ||
+        (allowedCountry === 'SG' && geolocation.country === 'Singapore') ||
+        (allowedCountry === 'HK' && geolocation.country === 'Hong Kong') ||
+        (allowedCountry === 'TW' && geolocation.country === 'Taiwan') ||
+        (allowedCountry === 'TH' && geolocation.country === 'Thailand') ||
+        (allowedCountry === 'MY' && geolocation.country === 'Malaysia') ||
+        (allowedCountry === 'ID' && geolocation.country === 'Indonesia') ||
+        (allowedCountry === 'VN' && geolocation.country === 'Vietnam') ||
+        (allowedCountry === 'BR' && geolocation.country === 'Brazil') ||
+        (allowedCountry === 'MX' && geolocation.country === 'Mexico') ||
+        (allowedCountry === 'AR' && geolocation.country === 'Argentina') ||
+        (allowedCountry === 'CL' && geolocation.country === 'Chile') ||
+        (allowedCountry === 'CO' && geolocation.country === 'Colombia') ||
+        (allowedCountry === 'PE' && geolocation.country === 'Peru') ||
+        (allowedCountry === 'ZA' && geolocation.country === 'South Africa') ||
+        (allowedCountry === 'EG' && geolocation.country === 'Egypt') ||
+        (allowedCountry === 'NG' && geolocation.country === 'Nigeria') ||
+        (allowedCountry === 'KE' && geolocation.country === 'Kenya') ||
+        (allowedCountry === 'MA' && geolocation.country === 'Morocco') ||
+        (allowedCountry === 'TN' && geolocation.country === 'Tunisia') ||
+        (allowedCountry === 'DZ' && geolocation.country === 'Algeria') ||
+        (allowedCountry === 'LY' && geolocation.country === 'Libya') ||
+        (allowedCountry === 'SD' && geolocation.country === 'Sudan') ||
+        (allowedCountry === 'ET' && geolocation.country === 'Ethiopia') ||
+        (allowedCountry === 'GH' && geolocation.country === 'Ghana') ||
+        (allowedCountry === 'UG' && geolocation.country === 'Uganda') ||
+        (allowedCountry === 'TZ' && geolocation.country === 'Tanzania') ||
+        (allowedCountry === 'ZM' && geolocation.country === 'Zambia') ||
+        (allowedCountry === 'ZW' && geolocation.country === 'Zimbabwe') ||
+        (allowedCountry === 'BW' && geolocation.country === 'Botswana') ||
+        (allowedCountry === 'NA' && geolocation.country === 'Namibia') ||
+        (allowedCountry === 'SZ' && geolocation.country === 'Eswatini') ||
+        (allowedCountry === 'LS' && geolocation.country === 'Lesotho') ||
+        (allowedCountry === 'MW' && geolocation.country === 'Malawi') ||
+        (allowedCountry === 'MZ' && geolocation.country === 'Mozambique') ||
+        (allowedCountry === 'MG' && geolocation.country === 'Madagascar') ||
+        (allowedCountry === 'MU' && geolocation.country === 'Mauritius') ||
+        (allowedCountry === 'SC' && geolocation.country === 'Seychelles') ||
+        (allowedCountry === 'KM' && geolocation.country === 'Comoros') ||
+        (allowedCountry === 'DJ' && geolocation.country === 'Djibouti') ||
+        (allowedCountry === 'SO' && geolocation.country === 'Somalia') ||
+        (allowedCountry === 'ER' && geolocation.country === 'Eritrea') ||
+        (allowedCountry === 'SS' && geolocation.country === 'South Sudan') ||
+        (allowedCountry === 'CF' && geolocation.country === 'Central African Republic') ||
+        (allowedCountry === 'TD' && geolocation.country === 'Chad') ||
+        (allowedCountry === 'NE' && geolocation.country === 'Niger') ||
+        (allowedCountry === 'ML' && geolocation.country === 'Mali') ||
+        (allowedCountry === 'BF' && geolocation.country === 'Burkina Faso') ||
+        (allowedCountry === 'CI' && geolocation.country === 'Côte d\'Ivoire') ||
+        (allowedCountry === 'LR' && geolocation.country === 'Liberia') ||
+        (allowedCountry === 'SL' && geolocation.country === 'Sierra Leone') ||
+        (allowedCountry === 'GN' && geolocation.country === 'Guinea') ||
+        (allowedCountry === 'GW' && geolocation.country === 'Guinea-Bissau') ||
+        (allowedCountry === 'GM' && geolocation.country === 'Gambia') ||
+        (allowedCountry === 'SN' && geolocation.country === 'Senegal') ||
+        (allowedCountry === 'MR' && geolocation.country === 'Mauritania') ||
+        (allowedCountry === 'CV' && geolocation.country === 'Cape Verde') ||
+        (allowedCountry === 'ST' && geolocation.country === 'São Tomé and Príncipe') ||
+        (allowedCountry === 'GQ' && geolocation.country === 'Equatorial Guinea') ||
+        (allowedCountry === 'GA' && geolocation.country === 'Gabon') ||
+        (allowedCountry === 'CG' && geolocation.country === 'Republic of the Congo') ||
+        (allowedCountry === 'CD' && geolocation.country === 'Democratic Republic of the Congo') ||
+        (allowedCountry === 'AO' && geolocation.country === 'Angola') ||
+        (allowedCountry === 'CM' && geolocation.country === 'Cameroon')
+      );
+      
+      if (!countryAllowed) {
+        violations.push({
+          timestamp: new Date() as any,
+          type: 'wrong_country',
+          details: `Expected: ${invitation.countryAllowlist.join(', ')}, Got: ${geolocation.country} (${geolocation.countryCode})`,
+          ip: clientIP,
+          userAgent,
+        });
+      }
     }
 
     // Debug logging for validation

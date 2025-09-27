@@ -21,7 +21,7 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<InvitationFormData>({
     email: '',
-    countries: ['US'],
+    countries: ['United States'],
     browsers: ['Chrome', 'Firefox', 'Safari', 'Edge'],
     deviceBinding: false,
     expiresInHours: 24,
@@ -206,7 +206,7 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
         // Reset form
         setFormData({
           email: '',
-          countries: ['US'],
+          countries: ['United States'],
           browsers: ['Chrome', 'Firefox', 'Safari', 'Edge'],
           deviceBinding: false,
           expiresInHours: 24,
@@ -322,6 +322,33 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
           }}>
             <p><strong>Expires:</strong> {new Date(createdInvitation.expiresAt).toLocaleString()}</p>
             <p><strong>ID:</strong> {createdInvitation.invitationId}</p>
+            {createdInvitation.existingAccount && (
+              <p style={{ color: '#059669', fontWeight: '500', marginTop: '0.5rem' }}>
+                ℹ️ {createdInvitation.existingAccount.message}
+              </p>
+            )}
+          </div>
+
+          <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={() => {
+                const doctorJoinUrl = `/room/${roomName}/doctor`;
+                window.open(doctorJoinUrl, '_blank');
+              }}
+              style={{
+                backgroundColor: '#059669',
+                color: 'white',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.375rem',
+                border: 'none',
+                fontSize: '0.75rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                flex: '1'
+              }}
+            >
+              🩺 Join as Doctor
+            </button>
           </div>
         </div>
       )}
@@ -431,7 +458,7 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
             onBlur={(e) => e.target.style.outline = 'none'}
           >
             {countryOptions.map(country => (
-              <option key={country.code} value={country.code}>
+              <option key={country.code} value={country.name}>
                 {country.name}
               </option>
             ))}
