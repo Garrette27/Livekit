@@ -165,8 +165,17 @@ export async function POST(req: NextRequest) {
     );
 
     // Generate invite URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
     const inviteUrl = `${baseUrl}/invite/${inviteToken}`;
+
+    // Debug logging for URL generation
+    console.log('Environment variables for URL generation:', {
+      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+      VERCEL_URL: process.env.VERCEL_URL,
+      baseUrl: baseUrl,
+      inviteUrl: inviteUrl
+    });
 
     const response: CreateInvitationResponse = {
       success: true,
