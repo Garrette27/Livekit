@@ -413,6 +413,15 @@ export async function POST(req: NextRequest) {
         video: {
           roomJoin: true,
           room: tokenPayload.roomName,
+          canPublish: true,
+          canSubscribe: true,
+          canPublishData: true,
+        },
+        audio: {
+          roomJoin: true,
+          room: tokenPayload.roomName,
+          canPublish: true,
+          canSubscribe: true,
         },
       },
       process.env.LIVEKIT_API_SECRET || 'fallback-secret',

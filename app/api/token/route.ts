@@ -86,6 +86,15 @@ export async function POST(req: NextRequest) {
         video: {
           roomJoin: true,
           room: sanitizedRoomName,
+          canPublish: true,
+          canSubscribe: true,
+          canPublishData: true,
+        },
+        audio: {
+          roomJoin: true,
+          room: sanitizedRoomName,
+          canPublish: true,
+          canSubscribe: true,
         },
       },
       process.env.LIVEKIT_API_SECRET,
