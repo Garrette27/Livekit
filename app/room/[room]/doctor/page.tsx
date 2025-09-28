@@ -22,9 +22,16 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
         setUser(user);
         setIsAuthenticated(!!user);
         console.log('Doctor auth state changed:', user ? 'Doctor signed in' : 'Doctor signed out');
+        
+        // Auto-fill doctor name from authenticated user
+        if (user && !doctorName) {
+          const displayName = user.displayName || user.email || 'Dr. Anonymous';
+          setDoctorName(displayName);
+          localStorage.setItem(`doctorName_${roomName}`, displayName);
+        }
       });
     }
-  }, []);
+  }, [roomName]);
 
   // Load doctor name from localStorage on mount
   useEffect(() => {
@@ -33,40 +40,6 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
       setDoctorName(savedName);
     }
   }, [roomName]);
-
-  const handleSignIn = async () => {
-    if (!auth || !provider) {
-      setError('Authentication not available');
-      return;
-    }
-
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      setUser(user);
-      setIsAuthenticated(true);
-      setDoctorName(user.displayName || user.email || 'Dr. Anonymous');
-      localStorage.setItem(`doctorName_${roomName}`, user.displayName || user.email || 'Dr. Anonymous');
-    } catch (error) {
-      console.error('Sign in error:', error);
-      setError('Failed to sign in. Please try again.');
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      if (auth) {
-        await signOut(auth);
-        setUser(null);
-        setIsAuthenticated(false);
-        setDoctorName('');
-        localStorage.removeItem(`doctorName_${roomName}`);
-        localStorage.removeItem(`doctorToken_${roomName}`);
-      }
-    } catch (error) {
-      console.error('Sign out error:', error);
-    }
-  };
 
   const generateDoctorToken = async () => {
     if (!doctorName.trim()) {
@@ -104,6 +77,48 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
       setError('Network error. Please try again.');
     } finally {
       setIsJoining(false);
+    }
+  };
+
+  // Auto-join when user is authenticated and has a name
+  useEffect(() => {
+    if (isAuthenticated && user && doctorName.trim() && !token && !isJoining) {
+      console.log('Auto-joining as doctor:', doctorName);
+      generateDoctorToken();
+    }
+  }, [isAuthenticated, user, doctorName, token, isJoining, roomName]);
+
+  const handleSignIn = async () => {
+    if (!auth || !provider) {
+      setError('Authentication not available');
+      return;
+    }
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      setUser(user);
+      setIsAuthenticated(true);
+      setDoctorName(user.displayName || user.email || 'Dr. Anonymous');
+      localStorage.setItem(`doctorName_${roomName}`, user.displayName || user.email || 'Dr. Anonymous');
+    } catch (error) {
+      console.error('Sign in error:', error);
+      setError('Failed to sign in. Please try again.');
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      if (auth) {
+        await signOut(auth);
+        setUser(null);
+        setIsAuthenticated(false);
+        setDoctorName('');
+        localStorage.removeItem(`doctorName_${roomName}`);
+        localStorage.removeItem(`doctorToken_${roomName}`);
+      }
+    } catch (error) {
+      console.error('Sign out error:', error);
     }
   };
 
@@ -210,8 +225,8 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
     );
   }
 
-  // Show name input if not set
-  if (!doctorName.trim() && !token) {
+  // Show name input if not set and user is authenticated
+  if (isAuthenticated && !doctorName.trim() && !token) {
     return (
       <div style={{
         minHeight: '100vh',
