@@ -381,10 +381,21 @@ export async function POST(req: NextRequest) {
       
       accessAttempt.reason = `Violations: ${violations.map(v => v.type).join(', ')}`;
       
+      // Prepare access attempt data without undefined values for Firestore
+      const accessAttemptData = {
+        timestamp: accessAttempt.timestamp,
+        ip: accessAttempt.ip,
+        userAgent: accessAttempt.userAgent,
+        success: accessAttempt.success,
+        reason: accessAttempt.reason,
+        ...(accessAttempt.country && { country: accessAttempt.country }),
+        ...(accessAttempt.deviceFingerprint && { deviceFingerprint: accessAttempt.deviceFingerprint }),
+      };
+      
       // Update invitation with access attempt and violations
       await db.collection('invitations').doc(tokenPayload.invitationId).update({
-        'audit.accessAttempts': [...invitation.audit.accessAttempts, accessAttempt],
-        'audit.violations': [...invitation.audit.violations, ...violations],
+        'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
+        'audit.violations': [...(invitation.audit?.violations || []), ...violations],
         'audit.lastAccessed': new Date(),
       });
 
@@ -414,11 +425,24 @@ export async function POST(req: NextRequest) {
 
     // Mark invitation as used
     accessAttempt.success = true;
+    accessAttempt.reason = 'Access granted successfully';
+    
+    // Prepare access attempt data without undefined values for Firestore
+    const accessAttemptData = {
+      timestamp: accessAttempt.timestamp,
+      ip: accessAttempt.ip,
+      userAgent: accessAttempt.userAgent,
+      success: accessAttempt.success,
+      reason: accessAttempt.reason,
+      ...(accessAttempt.country && { country: accessAttempt.country }),
+      ...(accessAttempt.deviceFingerprint && { deviceFingerprint: accessAttempt.deviceFingerprint }),
+    };
+    
     await db.collection('invitations').doc(tokenPayload.invitationId).update({
       status: 'used',
       usedAt: new Date(),
       usedBy: clientIP,
-      'audit.accessAttempts': [...invitation.audit.accessAttempts, accessAttempt],
+      'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
       'audit.lastAccessed': new Date(),
     });
 
