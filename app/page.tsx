@@ -206,7 +206,7 @@ export default function Page() {
           </button>
           
           <p style={{ fontSize: '0.875rem', color: '#6B7280', marginTop: '2rem' }}>
-            Secure • HIPAA Compliant • Professional
+            Secure • Data Privacy (Philippines) Compliant • Professional
           </p>
         </div>
       </div>
