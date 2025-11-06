@@ -275,15 +275,13 @@ export default function InvitationsPage() {
                     <p><strong>Created:</strong> {invitation.createdAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
                     <p><strong>Expires:</strong> {invitation.expiresAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
                     <p><strong>Uses:</strong> {invitation.usedAt ? 1 : 0} / {invitation.maxUses || 1}</p>
-                    {invitation.countryAllowlist && invitation.countryAllowlist.length > 0 && (
-                      <p><strong>Countries:</strong> {invitation.countryAllowlist.join(', ')}</p>
+                    <p><strong>Email:</strong> {invitation.emailAllowed}</p>
+                    {invitation.phoneAllowed && (
+                      <p><strong>Phone:</strong> {invitation.phoneAllowed}</p>
                     )}
-                    {invitation.browserAllowlist && invitation.browserAllowlist.length > 0 && (
-                      <p><strong>Browsers:</strong> {invitation.browserAllowlist.join(', ')}</p>
-                    )}
-                    {invitation.deviceFingerprintHash && (
-                      <p><strong>Device Binding:</strong> Bound</p>
-                    )}
+                    <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                      <strong>Note:</strong> Device, location, and browser verification is handled automatically via user registration.
+                    </p>
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

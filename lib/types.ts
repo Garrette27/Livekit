@@ -193,7 +193,7 @@ export interface UserProfile {
   email: string;
   phone?: string;
   consentGiven: boolean;
-  consentGivenAt: Timestamp;
+  consentGivenAt: Timestamp | Date | any; // Flexible for client/server compatibility
   deviceInfo: {
     deviceFingerprintHash: string;
     userAgent: string;
@@ -212,8 +212,8 @@ export interface UserProfile {
     name: string;
     version?: string;
   };
-  registeredAt: Timestamp;
-  lastLoginAt: Timestamp;
+  registeredAt: Timestamp | Date | any; // Flexible for client/server compatibility
+  lastLoginAt: Timestamp | Date | any; // Flexible for client/server compatibility
 }
 
 export interface RegisterUserRequest {
