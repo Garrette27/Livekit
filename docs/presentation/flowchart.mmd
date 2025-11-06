@@ -1,0 +1,34 @@
+flowchart TD
+  UA[User Access] --> FA[Firebase Auth]
+  FA --> GS[Google Sign-in]
+
+  subgraph Doctor Flow
+    DL[Doctor Login] --> CR[Create Room Form]
+    CR --> FRD[Firestore room doc create]
+    CR --> SL[Share Link generated]
+  end
+
+  subgraph Patient Flow
+    PR[Patient receives link] --> PP[Patient room page]
+    PP --> TV[Token validation via /api/invite/validate]
+  end
+
+  subgraph Consultation
+    JV[Both participants join] --> VC[LiveKit Video Conference]
+    VC --> FC[Firestore call metadata/transcription]
+  end
+
+  subgraph EndProcessing
+    CE[Call ends] --> LKE[LiveKit event webhook]
+    LKE -->|HMAC verify + idempotent| AS[AI Summary Generation]
+    AS --> CSF[call-summaries]
+    AS --> DELC[delete calls]
+    CSF --> SD[scheduled deletions +30 days]
+  end
+
+  subgraph Dashboard
+    DR[Doctor access] --> DH[Dashboard]
+    DH --> QCS[Query call-summaries]
+    QCS --> View[User-specific summary view]
+  end
+

@@ -21,158 +21,14 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<InvitationFormData>({
     email: '',
-    countries: ['United States'],
-    browsers: ['Chrome', 'Firefox', 'Safari', 'Edge'],
-    deviceBinding: false,
+    phone: '',
     expiresInHours: 24,
-    ipAllowlist: [],
-    deviceIdAllowlist: [],
   });
 
-  const countryOptions = [
-    { code: 'US', name: 'United States' },
-    { code: 'CA', name: 'Canada' },
-    { code: 'GB', name: 'United Kingdom' },
-    { code: 'AU', name: 'Australia' },
-    { code: 'DE', name: 'Germany' },
-    { code: 'FR', name: 'France' },
-    { code: 'IT', name: 'Italy' },
-    { code: 'ES', name: 'Spain' },
-    { code: 'NL', name: 'Netherlands' },
-    { code: 'SE', name: 'Sweden' },
-    { code: 'NO', name: 'Norway' },
-    { code: 'DK', name: 'Denmark' },
-    { code: 'FI', name: 'Finland' },
-    { code: 'CH', name: 'Switzerland' },
-    { code: 'AT', name: 'Austria' },
-    { code: 'BE', name: 'Belgium' },
-    { code: 'IE', name: 'Ireland' },
-    { code: 'PT', name: 'Portugal' },
-    { code: 'GR', name: 'Greece' },
-    { code: 'PL', name: 'Poland' },
-    { code: 'PH', name: 'Philippines' },
-    { code: 'CZ', name: 'Czech Republic' },
-    { code: 'HU', name: 'Hungary' },
-    { code: 'SK', name: 'Slovakia' },
-    { code: 'SI', name: 'Slovenia' },
-    { code: 'HR', name: 'Croatia' },
-    { code: 'RO', name: 'Romania' },
-    { code: 'BG', name: 'Bulgaria' },
-    { code: 'LT', name: 'Lithuania' },
-    { code: 'LV', name: 'Latvia' },
-    { code: 'EE', name: 'Estonia' },
-    { code: 'JP', name: 'Japan' },
-    { code: 'KR', name: 'South Korea' },
-    { code: 'CN', name: 'China' },
-    { code: 'IN', name: 'India' },
-    { code: 'SG', name: 'Singapore' },
-    { code: 'HK', name: 'Hong Kong' },
-    { code: 'TW', name: 'Taiwan' },
-    { code: 'TH', name: 'Thailand' },
-    { code: 'MY', name: 'Malaysia' },
-    { code: 'ID', name: 'Indonesia' },
-    { code: 'PH', name: 'Philippines' },
-    { code: 'VN', name: 'Vietnam' },
-    { code: 'BR', name: 'Brazil' },
-    { code: 'MX', name: 'Mexico' },
-    { code: 'AR', name: 'Argentina' },
-    { code: 'CL', name: 'Chile' },
-    { code: 'CO', name: 'Colombia' },
-    { code: 'PE', name: 'Peru' },
-    { code: 'ZA', name: 'South Africa' },
-    { code: 'EG', name: 'Egypt' },
-    { code: 'NG', name: 'Nigeria' },
-    { code: 'KE', name: 'Kenya' },
-    { code: 'MA', name: 'Morocco' },
-    { code: 'TN', name: 'Tunisia' },
-    { code: 'DZ', name: 'Algeria' },
-    { code: 'LY', name: 'Libya' },
-    { code: 'SD', name: 'Sudan' },
-    { code: 'ET', name: 'Ethiopia' },
-    { code: 'GH', name: 'Ghana' },
-    { code: 'UG', name: 'Uganda' },
-    { code: 'TZ', name: 'Tanzania' },
-    { code: 'ZM', name: 'Zambia' },
-    { code: 'ZW', name: 'Zimbabwe' },
-    { code: 'BW', name: 'Botswana' },
-    { code: 'NA', name: 'Namibia' },
-    { code: 'SZ', name: 'Eswatini' },
-    { code: 'LS', name: 'Lesotho' },
-    { code: 'MW', name: 'Malawi' },
-    { code: 'MZ', name: 'Mozambique' },
-    { code: 'MG', name: 'Madagascar' },
-    { code: 'MU', name: 'Mauritius' },
-    { code: 'SC', name: 'Seychelles' },
-    { code: 'KM', name: 'Comoros' },
-    { code: 'DJ', name: 'Djibouti' },
-    { code: 'SO', name: 'Somalia' },
-    { code: 'ER', name: 'Eritrea' },
-    { code: 'SS', name: 'South Sudan' },
-    { code: 'CF', name: 'Central African Republic' },
-    { code: 'TD', name: 'Chad' },
-    { code: 'NE', name: 'Niger' },
-    { code: 'ML', name: 'Mali' },
-    { code: 'BF', name: 'Burkina Faso' },
-    { code: 'CI', name: 'Côte d\'Ivoire' },
-    { code: 'LR', name: 'Liberia' },
-    { code: 'SL', name: 'Sierra Leone' },
-    { code: 'GN', name: 'Guinea' },
-    { code: 'GW', name: 'Guinea-Bissau' },
-    { code: 'GM', name: 'Gambia' },
-    { code: 'SN', name: 'Senegal' },
-    { code: 'MR', name: 'Mauritania' },
-    { code: 'CV', name: 'Cape Verde' },
-    { code: 'ST', name: 'São Tomé and Príncipe' },
-    { code: 'GQ', name: 'Equatorial Guinea' },
-    { code: 'GA', name: 'Gabon' },
-    { code: 'CG', name: 'Republic of the Congo' },
-    { code: 'CD', name: 'Democratic Republic of the Congo' },
-    { code: 'AO', name: 'Angola' },
-    { code: 'CM', name: 'Cameroon' },
-    { code: 'CF', name: 'Central African Republic' },
-    { code: 'TD', name: 'Chad' },
-    { code: 'NE', name: 'Niger' },
-    { code: 'ML', name: 'Mali' },
-    { code: 'BF', name: 'Burkina Faso' },
-    { code: 'CI', name: 'Côte d\'Ivoire' },
-    { code: 'LR', name: 'Liberia' },
-    { code: 'SL', name: 'Sierra Leone' },
-    { code: 'GN', name: 'Guinea' },
-    { code: 'GW', name: 'Guinea-Bissau' },
-    { code: 'GM', name: 'Gambia' },
-    { code: 'SN', name: 'Senegal' },
-    { code: 'MR', name: 'Mauritania' },
-    { code: 'CV', name: 'Cape Verde' },
-    { code: 'ST', name: 'São Tomé and Príncipe' },
-    { code: 'GQ', name: 'Equatorial Guinea' },
-    { code: 'GA', name: 'Gabon' },
-    { code: 'CG', name: 'Republic of the Congo' },
-    { code: 'CD', name: 'Democratic Republic of the Congo' },
-    { code: 'AO', name: 'Angola' },
-    { code: 'CM', name: 'Cameroon' },
-  ];
-
-  const browserOptions = [
-    { value: 'Chrome', label: 'Google Chrome' },
-    { value: 'Firefox', label: 'Mozilla Firefox' },
-    { value: 'Safari', label: 'Safari' },
-    { value: 'Edge', label: 'Microsoft Edge' },
-    { value: 'Opera', label: 'Opera' },
-  ];
 
   const handleCreateInvitation = async () => {
     if (!formData.email.trim()) {
       setError('Please enter a patient email address');
-      return;
-    }
-
-    if (formData.countries.length === 0) {
-      setError('Please select at least one country');
-      return;
-    }
-
-    if (formData.browsers.length === 0) {
-      setError('Please select at least one browser');
       return;
     }
 
@@ -183,12 +39,8 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
       const request: CreateInvitationRequest = {
         roomName,
         emailAllowed: formData.email,
-        countryAllowlist: formData.countries,
-        browserAllowlist: formData.browsers,
-        deviceBinding: formData.deviceBinding,
+        phoneAllowed: formData.phone?.trim() || undefined,
         expiresInHours: formData.expiresInHours,
-        allowedIpAddresses: formData.ipAllowlist?.filter(Boolean) || [],
-        allowedDeviceIds: formData.deviceIdAllowlist?.filter(Boolean) || [],
       };
 
       const response = await fetch('/api/invite/create', {
@@ -206,9 +58,7 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
         // Reset form
         setFormData({
           email: '',
-          countries: ['United States'],
-          browsers: ['Chrome', 'Firefox', 'Safari', 'Edge'],
-          deviceBinding: false,
+          phone: '',
           expiresInHours: 24,
         });
       } else {
@@ -387,6 +237,43 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
             }}
             autoComplete="email"
           />
+          <p style={{
+            fontSize: '0.65rem',
+            color: '#6b7280',
+            marginTop: '0.25rem'
+          }}>
+            The system will automatically verify the patient's device, location, and browser after they register.
+          </p>
+        </div>
+
+        {/* Phone Input (Optional) */}
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '0.75rem',
+            fontWeight: '500',
+            color: '#374151',
+            marginBottom: '0.5rem'
+          }}>
+            Patient Phone (Optional)
+          </label>
+          <input
+            type="tel"
+            value={formData.phone || ''}
+            onChange={(e) => {
+              const newPhone = e.target.value;
+              setFormData(prev => ({ ...prev, phone: newPhone }));
+            }}
+            placeholder="+1234567890"
+            style={{
+              width: '100%',
+              padding: '0.5rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.375rem',
+              fontSize: '0.8rem'
+            }}
+            autoComplete="tel"
+          />
         </div>
 
         {/* Expiration Time */}
@@ -422,204 +309,21 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
         </div>
       </div>
 
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1rem',
-        marginBottom: '1rem'
-      }}>
-        {/* Country Selection */}
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '0.75rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}>
-            Allowed Countries *
-          </label>
-          <select
-            multiple
-            value={formData.countries}
-            onChange={(e) => {
-              const selected = Array.from(e.target.selectedOptions, option => option.value);
-              setFormData(prev => ({ ...prev, countries: selected }));
-            }}
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.375rem',
-              fontSize: '0.7rem',
-              height: '80px'
-            }}
-            onFocus={(e) => e.target.style.outline = '2px solid #059669'}
-            onBlur={(e) => e.target.style.outline = 'none'}
-          >
-            {countryOptions.map(country => (
-              <option key={country.code} value={country.name}>
-                {country.name}
-              </option>
-            ))}
-          </select>
-          <p style={{
-            fontSize: '0.65rem',
-            color: '#6b7280',
-            marginTop: '0.25rem'
-          }}>
-            Hold Ctrl/Cmd for multiple
-          </p>
-        </div>
-
-        {/* Browser Selection */}
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '0.75rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}>
-            Allowed Browsers *
-          </label>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.25rem'
-          }}>
-            {browserOptions.map(browser => (
-              <label key={browser.value} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.7rem'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={formData.browsers.includes(browser.value)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setFormData(prev => ({
-                        ...prev,
-                        browsers: [...prev.browsers, browser.value]
-                      }));
-                    } else {
-                      setFormData(prev => ({
-                        ...prev,
-                        browsers: prev.browsers.filter(b => b !== browser.value)
-                      }));
-                    }
-                  }}
-                />
-                {browser.label}
-              </label>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Optional Allowlists */}
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1rem',
-        marginBottom: '1rem'
-      }}>
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '0.75rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}>
-            Allowed IP Addresses (comma-separated)
-          </label>
-          <input
-            type="text"
-            placeholder="e.g., 203.0.113.10, 198.51.100.25"
-            value={(formData.ipAllowlist || []).join(', ')}
-            onChange={(e) => {
-              const newIps = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
-              setFormData(prev => ({ ...prev, ipAllowlist: newIps }));
-            }}
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.375rem',
-              fontSize: '0.8rem'
-            }}
-          />
-          <p style={{ fontSize: '0.65rem', color: '#6b7280', marginTop: '0.25rem' }}>
-            Optional. If set, only these IPs can use the invite.
-          </p>
-        </div>
-
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '0.75rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}>
-            Allowed Device IDs (comma-separated)
-          </label>
-          <input
-            type="text"
-            placeholder="Fingerprint visitorId(s) or hashes"
-            value={(formData.deviceIdAllowlist || []).join(', ')}
-            onChange={(e) => {
-              const newDevices = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
-              setFormData(prev => ({ ...prev, deviceIdAllowlist: newDevices }));
-            }}
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.375rem',
-              fontSize: '0.8rem'
-            }}
-          />
-          <p style={{ fontSize: '0.65rem', color: '#6b7280', marginTop: '0.25rem' }}>
-            Optional. If set, only these devices can use the invite.
-          </p>
-        </div>
-      </div>
-
-      {/* Device Binding */}
+      {/* Info Box */}
       <div style={{
         marginBottom: '1rem',
         padding: '0.75rem',
-        backgroundColor: '#f8fafc',
-        border: '1px solid #e2e8f0',
+        backgroundColor: '#eff6ff',
+        border: '1px solid #bfdbfe',
         borderRadius: '0.375rem'
       }}>
-        <label style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          fontSize: '0.7rem',
-          fontWeight: '500',
-          color: '#374151',
-          cursor: 'pointer'
-        }}>
-          <input
-            type="checkbox"
-            checked={formData.deviceBinding}
-            onChange={(e) => setFormData(prev => ({ ...prev, deviceBinding: e.target.checked }))}
-          />
-          <span>Enable Device Binding</span>
-        </label>
         <p style={{
-          fontSize: '0.65rem',
-          color: '#6b7280',
-          marginTop: '0.5rem',
-          marginLeft: '1.5rem'
+          fontSize: '0.7rem',
+          color: '#1e40af',
+          margin: 0,
+          lineHeight: '1.5'
         }}>
-          Bind to first device for extra security
+          <strong>ℹ️ Privacy-Compliant System:</strong> Device ID, location, and browser information are only collected after the patient provides consent during registration. The system will automatically verify these details when the patient accesses the invitation link.
         </p>
       </div>
 

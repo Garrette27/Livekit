@@ -1,0 +1,29 @@
+flowchart LR
+  D[Doctor Web UI]
+  P[Patient Web UI]
+
+  NEXT[Next.js API Routes]
+  RL[Rate Limiting]
+  VAL[Input Validation]
+
+  FA[Firebase Auth]
+  FS[(Firestore)]
+  CF[Cloud Functions / Schedules]
+
+  LK[LiveKit Cloud]
+  OA[OpenAI API]
+
+  D -->|Sign in| FA
+  P -->|Invite validate| NEXT
+  D -->|Create invite/room| NEXT
+
+  NEXT --> RL
+  NEXT --> VAL
+  NEXT --> FS
+
+  LK -->|room_finished / participant_left| NEXT
+  NEXT -->|HMAC-SHA256 verify| NEXT
+  NEXT --> OA
+
+  CF --> FS
+

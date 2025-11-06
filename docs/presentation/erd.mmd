@@ -1,0 +1,92 @@
+erDiagram
+  USERS ||--o{ INVITATIONS : "createdBy"
+  USERS ||--o{ ROOMS : "createdBy"
+  USERS ||--o{ CONSULTATIONS : "createdBy"
+  USERS ||--o{ CALL_SUMMARIES : "createdBy"
+
+  ROOMS ||--o| CALLS : "roomName = docId"
+  ROOMS ||--o| CONSULTATIONS : "roomName = docId"
+  ROOMS ||--o| CALL_SUMMARIES : "roomName = docId"
+  CALL_SUMMARIES ||--o| SCHEDULED_DELETIONS : "summaryId = roomName"
+
+  INVITATIONS {
+    string id
+    string roomName
+    string emailAllowed
+    string[] countryAllowlist
+    string[] browserAllowlist
+    string deviceFingerprintHash
+    string[] allowedIpAddresses
+    string[] allowedDeviceIds
+    timestamp expiresAt
+    number maxUses
+    timestamp usedAt
+    string usedBy
+    string createdBy
+    timestamp createdAt
+    string status
+    json metadata
+    json audit
+  }
+
+  ROOMS {
+    string roomName
+    string createdBy
+    timestamp createdAt
+    string status
+    json metadata
+  }
+
+  CALLS {
+    string roomName
+    string createdBy
+    timestamp createdAt
+    string status
+    string[] transcription
+    json metadata
+  }
+
+  CONSULTATIONS {
+    string roomName
+    string patientName
+    number duration
+    string status
+    timestamp joinedAt
+    timestamp leftAt
+    string createdBy
+    string patientUserId
+    boolean isRealConsultation
+    json metadata
+  }
+
+  CALL_SUMMARIES {
+    string roomName
+    string summary
+    string[] keyPoints
+    string[] recommendations
+    string[] followUpActions
+    string riskLevel
+    string category
+    string[] participants
+    number duration
+    timestamp createdAt
+    string createdBy
+    boolean hasTranscriptionData
+    string[] transcriptionData
+    json metadata
+  }
+
+  SCHEDULED_DELETIONS {
+    string roomName
+    string summaryId
+    timestamp scheduledFor
+    timestamp createdAt
+    string reason
+  }
+
+
+
+
+
+
+

@@ -49,12 +49,7 @@ export interface Invitation {
   id: string;
   roomName: string;
   emailAllowed: string;
-  countryAllowlist: string[];
-  browserAllowlist: string[];
-  deviceFingerprintHash?: string;
-  // Optional allowlists for stricter access control
-  allowedIpAddresses?: string[]; // e.g., ["203.0.113.10", "198.51.100.25"]
-  allowedDeviceIds?: string[];   // raw device IDs (e.g., FingerprintJS visitorId) or precomputed hashes
+  phoneAllowed?: string; // Optional phone number
   expiresAt: Timestamp;
   maxUses: number;
   usedAt?: Timestamp;
@@ -69,15 +64,12 @@ export interface Invitation {
     roomName: string;
     constraints: {
       email: string;
-      countries: string[];
-      browsers: string[];
-      deviceBinding: boolean;
+      phone?: string;
     };
     security: {
       singleUse: boolean;
       timeLimited: boolean;
-      geoRestricted: boolean;
-      deviceRestricted: boolean;
+      // Removed: geoRestricted, deviceRestricted - now handled via user profile
     };
   };
   audit: {
@@ -100,7 +92,7 @@ export interface AccessAttempt {
 
 export interface SecurityViolation {
   timestamp: Timestamp;
-  type: 'wrong_email' | 'wrong_country' | 'wrong_browser' | 'wrong_device' | 'wrong_ip' | 'expired' | 'already_used';
+  type: 'wrong_email' | 'wrong_country' | 'wrong_browser' | 'wrong_device' | 'wrong_ip' | 'expired' | 'already_used' | 'not_registered' | 'consent_not_given';
   details: string;
   ip: string;
   userAgent: string;
@@ -140,12 +132,10 @@ export interface GeolocationData {
 export interface CreateInvitationRequest {
   roomName: string;
   emailAllowed: string;
-  countryAllowlist: string[];
-  browserAllowlist: string[];
-  deviceBinding: boolean;
+  phoneAllowed?: string; // Optional phone number
   expiresInHours: number;
-  allowedIpAddresses?: string[];
-  allowedDeviceIds?: string[];
+  // Removed: countryAllowlist, browserAllowlist, deviceBinding, allowedIpAddresses, allowedDeviceIds
+  // System will automatically verify using registered user's device/location/browser info
 }
 
 export interface CreateInvitationResponse {
@@ -164,6 +154,7 @@ export interface ValidateInvitationRequest {
   token: string;
   deviceFingerprint?: DeviceFingerprint;
   geolocation?: GeolocationData;
+  userEmail?: string; // Email from registration if user just registered
 }
 
 export interface ValidateInvitationResponse {
@@ -172,17 +163,16 @@ export interface ValidateInvitationResponse {
   roomName?: string;
   error?: string;
   violations?: SecurityViolation[];
+  requiresRegistration?: boolean; // If true, user needs to register first
+  registeredEmail?: string; // Email that should be used for registration
 }
 
 // UI component props
 export interface InvitationFormData {
   email: string;
-  countries: string[];
-  browsers: string[];
-  deviceBinding: boolean;
+  phone?: string; // Optional phone number
   expiresInHours: number;
-  ipAllowlist?: string[];
-  deviceIdAllowlist?: string[];
+  // Removed: countries, browsers, deviceBinding, ipAllowlist, deviceIdAllowlist
 }
 
 export interface InvitationListItem {
@@ -195,4 +185,48 @@ export interface InvitationListItem {
   usedAt?: string;
   accessAttempts: number;
   violations: number;
+}
+
+// User profile types for privacy-compliant registration
+export interface UserProfile {
+  id: string;
+  email: string;
+  phone?: string;
+  consentGiven: boolean;
+  consentGivenAt: Timestamp;
+  deviceInfo: {
+    deviceFingerprintHash: string;
+    userAgent: string;
+    platform: string;
+    screenResolution: string;
+    timezone: string;
+  };
+  locationInfo: {
+    country: string;
+    countryCode: string;
+    region: string;
+    city: string;
+    ipHash: string; // Hashed IP for privacy
+  };
+  browserInfo: {
+    name: string;
+    version?: string;
+  };
+  registeredAt: Timestamp;
+  lastLoginAt: Timestamp;
+}
+
+export interface RegisterUserRequest {
+  email: string;
+  phone?: string;
+  consentGiven: boolean;
+  deviceFingerprint: DeviceFingerprint;
+  geolocation?: GeolocationData;
+}
+
+export interface RegisterUserResponse {
+  success: boolean;
+  userId?: string;
+  error?: string;
+  requiresConsent?: boolean;
 }

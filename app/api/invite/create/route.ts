@@ -19,12 +19,12 @@ export async function POST(req: NextRequest) {
     }
 
     const body: CreateInvitationRequest = await req.json();
-    const { roomName, emailAllowed, countryAllowlist, browserAllowlist, deviceBinding, expiresInHours, allowedIpAddresses, allowedDeviceIds } = body;
+    const { roomName, emailAllowed, phoneAllowed, expiresInHours } = body;
 
     // Input validation
-    if (!roomName || !emailAllowed || !countryAllowlist || !browserAllowlist) {
+    if (!roomName || !emailAllowed) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
+        { success: false, error: 'Missing required fields: roomName and emailAllowed are required' },
         { status: 400 }
       );
     }
@@ -44,27 +44,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!Array.isArray(countryAllowlist) || countryAllowlist.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Country allowlist must be a non-empty array' },
-        { status: 400 }
-      );
-    }
-
-    if (!Array.isArray(browserAllowlist) || browserAllowlist.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Browser allowlist must be a non-empty array' },
-        { status: 400 }
-      );
-    }
-
     // Sanitize inputs
     const sanitizedRoomName = sanitizeInput(roomName);
-    const sanitizedEmail = sanitizeInput(emailAllowed);
-    const sanitizedCountries = countryAllowlist.map(c => sanitizeInput(c));
-    const sanitizedBrowsers = browserAllowlist.map(b => sanitizeInput(b));
-    const sanitizedAllowedIps = (allowedIpAddresses || []).map(ip => sanitizeInput(ip));
-    const sanitizedAllowedDevices = (allowedDeviceIds || []).map(id => sanitizeInput(id));
+    const sanitizedEmail = sanitizeInput(emailAllowed.toLowerCase().trim());
+    const sanitizedPhone = phoneAllowed ? sanitizeInput(phoneAllowed.trim()) : undefined;
 
     // Validate expiration time (1-168 hours = 1 hour to 1 week)
     const validExpirationHours = Math.max(1, Math.min(168, expiresInHours || 24));
@@ -99,12 +82,10 @@ export async function POST(req: NextRequest) {
     // Generate unique invitation ID
     const invitationId = `invite_${sanitizedRoomName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Create invitation document - only include fields that have values
+    // Create invitation document
     const invitation: any = {
       roomName: sanitizedRoomName,
       emailAllowed: sanitizedEmail,
-      countryAllowlist: sanitizedCountries,
-      browserAllowlist: sanitizedBrowsers,
       expiresAt: expiresAt as any, // Firestore Timestamp
       maxUses: 1, // Single use
       createdBy: 'system', // TODO: Get from auth context
@@ -117,15 +98,12 @@ export async function POST(req: NextRequest) {
         roomName: sanitizedRoomName,
         constraints: {
           email: sanitizedEmail,
-          countries: sanitizedCountries,
-          browsers: sanitizedBrowsers,
-          deviceBinding: deviceBinding || false,
+          ...(sanitizedPhone && { phone: sanitizedPhone }),
         },
         security: {
           singleUse: true,
           timeLimited: true,
-          geoRestricted: true,
-          deviceRestricted: deviceBinding || false,
+          // Removed: geoRestricted, deviceRestricted - now handled via user profile verification
         },
       },
       audit: {
@@ -135,24 +113,9 @@ export async function POST(req: NextRequest) {
       },
     };
 
-    // Debug logging
-    console.log('Creating invitation with data:', {
-      sanitizedAllowedIps: sanitizedAllowedIps,
-      sanitizedAllowedDevices: sanitizedAllowedDevices,
-      deviceBinding: deviceBinding
-    });
-
-    // Only add optional fields if they have values
-    if (sanitizedAllowedIps.length > 0) {
-      invitation.allowedIpAddresses = sanitizedAllowedIps;
-    }
-    
-    if (sanitizedAllowedDevices.length > 0) {
-      invitation.allowedDeviceIds = sanitizedAllowedDevices;
-    }
-    
-    if (deviceBinding) {
-      invitation.deviceFingerprintHash = null; // Will be set on first access
+    // Add phone if provided
+    if (sanitizedPhone) {
+      invitation.phoneAllowed = sanitizedPhone;
     }
 
     // Store invitation in Firestore

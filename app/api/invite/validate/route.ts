@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body: ValidateInvitationRequest = await req.json();
-    const { token, deviceFingerprint } = body;
+    const { token, deviceFingerprint, userEmail } = body;
 
     if (!token) {
       return NextResponse.json(
@@ -169,128 +169,82 @@ export async function POST(req: NextRequest) {
 
     const violations: SecurityViolation[] = [];
 
-    // Validate email (if provided in token)
-    if (tokenPayload.email && tokenPayload.email !== invitation.emailAllowed) {
+    // Check if user is registered
+    const userEmailToCheck = userEmail || tokenPayload.email || invitation.emailAllowed;
+    const userQuery = await db.collection('users')
+      .where('email', '==', userEmailToCheck.toLowerCase().trim())
+      .limit(1)
+      .get();
+
+    // If user is not registered, require registration
+    if (userQuery.empty) {
+      return NextResponse.json({
+        success: false,
+        error: 'User not registered. Please register first.',
+        requiresRegistration: true,
+        registeredEmail: invitation.emailAllowed,
+      } as ValidateInvitationResponse, { status: 403 });
+    }
+
+    const userProfile = userQuery.docs[0].data();
+
+    // Check if consent was given
+    if (!userProfile.consentGiven) {
       violations.push({
         timestamp: new Date() as any,
-        type: 'wrong_email',
-        details: `Expected: ${invitation.emailAllowed}, Got: ${tokenPayload.email}`,
+        type: 'consent_not_given',
+        details: 'User has not given consent to store device information',
         ip: clientIP,
         userAgent,
       });
     }
 
-    // Validate country - check both country name and country code
-    if (geolocation) {
-      const countryAllowed = invitation.countryAllowlist.some(allowedCountry => 
-        allowedCountry === geolocation.country || 
-        allowedCountry === geolocation.countryCode ||
-        // Handle case where allowlist has country codes but geolocation has full names
-        (allowedCountry === 'PH' && geolocation.country === 'Philippines') ||
-        (allowedCountry === 'US' && geolocation.country === 'United States') ||
-        (allowedCountry === 'GB' && geolocation.country === 'United Kingdom') ||
-        (allowedCountry === 'CA' && geolocation.country === 'Canada') ||
-        (allowedCountry === 'AU' && geolocation.country === 'Australia') ||
-        (allowedCountry === 'DE' && geolocation.country === 'Germany') ||
-        (allowedCountry === 'FR' && geolocation.country === 'France') ||
-        (allowedCountry === 'IT' && geolocation.country === 'Italy') ||
-        (allowedCountry === 'ES' && geolocation.country === 'Spain') ||
-        (allowedCountry === 'NL' && geolocation.country === 'Netherlands') ||
-        (allowedCountry === 'SE' && geolocation.country === 'Sweden') ||
-        (allowedCountry === 'NO' && geolocation.country === 'Norway') ||
-        (allowedCountry === 'DK' && geolocation.country === 'Denmark') ||
-        (allowedCountry === 'FI' && geolocation.country === 'Finland') ||
-        (allowedCountry === 'CH' && geolocation.country === 'Switzerland') ||
-        (allowedCountry === 'AT' && geolocation.country === 'Austria') ||
-        (allowedCountry === 'BE' && geolocation.country === 'Belgium') ||
-        (allowedCountry === 'IE' && geolocation.country === 'Ireland') ||
-        (allowedCountry === 'PT' && geolocation.country === 'Portugal') ||
-        (allowedCountry === 'GR' && geolocation.country === 'Greece') ||
-        (allowedCountry === 'PL' && geolocation.country === 'Poland') ||
-        (allowedCountry === 'CZ' && geolocation.country === 'Czech Republic') ||
-        (allowedCountry === 'HU' && geolocation.country === 'Hungary') ||
-        (allowedCountry === 'SK' && geolocation.country === 'Slovakia') ||
-        (allowedCountry === 'SI' && geolocation.country === 'Slovenia') ||
-        (allowedCountry === 'HR' && geolocation.country === 'Croatia') ||
-        (allowedCountry === 'RO' && geolocation.country === 'Romania') ||
-        (allowedCountry === 'BG' && geolocation.country === 'Bulgaria') ||
-        (allowedCountry === 'LT' && geolocation.country === 'Lithuania') ||
-        (allowedCountry === 'LV' && geolocation.country === 'Latvia') ||
-        (allowedCountry === 'EE' && geolocation.country === 'Estonia') ||
-        (allowedCountry === 'JP' && geolocation.country === 'Japan') ||
-        (allowedCountry === 'KR' && geolocation.country === 'South Korea') ||
-        (allowedCountry === 'CN' && geolocation.country === 'China') ||
-        (allowedCountry === 'IN' && geolocation.country === 'India') ||
-        (allowedCountry === 'SG' && geolocation.country === 'Singapore') ||
-        (allowedCountry === 'HK' && geolocation.country === 'Hong Kong') ||
-        (allowedCountry === 'TW' && geolocation.country === 'Taiwan') ||
-        (allowedCountry === 'TH' && geolocation.country === 'Thailand') ||
-        (allowedCountry === 'MY' && geolocation.country === 'Malaysia') ||
-        (allowedCountry === 'ID' && geolocation.country === 'Indonesia') ||
-        (allowedCountry === 'VN' && geolocation.country === 'Vietnam') ||
-        (allowedCountry === 'BR' && geolocation.country === 'Brazil') ||
-        (allowedCountry === 'MX' && geolocation.country === 'Mexico') ||
-        (allowedCountry === 'AR' && geolocation.country === 'Argentina') ||
-        (allowedCountry === 'CL' && geolocation.country === 'Chile') ||
-        (allowedCountry === 'CO' && geolocation.country === 'Colombia') ||
-        (allowedCountry === 'PE' && geolocation.country === 'Peru') ||
-        (allowedCountry === 'ZA' && geolocation.country === 'South Africa') ||
-        (allowedCountry === 'EG' && geolocation.country === 'Egypt') ||
-        (allowedCountry === 'NG' && geolocation.country === 'Nigeria') ||
-        (allowedCountry === 'KE' && geolocation.country === 'Kenya') ||
-        (allowedCountry === 'MA' && geolocation.country === 'Morocco') ||
-        (allowedCountry === 'TN' && geolocation.country === 'Tunisia') ||
-        (allowedCountry === 'DZ' && geolocation.country === 'Algeria') ||
-        (allowedCountry === 'LY' && geolocation.country === 'Libya') ||
-        (allowedCountry === 'SD' && geolocation.country === 'Sudan') ||
-        (allowedCountry === 'ET' && geolocation.country === 'Ethiopia') ||
-        (allowedCountry === 'GH' && geolocation.country === 'Ghana') ||
-        (allowedCountry === 'UG' && geolocation.country === 'Uganda') ||
-        (allowedCountry === 'TZ' && geolocation.country === 'Tanzania') ||
-        (allowedCountry === 'ZM' && geolocation.country === 'Zambia') ||
-        (allowedCountry === 'ZW' && geolocation.country === 'Zimbabwe') ||
-        (allowedCountry === 'BW' && geolocation.country === 'Botswana') ||
-        (allowedCountry === 'NA' && geolocation.country === 'Namibia') ||
-        (allowedCountry === 'SZ' && geolocation.country === 'Eswatini') ||
-        (allowedCountry === 'LS' && geolocation.country === 'Lesotho') ||
-        (allowedCountry === 'MW' && geolocation.country === 'Malawi') ||
-        (allowedCountry === 'MZ' && geolocation.country === 'Mozambique') ||
-        (allowedCountry === 'MG' && geolocation.country === 'Madagascar') ||
-        (allowedCountry === 'MU' && geolocation.country === 'Mauritius') ||
-        (allowedCountry === 'SC' && geolocation.country === 'Seychelles') ||
-        (allowedCountry === 'KM' && geolocation.country === 'Comoros') ||
-        (allowedCountry === 'DJ' && geolocation.country === 'Djibouti') ||
-        (allowedCountry === 'SO' && geolocation.country === 'Somalia') ||
-        (allowedCountry === 'ER' && geolocation.country === 'Eritrea') ||
-        (allowedCountry === 'SS' && geolocation.country === 'South Sudan') ||
-        (allowedCountry === 'CF' && geolocation.country === 'Central African Republic') ||
-        (allowedCountry === 'TD' && geolocation.country === 'Chad') ||
-        (allowedCountry === 'NE' && geolocation.country === 'Niger') ||
-        (allowedCountry === 'ML' && geolocation.country === 'Mali') ||
-        (allowedCountry === 'BF' && geolocation.country === 'Burkina Faso') ||
-        (allowedCountry === 'CI' && geolocation.country === 'Côte d\'Ivoire') ||
-        (allowedCountry === 'LR' && geolocation.country === 'Liberia') ||
-        (allowedCountry === 'SL' && geolocation.country === 'Sierra Leone') ||
-        (allowedCountry === 'GN' && geolocation.country === 'Guinea') ||
-        (allowedCountry === 'GW' && geolocation.country === 'Guinea-Bissau') ||
-        (allowedCountry === 'GM' && geolocation.country === 'Gambia') ||
-        (allowedCountry === 'SN' && geolocation.country === 'Senegal') ||
-        (allowedCountry === 'MR' && geolocation.country === 'Mauritania') ||
-        (allowedCountry === 'CV' && geolocation.country === 'Cape Verde') ||
-        (allowedCountry === 'ST' && geolocation.country === 'São Tomé and Príncipe') ||
-        (allowedCountry === 'GQ' && geolocation.country === 'Equatorial Guinea') ||
-        (allowedCountry === 'GA' && geolocation.country === 'Gabon') ||
-        (allowedCountry === 'CG' && geolocation.country === 'Republic of the Congo') ||
-        (allowedCountry === 'CD' && geolocation.country === 'Democratic Republic of the Congo') ||
-        (allowedCountry === 'AO' && geolocation.country === 'Angola') ||
-        (allowedCountry === 'CM' && geolocation.country === 'Cameroon')
-      );
-      
-      if (!countryAllowed) {
+    // Validate email matches invitation
+    if (userEmailToCheck.toLowerCase().trim() !== invitation.emailAllowed.toLowerCase().trim()) {
+      violations.push({
+        timestamp: new Date() as any,
+        type: 'wrong_email',
+        details: `Expected: ${invitation.emailAllowed}, Got: ${userEmailToCheck}`,
+        ip: clientIP,
+        userAgent,
+      });
+    }
+
+    // Validate device fingerprint if device info exists
+    if (deviceFingerprint && userProfile.deviceInfo) {
+      const currentDeviceHash = generateDeviceFingerprintHash(deviceFingerprint);
+      if (userProfile.deviceInfo.deviceFingerprintHash !== currentDeviceHash) {
+        violations.push({
+          timestamp: new Date() as any,
+          type: 'wrong_device',
+          details: 'Device fingerprint does not match registered device',
+          ip: clientIP,
+          userAgent,
+        });
+      }
+    }
+
+    // Validate location if location info exists
+    if (geolocation && userProfile.locationInfo) {
+      if (userProfile.locationInfo.country !== geolocation.country &&
+          userProfile.locationInfo.countryCode !== geolocation.countryCode) {
         violations.push({
           timestamp: new Date() as any,
           type: 'wrong_country',
-          details: `Expected: ${invitation.countryAllowlist.join(', ')}, Got: ${geolocation.country} (${geolocation.countryCode})`,
+          details: `Expected: ${userProfile.locationInfo.country} (${userProfile.locationInfo.countryCode}), Got: ${geolocation.country} (${geolocation.countryCode})`,
+          ip: clientIP,
+          userAgent,
+        });
+      }
+    }
+
+    // Validate browser if browser info exists
+    if (userProfile.browserInfo) {
+      if (userProfile.browserInfo.name !== detectedBrowser) {
+        violations.push({
+          timestamp: new Date() as any,
+          type: 'wrong_browser',
+          details: `Expected: ${userProfile.browserInfo.name}, Got: ${detectedBrowser}`,
           ip: clientIP,
           userAgent,
         });
@@ -300,77 +254,17 @@ export async function POST(req: NextRequest) {
     // Debug logging for validation
     console.log('Validation debug info:', {
       invitationId: tokenPayload.invitationId,
+      userEmail: userEmailToCheck,
+      userRegistered: !userQuery.empty,
+      consentGiven: userProfile.consentGiven,
       clientIP,
       geolocation: geolocation ? {
         country: geolocation.country,
         countryCode: geolocation.countryCode
       } : null,
       detectedBrowser,
-      countryAllowlist: invitation.countryAllowlist,
-      browserAllowlist: invitation.browserAllowlist,
       userAgent
     });
-
-    // Validate browser
-    if (!invitation.browserAllowlist.includes(detectedBrowser)) {
-      violations.push({
-        timestamp: new Date() as any,
-        type: 'wrong_browser',
-        details: `Expected: ${invitation.browserAllowlist.join(', ')}, Got: ${detectedBrowser}`,
-        ip: clientIP,
-        userAgent,
-      });
-    }
-
-    // Validate IP allowlist if provided
-    if (invitation.allowedIpAddresses && invitation.allowedIpAddresses.length > 0) {
-      const ipAllowed = invitation.allowedIpAddresses.some(ip => ip.trim() === clientIP);
-      if (!ipAllowed) {
-        violations.push({
-          timestamp: new Date() as any,
-          type: 'wrong_ip',
-          details: `IP ${clientIP} not in allowlist`,
-          ip: clientIP,
-          userAgent,
-        });
-      }
-    }
-
-    // Validate device ID allowlist if provided (raw visitorId or hash)
-    if (invitation.allowedDeviceIds && invitation.allowedDeviceIds.length > 0 && deviceFingerprint) {
-      const deviceHash = generateDeviceFingerprintHash(deviceFingerprint);
-      const rawId = deviceFingerprint.hash || '';
-      const deviceAllowed = invitation.allowedDeviceIds.some(id => id === rawId || id === deviceHash);
-      if (!deviceAllowed) {
-        violations.push({
-          timestamp: new Date() as any,
-          type: 'wrong_device',
-          details: 'Device ID not in allowlist',
-          ip: clientIP,
-          userAgent,
-        });
-      }
-    }
-
-    // Validate device fingerprint (if device binding is enabled)
-    if (invitation.metadata.security.deviceRestricted && deviceFingerprint) {
-      const deviceHash = generateDeviceFingerprintHash(deviceFingerprint);
-      
-      if (invitation.deviceFingerprintHash && invitation.deviceFingerprintHash !== deviceHash) {
-        violations.push({
-          timestamp: new Date() as any,
-          type: 'wrong_device',
-          details: 'Device fingerprint does not match',
-          ip: clientIP,
-          userAgent,
-        });
-      } else if (!invitation.deviceFingerprintHash) {
-        // First time access - bind the device
-        await db.collection('invitations').doc(tokenPayload.invitationId).update({
-          deviceFingerprintHash: deviceHash,
-        });
-      }
-    }
 
     // If there are violations, record them and deny access
     if (violations.length > 0) {
