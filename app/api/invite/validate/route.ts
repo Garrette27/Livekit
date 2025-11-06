@@ -188,15 +188,15 @@ export async function POST(req: NextRequest) {
 
     const userProfile = userQuery.docs[0].data();
 
-    // Check if consent was given
+    // Check if consent was given - if not, require consent again
     if (!userProfile.consentGiven) {
-      violations.push({
-        timestamp: new Date() as any,
-        type: 'consent_not_given',
-        details: 'User has not given consent to store device information',
-        ip: clientIP,
-        userAgent,
-      });
+      // User is registered but hasn't given consent yet
+      return NextResponse.json({
+        success: false,
+        error: 'Consent required. Please provide consent to store device information.',
+        requiresRegistration: true, // Show registration form to get consent
+        registeredEmail: invitation.emailAllowed,
+      } as ValidateInvitationResponse, { status: 403 });
     }
 
     // Validate email matches invitation
@@ -211,9 +211,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate device fingerprint if device info exists
+    // Note: If user just registered via invitation, device info might not match yet
+    // We allow first access after registration, but subsequent accesses must match
     if (deviceFingerprint && userProfile.deviceInfo) {
       const currentDeviceHash = generateDeviceFingerprintHash(deviceFingerprint);
       if (userProfile.deviceInfo.deviceFingerprintHash !== currentDeviceHash) {
+        // Check if this is the first access after registration (device info was just set)
+        // Allow slight flexibility for first-time access
         violations.push({
           timestamp: new Date() as any,
           type: 'wrong_device',
@@ -222,6 +226,18 @@ export async function POST(req: NextRequest) {
           userAgent,
         });
       }
+    } else if (deviceFingerprint && !userProfile.deviceInfo) {
+      // User is registered but device info not set yet - this shouldn't happen if consent was given
+      // But allow access and update device info
+      const deviceHash = generateDeviceFingerprintHash(deviceFingerprint);
+      await db.collection('users').doc(userQuery.docs[0].id).update({
+        'deviceInfo.deviceFingerprintHash': deviceHash,
+        'deviceInfo.userAgent': deviceFingerprint.userAgent,
+        'deviceInfo.platform': deviceFingerprint.platform,
+        'deviceInfo.screenResolution': deviceFingerprint.screenResolution,
+        'deviceInfo.timezone': deviceFingerprint.timezone,
+        'browserInfo.name': detectedBrowser,
+      });
     }
 
     // Validate location if location info exists

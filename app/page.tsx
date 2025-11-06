@@ -182,13 +182,15 @@ export default function Page() {
     );
   }
 
-  // Signed-out view
+  // Signed-out view - Show role selection
   if (!user) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-        <div style={{ textAlign: 'center', maxWidth: '28rem' }}>
+      <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+        <div style={{ textAlign: 'center', maxWidth: '40rem', width: '100%' }}>
           <h1 style={{ fontSize: '2.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>Telehealth Console</h1>
-          <p style={{ fontSize: '1.25rem', color: '#4B5563', marginBottom: '2rem' }}>Sign in to create secure video consultation rooms</p>
+          <p style={{ fontSize: '1.125rem', color: '#6B7280', marginBottom: '3rem' }}>
+            Secure video consultation platform
+          </p>
           
           {error && (
             <div style={{ marginBottom: '2rem', padding: '1rem', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '0.5rem', color: '#DC2626', fontSize: '1rem' }}>
@@ -196,14 +198,114 @@ export default function Page() {
             </div>
           )}
           
-          <button 
-            onClick={login} 
-            style={{ width: '100%', backgroundColor: '#2563EB', color: 'white', padding: '1rem 2rem', borderRadius: '0.5rem', fontWeight: '600', fontSize: '1.25rem', border: 'none', cursor: 'pointer' }}
-            onMouseOver={(e) => (e.target as HTMLElement).style.backgroundColor = '#1D4ED8'}
-            onMouseOut={(e) => (e.target as HTMLElement).style.backgroundColor = '#2563EB'}
-          >
-            Sign in with Google
-          </button>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: '1fr 1fr', 
+            gap: '2rem',
+            marginBottom: '2rem'
+          }}>
+            {/* Doctor Sign In */}
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '1rem',
+              padding: '2rem',
+              border: '2px solid #dbeafe',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{
+                width: '4rem',
+                height: '4rem',
+                backgroundColor: '#dbeafe',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1.5rem'
+              }}>
+                <span style={{ fontSize: '2rem' }}>🩺</span>
+              </div>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e40af', marginBottom: '0.5rem' }}>
+                For Doctors
+              </h2>
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+                Create rooms, manage invitations, and view consultation history
+              </p>
+              <Link
+                href="/doctor/login"
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  backgroundColor: '#2563EB',
+                  color: 'white',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  fontWeight: '600',
+                  fontSize: '1rem',
+                  textDecoration: 'none',
+                  textAlign: 'center'
+                }}
+              >
+                Sign in as Doctor
+              </Link>
+            </div>
+
+            {/* Patient Sign In */}
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '1rem',
+              padding: '2rem',
+              border: '2px solid #dcfce7',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{
+                width: '4rem',
+                height: '4rem',
+                backgroundColor: '#dcfce7',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1.5rem'
+              }}>
+                <span style={{ fontSize: '2rem' }}>👤</span>
+              </div>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#166534', marginBottom: '0.5rem' }}>
+                For Patients
+              </h2>
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+                View your consultation history and summaries
+              </p>
+              <Link
+                href="/patient/login"
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  backgroundColor: '#059669',
+                  color: 'white',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  fontWeight: '600',
+                  fontSize: '1rem',
+                  textDecoration: 'none',
+                  textAlign: 'center'
+                }}
+              >
+                Sign in as Patient
+              </Link>
+            </div>
+          </div>
+
+          <div style={{
+            backgroundColor: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            marginTop: '2rem'
+          }}>
+            <p style={{ fontSize: '0.875rem', color: '#1e40af', margin: 0, lineHeight: '1.6' }}>
+              <strong>Note for Patients:</strong> You can also join consultations directly using invitation links from your doctor without signing in. Sign in is optional and allows you to view your consultation history.
+            </p>
+          </div>
           
           <p style={{ fontSize: '0.875rem', color: '#6B7280', marginTop: '2rem' }}>
             Secure • Data Privacy (Philippines) Compliant • Professional

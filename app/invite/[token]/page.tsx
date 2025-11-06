@@ -247,8 +247,17 @@ function InvitePageContent() {
           video
           style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}
           onDisconnected={() => {
-            console.log('Disconnected from room');
-            router.push('/');
+            console.log('Patient disconnected from consultation');
+            // Redirect to patient dashboard or login page
+            // Check if user is registered by checking localStorage or redirect to patient login
+            const registeredEmail = localStorage.getItem('patientRegisteredEmail');
+            if (registeredEmail) {
+              // Patient just registered, guide them to sign in
+              router.push('/patient/login?registered=true&email=' + encodeURIComponent(registeredEmail));
+            } else {
+              // Not registered or no email stored, go to patient login
+              router.push('/patient/login');
+            }
           }}
           onError={(error) => {
             console.error('LiveKit error:', error);

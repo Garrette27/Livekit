@@ -104,7 +104,13 @@ export default function PatientRegistration({
       const result: RegisterUserResponse = await response.json();
 
       if (result.success) {
+        // Store registered email in localStorage for post-consultation redirect
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('patientRegisteredEmail', email.trim());
+        }
         // Registration successful, now validate the invitation
+        // Show a brief message before proceeding
+        alert('Registration successful! You can now join the consultation. After the consultation, you can sign in to view your consultation history.');
         onRegistrationComplete(email.trim());
       } else {
         setError(result.error || 'Registration failed. Please try again.');

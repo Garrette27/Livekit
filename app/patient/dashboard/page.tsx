@@ -67,27 +67,82 @@ export default function PatientDashboard() {
     }
 
     // Fetch summaries where patient is a participant
+    // Try multiple query strategies to find patient's consultations
     const summariesRef = collection(db, 'call-summaries');
-    const q = query(
+    
+    // Query 1: By visibleToUsers array
+    const q1 = query(
       summariesRef,
       where('metadata.visibleToUsers', 'array-contains', user.uid),
       orderBy('createdAt', sortOrder),
       limit(100)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    // Query 2: By patientUserId (if exists)
+    const q2 = query(
+      summariesRef,
+      where('patientUserId', '==', user.uid),
+      orderBy('createdAt', sortOrder),
+      limit(100)
+    );
+
+    // Also fetch consultations to show session history
+    const consultationsRef = collection(db, 'consultations');
+    const consultationsQuery = query(
+      consultationsRef,
+      where('metadata.visibleToUsers', 'array-contains', user.uid),
+      orderBy('joinedAt', sortOrder),
+      limit(100)
+    );
+
+    // Combine results from both queries
+    const unsubscribe1 = onSnapshot(q1, (snapshot) => {
       const summaryData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as CallSummary[];
-      setSummaries(summaryData);
+      setSummaries(prev => {
+        const combined = [...prev, ...summaryData];
+        // Remove duplicates
+        const unique = combined.filter((item, index, self) => 
+          index === self.findIndex(t => t.id === item.id)
+        );
+        return unique.sort((a, b) => {
+          const aTime = a.createdAt?.toDate?.()?.getTime() || 0;
+          const bTime = b.createdAt?.toDate?.()?.getTime() || 0;
+          return sortOrder === 'desc' ? bTime - aTime : aTime - bTime;
+        });
+      });
       setLoading(false);
     }, (error) => {
       console.error('Error fetching summaries:', error);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const unsubscribe2 = onSnapshot(q2, (snapshot) => {
+      const summaryData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as CallSummary[];
+      setSummaries(prev => {
+        const combined = [...prev, ...summaryData];
+        const unique = combined.filter((item, index, self) => 
+          index === self.findIndex(t => t.id === item.id)
+        );
+        return unique.sort((a, b) => {
+          const aTime = a.createdAt?.toDate?.()?.getTime() || 0;
+          const bTime = b.createdAt?.toDate?.()?.getTime() || 0;
+          return sortOrder === 'desc' ? bTime - aTime : aTime - bTime;
+        });
+      });
+    }, (error) => {
+      console.error('Error fetching summaries by patientUserId:', error);
+    });
+
+    return () => {
+      unsubscribe1();
+      unsubscribe2();
+    };
   }, [user, sortOrder, isAuthorized]);
 
   if (!user) {

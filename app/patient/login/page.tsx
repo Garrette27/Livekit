@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { doc, getDoc, setDoc, serverTimestamp, query, where, getDocs, collection } from "firebase/firestore";
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,24 @@ export default function PatientLoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [justRegistered, setJustRegistered] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Check if user just registered
+  useEffect(() => {
+    const registered = searchParams.get('registered');
+    const emailParam = searchParams.get('email');
+    if (registered === 'true' && emailParam) {
+      setJustRegistered(true);
+      setEmail(emailParam);
+      setIsSignUp(false); // Show sign-in form, not sign-up
+      // Clear localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('patientRegisteredEmail');
+      }
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,18 +68,35 @@ export default function PatientLoginPage() {
           return;
         }
 
+        // Check if user already exists in users collection (registered via invitation)
+        const existingUserQuery = query(
+          collection(db, 'users'),
+          where('email', '==', email.toLowerCase().trim())
+        );
+        const existingDocs = await getDocs(existingUserQuery);
+
         // Create new Firebase Auth account
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        // Create patient profile
-        await setDoc(doc(db, 'users', user.uid), {
-          email: email.toLowerCase().trim(),
-          role: 'patient',
-          registeredAt: serverTimestamp(),
-          lastLoginAt: serverTimestamp(),
-          consentGiven: false, // Will be given when accessing invitation
-        });
+        if (!existingDocs.empty) {
+          // User already registered via invitation, just link Firebase Auth account
+          const existingUserDoc = existingDocs.docs[0];
+          await setDoc(doc(db, 'users', user.uid), {
+            ...existingUserDoc.data(),
+            // Keep existing consent and device info
+          }, { merge: true });
+          // Also update the old document to point to new UID if needed
+        } else {
+          // Create new patient profile
+          await setDoc(doc(db, 'users', user.uid), {
+            email: email.toLowerCase().trim(),
+            role: 'patient',
+            registeredAt: serverTimestamp(),
+            lastLoginAt: serverTimestamp(),
+            consentGiven: false, // Will be given when accessing invitation
+          });
+        }
 
         router.push('/patient/dashboard');
       } else {
@@ -149,11 +183,27 @@ export default function PatientLoginPage() {
           fontSize: '0.875rem',
           textAlign: 'center'
         }}>
-          {isSignUp 
+          {justRegistered 
+            ? 'Registration successful! Please sign in to view your consultation history.'
+            : isSignUp 
             ? 'Create an account to view your consultation history'
             : 'Sign in to view your consultation history'
           }
         </p>
+
+        {justRegistered && (
+          <div style={{
+            backgroundColor: '#dcfce7',
+            border: '1px solid #bbf7d0',
+            borderRadius: '0.5rem',
+            padding: '1rem',
+            marginBottom: '1.5rem'
+          }}>
+            <p style={{ fontSize: '0.875rem', color: '#166534', margin: 0, lineHeight: '1.5' }}>
+              ✅ <strong>Registration Complete!</strong> You've successfully registered. Please create a password below to sign in and access your consultation dashboard.
+            </p>
+          </div>
+        )}
 
         {error && (
           <div style={{
