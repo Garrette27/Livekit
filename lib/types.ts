@@ -192,28 +192,32 @@ export interface UserProfile {
   id: string;
   email: string;
   phone?: string;
+  role: 'doctor' | 'patient'; // User role
   consentGiven: boolean;
   consentGivenAt: Timestamp | Date | any; // Flexible for client/server compatibility
-  deviceInfo: {
+  deviceInfo?: { // Only for patients who gave consent
     deviceFingerprintHash: string;
     userAgent: string;
     platform: string;
     screenResolution: string;
     timezone: string;
   };
-  locationInfo: {
+  locationInfo?: { // Only for patients who gave consent
     country: string;
     countryCode: string;
     region: string;
     city: string;
     ipHash: string; // Hashed IP for privacy
   };
-  browserInfo: {
+  browserInfo?: { // Only for patients who gave consent
     name: string;
     version?: string;
   };
   registeredAt: Timestamp | Date | any; // Flexible for client/server compatibility
   lastLoginAt: Timestamp | Date | any; // Flexible for client/server compatibility
+  // Doctor-specific fields
+  doctorName?: string;
+  doctorEmail?: string;
 }
 
 export interface RegisterUserRequest {

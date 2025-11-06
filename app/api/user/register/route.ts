@@ -104,8 +104,10 @@ export async function POST(req: NextRequest) {
     const ipHash = hashIP(clientIP);
 
     // Prepare user profile data
+    // Default to 'patient' role - doctors are registered separately via login
     const userProfileData: any = {
       email: sanitizedEmail,
+      role: 'patient', // Patients register via invitation flow
       consentGiven: true,
       consentGivenAt: new Date(),
       deviceInfo: {

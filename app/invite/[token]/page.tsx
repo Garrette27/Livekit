@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
+import PatientRegistration from '@/components/PatientRegistration';
 import { 
   ValidateInvitationRequest, 
   ValidateInvitationResponse, 
@@ -18,6 +19,8 @@ function InvitePageContent() {
   const [validationResult, setValidationResult] = useState<ValidateInvitationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deviceFingerprint, setDeviceFingerprint] = useState<DeviceFingerprint | null>(null);
+  const [requiresRegistration, setRequiresRegistration] = useState(false);
+  const [invitationEmail, setInvitationEmail] = useState<string>('');
 
   // Generate device fingerprint
   useEffect(() => {
@@ -62,6 +65,10 @@ function InvitePageContent() {
 
         if (result.success) {
           setValidationResult(result);
+        } else if (result.requiresRegistration) {
+          // User needs to register first
+          setRequiresRegistration(true);
+          setInvitationEmail(result.registeredEmail || '');
         } else {
           setError(result.error || 'Validation failed');
           if (result.violations && result.violations.length > 0) {
@@ -78,6 +85,53 @@ function InvitePageContent() {
 
     validateInvitation();
   }, [token, deviceFingerprint]);
+
+  // Handle registration requirement
+  if (requiresRegistration) {
+    return (
+      <PatientRegistration
+        invitationEmail={invitationEmail}
+        invitationToken={token}
+        onRegistrationComplete={async (registeredEmail: string) => {
+          // After registration, re-validate the invitation
+          if (!deviceFingerprint) return;
+          
+          try {
+            setIsValidating(true);
+            setRequiresRegistration(false);
+            setError(null);
+
+            const request: ValidateInvitationRequest = {
+              token,
+              deviceFingerprint,
+              userEmail: registeredEmail,
+            };
+
+            const response = await fetch('/api/invite/validate', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(request),
+            });
+
+            const result: ValidateInvitationResponse = await response.json();
+
+            if (result.success) {
+              setValidationResult(result);
+            } else {
+              setError(result.error || 'Validation failed after registration');
+            }
+          } catch (err) {
+            setError('Network error. Please try again.');
+            console.error('Error validating invitation after registration:', err);
+          } finally {
+            setIsValidating(false);
+          }
+        }}
+      />
+    );
+  }
 
   // Handle validation errors
   if (error) {

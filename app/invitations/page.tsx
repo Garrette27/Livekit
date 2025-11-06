@@ -171,13 +171,13 @@ export default function InvitationsPage() {
             padding: '1rem',
             marginBottom: '1.5rem'
           }}>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#0369a1', marginBottom: '0.5rem' }}>
-              💡 How it works:
+            <h3 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1e40af', marginBottom: '0.75rem' }}>
+              How it works:
             </h3>
-            <ul style={{ fontSize: '0.8rem', color: '#0369a1', margin: 0, paddingLeft: '1rem' }}>
-              <li><strong>Patient:</strong> Uses the invitation link to join</li>
-              <li><strong>Doctor:</strong> Uses the "Join as Doctor" button (no invitation needed)</li>
-              <li><strong>Security:</strong> Invitation validates country, browser, and device</li>
+            <ul style={{ fontSize: '0.875rem', color: '#1e40af', margin: 0, paddingLeft: '1.25rem', lineHeight: '1.75' }}>
+              <li><strong>Patient:</strong> Uses the invitation link to join and register (if first time)</li>
+              <li><strong>Doctor:</strong> Uses the 'Join as Doctor' button (no invitation needed)</li>
+              <li><strong>Security:</strong> System automatically verifies patient's device, location, and browser after registration with consent</li>
             </ul>
           </div>
           
