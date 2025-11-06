@@ -1,0 +1,286 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { auth, db } from "@/lib/firebase";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { useRouter } from "next/navigation";
+import { doc, getDoc, setDoc, serverTimestamp, query, where, getDocs, collection } from "firebase/firestore";
+
+export const dynamic = 'force-dynamic';
+
+export default function PatientLoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    if (!auth || !db) {
+      setError('System not ready. Please refresh the page.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      if (isSignUp) {
+        // Check if user exists in users collection with this email
+        const usersQuery = query(
+          collection(db, 'users'),
+          where('email', '==', email.toLowerCase().trim())
+        );
+        const userDocs = await getDocs(usersQuery);
+
+        if (!userDocs.empty) {
+          // User exists, check if they have a password (Firebase Auth account)
+          const userData = userDocs.docs[0].data();
+          if (userData.role !== 'patient') {
+            setError('This email is registered as a doctor. Please use doctor login.');
+            setLoading(false);
+            return;
+          }
+          // User exists but might not have Firebase Auth account
+          setError('An account with this email already exists. Please sign in instead.');
+          setIsSignUp(false);
+          setLoading(false);
+          return;
+        }
+
+        // Create new Firebase Auth account
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        // Create patient profile
+        await setDoc(doc(db, 'users', user.uid), {
+          email: email.toLowerCase().trim(),
+          role: 'patient',
+          registeredAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
+          consentGiven: false, // Will be given when accessing invitation
+        });
+
+        router.push('/patient/dashboard');
+      } else {
+        // Sign in
+        await signInWithEmailAndPassword(auth, email, password);
+        
+        // Check user role
+        const user = auth.currentUser;
+        if (user && db) {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.role === 'patient') {
+              router.push('/patient/dashboard');
+            } else {
+              setError('This account is for doctors. Please use doctor login.');
+              if (auth) {
+                await auth.signOut();
+              }
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Auth error:', err);
+      if (err.code === 'auth/user-not-found') {
+        setError('No account found with this email. Please sign up.');
+        setIsSignUp(true);
+      } else if (err.code === 'auth/wrong-password') {
+        setError('Incorrect password. Please try again.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('This email is already registered. Please sign in.');
+        setIsSignUp(false);
+      } else {
+        setError(err.message || 'An error occurred. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#f0fdf4',
+      padding: '2rem'
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '1rem',
+        padding: '3rem',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        maxWidth: '28rem',
+        width: '100%'
+      }}>
+        <div style={{
+          width: '5rem',
+          height: '5rem',
+          backgroundColor: '#dcfce7',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 2rem'
+        }}>
+          <span style={{ fontSize: '2.5rem' }}>👤</span>
+        </div>
+
+        <h1 style={{
+          fontSize: '1.875rem',
+          fontWeight: 'bold',
+          color: '#166534',
+          marginBottom: '0.5rem',
+          textAlign: 'center'
+        }}>
+          {isSignUp ? 'Create Patient Account' : 'Patient Login'}
+        </h1>
+        <p style={{
+          color: '#6b7280',
+          marginBottom: '2rem',
+          fontSize: '0.875rem',
+          textAlign: 'center'
+        }}>
+          {isSignUp 
+            ? 'Create an account to view your consultation history'
+            : 'Sign in to view your consultation history'
+          }
+        </p>
+
+        {error && (
+          <div style={{
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '0.5rem',
+            padding: '0.75rem',
+            marginBottom: '1.5rem',
+            color: '#dc2626',
+            fontSize: '0.875rem'
+          }}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '0.5rem'
+            }}>
+              Email Address
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="patient@example.com"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.5rem',
+                fontSize: '1rem'
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '0.5rem'
+            }}>
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="Enter your password"
+              minLength={6}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.5rem',
+                fontSize: '1rem'
+              }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%',
+              backgroundColor: loading ? '#9ca3af' : '#059669',
+              color: 'white',
+              padding: '0.75rem 1.5rem',
+              borderRadius: '0.5rem',
+              border: 'none',
+              fontWeight: '600',
+              fontSize: '1rem',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              marginBottom: '1rem'
+            }}
+          >
+            {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
+          </button>
+        </form>
+
+        <div style={{
+          textAlign: 'center',
+          paddingTop: '1rem',
+          borderTop: '1px solid #e5e7eb'
+        }}>
+          <button
+            onClick={() => {
+              setIsSignUp(!isSignUp);
+              setError(null);
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#059669',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              textDecoration: 'underline'
+            }}
+          >
+            {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+          </button>
+        </div>
+
+        <div style={{
+          marginTop: '2rem',
+          padding: '1rem',
+          backgroundColor: '#f0f9ff',
+          borderRadius: '0.5rem',
+          fontSize: '0.75rem',
+          color: '#1e40af',
+          textAlign: 'center'
+        }}>
+          <p style={{ margin: 0 }}>
+            <strong>Note:</strong> You can also join consultations directly using invitation links from your doctor without signing in.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
