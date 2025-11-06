@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { auth, db } from "@/lib/firebase";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -8,7 +8,7 @@ import { doc, getDoc, setDoc, serverTimestamp, query, where, getDocs, collection
 
 export const dynamic = 'force-dynamic';
 
-export default function PatientLoginPage() {
+function PatientLoginContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
@@ -331,6 +331,36 @@ export default function PatientLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PatientLoginPage() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f0fdf4',
+        padding: '2rem'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '4rem',
+            height: '4rem',
+            border: '2px solid #dcfce7',
+            borderTop: '2px solid #059669',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 1rem'
+          }}></div>
+          <p style={{ color: '#6b7280' }}>Loading...</p>
+        </div>
+      </div>
+    }>
+      <PatientLoginContent />
+    </Suspense>
   );
 }
 
