@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { auth, db } from "@/lib/firebase";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { doc, getDoc, setDoc, serverTimestamp, query, where, getDocs, collection } from "firebase/firestore";
 
@@ -15,6 +15,9 @@ function PatientLoginContent() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [justRegistered, setJustRegistered] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -126,15 +129,51 @@ function PatientLoginContent() {
         setError('No account found with this email. Please sign up.');
         setIsSignUp(true);
       } else if (err.code === 'auth/wrong-password') {
-        setError('Incorrect password. Please try again.');
+        setError('Incorrect password. Please try again or reset your password.');
       } else if (err.code === 'auth/email-already-in-use') {
         setError('This email is already registered. Please sign in.');
         setIsSignUp(false);
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('Email/password authentication is not enabled. Please contact support.');
       } else {
         setError(err.message || 'An error occurred. Please try again.');
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setResetLoading(true);
+
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      setResetLoading(false);
+      return;
+    }
+
+    if (!auth) {
+      setError('System not ready. Please refresh the page.');
+      setResetLoading(false);
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setResetEmailSent(true);
+    } catch (err: any) {
+      console.error('Password reset error:', err);
+      if (err.code === 'auth/user-not-found') {
+        setError('No account found with this email address.');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('Password reset is not enabled. Please contact support.');
+      } else {
+        setError(err.message || 'Failed to send password reset email. Please try again.');
+      }
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -219,7 +258,7 @@ function PatientLoginContent() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={showForgotPassword ? handleForgotPassword : handleSubmit}>
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
               display: 'block',
@@ -246,75 +285,170 @@ function PatientLoginContent() {
             />
           </div>
 
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              color: '#374151',
-              marginBottom: '0.5rem'
-            }}>
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="Enter your password"
-              minLength={6}
+          {!showForgotPassword && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151'
+                }}>
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPassword(true);
+                    setError(null);
+                    setResetEmailSent(false);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#059669',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    textDecoration: 'underline',
+                    padding: 0
+                  }}
+                >
+                  Forgot password?
+                </button>
+              </div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required={!showForgotPassword}
+                placeholder="Enter your password"
+                minLength={6}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.5rem',
+                  fontSize: '1rem'
+                }}
+              />
+            </div>
+          )}
+
+          {showForgotPassword && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              {resetEmailSent ? (
+                <div style={{
+                  backgroundColor: '#dcfce7',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '0.5rem',
+                  padding: '1rem',
+                  marginBottom: '1rem'
+                }}>
+                  <p style={{ fontSize: '0.875rem', color: '#166534', margin: 0, lineHeight: '1.5' }}>
+                    ✅ <strong>Password reset email sent!</strong> Please check your inbox at <strong>{email}</strong> and follow the instructions to reset your password.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    marginBottom: '1rem',
+                    lineHeight: '1.5'
+                  }}>
+                    Enter your email address and we'll send you a link to reset your password.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setError(null);
+                      setResetEmailSent(false);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#059669',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      textDecoration: 'underline',
+                      marginBottom: '1rem',
+                      padding: 0
+                    }}
+                  >
+                    ← Back to sign in
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {showForgotPassword && !resetEmailSent ? (
+            <button
+              type="submit"
+              disabled={resetLoading || !email.trim()}
               style={{
                 width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
+                backgroundColor: resetLoading || !email.trim() ? '#9ca3af' : '#059669',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
                 borderRadius: '0.5rem',
-                fontSize: '1rem'
+                border: 'none',
+                fontWeight: '600',
+                fontSize: '1rem',
+                cursor: resetLoading || !email.trim() ? 'not-allowed' : 'pointer',
+                marginBottom: '1rem'
               }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              backgroundColor: loading ? '#9ca3af' : '#059669',
-              color: 'white',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '0.5rem',
-              border: 'none',
-              fontWeight: '600',
-              fontSize: '1rem',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              marginBottom: '1rem'
-            }}
-          >
-            {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
-          </button>
+            >
+              {resetLoading ? 'Sending...' : 'Send Reset Link'}
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={loading || (showForgotPassword && resetEmailSent)}
+              style={{
+                width: '100%',
+                backgroundColor: loading || (showForgotPassword && resetEmailSent) ? '#9ca3af' : '#059669',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                fontSize: '1rem',
+                cursor: loading || (showForgotPassword && resetEmailSent) ? 'not-allowed' : 'pointer',
+                marginBottom: '1rem'
+              }}
+            >
+              {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
+            </button>
+          )}
         </form>
 
-        <div style={{
-          textAlign: 'center',
-          paddingTop: '1rem',
-          borderTop: '1px solid #e5e7eb'
-        }}>
-          <button
-            onClick={() => {
-              setIsSignUp(!isSignUp);
-              setError(null);
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#059669',
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              textDecoration: 'underline'
-            }}
-          >
-            {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-          </button>
-        </div>
+        {!showForgotPassword && (
+          <div style={{
+            textAlign: 'center',
+            paddingTop: '1rem',
+            borderTop: '1px solid #e5e7eb'
+          }}>
+            <button
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError(null);
+                setShowForgotPassword(false);
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#059669',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                textDecoration: 'underline'
+              }}
+            >
+              {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+            </button>
+          </div>
+        )}
 
         <div style={{
           marginTop: '2rem',
