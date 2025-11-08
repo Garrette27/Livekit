@@ -70,12 +70,13 @@ function addSecurityHeaders(response: NextResponse) {
   // Content Security Policy for invitation pages
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-    "style-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.google.com https://apis.google.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: https:",
-    "font-src 'self'",
-    "connect-src 'self' https://api.openai.com https://*.livekit.cloud wss://*.livekit.cloud",
-    "media-src 'self'",
+    "font-src 'self' https://fonts.gstatic.com",
+    "connect-src 'self' https://api.openai.com https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com http://ip-api.com https://ip-api.com",
+    "media-src 'self' https://*.livekit.cloud",
+    "frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
