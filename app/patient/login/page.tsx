@@ -51,56 +51,79 @@ function PatientLoginContent() {
 
     try {
       if (isSignUp) {
-        // Check if user exists in users collection with this email
-        const usersQuery = query(
-          collection(db, 'users'),
-          where('email', '==', email.toLowerCase().trim())
-        );
-        const userDocs = await getDocs(usersQuery);
-
-        if (!userDocs.empty) {
-          // User exists, check if they have a password (Firebase Auth account)
-          const userData = userDocs.docs[0].data();
-          if (userData.role !== 'patient') {
-            setError('This email is registered as a doctor. Please use doctor login.');
-            setLoading(false);
-            return;
-          }
-          // User exists but might not have Firebase Auth account
-          setError('An account with this email already exists. Please sign in instead.');
-          setIsSignUp(false);
-          setLoading(false);
-          return;
-        }
-
-        // Check if user already exists in users collection (registered via invitation)
-        const existingUserQuery = query(
-          collection(db, 'users'),
-          where('email', '==', email.toLowerCase().trim())
-        );
-        const existingDocs = await getDocs(existingUserQuery);
-
-        // Create new Firebase Auth account
+        // Create new Firebase Auth account first
+        // Firebase Auth will throw an error if email already exists
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        if (!existingDocs.empty) {
-          // User already registered via invitation, just link Firebase Auth account
-          const existingUserDoc = existingDocs.docs[0];
-          await setDoc(doc(db, 'users', user.uid), {
-            ...existingUserDoc.data(),
-            // Keep existing consent and device info
-          }, { merge: true });
-          // Also update the old document to point to new UID if needed
-        } else {
-          // Create new patient profile
-          await setDoc(doc(db, 'users', user.uid), {
-            email: email.toLowerCase().trim(),
-            role: 'patient',
-            registeredAt: serverTimestamp(),
-            lastLoginAt: serverTimestamp(),
-            consentGiven: false, // Will be given when accessing invitation
-          });
+        // Now that user is authenticated, check if user document exists in Firestore
+        // (from invitation flow or previous registration)
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          
+          if (userDoc.exists()) {
+            // User document already exists, update it
+            const userData = userDoc.data();
+            if (userData.role !== 'patient') {
+              setError('This email is registered as a doctor. Please use doctor login.');
+              await auth.signOut();
+              setLoading(false);
+              return;
+            }
+            // Update existing document with latest info
+            await setDoc(doc(db, 'users', user.uid), {
+              ...userData,
+              lastLoginAt: serverTimestamp(),
+            }, { merge: true });
+          } else {
+            // Check if email exists in another document (from invitation)
+            const usersQuery = query(
+              collection(db, 'users'),
+              where('email', '==', email.toLowerCase().trim())
+            );
+            const userDocs = await getDocs(usersQuery);
+
+            if (!userDocs.empty) {
+              // User exists with different UID (from invitation), merge data
+              const existingUserDoc = userDocs.docs[0];
+              const existingData = existingUserDoc.data();
+              
+              if (existingData.role !== 'patient') {
+                setError('This email is registered as a doctor. Please use doctor login.');
+                await auth.signOut();
+                setLoading(false);
+                return;
+              }
+              
+              // Create/update document with new UID, preserving existing data
+              await setDoc(doc(db, 'users', user.uid), {
+                ...existingData,
+                email: email.toLowerCase().trim(),
+                role: 'patient',
+                lastLoginAt: serverTimestamp(),
+              }, { merge: true });
+            } else {
+              // Create new patient profile
+              await setDoc(doc(db, 'users', user.uid), {
+                email: email.toLowerCase().trim(),
+                role: 'patient',
+                registeredAt: serverTimestamp(),
+                lastLoginAt: serverTimestamp(),
+                consentGiven: false, // Will be given when accessing invitation
+              });
+            }
+          }
+        } catch (firestoreError: any) {
+          console.error('Firestore error during sign-up:', firestoreError);
+          // If Firestore write fails, sign out the user to prevent orphaned Auth account
+          await auth.signOut();
+          if (firestoreError.code === 'permission-denied') {
+            setError('Permission denied. Please contact support.');
+          } else {
+            setError('Failed to create account. Please try again.');
+          }
+          setLoading(false);
+          return;
         }
 
         router.push('/patient/dashboard');
