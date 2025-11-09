@@ -53,74 +53,57 @@ function PatientLoginContent() {
       if (isSignUp) {
         // Create new Firebase Auth account first
         // Firebase Auth will throw an error if email already exists
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        let userCredential;
+        try {
+          userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        } catch (authError: any) {
+          if (authError.code === 'auth/email-already-in-use') {
+            setError('This email is already registered. Please sign in instead.');
+            setIsSignUp(false);
+            setLoading(false);
+            return;
+          }
+          throw authError;
+        }
+        
         const user = userCredential.user;
 
-        // Now that user is authenticated, check if user document exists in Firestore
-        // (from invitation flow or previous registration)
+        // Now that user is authenticated, create user document in Firestore
         try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          // Create new patient profile
+          // Use setDoc without merge to ensure it's a create operation
+          await setDoc(doc(db, 'users', user.uid), {
+            email: email.toLowerCase().trim(),
+            role: 'patient',
+            registeredAt: serverTimestamp(),
+            lastLoginAt: serverTimestamp(),
+            consentGiven: false, // Will be given when accessing invitation
+          });
           
-          if (userDoc.exists()) {
-            // User document already exists, update it
-            const userData = userDoc.data();
-            if (userData.role !== 'patient') {
-              setError('This email is registered as a doctor. Please use doctor login.');
-              await auth.signOut();
-              setLoading(false);
-              return;
-            }
-            // Update existing document with latest info
-            await setDoc(doc(db, 'users', user.uid), {
-              ...userData,
-              lastLoginAt: serverTimestamp(),
-            }, { merge: true });
-          } else {
-            // Check if email exists in another document (from invitation)
-            const usersQuery = query(
-              collection(db, 'users'),
-              where('email', '==', email.toLowerCase().trim())
-            );
-            const userDocs = await getDocs(usersQuery);
-
-            if (!userDocs.empty) {
-              // User exists with different UID (from invitation), merge data
-              const existingUserDoc = userDocs.docs[0];
-              const existingData = existingUserDoc.data();
-              
-              if (existingData.role !== 'patient') {
-                setError('This email is registered as a doctor. Please use doctor login.');
-                await auth.signOut();
-                setLoading(false);
-                return;
-              }
-              
-              // Create/update document with new UID, preserving existing data
-              await setDoc(doc(db, 'users', user.uid), {
-                ...existingData,
-                email: email.toLowerCase().trim(),
-                role: 'patient',
-                lastLoginAt: serverTimestamp(),
-              }, { merge: true });
-            } else {
-              // Create new patient profile
-              await setDoc(doc(db, 'users', user.uid), {
-                email: email.toLowerCase().trim(),
-                role: 'patient',
-                registeredAt: serverTimestamp(),
-                lastLoginAt: serverTimestamp(),
-                consentGiven: false, // Will be given when accessing invitation
-              });
-            }
-          }
+          console.log('User document created successfully:', user.uid);
         } catch (firestoreError: any) {
-          console.error('Firestore error during sign-up:', firestoreError);
-          // If Firestore write fails, sign out the user to prevent orphaned Auth account
-          await auth.signOut();
+          console.error('Firestore error during sign-up:', {
+            code: firestoreError.code,
+            message: firestoreError.message,
+            uid: user.uid,
+            email: email
+          });
+          
+          // If Firestore write fails, try to clean up Auth account
+          try {
+            await auth.signOut();
+            // Note: We can't delete the Auth account from client-side
+            // The user will need to use password reset or contact support
+          } catch (signOutError) {
+            console.error('Error signing out after Firestore failure:', signOutError);
+          }
+          
           if (firestoreError.code === 'permission-denied') {
-            setError('Permission denied. Please contact support.');
+            setError('Permission denied. The security rules may not be deployed yet. Please wait a moment and try again, or contact support.');
+          } else if (firestoreError.code === 'failed-precondition') {
+            setError('Account creation failed. Please try again.');
           } else {
-            setError('Failed to create account. Please try again.');
+            setError(`Failed to create account: ${firestoreError.message || 'Unknown error'}. Please try again or contact support.`);
           }
           setLoading(false);
           return;

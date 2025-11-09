@@ -59,14 +59,18 @@ service cloud.firestore {
     
     // Users collection - users can only access their own data
     match /users/{userId} {
-      // Allow users to read/write their own document
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      // Allow creating a new user document during registration (user must be authenticated and creating their own document)
+      // Allow users to read their own document
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Allow users to create their own document during registration
       allow create: if request.auth != null && 
         request.auth.uid == userId &&
         request.resource.data.keys().hasAll(['email', 'role']) &&
         request.resource.data.email is string &&
         request.resource.data.role in ['patient', 'doctor'];
+      // Allow users to update their own document (including merge operations)
+      allow update: if request.auth != null && request.auth.uid == userId;
+      // Allow users to write/delete their own document (covers all write operations)
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
     
     // Audit logs - read-only for users, write-only for server
