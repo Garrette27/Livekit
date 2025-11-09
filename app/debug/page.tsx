@@ -5,6 +5,9 @@ export default function DebugPage() {
   const [roomName, setRoomName] = useState('');
   const [testResult, setTestResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [passwordResetEmail, setPasswordResetEmail] = useState('');
+  const [passwordResetResult, setPasswordResetResult] = useState<any>(null);
+  const [passwordResetLoading, setPasswordResetLoading] = useState(false);
 
   const testWebhook = async () => {
     setLoading(true);
@@ -85,6 +88,26 @@ export default function DebugPage() {
       setTestResult({ error: 'LiveKit webhook test failed', details: error });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkPasswordResetStatus = async () => {
+    if (!passwordResetEmail.trim()) {
+      alert('Please enter an email address');
+      return;
+    }
+
+    setPasswordResetLoading(true);
+    setPasswordResetResult(null);
+    
+    try {
+      const response = await fetch(`/api/password-reset?email=${encodeURIComponent(passwordResetEmail.trim())}`);
+      const result = await response.json();
+      setPasswordResetResult(result);
+    } catch (error: any) {
+      setPasswordResetResult({ error: 'Failed to check password reset status', details: error.message });
+    } finally {
+      setPasswordResetLoading(false);
     }
   };
 
@@ -277,6 +300,92 @@ export default function DebugPage() {
           backgroundColor: 'white',
           borderRadius: '1rem',
           padding: '2rem',
+          marginBottom: '2rem',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <h2 style={{ 
+            fontSize: '1.5rem', 
+            fontWeight: 'bold', 
+            color: '#dc2626', 
+            marginBottom: '1rem'
+          }}>
+            Password Reset Diagnostic
+          </h2>
+          <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
+            Check if a user exists in Firebase Auth and if they can reset their password.
+          </p>
+          <div style={{ marginBottom: '1rem' }}>
+            <input
+              type="email"
+              value={passwordResetEmail}
+              onChange={(e) => setPasswordResetEmail(e.target.value)}
+              placeholder="Enter email address (e.g., user@example.com)"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.5rem',
+                fontSize: '1rem',
+                marginBottom: '1rem'
+              }}
+            />
+            <button
+              onClick={checkPasswordResetStatus}
+              disabled={passwordResetLoading || !passwordResetEmail.trim()}
+              style={{
+                backgroundColor: passwordResetLoading || !passwordResetEmail.trim() ? '#9ca3af' : '#dc2626',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                cursor: passwordResetLoading || !passwordResetEmail.trim() ? 'not-allowed' : 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              {passwordResetLoading ? 'Checking...' : 'Check Password Reset Status'}
+            </button>
+          </div>
+          {passwordResetResult && (
+            <div style={{
+              backgroundColor: passwordResetResult.error || !passwordResetResult.exists ? '#fef2f2' : '#f0fdf4',
+              border: `1px solid ${passwordResetResult.error || !passwordResetResult.exists ? '#fecaca' : '#bbf7d0'}`,
+              padding: '1rem',
+              borderRadius: '0.5rem',
+              marginTop: '1rem'
+            }}>
+              <pre style={{
+                backgroundColor: 'white',
+                padding: '1rem',
+                borderRadius: '0.25rem',
+                overflow: 'auto',
+                fontSize: '0.875rem',
+                color: passwordResetResult.error || !passwordResetResult.exists ? '#dc2626' : '#059669'
+              }}>
+                {JSON.stringify(passwordResetResult, null, 2)}
+              </pre>
+              {passwordResetResult.exists && passwordResetResult.hasPasswordProvider && (
+                <p style={{ color: '#059669', marginTop: '0.5rem', fontWeight: '500' }}>
+                  ✅ User can reset password - email/password provider is enabled
+                </p>
+              )}
+              {passwordResetResult.exists && !passwordResetResult.hasPasswordProvider && (
+                <p style={{ color: '#dc2626', marginTop: '0.5rem', fontWeight: '500' }}>
+                  ⚠️ User exists but cannot reset password - account was created with Google Sign-In only
+                </p>
+              )}
+              {!passwordResetResult.exists && (
+                <p style={{ color: '#dc2626', marginTop: '0.5rem', fontWeight: '500' }}>
+                  ❌ User not found in Firebase Auth - user needs to sign up first
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '1rem',
+          padding: '2rem',
           marginTop: '2rem',
           boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
         }}>
@@ -294,6 +403,9 @@ export default function DebugPage() {
             </li>
             <li style={{ marginBottom: '0.5rem' }}>
               <strong>Test Firebase Connection:</strong> If environment is OK, test Firebase Admin functionality
+            </li>
+            <li style={{ marginBottom: '0.5rem' }}>
+              <strong>Check Password Reset Status:</strong> Use the password reset diagnostic to check if a user can reset their password
             </li>
             <li style={{ marginBottom: '0.5rem' }}>
               <strong>Test Manual Webhook:</strong> Use the manual trigger to test the full webhook flow
