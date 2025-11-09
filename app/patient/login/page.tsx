@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { auth, db } from "@/lib/firebase";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { auth, db, provider } from "@/lib/firebase";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithPopup } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { doc, getDoc, setDoc, serverTimestamp, query, where, getDocs, collection } from "firebase/firestore";
 
@@ -18,6 +18,8 @@ function PatientLoginContent() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [loginMethod, setLoginMethod] = useState<'email' | 'google'>('email');
+  const [googleLoading, setGoogleLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -172,8 +174,9 @@ function PatientLoginContent() {
       }
 
       if (!statusData.hasPasswordProvider) {
-        setError('This account was created with Google Sign-In. Please use Google Sign-In to access your account.');
+        setError('This account was created with Google Sign-In only. Password reset is not available. Please use the "Sign in with Google" button to access your account. After signing in, you can set a password for future use in your account settings.');
         setResetLoading(false);
+        setShowForgotPassword(false);
         return;
       }
 
@@ -208,6 +211,57 @@ function PatientLoginContent() {
       }
     } finally {
       setResetLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    if (!auth || !provider) {
+      setError('System not ready. Please refresh the page.');
+      return;
+    }
+
+    setError(null);
+    setGoogleLoading(true);
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      if (user && db) {
+        // Check if user exists in Firestore
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.role === 'patient') {
+            router.push('/patient/dashboard');
+          } else {
+            setError('This account is for doctors. Please use doctor login.');
+            await auth.signOut();
+          }
+        } else {
+          // Create new patient profile for Google sign-in
+          await setDoc(doc(db, 'users', user.uid), {
+            email: user.email?.toLowerCase().trim() || '',
+            role: 'patient',
+            registeredAt: serverTimestamp(),
+            lastLoginAt: serverTimestamp(),
+            consentGiven: false,
+          });
+          router.push('/patient/dashboard');
+        }
+      }
+    } catch (err: any) {
+      console.error('Google sign-in error:', err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('Sign-in was cancelled. Please try again.');
+      } else if (err.code === 'auth/account-exists-with-different-credential') {
+        setError('An account already exists with this email. Please use email/password to sign in.');
+      } else {
+        setError(err.message || 'Failed to sign in with Google. Please try again.');
+      }
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -292,7 +346,109 @@ function PatientLoginContent() {
           </div>
         )}
 
-        <form onSubmit={showForgotPassword ? handleForgotPassword : handleSubmit}>
+        {/* Login Method Toggle */}
+        <div style={{
+          display: 'flex',
+          gap: '0.5rem',
+          marginBottom: '1.5rem',
+          border: '1px solid #e5e7eb',
+          borderRadius: '0.5rem',
+          padding: '0.25rem'
+        }}>
+          <button
+            type="button"
+            onClick={() => {
+              setLoginMethod('google');
+              setError(null);
+              setShowForgotPassword(false);
+              setResetEmailSent(false);
+            }}
+            style={{
+              flex: 1,
+              padding: '0.5rem',
+              borderRadius: '0.375rem',
+              border: 'none',
+              backgroundColor: loginMethod === 'google' ? '#059669' : 'transparent',
+              color: loginMethod === 'google' ? 'white' : '#6b7280',
+              fontWeight: loginMethod === 'google' ? '600' : '400',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            Google
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLoginMethod('email');
+              setError(null);
+              setShowForgotPassword(false);
+              setResetEmailSent(false);
+            }}
+            style={{
+              flex: 1,
+              padding: '0.5rem',
+              borderRadius: '0.375rem',
+              border: 'none',
+              backgroundColor: loginMethod === 'email' ? '#059669' : 'transparent',
+              color: loginMethod === 'email' ? 'white' : '#6b7280',
+              fontWeight: loginMethod === 'email' ? '600' : '400',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            Email
+          </button>
+        </div>
+
+        {loginMethod === 'google' ? (
+          <div>
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={googleLoading}
+              style={{
+                width: '100%',
+                backgroundColor: googleLoading ? '#9ca3af' : '#059669',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontWeight: '600',
+                fontSize: '1rem',
+                cursor: googleLoading ? 'not-allowed' : 'pointer',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              {googleLoading ? 'Signing in...' : (
+                <>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  </svg>
+                  Sign in with Google
+                </>
+              )}
+            </button>
+            <p style={{
+              fontSize: '0.75rem',
+              color: '#6b7280',
+              textAlign: 'center',
+              marginTop: '1rem'
+            }}>
+              Use your Google account to sign in to your patient dashboard
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={showForgotPassword ? handleForgotPassword : handleSubmit}>
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
               display: 'block',
@@ -457,6 +613,7 @@ function PatientLoginContent() {
             </button>
           )}
         </form>
+        )}
 
         {!showForgotPassword && (
           <div style={{
