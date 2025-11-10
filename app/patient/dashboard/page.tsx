@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, onSnapshot, orderBy, query, Timestamp, where, limit } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, doc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { isPatient, getUserProfile } from '@/lib/auth-utils';
@@ -12,13 +12,13 @@ export const dynamic = 'force-dynamic';
 interface CallSummary {
   id: string;
   roomName: string;
-  summary: string;
-  keyPoints: string[];
-  recommendations: string[];
-  followUpActions: string[];
-  riskLevel: string;
-  category: string;
-  createdAt: Timestamp;
+  summary?: string; // Optional - patients don't see AI summaries
+  keyPoints?: string[]; // Optional - patients don't see AI summaries
+  recommendations?: string[]; // Optional - patients don't see AI summaries
+  followUpActions?: string[]; // Optional - patients don't see AI summaries
+  riskLevel?: string; // Optional - patients don't see AI summaries
+  category?: string; // Optional - patients don't see AI summaries
+  createdAt: Timestamp | Date;
   participants: string[];
   duration: number;
   metadata?: {
@@ -29,6 +29,27 @@ interface CallSummary {
   };
   createdBy?: string;
   patientUserId?: string;
+  doctorEmail?: string;
+  patientEmail?: string;
+}
+
+interface Consultation {
+  id: string;
+  roomName: string;
+  patientName?: string;
+  duration?: number;
+  status?: string;
+  joinedAt?: any;
+  leftAt?: any;
+  createdBy?: string;
+  patientUserId?: string;
+  isRealConsultation?: boolean;
+  metadata?: {
+    createdBy?: string;
+    patientUserId?: string;
+    doctorUserId?: string;
+    visibleToUsers?: string[];
+  };
 }
 
 export default function PatientDashboard() {
@@ -60,88 +81,160 @@ export default function PatientDashboard() {
     }
   }, [router]);
 
+  // Helper function to fetch user email
+  const fetchUserEmail = async (userId: string | undefined): Promise<string | null> => {
+    if (!userId || !db || userId === 'anonymous' || userId === 'unknown') return null;
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        return userData.email || null;
+      }
+    } catch (error) {
+      console.error('Error fetching user email:', error);
+    }
+    return null;
+  };
+
   useEffect(() => {
     if (!user || !db || !isAuthorized) {
       setLoading(false);
       return;
     }
 
-    // Fetch summaries where patient is a participant
-    // Try multiple query strategies to find patient's consultations
-    const summariesRef = collection(db, 'call-summaries');
-    
-    // Query 1: By visibleToUsers array
-    const q1 = query(
-      summariesRef,
-      where('metadata.visibleToUsers', 'array-contains', user.uid),
-      orderBy('createdAt', sortOrder),
-      limit(100)
-    );
+    // NOTE: Patients should NOT see AI summaries - only doctors see those
+    // We only fetch consultations (session history), not call-summaries
 
-    // Query 2: By patientUserId (if exists)
-    const q2 = query(
-      summariesRef,
-      where('patientUserId', '==', user.uid),
-      orderBy('createdAt', sortOrder),
-      limit(100)
-    );
-
-    // Also fetch consultations to show session history
+    // Fetch consultations to show ALL sessions (even without summaries)
     const consultationsRef = collection(db, 'consultations');
-    const consultationsQuery = query(
+    const consultationsQuery1 = query(
       consultationsRef,
       where('metadata.visibleToUsers', 'array-contains', user.uid),
-      orderBy('joinedAt', sortOrder),
       limit(100)
     );
 
-    // Combine results from both queries
-    const unsubscribe1 = onSnapshot(q1, (snapshot) => {
-      const summaryData = snapshot.docs.map(doc => ({
+    const consultationsQuery2 = query(
+      consultationsRef,
+      where('patientUserId', '==', user.uid),
+      limit(100)
+    );
+
+    let allConsultationSummaries: CallSummary[] = [];
+
+    // NOTE: We don't process call-summaries for patients - only doctors see AI summaries
+
+    // Process consultations
+    const processConsultations = async (consultationData: Consultation[]) => {
+      // Filter to show ALL real consultations (even 1-second sessions)
+      // Show if patient joined (joinedAt exists) - this ensures even brief sessions are included
+      const filtered = consultationData.filter(consultation => {
+        const isReal = consultation.isRealConsultation === true;
+        const hasJoined = consultation.joinedAt; // Patient joined the session
+        const isVisible = consultation.metadata?.visibleToUsers?.includes(user.uid) || 
+                         consultation.patientUserId === user.uid;
+        // Show all real consultations where patient joined, regardless of duration
+        return isReal && hasJoined && isVisible;
+      });
+
+      // Convert consultations to simple consultation format (NO summaries - only basic info)
+      const consultationSummaries = await Promise.all(
+        filtered.map(async (consultation) => {
+          const doctorUserId = consultation.createdBy || consultation.metadata?.createdBy || consultation.metadata?.doctorUserId;
+          const patientUserId = consultation.patientUserId || consultation.metadata?.patientUserId || user.uid;
+          
+          const doctorEmail = await fetchUserEmail(doctorUserId);
+          const patientEmail = await fetchUserEmail(patientUserId);
+
+          const joinedAt = consultation.joinedAt?.toDate?.() || consultation.joinedAt;
+          const leftAt = consultation.leftAt?.toDate?.() || consultation.leftAt;
+          const createdAt = leftAt || joinedAt || new Date();
+
+          // Calculate duration in minutes
+          let durationMinutes = consultation.duration || 0;
+          if (joinedAt && leftAt && !durationMinutes) {
+            durationMinutes = Math.round((leftAt.getTime() - joinedAt.getTime()) / (1000 * 60));
+          }
+
+          return {
+            id: consultation.id,
+            roomName: consultation.roomName,
+            // No summary text - patients don't see AI summaries
+            summary: undefined,
+            keyPoints: undefined,
+            recommendations: undefined,
+            followUpActions: undefined,
+            riskLevel: undefined,
+            category: undefined,
+            participants: [consultation.patientName || 'Unknown Patient'],
+            duration: durationMinutes,
+            createdAt: createdAt,
+            createdBy: doctorUserId,
+            patientUserId: patientUserId,
+            doctorEmail: doctorEmail || undefined,
+            patientEmail: patientEmail || undefined,
+            metadata: {
+              totalParticipants: 1,
+              createdBy: doctorUserId,
+              patientUserId: patientUserId,
+              source: 'consultation_tracking',
+              hasTranscriptionData: false,
+              consultationData: true
+            }
+          } as CallSummary;
+        })
+      );
+
+      allConsultationSummaries = consultationSummaries;
+      updateDisplay();
+    };
+
+    const updateDisplay = () => {
+      // Only show consultations (no AI summaries for patients)
+      const unique = allConsultationSummaries.filter((item, index, self) => 
+        index === self.findIndex(t => t.roomName === item.roomName)
+      );
+
+      // Sort by date
+      const sorted = unique.sort((a, b) => {
+        const aTime = (a.createdAt instanceof Date ? a.createdAt.getTime() : 
+                      (a.createdAt && typeof a.createdAt === 'object' && 'toDate' in a.createdAt ? 
+                       (a.createdAt as any).toDate().getTime() : 0)) || 0;
+        const bTime = (b.createdAt instanceof Date ? b.createdAt.getTime() : 
+                      (b.createdAt && typeof b.createdAt === 'object' && 'toDate' in b.createdAt ? 
+                       (b.createdAt as any).toDate().getTime() : 0)) || 0;
+        return sortOrder === 'desc' ? bTime - aTime : aTime - bTime;
+      });
+
+      setSummaries(sorted);
+      setLoading(false);
+    };
+
+    // NOTE: No listeners for call-summaries - patients don't see AI summaries
+
+    // Listen to consultations
+    const unsubscribe3 = onSnapshot(consultationsQuery1, async (snapshot) => {
+      const consultationData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })) as CallSummary[];
-      setSummaries(prev => {
-        const combined = [...prev, ...summaryData];
-        // Remove duplicates
-        const unique = combined.filter((item, index, self) => 
-          index === self.findIndex(t => t.id === item.id)
-        );
-        return unique.sort((a, b) => {
-          const aTime = a.createdAt?.toDate?.()?.getTime() || 0;
-          const bTime = b.createdAt?.toDate?.()?.getTime() || 0;
-          return sortOrder === 'desc' ? bTime - aTime : aTime - bTime;
-        });
-      });
-      setLoading(false);
+      })) as Consultation[];
+      await processConsultations(consultationData);
     }, (error) => {
-      console.error('Error fetching summaries:', error);
-      setLoading(false);
+      console.error('Error fetching consultations:', error);
     });
 
-    const unsubscribe2 = onSnapshot(q2, (snapshot) => {
-      const summaryData = snapshot.docs.map(doc => ({
+    const unsubscribe4 = onSnapshot(consultationsQuery2, async (snapshot) => {
+      const consultationData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })) as CallSummary[];
-      setSummaries(prev => {
-        const combined = [...prev, ...summaryData];
-        const unique = combined.filter((item, index, self) => 
-          index === self.findIndex(t => t.id === item.id)
-        );
-        return unique.sort((a, b) => {
-          const aTime = a.createdAt?.toDate?.()?.getTime() || 0;
-          const bTime = b.createdAt?.toDate?.()?.getTime() || 0;
-          return sortOrder === 'desc' ? bTime - aTime : aTime - bTime;
-        });
-      });
+      })) as Consultation[];
+      await processConsultations(consultationData);
     }, (error) => {
-      console.error('Error fetching summaries by patientUserId:', error);
+      console.error('Error fetching consultations by patientUserId:', error);
     });
 
     return () => {
-      unsubscribe1();
-      unsubscribe2();
+      unsubscribe3();
+      unsubscribe4();
     };
   }, [user, sortOrder, isAuthorized]);
 
@@ -310,7 +403,7 @@ export default function PatientDashboard() {
           ) : summaries.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
               <p style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>No consultations yet</p>
-              <p>Your consultation summaries will appear here after video calls with your doctor.</p>
+              <p>Your consultation history will appear here after video calls with your doctor.</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -325,52 +418,45 @@ export default function PatientDashboard() {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#166534', marginBottom: '0.5rem' }}>
                         Consultation: {summary.roomName}
                       </h3>
-                      <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                        {summary.createdAt?.toDate?.()?.toLocaleString() || 'Unknown date'}
+                      <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                        {summary.createdAt instanceof Date ? summary.createdAt.toLocaleString() :
+                         (summary.createdAt && typeof summary.createdAt === 'object' && 'toDate' in summary.createdAt ?
+                          (summary.createdAt as any).toDate().toLocaleString() : 'Unknown date')}
                       </p>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        {summary.doctorEmail && (
+                          <span>👨‍⚕️ Doctor: <strong>{summary.doctorEmail}</strong></span>
+                        )}
+                        {summary.patientEmail && (
+                          <span>👤 Patient: <strong>{summary.patientEmail}</strong></span>
+                        )}
+                      </div>
                     </div>
-                    <span style={{
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '9999px',
-                      fontSize: '0.75rem',
-                      fontWeight: '500',
-                      backgroundColor: summary.riskLevel === 'High' ? '#fef2f2' : summary.riskLevel === 'Medium' ? '#fef3c7' : '#dcfce7',
-                      color: summary.riskLevel === 'High' ? '#dc2626' : summary.riskLevel === 'Medium' ? '#d97706' : '#166534'
-                    }}>
-                      {summary.riskLevel}
-                    </span>
+                    {summary.duration > 0 && (
+                      <span style={{
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '9999px',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        backgroundColor: '#dcfce7',
+                        color: '#166534',
+                        marginLeft: '1rem'
+                      }}>
+                        {summary.duration} min
+                      </span>
+                    )}
                   </div>
-                  <p style={{ color: '#374151', marginBottom: '1rem', lineHeight: '1.6' }}>
-                    {summary.summary}
-                  </p>
-                  {summary.keyPoints && summary.keyPoints.length > 0 && (
-                    <div style={{ marginTop: '1rem' }}>
-                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#166534', marginBottom: '0.5rem' }}>
-                        Key Points:
-                      </h4>
-                      <ul style={{ fontSize: '0.875rem', color: '#6b7280', paddingLeft: '1.25rem' }}>
-                        {summary.keyPoints.map((point, idx) => (
-                          <li key={idx} style={{ marginBottom: '0.25rem' }}>{point}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {summary.recommendations && summary.recommendations.length > 0 && (
-                    <div style={{ marginTop: '1rem' }}>
-                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#166534', marginBottom: '0.5rem' }}>
-                        Recommendations:
-                      </h4>
-                      <ul style={{ fontSize: '0.875rem', color: '#6b7280', paddingLeft: '1.25rem' }}>
-                        {summary.recommendations.map((rec, idx) => (
-                          <li key={idx} style={{ marginBottom: '0.25rem' }}>{rec}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                    {summary.duration > 0 ? (
+                      <p>Duration: {summary.duration} minute{summary.duration !== 1 ? 's' : ''}</p>
+                    ) : (
+                      <p>Session completed</p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

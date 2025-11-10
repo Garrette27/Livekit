@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, getFirestore, doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +25,9 @@ interface CallSummary {
   };
   createdBy?: string; // Added for client-side filtering
   _logged?: boolean; // Internal flag for one-time logging during render
+  doctorEmail?: string;
+  patientEmail?: string;
+  patientUserId?: string;
 }
 
 interface Consultation {
@@ -90,14 +93,27 @@ export default function Dashboard() {
       }
       
       // Debounce the processing by 500ms
-      timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(async () => {
         const allSummaries = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as CallSummary[];
         
+        // Fetch emails for summaries
+        const summariesWithEmails = await Promise.all(
+          allSummaries.map(async (summary) => {
+            const doctorEmail = await fetchUserEmail(summary.createdBy || summary.metadata?.createdBy);
+            const patientEmail = await fetchUserEmail(summary.patientUserId || (summary.metadata as any)?.patientUserId);
+            return {
+              ...summary,
+              doctorEmail: doctorEmail || undefined,
+              patientEmail: patientEmail || undefined
+            };
+          })
+        );
+        
           // Filter by user on the client side - show summaries for current user and exclude test data
-    const userSummaries = allSummaries.filter(summary => {
+    const userSummaries = summariesWithEmails.filter(summary => {
       const summaryUserId = summary.createdBy || summary.metadata?.createdBy;
       const isUserSummary = summaryUserId === user.uid;
       
@@ -167,6 +183,21 @@ export default function Dashboard() {
     };
   }, [user, sortOrder]);
 
+  // Helper function to fetch user email
+  const fetchUserEmail = async (userId: string | undefined): Promise<string | null> => {
+    if (!userId || !db || userId === 'anonymous' || userId === 'unknown') return null;
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        return userData.email || null;
+      }
+    } catch (error) {
+      console.error('Error fetching user email:', error);
+    }
+    return null;
+  };
+
   // Also fetch real consultations from the consultations collection and merge with summaries
   useEffect(() => {
     if (!user || !db) return;
@@ -192,49 +223,63 @@ export default function Dashboard() {
     let timeoutB: NodeJS.Timeout | undefined;
 
     // Helper to process a snapshot into summaries and merge
-    const processAndMerge = (consultations: Consultation[]) => {
+    const processAndMerge = async (consultations: Consultation[]) => {
       console.log('Dashboard: Found real consultations:', consultations.length);
 
-      const consultationSummaries = consultations
-        .filter(consultation => {
-          const consultationUserId = consultation.createdBy || consultation.metadata?.createdBy;
+      const filtered = consultations.filter(consultation => {
+        const consultationUserId = consultation.createdBy || consultation.metadata?.createdBy;
+        const patientUserId = consultation.patientUserId || consultation.metadata?.patientUserId;
+        const visibleToUsers = consultation.metadata?.visibleToUsers || [];
+
+        const isDoctorConsultation = consultationUserId === user.uid;
+        const isPatientConsultation = patientUserId === user.uid;
+        const isVisibleToUser = visibleToUsers.includes(user.uid);
+        const isRealConsultation = consultation.isRealConsultation === true;
+        const isCompleted = consultation.status === 'completed';
+
+        return (isDoctorConsultation || isPatientConsultation || isVisibleToUser) && isRealConsultation && isCompleted;
+      });
+
+      // Fetch emails for all consultations
+      const consultationSummaries = await Promise.all(
+        filtered.map(async (consultation) => {
+          const doctorUserId = consultation.createdBy || consultation.metadata?.createdBy;
           const patientUserId = consultation.patientUserId || consultation.metadata?.patientUserId;
-          const visibleToUsers = consultation.metadata?.visibleToUsers || [];
+          
+          const doctorEmail = await fetchUserEmail(doctorUserId);
+          const patientEmail = await fetchUserEmail(patientUserId);
 
-          const isDoctorConsultation = consultationUserId === user.uid;
-          const isPatientConsultation = patientUserId === user.uid;
-          const isVisibleToUser = visibleToUsers.includes(user.uid);
-          const isRealConsultation = consultation.isRealConsultation === true;
-          const isCompleted = consultation.status === 'completed';
-
-          return (isDoctorConsultation || isPatientConsultation || isVisibleToUser) && isRealConsultation && isCompleted;
+          return {
+            id: consultation.id,
+            roomName: consultation.roomName,
+            summary: `Consultation completed with ${consultation.patientName || 'Unknown Patient'}. Duration: ${consultation.duration || 0} minutes.`,
+            keyPoints: [
+              `Patient: ${consultation.patientName || 'Unknown Patient'}`,
+              `Duration: ${consultation.duration || 0} minutes`,
+              `Status: ${consultation.status}`,
+              'No AI analysis available'
+            ],
+            recommendations: ['Follow up as needed', 'Review consultation notes if available'],
+            followUpActions: ['Schedule follow-up if required', 'Document consultation outcomes'],
+            riskLevel: 'Low',
+            category: 'General Consultation',
+            participants: [consultation.patientName || 'Unknown Patient'],
+            duration: consultation.duration || 0,
+            createdAt: consultation.leftAt || consultation.joinedAt || new Date(),
+            createdBy: doctorUserId,
+            patientUserId: patientUserId,
+            doctorEmail: doctorEmail || undefined,
+            patientEmail: patientEmail || undefined,
+            metadata: {
+              totalParticipants: 1,
+              createdBy: doctorUserId,
+              source: 'consultation_tracking',
+              hasTranscriptionData: false,
+              consultationData: true
+            }
+          };
         })
-        .map(consultation => ({
-          id: consultation.id,
-          roomName: consultation.roomName,
-          summary: `Consultation completed with ${consultation.patientName || 'Unknown Patient'}. Duration: ${consultation.duration || 0} minutes.`,
-          keyPoints: [
-            `Patient: ${consultation.patientName || 'Unknown Patient'}`,
-            `Duration: ${consultation.duration || 0} minutes`,
-            `Status: ${consultation.status}`,
-            'No AI analysis available'
-          ],
-          recommendations: ['Follow up as needed', 'Review consultation notes if available'],
-          followUpActions: ['Schedule follow-up if required', 'Document consultation outcomes'],
-          riskLevel: 'Low',
-          category: 'General Consultation',
-          participants: [consultation.patientName || 'Unknown Patient'],
-          duration: consultation.duration || 0,
-          createdAt: consultation.leftAt || consultation.joinedAt || new Date(),
-          createdBy: consultation.createdBy || consultation.metadata?.createdBy,
-          metadata: {
-            totalParticipants: 1,
-            createdBy: consultation.createdBy || consultation.metadata?.createdBy,
-            source: 'consultation_tracking',
-            hasTranscriptionData: false,
-            consultationData: true
-          }
-        }));
+      );
 
       console.log('Dashboard: Generated consultation summaries:', consultationSummaries.length);
 
@@ -252,19 +297,19 @@ export default function Dashboard() {
       });
     };
 
-    const unsubA = onSnapshot(byCreator, (snapshot) => {
+    const unsubA = onSnapshot(byCreator, async (snapshot) => {
       if (timeoutA) clearTimeout(timeoutA);
-      timeoutA = setTimeout(() => {
+      timeoutA = setTimeout(async () => {
         const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Consultation[];
-        processAndMerge(docs);
+        await processAndMerge(docs);
       }, 500);
     }, (error) => console.error('Dashboard: Error fetching consultations by creator:', error));
 
-    const unsubB = onSnapshot(visibleToUser, (snapshot) => {
+    const unsubB = onSnapshot(visibleToUser, async (snapshot) => {
       if (timeoutB) clearTimeout(timeoutB);
-      timeoutB = setTimeout(() => {
+      timeoutB = setTimeout(async () => {
         const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Consultation[];
-        processAndMerge(docs);
+        await processAndMerge(docs);
       }, 500);
     }, (error) => console.error('Dashboard: Error fetching consultations visible to user:', error));
 
@@ -743,6 +788,27 @@ export default function Dashboard() {
                       <span>👥 {summary.participants || summary.metadata?.totalParticipants || 0} participants</span>
                       <span>🔒 Auto-delete in 30 days</span>
                     </div>
+                    {(summary.doctorEmail || summary.patientEmail) && (
+                      <div style={{ 
+                        marginTop: '0.75rem',
+                        padding: '0.75rem',
+                        backgroundColor: '#f3f4f6',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        color: '#374151'
+                      }}>
+                        {summary.doctorEmail && (
+                          <div style={{ marginBottom: '0.25rem' }}>
+                            👨‍⚕️ Doctor: <strong>{summary.doctorEmail}</strong>
+                          </div>
+                        )}
+                        {summary.patientEmail && (
+                          <div>
+                            👤 Patient: <strong>{summary.patientEmail}</strong>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
