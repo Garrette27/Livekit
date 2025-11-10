@@ -60,7 +60,8 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
           roomName,
           action: 'leave',
           patientName,
-          userId: user?.uid || 'anonymous'
+          userId: user?.uid || 'anonymous',
+          patientEmail: user?.email || null
         });
         
         if (navigator.sendBeacon) {
@@ -173,7 +174,8 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
             roomName,
             action: 'join',
             patientName,
-            userId: user?.uid || 'anonymous' // Pass user ID for tracking
+            userId: user?.uid || 'anonymous', // Pass user ID for tracking
+            patientEmail: user?.email || null // Pass email to look up patient if not authenticated
           }),
         });
       } catch (error) {
@@ -736,7 +738,25 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
               {`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`}
             </div>
             <button
-              onClick={() => {
+              onClick={async () => {
+                // Track patient leaving consultation
+                try {
+                  await fetch('/api/track-consultation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      roomName,
+                      action: 'leave',
+                      patientName,
+                      userId: user?.uid || 'anonymous',
+                      patientEmail: user?.email || null // Pass email to look up patient if not authenticated
+                    })
+                  });
+                  console.log('✅ Patient leave tracked for room:', roomName);
+                } catch (error) {
+                  console.error('Error tracking patient leave:', error);
+                }
+                
                 // Clear current token and redirect to patient join page
                 localStorage.removeItem(`patientToken_${roomName}`);
                 localStorage.removeItem(`patientInCall_${roomName}`);

@@ -43,24 +43,50 @@ service cloud.firestore {
         request.resource.data.createdBy == request.auth.uid;
     }
     
-    // Consultations collection - users can only access their own consultations
+    // Consultations collection - users can access consultations they created OR where they are a participant
     match /consultations/{consultationId} {
-      allow read, write: if request.auth != null && isOwner(resource);
+      // Helper function to check if user is a participant
+      function isParticipant(resource) {
+        let metadata = resource.data.metadata;
+        let visibleToUsers = metadata != null ? metadata.visibleToUsers : [];
+        return request.auth.uid == resource.data.patientUserId ||
+               request.auth.uid == resource.data.createdBy ||
+               request.auth.uid == metadata.createdBy ||
+               request.auth.uid == metadata.patientUserId ||
+               request.auth.uid == metadata.doctorUserId ||
+               request.auth.uid in visibleToUsers;
+      }
+      
+      // Allow read if user is the creator, patient, or in visibleToUsers
+      allow read: if request.auth != null && (
+        resource.data.createdBy == request.auth.uid ||
+        resource.data.patientUserId == request.auth.uid ||
+        isParticipant(resource)
+      );
+      // Allow write if user is the creator
+      allow write: if request.auth != null && isOwner(resource);
+      // Allow create if user is the creator
       allow create: if request.auth != null && 
         request.resource.data.createdBy == request.auth.uid;
     }
     
-    // Call summaries - read-only for users, write-only for server
+    // Call summaries - read-only for doctors (creators only), write-only for server
+    // NOTE: Patients should NOT have access to AI summaries - only doctors see these
     match /call-summaries/{summaryId} {
+      // Only allow doctors (creators) to read summaries - patients cannot access
       allow read: if request.auth != null && isOwner(resource);
       // Only allow writes from server-side (admin SDK) - no client writes
       allow write: if false;
     }
     
-    // Users collection - users can only access their own data
+    // Users collection - users can read their own data and email of other users (for dashboard display)
     match /users/{userId} {
       // Allow users to read their own document
-      allow read: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        // Allow reading email field of other users for dashboard display
+        (request.auth != null && resource.data.keys().hasAll(['email', 'role']))
+      );
       // Allow users to create their own document during registration
       allow create: if request.auth != null && 
         request.auth.uid == userId &&

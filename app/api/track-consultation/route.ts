@@ -3,8 +3,8 @@ import { getFirebaseAdmin } from '../../../lib/firebase-admin';
 
 export async function POST(req: Request) {
   try {
-    const { roomName, action, patientName, duration, userId } = await req.json();
-    console.log(`Track consultation: ${action} for room: ${roomName}, user: ${userId}`);
+    const { roomName, action, patientName, duration, userId, patientEmail } = await req.json();
+    console.log(`Track consultation: ${action} for room: ${roomName}, user: ${userId}, patientEmail: ${patientEmail}`);
 
     if (!roomName || !action) {
       return NextResponse.json({ error: 'Room name and action are required' }, { status: 400 });
@@ -20,20 +20,34 @@ export async function POST(req: Request) {
     }
 
     // Look up the room creator (doctor) to link the consultation to them
-    let doctorUserId = userId || 'unknown';
+    let doctorUserId = 'unknown';
     try {
       const roomRef = db.collection('rooms').doc(roomName);
       const roomDoc = await roomRef.get();
       if (roomDoc.exists) {
         const roomData = roomDoc.data();
-        doctorUserId = roomData?.createdBy || roomData?.metadata?.createdBy || userId || 'unknown';
+        doctorUserId = roomData?.createdBy || roomData?.metadata?.createdBy || 'unknown';
         console.log(`Found room creator: ${doctorUserId} for room: ${roomName}`);
       } else {
-        console.log(`Room ${roomName} not found in rooms collection, using provided userId: ${userId}`);
+        console.log(`Room ${roomName} not found in rooms collection`);
       }
     } catch (error) {
       console.error('Error looking up room creator:', error);
-      console.log(`Using provided userId: ${userId}`);
+    }
+
+    // If userId is 'anonymous' or missing, try to look up patient by email
+    let actualPatientUserId = userId || 'anonymous';
+    if ((!userId || userId === 'anonymous') && patientEmail) {
+      try {
+        const usersRef = db.collection('users');
+        const userQuery = await usersRef.where('email', '==', patientEmail.toLowerCase().trim()).limit(1).get();
+        if (!userQuery.empty) {
+          actualPatientUserId = userQuery.docs[0].id;
+          console.log(`Found patient user ID by email: ${actualPatientUserId} for email: ${patientEmail}`);
+        }
+      } catch (error) {
+        console.error('Error looking up patient by email:', error);
+      }
     }
 
     const consultationRef = db.collection('consultations').doc(roomName);
@@ -47,21 +61,23 @@ export async function POST(req: Request) {
         status: 'active',
         isRealConsultation: true, // Mark as real consultation, not test
         createdBy: doctorUserId, // Store doctor's user ID for doctor's view
-        patientUserId: userId || 'anonymous', // Store patient's user ID for patient's view
+        patientUserId: actualPatientUserId, // Store patient's user ID for patient's view
         metadata: {
           source: 'patient_join',
           trackedAt: new Date(),
           createdBy: doctorUserId,
-          patientUserId: userId || 'anonymous', // Store patient's user ID if available
+          patientUserId: actualPatientUserId, // Store patient's user ID if available
           doctorUserId: doctorUserId, // Explicitly store doctor's user ID
-          // Add both user IDs so both can see the consultation
-          visibleToUsers: [doctorUserId, userId || 'anonymous']
+          // Add both user IDs so both can see the consultation (remove duplicates)
+          visibleToUsers: [doctorUserId, actualPatientUserId].filter((id, index, self) => 
+            id !== 'unknown' && id !== 'anonymous' && self.indexOf(id) === index
+          )
         }
       };
       
       await consultationRef.set(consultationData, { merge: true });
       
-      console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}, patient: ${userId}`);
+      console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}, patient: ${actualPatientUserId}`);
       console.log('Consultation data stored:', consultationData);
       
     } else if (action === 'leave') {
@@ -79,16 +95,19 @@ export async function POST(req: Request) {
           status: 'completed',
           isRealConsultation: true,
           createdBy: doctorUserId, // Ensure doctor's user ID is preserved
-          patientUserId: userId || 'anonymous', // Ensure patient's user ID is preserved
+          patientUserId: actualPatientUserId, // Ensure patient's user ID is preserved
           metadata: {
             ...data?.metadata,
             source: 'patient_leave',
             durationMinutes,
             trackedAt: new Date(),
             createdBy: doctorUserId,
-            patientUserId: userId || 'anonymous',
-            // Add both user IDs so both can see the consultation
-            visibleToUsers: [doctorUserId, userId || 'anonymous']
+            patientUserId: actualPatientUserId,
+            doctorUserId: doctorUserId,
+            // Add both user IDs so both can see the consultation (remove duplicates)
+            visibleToUsers: [doctorUserId, actualPatientUserId].filter((id, index, self) => 
+              id !== 'unknown' && id !== 'anonymous' && self.indexOf(id) === index
+            )
           }
         });
         
