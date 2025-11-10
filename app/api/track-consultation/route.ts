@@ -36,17 +36,62 @@ export async function POST(req: Request) {
     }
 
     // If userId is 'anonymous' or missing, try to look up patient by email
+    // Also check if this is a doctor joining (should not set patientUserId to doctor's ID)
     let actualPatientUserId = userId || 'anonymous';
-    if ((!userId || userId === 'anonymous') && patientEmail) {
+    
+    // Don't set patientUserId to doctor's ID - only set if it's actually a patient
+    if (userId && userId === doctorUserId && action === 'join') {
+      // This is likely the doctor joining, not the patient
+      // Don't set patientUserId to doctor's ID - keep it as 'anonymous' until patient joins
+      actualPatientUserId = 'anonymous';
+      console.log(`Doctor joining detected (userId matches doctorUserId), keeping patientUserId as anonymous`);
+    } else if ((!userId || userId === 'anonymous') && patientEmail) {
+      // Try to look up patient by email
       try {
         const usersRef = db.collection('users');
         const userQuery = await usersRef.where('email', '==', patientEmail.toLowerCase().trim()).limit(1).get();
         if (!userQuery.empty) {
-          actualPatientUserId = userQuery.docs[0].id;
-          console.log(`Found patient user ID by email: ${actualPatientUserId} for email: ${patientEmail}`);
+          const foundUserId = userQuery.docs[0].id;
+          // Make sure we're not setting patientUserId to doctor's ID
+          if (foundUserId !== doctorUserId) {
+            actualPatientUserId = foundUserId;
+            console.log(`Found patient user ID by email: ${actualPatientUserId} for email: ${patientEmail}`);
+          } else {
+            console.log(`Found user ID matches doctor ID, keeping patientUserId as anonymous`);
+          }
         }
       } catch (error) {
         console.error('Error looking up patient by email:', error);
+      }
+    } else if (!patientEmail && (userId === 'anonymous' || !userId)) {
+      // If no email provided and userId is anonymous, try to get email from invitation
+      try {
+        const invitationsRef = db.collection('invitations');
+        // Find invitation for this room that hasn't been used
+        const invitationQuery = await invitationsRef
+          .where('roomName', '==', roomName)
+          .where('status', '==', 'active')
+          .limit(1)
+          .get();
+        
+        if (!invitationQuery.empty) {
+          const invitation = invitationQuery.docs[0].data();
+          const invitationEmail = invitation?.emailAllowed || invitation?.metadata?.constraints?.email;
+          if (invitationEmail) {
+            // Look up user by invitation email
+            const usersRef = db.collection('users');
+            const userQuery = await usersRef.where('email', '==', invitationEmail.toLowerCase().trim()).limit(1).get();
+            if (!userQuery.empty) {
+              const foundUserId = userQuery.docs[0].id;
+              if (foundUserId !== doctorUserId) {
+                actualPatientUserId = foundUserId;
+                console.log(`Found patient user ID from invitation email: ${actualPatientUserId} for email: ${invitationEmail}`);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error looking up patient from invitation:', error);
       }
     }
 

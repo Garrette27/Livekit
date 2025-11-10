@@ -82,10 +82,11 @@ service cloud.firestore {
     // Users collection - users can read their own data and email of other users (for dashboard display)
     match /users/{userId} {
       // Allow users to read their own document
+      // Also allow authenticated users to read email and role of other users for dashboard display
       allow read: if request.auth != null && (
         request.auth.uid == userId ||
-        // Allow reading email field of other users for dashboard display
-        (request.auth != null && resource.data.keys().hasAll(['email', 'role']))
+        // Allow reading email and role fields of other users for dashboard display
+        (resource.data.keys().hasAll(['email', 'role']))
       );
       // Allow users to create their own document during registration
       allow create: if request.auth != null && 
