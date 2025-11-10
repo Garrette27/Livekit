@@ -61,6 +61,8 @@ function PatientLoginContent() {
             setError('This email is already registered. Please sign in instead.');
             setIsSignUp(false);
             setLoading(false);
+            // Don't return - try to sign in instead
+            // Fall through to sign-in logic below
             return;
           }
           throw authError;
@@ -109,21 +111,43 @@ function PatientLoginContent() {
           return;
         }
 
-        router.push('/patient/dashboard');
+        // Use window.location for more reliable navigation after sign-up
+        window.location.href = '/patient/dashboard';
       } else {
         // Sign in
-        await signInWithEmailAndPassword(auth, email, password);
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
         
-        // Check user role
-        const user = auth.currentUser;
+        // Check user role and create document if missing
         if (user && db) {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data();
             if (userData.role === 'patient') {
-              router.push('/patient/dashboard');
+              // Use window.location for more reliable navigation
+              window.location.href = '/patient/dashboard';
             } else {
               setError('This account is for doctors. Please use doctor login.');
+              if (auth) {
+                await auth.signOut();
+              }
+            }
+          } else {
+            // User document doesn't exist - create it
+            // This can happen if sign-up partially failed or user was created via Google
+            try {
+              await setDoc(doc(db, 'users', user.uid), {
+                email: email.toLowerCase().trim(),
+                role: 'patient',
+                registeredAt: serverTimestamp(),
+                lastLoginAt: serverTimestamp(),
+                consentGiven: false,
+              });
+              // Use window.location for more reliable navigation
+              window.location.href = '/patient/dashboard';
+            } catch (firestoreError: any) {
+              console.error('Error creating user document during sign-in:', firestoreError);
+              setError('Account found but profile setup failed. Please try again or contact support.');
               if (auth) {
                 await auth.signOut();
               }
@@ -240,7 +264,7 @@ function PatientLoginContent() {
         if (userDoc.exists()) {
           const userData = userDoc.data();
           if (userData.role === 'patient') {
-            router.push('/patient/dashboard');
+            window.location.href = '/patient/dashboard';
           } else {
             setError('This account is for doctors. Please use doctor login.');
             await auth.signOut();
@@ -254,7 +278,7 @@ function PatientLoginContent() {
             lastLoginAt: serverTimestamp(),
             consentGiven: false,
           });
-          router.push('/patient/dashboard');
+          window.location.href = '/patient/dashboard';
         }
       }
     } catch (err: any) {
