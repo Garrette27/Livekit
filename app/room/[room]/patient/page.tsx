@@ -30,8 +30,26 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         setIsAuthenticated(wasAuthenticated);
         console.log('Auth state changed:', user ? 'User signed in' : 'User signed out');
         
-        // If user just signed in and was in a call, update the consultation to link their user ID
+        // If user just signed in, link their consultations and update current room consultation
         if (user && roomName) {
+          // First, link all consultations that match this patient's email
+          if (user.email) {
+            try {
+              await fetch('/api/link-patient-consultations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: user.uid,
+                  userEmail: user.email
+                }),
+              });
+              console.log('Linked patient consultations after sign-in');
+            } catch (error) {
+              console.error('Error linking consultations after sign-in:', error);
+            }
+          }
+          
+          // Also update the current room consultation if patient was in call
           const wasInCall = localStorage.getItem(`patientInCall_${roomName}`);
           if (wasInCall === 'true') {
             try {

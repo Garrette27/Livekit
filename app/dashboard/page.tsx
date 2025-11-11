@@ -99,11 +99,23 @@ export default function Dashboard() {
           ...doc.data()
         })) as CallSummary[];
         
-        // Fetch emails for summaries
+        // Fetch emails for summaries - prefer stored email, fallback to user document lookup
         const summariesWithEmails = await Promise.all(
           allSummaries.map(async (summary) => {
-            const doctorEmail = await fetchUserEmail(summary.createdBy || summary.metadata?.createdBy);
-            const patientEmail = await fetchUserEmail(summary.patientUserId || (summary.metadata as any)?.patientUserId);
+            // Try to get patient email from summary first (stored directly)
+            let patientEmail = (summary as any).patientEmail || (summary.metadata as any)?.patientEmail;
+            if (!patientEmail) {
+              // Fallback to fetching from user document
+              patientEmail = await fetchUserEmail(summary.patientUserId || (summary.metadata as any)?.patientUserId);
+            }
+            
+            // Try to get doctor email from summary first
+            let doctorEmail = (summary as any).doctorEmail || (summary.metadata as any)?.doctorEmail;
+            if (!doctorEmail) {
+              // Fallback to fetching from user document
+              doctorEmail = await fetchUserEmail(summary.createdBy || summary.metadata?.createdBy);
+            }
+            
             return {
               ...summary,
               doctorEmail: doctorEmail || undefined,
@@ -240,14 +252,25 @@ export default function Dashboard() {
         return (isDoctorConsultation || isPatientConsultation || isVisibleToUser) && isRealConsultation && isCompleted;
       });
 
-      // Fetch emails for all consultations
+      // Fetch emails for all consultations - prefer stored email, fallback to user document lookup
       const consultationSummaries = await Promise.all(
         filtered.map(async (consultation) => {
           const doctorUserId = consultation.createdBy || consultation.metadata?.createdBy;
           const patientUserId = consultation.patientUserId || consultation.metadata?.patientUserId;
           
-          const doctorEmail = await fetchUserEmail(doctorUserId);
-          const patientEmail = await fetchUserEmail(patientUserId);
+          // Try to get patient email from consultation first (stored directly)
+          let patientEmail = (consultation as any).patientEmail || (consultation.metadata as any)?.patientEmail;
+          if (!patientEmail) {
+            // Fallback to fetching from user document
+            patientEmail = await fetchUserEmail(patientUserId);
+          }
+          
+          // Try to get doctor email from consultation first
+          let doctorEmail = (consultation as any).doctorEmail || (consultation.metadata as any)?.doctorEmail;
+          if (!doctorEmail) {
+            // Fallback to fetching from user document
+            doctorEmail = await fetchUserEmail(doctorUserId);
+          }
 
           return {
             id: consultation.id,

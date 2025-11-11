@@ -41,6 +41,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "invitations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "roomName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "emailAllowed",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

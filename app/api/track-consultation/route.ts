@@ -45,53 +45,82 @@ export async function POST(req: Request) {
       // Don't set patientUserId to doctor's ID - keep it as 'anonymous' until patient joins
       actualPatientUserId = 'anonymous';
       console.log(`Doctor joining detected (userId matches doctorUserId), keeping patientUserId as anonymous`);
-    } else if ((!userId || userId === 'anonymous') && patientEmail) {
-      // Try to look up patient by email
-      try {
-        const usersRef = db.collection('users');
-        const userQuery = await usersRef.where('email', '==', patientEmail.toLowerCase().trim()).limit(1).get();
-        if (!userQuery.empty) {
-          const foundUserId = userQuery.docs[0].id;
-          // Make sure we're not setting patientUserId to doctor's ID
-          if (foundUserId !== doctorUserId) {
-            actualPatientUserId = foundUserId;
-            console.log(`Found patient user ID by email: ${actualPatientUserId} for email: ${patientEmail}`);
-          } else {
-            console.log(`Found user ID matches doctor ID, keeping patientUserId as anonymous`);
-          }
-        }
-      } catch (error) {
-        console.error('Error looking up patient by email:', error);
+    } else {
+      // Try multiple methods to find patient user ID
+      
+      // Method 1: If we have a userId and it's not the doctor, use it
+      if (userId && userId !== doctorUserId && userId !== 'anonymous') {
+        actualPatientUserId = userId;
+        console.log(`Using provided user ID as patient: ${actualPatientUserId}`);
       }
-    } else if (!patientEmail && (userId === 'anonymous' || !userId)) {
-      // If no email provided and userId is anonymous, try to get email from invitation
-      try {
-        const invitationsRef = db.collection('invitations');
-        // Find invitation for this room that hasn't been used
-        const invitationQuery = await invitationsRef
-          .where('roomName', '==', roomName)
-          .where('status', '==', 'active')
-          .limit(1)
-          .get();
-        
-        if (!invitationQuery.empty) {
-          const invitation = invitationQuery.docs[0].data();
-          const invitationEmail = invitation?.emailAllowed || invitation?.metadata?.constraints?.email;
-          if (invitationEmail) {
-            // Look up user by invitation email
-            const usersRef = db.collection('users');
-            const userQuery = await usersRef.where('email', '==', invitationEmail.toLowerCase().trim()).limit(1).get();
-            if (!userQuery.empty) {
-              const foundUserId = userQuery.docs[0].id;
-              if (foundUserId !== doctorUserId) {
-                actualPatientUserId = foundUserId;
-                console.log(`Found patient user ID from invitation email: ${actualPatientUserId} for email: ${invitationEmail}`);
+      // Method 2: If we have patientEmail, look up by email
+      else if (patientEmail) {
+        try {
+          const usersRef = db.collection('users');
+          const userQuery = await usersRef.where('email', '==', patientEmail.toLowerCase().trim()).limit(1).get();
+          if (!userQuery.empty) {
+            const foundUserId = userQuery.docs[0].id;
+            // Make sure we're not setting patientUserId to doctor's ID
+            if (foundUserId !== doctorUserId) {
+              actualPatientUserId = foundUserId;
+              console.log(`Found patient user ID by email: ${actualPatientUserId} for email: ${patientEmail}`);
+            } else {
+              console.log(`Found user ID matches doctor ID, keeping patientUserId as anonymous`);
+            }
+          } else {
+            console.log(`No user found with email: ${patientEmail}`);
+          }
+        } catch (error) {
+          console.error('Error looking up patient by email:', error);
+        }
+      }
+      
+      // Method 3: If still anonymous, try to get email from invitation and look up user
+      if (actualPatientUserId === 'anonymous' || !actualPatientUserId) {
+        try {
+          const invitationsRef = db.collection('invitations');
+          // Find invitation for this room (try both active and used status)
+          let invitationQuery = await invitationsRef
+            .where('roomName', '==', roomName)
+            .orderBy('createdAt', 'desc')
+            .limit(5)
+            .get();
+          
+          // If no results with orderBy, try without (in case index not ready)
+          if (invitationQuery.empty) {
+            invitationQuery = await invitationsRef
+              .where('roomName', '==', roomName)
+              .limit(5)
+              .get();
+          }
+          
+          if (!invitationQuery.empty) {
+            // Get the most recent invitation
+            const invitation = invitationQuery.docs[0].data();
+            const invitationEmail = invitation?.emailAllowed || invitation?.metadata?.constraints?.email;
+            if (invitationEmail) {
+              console.log(`Found invitation email for room ${roomName}: ${invitationEmail}`);
+              // Look up user by invitation email
+              const usersRef = db.collection('users');
+              const userQuery = await usersRef.where('email', '==', invitationEmail.toLowerCase().trim()).limit(1).get();
+              if (!userQuery.empty) {
+                const foundUserId = userQuery.docs[0].id;
+                if (foundUserId !== doctorUserId) {
+                  actualPatientUserId = foundUserId;
+                  console.log(`Found patient user ID from invitation email: ${actualPatientUserId} for email: ${invitationEmail}`);
+                } else {
+                  console.log(`Found user ID from invitation matches doctor ID, keeping patientUserId as anonymous`);
+                }
+              } else {
+                console.log(`No user found with invitation email: ${invitationEmail} - patient may not be registered yet`);
               }
             }
+          } else {
+            console.log(`No invitation found for room: ${roomName}`);
           }
+        } catch (error) {
+          console.error('Error looking up patient from invitation:', error);
         }
-      } catch (error) {
-        console.error('Error looking up patient from invitation:', error);
       }
     }
 
@@ -121,6 +150,22 @@ export async function POST(req: Request) {
         
         console.log(`✅ Updated consultation ${roomName} with patient user ID: ${actualPatientUserId}`);
       } else {
+        // Get patient email if available
+        let patientEmailToStore = null;
+        if (patientEmail) {
+          patientEmailToStore = patientEmail;
+        } else if (actualPatientUserId && actualPatientUserId !== 'anonymous' && actualPatientUserId !== 'unknown') {
+          // Try to get email from user document
+          try {
+            const userDoc = await db.collection('users').doc(actualPatientUserId).get();
+            if (userDoc.exists) {
+              patientEmailToStore = userDoc.data()?.email || null;
+            }
+          } catch (error) {
+            console.error('Error fetching patient email from user document:', error);
+          }
+        }
+        
         // Track when patient joins (new consultation or update existing)
         const consultationData = {
           roomName,
@@ -130,11 +175,13 @@ export async function POST(req: Request) {
           isRealConsultation: true, // Mark as real consultation, not test
           createdBy: doctorUserId, // Store doctor's user ID for doctor's view
           patientUserId: actualPatientUserId, // Store patient's user ID for patient's view
+          patientEmail: patientEmailToStore, // Store patient email for easy display
           metadata: {
             source: 'patient_join',
             trackedAt: new Date(),
             createdBy: doctorUserId,
             patientUserId: actualPatientUserId, // Store patient's user ID if available
+            patientEmail: patientEmailToStore, // Also store in metadata
             doctorUserId: doctorUserId, // Explicitly store doctor's user ID
             // Add both user IDs so both can see the consultation (remove duplicates)
             visibleToUsers: [doctorUserId, actualPatientUserId].filter((id, index, self) => 
@@ -145,7 +192,7 @@ export async function POST(req: Request) {
         
         await consultationRef.set(consultationData, { merge: true });
         
-        console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}, patient: ${actualPatientUserId}`);
+        console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}, patient: ${actualPatientUserId}, email: ${patientEmailToStore || 'not available'}`);
         console.log('Consultation data stored:', consultationData);
       }
       

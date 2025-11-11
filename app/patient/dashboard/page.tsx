@@ -71,6 +71,21 @@ export default function PatientDashboard() {
           if (!patient) {
             // Not a patient, redirect
             router.push('/');
+          } else {
+            // Patient is authenticated - link any consultations that match their email
+            try {
+              await fetch('/api/link-patient-consultations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: user.uid,
+                  userEmail: user.email
+                }),
+              });
+              console.log('Linked patient consultations');
+            } catch (error) {
+              console.error('Error linking consultations:', error);
+            }
           }
         } else {
           // Not logged in, show message (patients can still use invitation links)

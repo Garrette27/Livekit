@@ -168,7 +168,35 @@ export async function POST(req: NextRequest) {
           console.error('❌ Error fetching transcription data:', error);
         }
 
-        // 2. Generate comprehensive AI summary using actual conversation data
+        // 2. Re-check consultation RIGHT BEFORE storing summary to get latest patientUserId and email
+        // This ensures we get the most up-to-date patientUserId even if consultation was updated after initial check
+        let consultationDataForSummary: any = null;
+        try {
+          const db = getFirebaseAdmin();
+          if (db) {
+            const consultationDoc = await db.collection('consultations').doc(roomName).get();
+            if (consultationDoc.exists) {
+              consultationDataForSummary = consultationDoc.data();
+              const latestPatientUserId = consultationDataForSummary?.patientUserId 
+                || consultationDataForSummary?.metadata?.patientUserId 
+                || null;
+              
+              // Update patientUserId if we found a better value
+              if (latestPatientUserId && latestPatientUserId !== 'anonymous' && latestPatientUserId !== 'unknown') {
+                patientUserId = latestPatientUserId;
+                console.log('✅ Updated patientUserId from consultation (latest check):', patientUserId);
+              } else if (patientUserId && patientUserId !== 'anonymous' && patientUserId !== 'unknown') {
+                console.log('✅ Using patientUserId from earlier check:', patientUserId);
+              } else {
+                console.log('⚠️ No valid patientUserId found in consultation');
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error re-checking consultation for patientUserId:', error);
+        }
+
+        // 3. Generate comprehensive AI summary using actual conversation data
         try {
           console.log('Starting AI summary generation with transcription data...');
           console.log('Transcription data length:', transcriptionData ? transcriptionData.length : 0);
@@ -215,26 +243,66 @@ export async function POST(req: NextRequest) {
           if (db) {
             console.log('Firebase Admin initialized, storing summary...');
             const summaryRef = db.collection('call-summaries').doc(roomName);
-                          await summaryRef.set({
-                ...summaryData,
-                createdAt: new Date(),
-                createdBy: createdBy, // Store user ID from call data
-                patientUserId: patientUserId || undefined, // Store patient user ID if available
-                participants: participantNames,
-                duration: duration,
-                transcriptionData: transcriptionData, // Store the actual transcription
-                metadata: {
-                  totalParticipants: participants.length,
-                  recordingUrl: event.room?.recording_url || event.room?.recordingUrl || null,
-                  transcriptionUrl: event.room?.transcription_url || event.room?.transcriptionUrl || null,
-                  source: 'livekit_webhook',
-                  roomSid: event.room?.sid || null,
-                  creationTime: event.room?.creation_time || null,
-                  hasTranscriptionData: !!transcriptionData && transcriptionData.length > 0,
-                  callCreatedAt: new Date(), // Add call creation timestamp
-                  patientUserId: patientUserId || undefined // Also store in metadata
+            
+            // Build summary data object, only including patientUserId if it's not null/undefined
+            const summaryDataToStore: any = {
+              ...summaryData,
+              createdAt: new Date(),
+              createdBy: createdBy, // Store user ID from call data
+              participants: participantNames,
+              duration: duration,
+              transcriptionData: transcriptionData, // Store the actual transcription
+              metadata: {
+                totalParticipants: participants.length,
+                recordingUrl: event.room?.recording_url || event.room?.recordingUrl || null,
+                transcriptionUrl: event.room?.transcription_url || event.room?.transcriptionUrl || null,
+                source: 'livekit_webhook',
+                roomSid: event.room?.sid || null,
+                creationTime: event.room?.creation_time || null,
+                hasTranscriptionData: !!transcriptionData && transcriptionData.length > 0,
+                callCreatedAt: new Date() // Add call creation timestamp
+              }
+            };
+            
+            // Only include patientUserId if it has a valid value (not null or undefined)
+            if (patientUserId && patientUserId !== 'anonymous' && patientUserId !== 'unknown') {
+              summaryDataToStore.patientUserId = patientUserId;
+              summaryDataToStore.metadata.patientUserId = patientUserId;
+              
+              // Try to get and store patient email from consultation or user document
+              try {
+                let patientEmailToStore = null;
+                if (consultationDataForSummary?.patientEmail || consultationDataForSummary?.metadata?.patientEmail) {
+                  patientEmailToStore = consultationDataForSummary.patientEmail || consultationDataForSummary.metadata?.patientEmail;
+                  console.log('✅ Found patient email in consultation:', patientEmailToStore);
+                } else {
+                  // Try to get from user document
+                  const userDoc = await db.collection('users').doc(patientUserId).get();
+                  if (userDoc.exists) {
+                    patientEmailToStore = userDoc.data()?.email || null;
+                    console.log('✅ Found patient email in user document:', patientEmailToStore);
+                  } else {
+                    console.log('⚠️ Patient user document not found for userId:', patientUserId);
+                  }
                 }
-              });
+                
+                if (patientEmailToStore) {
+                  summaryDataToStore.patientEmail = patientEmailToStore;
+                  summaryDataToStore.metadata.patientEmail = patientEmailToStore;
+                  console.log('✅ Storing patient email in summary:', patientEmailToStore);
+                } else {
+                  console.log('⚠️ No patient email found to store in summary');
+                }
+              } catch (emailError) {
+                console.error('Error fetching patient email for summary:', emailError);
+              }
+              
+              console.log('✅ Storing summary with patientUserId:', patientUserId);
+            } else {
+              console.log('⚠️ Storing summary without patientUserId (not found or invalid)');
+            }
+            
+            await summaryRef.set(summaryDataToStore);
             
             console.log('✅ Summary stored successfully in Firestore');
           } else {
