@@ -98,32 +98,56 @@ export async function POST(req: Request) {
     const consultationRef = db.collection('consultations').doc(roomName);
     
     if (action === 'join') {
-      // Track when patient joins
-      const consultationData = {
-        roomName,
-        patientName: patientName || 'Unknown Patient',
-        joinedAt: new Date(),
-        status: 'active',
-        isRealConsultation: true, // Mark as real consultation, not test
-        createdBy: doctorUserId, // Store doctor's user ID for doctor's view
-        patientUserId: actualPatientUserId, // Store patient's user ID for patient's view
-        metadata: {
-          source: 'patient_join',
-          trackedAt: new Date(),
-          createdBy: doctorUserId,
-          patientUserId: actualPatientUserId, // Store patient's user ID if available
-          doctorUserId: doctorUserId, // Explicitly store doctor's user ID
-          // Add both user IDs so both can see the consultation (remove duplicates)
-          visibleToUsers: [doctorUserId, actualPatientUserId].filter((id, index, self) => 
-            id !== 'unknown' && id !== 'anonymous' && self.indexOf(id) === index
-          )
-        }
-      };
+      // Check if consultation already exists
+      const consultationDoc = await consultationRef.get();
+      const existingData = consultationDoc.exists ? consultationDoc.data() : null;
       
-      await consultationRef.set(consultationData, { merge: true });
-      
-      console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}, patient: ${actualPatientUserId}`);
-      console.log('Consultation data stored:', consultationData);
+      // If consultation exists and patientUserId is 'anonymous' but we now have a real user ID, update it
+      if (existingData && existingData.patientUserId === 'anonymous' && actualPatientUserId !== 'anonymous' && actualPatientUserId !== doctorUserId) {
+        console.log(`Updating existing consultation with patient user ID: ${actualPatientUserId}`);
+        const existingVisibleToUsers = existingData.metadata?.visibleToUsers || [];
+        const updatedVisibleToUsers = [...new Set([...existingVisibleToUsers, doctorUserId, actualPatientUserId])].filter(
+          (id) => id !== 'unknown' && id !== 'anonymous'
+        );
+        
+        await consultationRef.update({
+          patientUserId: actualPatientUserId,
+          metadata: {
+            ...existingData.metadata,
+            patientUserId: actualPatientUserId,
+            visibleToUsers: updatedVisibleToUsers
+          }
+        });
+        
+        console.log(`✅ Updated consultation ${roomName} with patient user ID: ${actualPatientUserId}`);
+      } else {
+        // Track when patient joins (new consultation or update existing)
+        const consultationData = {
+          roomName,
+          patientName: patientName || existingData?.patientName || 'Unknown Patient',
+          joinedAt: existingData?.joinedAt || new Date(),
+          status: 'active',
+          isRealConsultation: true, // Mark as real consultation, not test
+          createdBy: doctorUserId, // Store doctor's user ID for doctor's view
+          patientUserId: actualPatientUserId, // Store patient's user ID for patient's view
+          metadata: {
+            source: 'patient_join',
+            trackedAt: new Date(),
+            createdBy: doctorUserId,
+            patientUserId: actualPatientUserId, // Store patient's user ID if available
+            doctorUserId: doctorUserId, // Explicitly store doctor's user ID
+            // Add both user IDs so both can see the consultation (remove duplicates)
+            visibleToUsers: [doctorUserId, actualPatientUserId].filter((id, index, self) => 
+              id !== 'unknown' && id !== 'anonymous' && self.indexOf(id) === index
+            )
+          }
+        };
+        
+        await consultationRef.set(consultationData, { merge: true });
+        
+        console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}, patient: ${actualPatientUserId}`);
+        console.log('Consultation data stored:', consultationData);
+      }
       
     } else if (action === 'leave') {
       // Track when patient leaves and calculate duration

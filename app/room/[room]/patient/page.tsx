@@ -24,13 +24,38 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
   // Handle authentication
   useEffect(() => {
     if (auth) {
-      return onAuthStateChanged(auth, (user) => {
+      return onAuthStateChanged(auth, async (user) => {
+        const wasAuthenticated = !!user;
         setUser(user);
-        setIsAuthenticated(!!user);
+        setIsAuthenticated(wasAuthenticated);
         console.log('Auth state changed:', user ? 'User signed in' : 'User signed out');
+        
+        // If user just signed in and was in a call, update the consultation to link their user ID
+        if (user && roomName) {
+          const wasInCall = localStorage.getItem(`patientInCall_${roomName}`);
+          if (wasInCall === 'true') {
+            try {
+              // Update consultation to link patient user ID
+              await fetch('/api/track-consultation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  roomName,
+                  action: 'join',
+                  patientName: patientName || localStorage.getItem(`patientName_${roomName}`) || 'Patient',
+                  userId: user.uid,
+                  patientEmail: user.email || null
+                }),
+              });
+              console.log('Updated consultation with patient user ID after sign-in');
+            } catch (error) {
+              console.error('Error updating consultation after sign-in:', error);
+            }
+          }
+        }
       });
     }
-  }, []);
+  }, [roomName, patientName]);
 
   // Load patient name from localStorage on mount
   useEffect(() => {

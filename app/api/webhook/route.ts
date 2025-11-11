@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
         // 1. Fetch transcription data and call metadata from Firestore first
         let transcriptionData = null;
         let createdBy = 'unknown';
+        let patientUserId: string | null = null;
         try {
           const db = getFirebaseAdmin();
           if (db) {
@@ -136,10 +137,30 @@ export async function POST(req: NextRequest) {
                   || roomData?.metadata?.createdBy
                   || consultationData?.createdBy
                   || consultationData?.metadata?.createdBy
+                  || consultationData?.metadata?.doctorUserId
                   || 'unknown';
+                // Also get patientUserId from consultation for storing in summary
+                patientUserId = consultationData?.patientUserId 
+                  || consultationData?.metadata?.patientUserId 
+                  || null;
                 console.log('createdBy resolved from rooms/consultations:', createdBy);
+                console.log('patientUserId from consultation:', patientUserId);
               } catch (lookupErr) {
                 console.log('Lookup rooms/consultations failed:', lookupErr);
+              }
+            } else {
+              // Even if createdBy is known, try to get patientUserId from consultation
+              try {
+                const consultationDoc = await db.collection('consultations').doc(roomName).get();
+                if (consultationDoc.exists) {
+                  const consultationData = consultationDoc.data();
+                  patientUserId = consultationData?.patientUserId 
+                    || consultationData?.metadata?.patientUserId 
+                    || null;
+                  console.log('patientUserId from consultation:', patientUserId);
+                }
+              } catch (lookupErr) {
+                console.log('Lookup consultation for patientUserId failed:', lookupErr);
               }
             }
           }
@@ -198,6 +219,7 @@ export async function POST(req: NextRequest) {
                 ...summaryData,
                 createdAt: new Date(),
                 createdBy: createdBy, // Store user ID from call data
+                patientUserId: patientUserId || undefined, // Store patient user ID if available
                 participants: participantNames,
                 duration: duration,
                 transcriptionData: transcriptionData, // Store the actual transcription
@@ -209,7 +231,8 @@ export async function POST(req: NextRequest) {
                   roomSid: event.room?.sid || null,
                   creationTime: event.room?.creation_time || null,
                   hasTranscriptionData: !!transcriptionData && transcriptionData.length > 0,
-                  callCreatedAt: new Date() // Add call creation timestamp
+                  callCreatedAt: new Date(), // Add call creation timestamp
+                  patientUserId: patientUserId || undefined // Also store in metadata
                 }
               });
             
