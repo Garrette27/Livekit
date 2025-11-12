@@ -6,7 +6,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { email } = body;
 
+    console.log('Password reset request received:', {
+      email: email ? email.trim() : 'missing',
+      timestamp: new Date().toISOString()
+    });
+
     if (!email || !email.trim()) {
+      console.error('Password reset request missing email');
       return NextResponse.json(
         { success: false, error: 'Email is required' },
         { status: 400 }
@@ -14,6 +20,7 @@ export async function POST(req: NextRequest) {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+    console.log('Processing password reset for:', normalizedEmail);
 
     // Check if Firebase Admin is configured
     if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY) {
@@ -90,19 +97,29 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // User exists and has password provider - client will send email
-      console.log('User validated for password reset:', {
+      // User exists and has password provider - ready for password reset
+      console.log('✅ User validated for password reset:', {
         email: normalizedEmail,
         uid: userRecord.uid,
-        hasPasswordProvider: true
+        hasPasswordProvider: true,
+        emailVerified: userRecord.emailVerified,
+        providers: userRecord.providerData.map(p => p.providerId)
       });
+
+      // Note: We validate the user here, but the actual email sending is done by the client
+      // using Firebase client SDK's sendPasswordResetEmail() method, which triggers
+      // Firebase's email service. The email template must be configured in Firebase Console
+      // (Authentication → Templates → Password reset) for emails to be sent.
+      
+      console.log('Returning success response - client will send email via Firebase client SDK');
       
       return NextResponse.json({
         success: true,
         message: 'User validated. Password reset email can be sent.',
         email: normalizedEmail,
         userExists: true,
-        hasPasswordProvider: true
+        hasPasswordProvider: true,
+        emailVerified: userRecord.emailVerified
       });
 
     } catch (error: any) {

@@ -193,25 +193,40 @@ function PatientLoginContent() {
     }
 
     try {
-      // First, check user status via API to get better error messages
-      const statusResponse = await fetch(`/api/password-reset?email=${encodeURIComponent(email.trim())}`);
-      const statusData = await statusResponse.json();
+      // Use POST endpoint to validate user and trigger password reset email from server
+      console.log('Requesting password reset for:', email.trim());
+      const resetResponse = await fetch('/api/password-reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.trim() }),
+      });
 
-      if (!statusData.exists) {
-        setError('No account found with this email address. Please sign up first.');
+      const resetData = await resetResponse.json();
+
+      if (!resetResponse.ok) {
+        // Server returned an error
+        console.error('Password reset API error:', resetData);
+        setError(resetData.error || resetData.details || 'Failed to send password reset email. Please try again.');
+        if (resetData.code === 'NO_PASSWORD_PROVIDER') {
+          setShowForgotPassword(false);
+        }
         setResetLoading(false);
         return;
       }
 
-      if (!statusData.hasPasswordProvider) {
-        setError('This account was created with Google Sign-In only. Password reset is not available. Please use the "Sign in with Google" button to access your account. After signing in, you can set a password for future use in your account settings.');
+      if (!resetData.success) {
+        console.error('Password reset failed:', resetData);
+        setError(resetData.error || resetData.details || 'Failed to send password reset email.');
         setResetLoading(false);
-        setShowForgotPassword(false);
         return;
       }
 
-      // If user exists and has password provider, send reset email
-      console.log('Sending password reset email to:', email.trim());
+      // Server validated user successfully, now send the password reset email using client SDK
+      // This is what actually triggers Firebase to send the email
+      console.log('Server validated user, sending password reset email via Firebase client SDK...');
+      
       await sendPasswordResetEmail(auth, email.trim(), {
         url: `${window.location.origin}/patient/login?mode=resetPassword&oobCode=`,
         handleCodeInApp: false,
@@ -223,7 +238,8 @@ function PatientLoginContent() {
       console.error('Password reset error:', {
         code: err.code,
         message: err.message,
-        email: email.trim()
+        email: email.trim(),
+        error: err
       });
       
       if (err.code === 'auth/user-not-found') {
@@ -231,13 +247,13 @@ function PatientLoginContent() {
       } else if (err.code === 'auth/invalid-email') {
         setError('Invalid email address. Please check and try again.');
       } else if (err.code === 'auth/operation-not-allowed') {
-        setError('Password reset is not enabled. Please contact support or use Google Sign-In.');
+        setError('Password reset is not enabled. The email template may not be configured in Firebase Console. Please go to Firebase Console → Authentication → Templates → Password reset and ensure a sender email is configured. Contact support if you need assistance.');
       } else if (err.code === 'auth/too-many-requests') {
         setError('Too many password reset requests. Please wait a few minutes and try again.');
       } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
         setError('Network error. Please check your connection and try again.');
       } else {
-        setError(err.message || 'Failed to send password reset email. Please try again or contact support.');
+        setError(err.message || 'Failed to send password reset email. Please check your email inbox (including spam folder) or contact support.');
       }
     } finally {
       setResetLoading(false);
@@ -565,7 +581,7 @@ function PatientLoginContent() {
                   marginBottom: '1rem'
                 }}>
                   <p style={{ fontSize: '0.875rem', color: '#166534', margin: 0, lineHeight: '1.5' }}>
-                    ✅ <strong>Password reset email sent!</strong> Please check your inbox at <strong>{email}</strong> and follow the instructions to reset your password.
+                    ✅ <strong>Password reset email sent!</strong> Please check your inbox at <strong>{email}</strong> (including spam/junk folder) and follow the instructions to reset your password. If you don't receive the email within a few minutes, please try again or contact support.
                   </p>
                 </div>
               ) : (
@@ -683,6 +699,39 @@ function PatientLoginContent() {
           <p style={{ margin: 0 }}>
             <strong>Note:</strong> You can also join consultations directly using invitation links from your doctor without signing in.
           </p>
+        </div>
+
+        {/* Cross-navigation link to doctor login */}
+        <div style={{
+          marginTop: '1.5rem',
+          paddingTop: '1.5rem',
+          borderTop: '1px solid #e5e7eb',
+          textAlign: 'center'
+        }}>
+          <p style={{
+            fontSize: '0.875rem',
+            color: '#6b7280',
+            marginBottom: '0.5rem'
+          }}>
+            Are you a healthcare professional?
+          </p>
+          <a
+            href="/doctor/login"
+            style={{
+              color: '#059669',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              fontWeight: '500'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.textDecoration = 'underline';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.textDecoration = 'none';
+            }}
+          >
+            Go to Doctor Login →
+          </a>
         </div>
       </div>
     </div>

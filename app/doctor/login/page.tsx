@@ -91,41 +91,75 @@ export default function DoctorLoginPage() {
 
     try {
       if (isSignUp) {
-        // Check if user exists
-        const usersQuery = query(
-          collection(db, 'users'),
-          where('email', '==', email.toLowerCase().trim())
-        );
-        const userDocs = await getDocs(usersQuery);
-
-        if (!userDocs.empty) {
-          const userData = userDocs.docs[0].data();
-          if (userData.role !== 'doctor') {
-            setError('This email is registered as a patient. Please use patient login.');
+        // Create new Firebase Auth account first
+        let userCredential;
+        try {
+          userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        } catch (authError: any) {
+          if (authError.code === 'auth/email-already-in-use') {
+            setError('This email is already registered. Please sign in instead.');
+            setIsSignUp(false);
             setLoading(false);
             return;
           }
-          setError('An account with this email already exists. Please sign in.');
-          setIsSignUp(false);
+          throw authError;
+        }
+
+        const user = userCredential.user;
+
+        // Now that user is authenticated, check if user document exists
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.role !== 'doctor') {
+              setError('This email is registered as a patient. Please use patient login.');
+              // Sign out and clean up
+              await auth.signOut();
+              setLoading(false);
+              return;
+            }
+            // User document already exists, just redirect
+            router.push('/doctor/dashboard');
+            return;
+          }
+
+          // Create doctor profile - user is now authenticated so Firestore rules allow this
+          await setDoc(doc(db, 'users', user.uid), {
+            email: email.toLowerCase().trim(),
+            role: 'doctor',
+            doctorName: 'Dr. ' + (email.split('@')[0] || 'User'),
+            doctorEmail: email.toLowerCase().trim(),
+            registeredAt: serverTimestamp(),
+            lastLoginAt: serverTimestamp(),
+          });
+
+          console.log('Doctor profile created successfully');
+          router.push('/doctor/dashboard');
+        } catch (firestoreError: any) {
+          console.error('Firestore error during sign-up:', {
+            code: firestoreError.code,
+            message: firestoreError.message,
+            uid: user.uid,
+            email: email
+          });
+          
+          // Sign out on Firestore error
+          try {
+            await auth.signOut();
+          } catch (signOutError) {
+            console.error('Error signing out after Firestore failure:', signOutError);
+          }
+          
+          if (firestoreError.code === 'permission-denied') {
+            setError('Permission denied. Please contact support or try signing in with Google.');
+          } else {
+            setError('Failed to create account. Please try again or contact support.');
+          }
           setLoading(false);
           return;
         }
-
-        // Create new Firebase Auth account
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-
-        // Create doctor profile
-        await setDoc(doc(db, 'users', user.uid), {
-          email: email.toLowerCase().trim(),
-          role: 'doctor',
-          doctorName: 'Dr. ' + (email.split('@')[0] || 'User'),
-          doctorEmail: email.toLowerCase().trim(),
-          registeredAt: serverTimestamp(),
-          lastLoginAt: serverTimestamp(),
-        });
-
-        router.push('/doctor/dashboard');
       } else {
         // Sign in
         await signInWithEmailAndPassword(auth, email, password);
@@ -597,6 +631,39 @@ export default function DoctorLoginPage() {
         }}>
           For healthcare professionals only
         </p>
+
+        {/* Cross-navigation link to patient login */}
+        <div style={{
+          marginTop: '1.5rem',
+          paddingTop: '1.5rem',
+          borderTop: '1px solid #e5e7eb',
+          textAlign: 'center'
+        }}>
+          <p style={{
+            fontSize: '0.875rem',
+            color: '#6b7280',
+            marginBottom: '0.5rem'
+          }}>
+            Are you a patient?
+          </p>
+          <a
+            href="/patient/login"
+            style={{
+              color: '#2563eb',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              fontWeight: '500'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.textDecoration = 'underline';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.textDecoration = 'none';
+            }}
+          >
+            Go to Patient Login →
+          </a>
+        </div>
       </div>
     </div>
   );
