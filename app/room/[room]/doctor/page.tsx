@@ -424,6 +424,14 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
               borderRadius: '0.375rem',
               fontSize: '0.75rem'
             }}
+            onMouseDown={(e) => {
+              // Stop event propagation to prevent drag handlers from interfering
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              // Stop event propagation to ensure input gets focus
+              e.stopPropagation();
+            }}
             onKeyPress={(e) => {
               if (e.key === 'Enter') {
                 addNote();
@@ -431,7 +439,14 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
             }}
           />
           <button
-            onClick={addNote}
+            onClick={(e) => {
+              e.stopPropagation();
+              addNote();
+            }}
+            onMouseDown={(e) => {
+              // Stop event propagation to prevent drag handlers from interfering
+              e.stopPropagation();
+            }}
             disabled={!note.trim()}
             style={{
               backgroundColor: note.trim() ? '#2563eb' : '#9ca3af',
