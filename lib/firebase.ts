@@ -1,6 +1,7 @@
 import { initializeApp, FirebaseApp, getApps } from "firebase/app";
 import { getAuth, Auth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
+import { getStorage, FirebaseStorage } from "firebase/storage";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -20,6 +21,7 @@ const hasFirebaseConfig = firebaseConfig.apiKey && firebaseConfig.projectId;
 let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
 let db: Firestore | undefined;
+let storage: FirebaseStorage | undefined;
 let provider: GoogleAuthProvider | undefined;
 
 if (isClient && hasFirebaseConfig) {
@@ -39,6 +41,9 @@ if (isClient && hasFirebaseConfig) {
     try {
       auth = getAuth(app);
       db = getFirestore(app);
+      if (firebaseConfig.storageBucket) {
+        storage = getStorage(app);
+      }
       provider = new GoogleAuthProvider();
     } catch (error) {
       console.warn('Firebase services initialization failed:', error);
@@ -47,4 +52,4 @@ if (isClient && hasFirebaseConfig) {
 }
 
 // Export with fallbacks for SSR
-export { auth, db, provider };
+export { auth, db, storage, provider };
