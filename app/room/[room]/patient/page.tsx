@@ -1034,10 +1034,11 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
       >
         {/* Video Conference Component - This provides the actual video controls */}
         <VideoConference />
-        {/* Force blue controls for patient view */}
+      </LiveKitRoom>
+
+      {/* Force blue controls for patient view */}
         {token && (
-          <div style={{ display: 'none' }}>
-            <style jsx>{`
+          <style jsx global>{`
               /* Force ALL LiveKit controls to be blue */
               .lk-control-bar button,
               .lk-control-bar [data-lk-kind],
@@ -1268,8 +1269,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
                 --lk-chat-bg: #ffffff !important;
                 --chat-background: #ffffff !important;
               }
-            `}</style>
-          </div>
+          `}</style>
         )}
 
         {/* Room Information Panel - Collapsible */}
@@ -1418,7 +1418,6 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
             </div>
           )}
         </div>
-      </LiveKitRoom>
     </div>
   );
 }
