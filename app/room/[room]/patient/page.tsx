@@ -1126,6 +1126,148 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
                 height: 100% !important;
                 object-fit: cover !important;
               }
+
+              /* Fix chat panel background - make it white with visible text */
+              .lk-chat-panel,
+              [class*="chat-panel"],
+              [class*="ChatPanel"],
+              [data-lk="chat-panel"],
+              .lk-chat,
+              [class*="lk-chat"],
+              div[role="dialog"][class*="chat"],
+              aside[class*="chat"],
+              section[class*="chat"] {
+                background-color: #ffffff !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+                border: 1px solid #e5e7eb !important;
+                border-radius: 12px !important;
+              }
+
+              /* Fix chat panel container */
+              .lk-chat-container,
+              .lk-chat-wrapper,
+              .lk-chat-entry {
+                background-color: #ffffff !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+              }
+
+              /* Fix chat messages */
+              .lk-chat-message,
+              [class*="chat-message"],
+              [class*="message"],
+              [class*="Message"],
+              .lk-message {
+                background-color: #f8f9fa !important;
+                color: #000000 !important;
+                border: 1px solid #e9ecef !important;
+                border-radius: 8px !important;
+                padding: 8px 12px !important;
+                margin: 4px 0 !important;
+              }
+
+              /* Ensure all text in messages is visible */
+              .lk-chat-message p,
+              .lk-chat-message span,
+              .lk-chat-message div,
+              .lk-chat-message *,
+              [class*="chat-message"] p,
+              [class*="chat-message"] span,
+              [class*="chat-message"] div,
+              [class*="chat-message"] *,
+              [class*="message"] p,
+              [class*="message"] span,
+              [class*="message"] div,
+              [class*="message"] * {
+                color: #000000 !important;
+              }
+
+              /* Fix chat input */
+              .lk-chat-input,
+              [class*="chat-input"],
+              [class*="ChatInput"],
+              input[type="text"][class*="chat"],
+              textarea[class*="chat"] {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                border: 1px solid #ced4da !important;
+                border-radius: 8px !important;
+                padding: 8px 12px !important;
+              }
+
+              .lk-chat-input::placeholder,
+              [class*="chat-input"]::placeholder,
+              input[class*="chat"]::placeholder {
+                color: #6c757d !important;
+              }
+
+              /* Ensure all text in chat is visible */
+              .lk-chat *,
+              [class*="chat"] *,
+              [class*="Chat"] *,
+              [data-lk="chat"] * {
+                color: #000000 !important;
+              }
+
+              /* Override any dark theme styles */
+              [data-theme="dark"] .lk-chat,
+              [data-theme="dark"] .lk-chat-message,
+              [data-theme="dark"] .lk-chat-panel,
+              [class*="dark"] [class*="chat"],
+              [class*="dark"] [class*="Chat"] {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+              }
+
+              /* Force white background on all chat-related divs */
+              div[class*="chat"] div,
+              div[class*="Chat"] div,
+              .lk-chat div,
+              .lk-chat-panel div {
+                background-color: #ffffff !important;
+                background: #ffffff !important;
+              }
+
+              /* Fix chat scrollable areas */
+              .lk-chat [class*="scroll"],
+              .lk-chat-panel [class*="scroll"],
+              [class*="chat"] [class*="scroll"] {
+                background-color: #ffffff !important;
+              }
+
+              /* ULTRA AGGRESSIVE - Force white background on ALL possible chat elements */
+              [class*="lk-chat"],
+              [class*="Chat"],
+              [id*="chat"],
+              [id*="Chat"],
+              [data-lk*="chat"],
+              [data-lk*="Chat"],
+              [role="dialog"][class*="chat"],
+              [role="dialog"][class*="Chat"],
+              aside[class*="chat"],
+              aside[class*="Chat"],
+              nav[class*="chat"],
+              nav[class*="Chat"] {
+                background-color: #ffffff !important;
+                background: #ffffff !important;
+                background-image: none !important;
+              }
+
+              /* Force white on all children of chat elements */
+              [class*="chat"] *,
+              [class*="Chat"] *,
+              [id*="chat"] *,
+              [id*="Chat"] * {
+                background-color: #ffffff !important;
+                background: #ffffff !important;
+              }
+
+              /* Override any computed styles */
+              * {
+                --lk-chat-bg: #ffffff !important;
+                --chat-background: #ffffff !important;
+              }
             `}</style>
           </div>
         )}
