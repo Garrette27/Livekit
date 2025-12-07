@@ -421,29 +421,55 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
               padding: '0.5rem',
               border: '1px solid #d1d5db',
               borderRadius: '0.375rem',
-              fontSize: '0.75rem'
+              fontSize: '0.75rem',
+              pointerEvents: 'auto'
             }}
             onMouseDown={(e) => {
               // Stop event propagation to prevent drag handlers from interfering
+              e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
+            }}
+            onMouseUp={(e) => {
+              // Ensure focus is maintained
               e.stopPropagation();
             }}
             onClick={(e) => {
               // Stop event propagation to ensure input gets focus
               e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
+              // Force focus
+              e.currentTarget.focus();
             }}
-            onKeyPress={(e) => {
+            onFocus={(e) => {
+              // Ensure focus is not lost
+              e.stopPropagation();
+            }}
+            onKeyDown={(e) => {
+              // Stop propagation for all key events
+              e.stopPropagation();
               if (e.key === 'Enter') {
+                e.preventDefault();
                 addNote();
               }
             }}
+            onKeyPress={(e) => {
+              // Stop propagation
+              e.stopPropagation();
+            }}
+            autoFocus={false}
           />
           <button
             onClick={(e) => {
               e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
               addNote();
             }}
             onMouseDown={(e) => {
               // Stop event propagation to prevent drag handlers from interfering
+              e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
+            }}
+            onMouseUp={(e) => {
               e.stopPropagation();
             }}
             disabled={!note.trim()}
@@ -455,7 +481,8 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
               padding: '0.5rem 0.75rem',
               fontSize: '0.75rem',
               fontWeight: '500',
-              cursor: note.trim() ? 'pointer' : 'not-allowed'
+              cursor: note.trim() ? 'pointer' : 'not-allowed',
+              pointerEvents: 'auto'
             }}
           >
             Add

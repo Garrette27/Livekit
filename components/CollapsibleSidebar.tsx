@@ -93,6 +93,15 @@ export default function CollapsibleSidebar({
   }, [position]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Only handle drag on the header, not on interactive elements
+    const target = e.target as HTMLElement;
+    // Don't start dragging if clicking on input, button, or other interactive elements
+    if (target.tagName === 'INPUT' || 
+        target.tagName === 'TEXTAREA' || 
+        target.tagName === 'BUTTON' || 
+        target.closest('input, textarea, button, a, select')) {
+      return;
+    }
     setIsDragging(true);
     setDragStart({
       x: e.clientX,
@@ -232,7 +241,19 @@ export default function CollapsibleSidebar({
       </div>
 
       {/* Content */}
-      <div style={contentStyle}>
+      <div 
+        style={contentStyle}
+        onMouseDown={(e) => {
+          // Stop drag handling when clicking in content area (except on the header)
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'INPUT' || 
+              target.tagName === 'TEXTAREA' || 
+              target.tagName === 'BUTTON' || 
+              target.closest('input, textarea, button, a, select')) {
+            e.stopPropagation();
+          }
+        }}
+      >
         {children}
       </div>
 
