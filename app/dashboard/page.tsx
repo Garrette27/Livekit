@@ -22,12 +22,22 @@ interface CallSummary {
   metadata?: {
     totalParticipants: number;
     createdBy?: string;
+    isEdited?: boolean;
+    lastEditedAt?: Timestamp;
+    lastEditedBy?: string;
+    editHistory?: Array<{
+      editedAt: Date;
+      editedBy: string;
+      changes: string[];
+    }>;
   };
   createdBy?: string; // Added for client-side filtering
   _logged?: boolean; // Internal flag for one-time logging during render
   doctorEmail?: string;
   patientEmail?: string;
   patientUserId?: string;
+  lastEditedAt?: Timestamp;
+  lastEditedBy?: string;
 }
 
 interface Consultation {
@@ -53,6 +63,17 @@ export default function Dashboard() {
   const [summaries, setSummaries] = useState<CallSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [editingSummary, setEditingSummary] = useState<CallSummary | null>(null);
+  const [editForm, setEditForm] = useState({
+    summary: '',
+    keyPoints: [] as string[],
+    recommendations: [] as string[],
+    followUpActions: [] as string[],
+    riskLevel: '',
+    category: ''
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Handle authentication
   useEffect(() => {
@@ -194,6 +215,90 @@ export default function Dashboard() {
       unsubscribe();
     };
   }, [user, sortOrder]);
+
+  const handleEdit = (summary: CallSummary) => {
+    setEditingSummary(summary);
+    setEditForm({
+      summary: summary.summary || '',
+      keyPoints: summary.keyPoints || [],
+      recommendations: summary.recommendations || [],
+      followUpActions: summary.followUpActions || [],
+      riskLevel: summary.riskLevel || '',
+      category: summary.category || ''
+    });
+    setSaveError(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSummary(null);
+    setEditForm({
+      summary: '',
+      keyPoints: [],
+      recommendations: [],
+      followUpActions: [],
+      riskLevel: '',
+      category: ''
+    });
+    setSaveError(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSummary || !user) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      // Get Firebase ID token for authentication
+      const token = await user.getIdToken();
+
+      const response = await fetch('/api/summary/update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          summaryId: editingSummary.id,
+          summary: editForm.summary,
+          keyPoints: editForm.keyPoints,
+          recommendations: editForm.recommendations,
+          followUpActions: editForm.followUpActions,
+          riskLevel: editForm.riskLevel,
+          category: editForm.category
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update summary');
+      }
+
+      // Close edit modal - the real-time listener will update the UI
+      handleCancelEdit();
+    } catch (error) {
+      console.error('Error saving summary:', error);
+      setSaveError(error instanceof Error ? error.message : 'Failed to save changes');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateKeyPoint = (index: number, value: string) => {
+    const newKeyPoints = [...editForm.keyPoints];
+    newKeyPoints[index] = value;
+    setEditForm({ ...editForm, keyPoints: newKeyPoints });
+  };
+
+  const addKeyPoint = () => {
+    setEditForm({ ...editForm, keyPoints: [...editForm.keyPoints, ''] });
+  };
+
+  const removeKeyPoint = (index: number) => {
+    const newKeyPoints = editForm.keyPoints.filter((_, i) => i !== index);
+    setEditForm({ ...editForm, keyPoints: newKeyPoints });
+  };
 
   // Helper function to fetch user email
   const fetchUserEmail = async (userId: string | undefined): Promise<string | null> => {
@@ -724,16 +829,27 @@ export default function Dashboard() {
                     padding: '1.5rem 2rem',
                     borderBottom: '1px solid #f3f4f6'
                   }}>
-                    <div style={{ marginBottom: '1rem' }}>
-                      <h3 style={{ 
-                        fontSize: '1.25rem', 
-                        fontWeight: '600', 
-                        color: '#1e40af',
-                        marginBottom: '0.5rem'
-                      }}>
-                        Room: {summary.roomName}
-                      </h3>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <div style={{ flex: 1 }}>
+                        <h3 style={{ 
+                          fontSize: '1.25rem', 
+                          fontWeight: '600', 
+                          color: '#1e40af',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Room: {summary.roomName}
+                          {summary.metadata?.isEdited && (
+                            <span style={{
+                              marginLeft: '0.5rem',
+                              fontSize: '0.75rem',
+                              color: '#059669',
+                              fontWeight: 'normal'
+                            }}>
+                              (Edited)
+                            </span>
+                          )}
+                        </h3>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <span style={{
                           backgroundColor: '#dbeafe',
                           color: '#1e40af',
@@ -764,7 +880,24 @@ export default function Dashboard() {
                         }}>
                           {summary.category}
                         </span>
+                        </div>
                       </div>
+                      <button
+                        onClick={() => handleEdit(summary)}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          backgroundColor: '#2563eb',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '0.5rem',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Edit
+                      </button>
                     </div>
                     
                     <div style={{
@@ -840,6 +973,218 @@ export default function Dashboard() {
         </div>
       </div>
       
+      {/* Edit Modal */}
+      {editingSummary && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '2rem'
+        }}
+        onClick={handleCancelEdit}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '0.75rem',
+              padding: '2rem',
+              maxWidth: '48rem',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
+                Edit Summary: {editingSummary.roomName}
+              </h2>
+              <button
+                onClick={handleCancelEdit}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {saveError && (
+              <div style={{
+                padding: '0.75rem',
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '0.375rem',
+                color: '#dc2626',
+                marginBottom: '1rem'
+              }}>
+                {saveError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '0.5rem' }}>
+                  Summary
+                </label>
+                <textarea
+                  value={editForm.summary}
+                  onChange={(e) => setEditForm({ ...editForm, summary: e.target.value })}
+                  style={{
+                    width: '100%',
+                    minHeight: '120px',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '0.5rem' }}>
+                  Risk Level
+                </label>
+                <select
+                  value={editForm.riskLevel}
+                  onChange={(e) => setEditForm({ ...editForm, riskLevel: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '0.5rem' }}>
+                  Category
+                </label>
+                <input
+                  type="text"
+                  value={editForm.category}
+                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem'
+                  }}
+                />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>
+                    Key Points
+                  </label>
+                  <button
+                    onClick={addKeyPoint}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      backgroundColor: '#059669',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.25rem',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    + Add
+                  </button>
+                </div>
+                {editForm.keyPoints.map((point, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <input
+                      type="text"
+                      value={point}
+                      onChange={(e) => updateKeyPoint(idx, e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                    <button
+                      onClick={() => removeKeyPoint(idx)}
+                      style={{
+                        padding: '0.5rem',
+                        backgroundColor: '#dc2626',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '0.375rem',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+              <button
+                onClick={handleCancelEdit}
+                disabled={isSaving}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.375rem',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={isSaving}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: isSaving ? '#9ca3af' : '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500'
+                }}
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         @keyframes spin {
           from { transform: rotate(0deg); }
