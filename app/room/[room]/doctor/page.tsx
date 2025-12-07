@@ -731,10 +731,10 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
           typeof window !== 'undefined' ? document.body : ({} as any)
         )}
 
-        {/* Fix Control Panel - Rendered in a portal so it never gets hidden by LiveKit */}
+        {/* Doctor Session Control Panel - Rendered in a portal so it never gets hidden by LiveKit */}
         {createPortal(
           <CollapsibleSidebar
-            title="Fix Control Panel"
+            title="Doctor Session Control"
             icon="🛠️"
             position="right"
             defaultCollapsed={false}
@@ -918,49 +918,52 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
                   🚪 Leave Call
                 </button>
               </div>
-            </div>
-          </CollapsibleSidebar>,
-          typeof window !== 'undefined' ? document.body : ({} as any)
-        )}
 
-        {/* Manual Notes Sidebar */}
-        {createPortal(
-          <CollapsibleSidebar
-            title="Manual Notes"
-            icon="📝"
-            position="right"
-            defaultCollapsed={true}
-            width={350}
-            collapsedWidth={60}
-            style={{ top: '100px' }} // Position below the Fix Control Panel
-          >
-            <ManualTranscriptionInput />
-            {manualNotes.length > 0 && (
-              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                <h4 style={{ 
-                  margin: '0 0 0.5rem 0', 
-                  fontSize: '0.875rem', 
-                  fontWeight: '600', 
-                  color: '#374151' 
+              {/* Manual Notes Section - Inside Doctor Session Control Panel */}
+              <div style={{
+                backgroundColor: '#fef3c7',
+                border: '1px solid #f59e0b',
+                borderRadius: '0.5rem',
+                padding: '0.75rem',
+                marginTop: '0.75rem'
+              }}>
+                <h4 style={{
+                  margin: '0 0 0.5rem 0',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#92400e'
                 }}>
-                  Recent Notes:
+                  📝 Manual Notes
                 </h4>
-                {manualNotes.map((note, index) => (
-                  <div key={index} style={{
-                    padding: '0.5rem',
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '0.375rem',
-                    marginBottom: '0.5rem',
-                    fontSize: '0.75rem',
-                    color: '#475569',
-                    wordBreak: 'break-word' // Handle long text properly
-                  }}>
-                    {note}
+                <ManualTranscriptionInput />
+                {manualNotes.length > 0 && (
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '0.75rem' }}>
+                    <h5 style={{ 
+                      margin: '0 0 0.5rem 0', 
+                      fontSize: '0.75rem', 
+                      fontWeight: '600', 
+                      color: '#92400e' 
+                    }}>
+                      Recent Notes:
+                    </h5>
+                    {manualNotes.map((note, index) => (
+                      <div key={index} style={{
+                        padding: '0.5rem',
+                        backgroundColor: '#fef9c3',
+                        border: '1px solid #fde047',
+                        borderRadius: '0.375rem',
+                        marginBottom: '0.5rem',
+                        fontSize: '0.75rem',
+                        color: '#78350f',
+                        wordBreak: 'break-word'
+                      }}>
+                        {note}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            )}
+            </div>
           </CollapsibleSidebar>,
           typeof window !== 'undefined' ? document.body : ({} as any)
         )}
