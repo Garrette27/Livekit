@@ -58,22 +58,20 @@ export default function DoctorDashboard() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const router = useRouter();
 
-  // Handle authentication and role check
+  // Handle authentication and role check - redirect to main dashboard
   useEffect(() => {
     if (auth) {
       const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        setUser(user);
         if (user) {
           const doctor = await isDoctor(user);
-          setIsAuthorized(doctor);
-          if (!doctor) {
-            // Not a doctor, redirect
-            router.push('/');
+          if (doctor) {
+            // Doctor is logged in - redirect to main dashboard
+            router.replace('/dashboard');
+            return;
           }
-        } else {
-          // Not logged in, redirect to login
-          router.push('/doctor/login');
         }
+        // Not a doctor or not logged in, redirect to login
+        router.replace('/doctor/login');
       });
       return unsubscribe;
     }

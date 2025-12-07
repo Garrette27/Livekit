@@ -5,6 +5,8 @@ import { auth, db } from '@/lib/firebase';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
 import { collection, doc, serverTimestamp, setDoc, updateDoc, getFirestore } from 'firebase/firestore';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { isDoctor } from '@/lib/auth-utils';
 
 // Force dynamic rendering to prevent build-time Firebase errors
 export const dynamic = 'force-dynamic';
@@ -18,20 +20,30 @@ export default function Page() {
   const [isJoining, setIsJoining] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isFirebaseReady, setIsFirebaseReady] = useState<boolean>(false);
+  const router = useRouter();
 
   useEffect(() => {
     // Check if Firebase is initialized
     if (auth && db) {
       setIsFirebaseReady(true);
-      return onAuthStateChanged(auth, (user) => {
+      return onAuthStateChanged(auth, async (user) => {
         console.log('Auth state changed:', user ? 'User logged in' : 'No user');
         console.log('User details:', user);
         setUser(user);
+        
+        // If doctor is logged in, redirect to invitations page
+        if (user) {
+          const doctor = await isDoctor(user);
+          if (doctor) {
+            router.replace('/doctor/invitations');
+            return;
+          }
+        }
       });
     } else {
       console.warn('Firebase not initialized');
     }
-  }, []);
+  }, [router]);
 
   // Debug logging
   console.log('Current user state:', user);
@@ -340,105 +352,58 @@ export default function Page() {
           </div>
         </div>
 
-        {/* Main content */}
+        {/* Main content - Join Room Section Only (Create Room removed for doctors) */}
         <div style={{ maxWidth: '80rem', margin: '0 auto', padding: '2rem' }}>
           <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: '2rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>Create New Consultation Room</h2>
-            <p style={{ fontSize: '1.125rem', color: '#4B5563', marginBottom: '2rem' }}>Enter a room name to start a secure video consultation.</p>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>Join Existing Room</h2>
+            <p style={{ fontSize: '1.125rem', color: '#4B5563', marginBottom: '2rem' }}>
+              Have a room link? Enter the room name to join as a patient.
+            </p>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {/* Create Room Section */}
-              <div>
-                <label style={{ display: 'block', fontSize: '1.125rem', fontWeight: '500', color: '#374151', marginBottom: '0.75rem' }}>
-                  Room Name
-                </label>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <input
-                    value={roomName}
-                    onChange={(e) => setRoomName(e.target.value)}
-                    placeholder="e.g., dr-smith-aug15"
-                    disabled={!!shareUrl}
-                    style={{ 
-                      flex: '1', 
-                      border: '1px solid #D1D5DB', 
-                      borderRadius: '0.5rem', 
-                      padding: '1rem 1.25rem', 
-                      fontSize: '1.125rem',
-                      backgroundColor: shareUrl ? '#F9FAFB' : 'white',
-                      color: shareUrl ? '#6B7280' : '#111827'
-                    }}
-                    onKeyPress={(e) => e.key === 'Enter' && !shareUrl && handleCreateRoom()}
-                  />
-                  <button 
-                    onClick={handleCreateRoom} 
-                    disabled={isCreating || !roomName.trim() || !!shareUrl}
-                    style={{ 
-                      backgroundColor: isCreating || !roomName.trim() || shareUrl ? '#9CA3AF' : '#2563EB', 
-                      color: 'white', 
-                      padding: '1rem 2rem', 
-                      borderRadius: '0.5rem', 
-                      fontWeight: '600', 
-                      fontSize: '1.125rem', 
-                      border: 'none', 
-                      cursor: isCreating || !roomName.trim() || shareUrl ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    {isCreating ? 'Creating...' : 'Create Room'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Join Room Section */}
-              <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '1.5rem' }}>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#374151', marginBottom: '0.75rem' }}>
-                  Join Existing Room
-                </h3>
-                <p style={{ fontSize: '1rem', color: '#6B7280', marginBottom: '1rem' }}>
-                  Have a room link? Enter the room name to join as a patient.
-                </p>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <input
-                    placeholder="Enter room name to join"
-                    style={{ 
-                      flex: '1', 
-                      border: '1px solid #D1D5DB', 
-                      borderRadius: '0.5rem', 
-                      padding: '1rem 1.25rem', 
-                      fontSize: '1.125rem',
-                      backgroundColor: 'white',
-                      color: '#111827'
-                    }}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        const target = e.target as HTMLInputElement;
-                        if (target.value.trim()) {
-                          window.location.href = `/room/${target.value.trim()}/patient`;
-                        }
-                      }
-                    }}
-                  />
-                  <button 
-                    onClick={() => {
-                      const joinRoomName = (document.querySelector('input[placeholder="Enter room name to join"]') as HTMLInputElement)?.value;
-                      if (joinRoomName && joinRoomName.trim()) {
-                        window.location.href = `/room/${joinRoomName.trim()}/patient`;
-                      }
-                    }}
-                    style={{ 
-                      backgroundColor: '#059669', 
-                      color: 'white', 
-                      padding: '1rem 2rem', 
-                      borderRadius: '0.5rem', 
-                      fontWeight: '600', 
-                      fontSize: '1.125rem', 
-                      border: 'none', 
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Join Room
-                  </button>
-                </div>
-              </div>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <input
+                placeholder="Enter room name to join"
+                style={{ 
+                  flex: '1', 
+                  border: '1px solid #D1D5DB', 
+                  borderRadius: '0.5rem', 
+                  padding: '1rem 1.25rem', 
+                  fontSize: '1.125rem',
+                  backgroundColor: 'white',
+                  color: '#111827'
+                }}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    const target = e.target as HTMLInputElement;
+                    if (target.value.trim()) {
+                      window.location.href = `/room/${target.value.trim()}/patient`;
+                    }
+                  }
+                }}
+              />
+              <button 
+                onClick={() => {
+                  const joinRoomName = (document.querySelector('input[placeholder="Enter room name to join"]') as HTMLInputElement)?.value;
+                  if (joinRoomName && joinRoomName.trim()) {
+                    window.location.href = `/room/${joinRoomName.trim()}/patient`;
+                  }
+                }}
+                style={{ 
+                  backgroundColor: '#059669', 
+                  color: 'white', 
+                  padding: '1rem 2rem', 
+                  borderRadius: '0.5rem', 
+                  fontWeight: '600', 
+                  fontSize: '1.125rem', 
+                  border: 'none', 
+                  cursor: 'pointer'
+                }}
+              >
+                Join Room
+              </button>
+            </div>
+          </div>
+        </div>
 
               {error && (
                 <div style={{ padding: '1.25rem', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '0.5rem', color: '#DC2626', fontSize: '1rem' }}>

@@ -65,8 +65,8 @@ export default function DoctorLoginPage() {
         }
       }
 
-      // Redirect to doctor dashboard
-      router.push('/doctor/dashboard');
+      // Redirect to doctor invitations page
+      router.push('/doctor/invitations');
     } catch (err: unknown) {
       if (err instanceof Error) {
         console.error('Login error:', err.message);
@@ -121,7 +121,7 @@ export default function DoctorLoginPage() {
               return;
             }
             // User document already exists, just redirect
-            router.push('/doctor/dashboard');
+            router.push('/doctor/invitations');
             return;
           }
 
@@ -136,7 +136,7 @@ export default function DoctorLoginPage() {
           });
 
           console.log('Doctor profile created successfully');
-          router.push('/doctor/dashboard');
+          router.push('/doctor/invitations');
         } catch (firestoreError: any) {
           console.error('Firestore error during sign-up:', {
             code: firestoreError.code,
@@ -175,7 +175,7 @@ export default function DoctorLoginPage() {
               await setDoc(doc(db, 'users', user.uid), { 
                 lastLoginAt: serverTimestamp() 
               }, { merge: true });
-              router.push('/doctor/dashboard');
+              router.push('/doctor/invitations');
             } else {
               setError('This account is for patients. Please use patient login.');
               if (auth) {
