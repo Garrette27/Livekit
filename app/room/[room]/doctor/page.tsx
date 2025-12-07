@@ -8,7 +8,6 @@ import Link from 'next/link';
 import { auth, provider, db } from '@/lib/firebase';
 import { signInWithPopup, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
-import InvitationManager from '@/components/InvitationManager';
 import CollapsibleSidebar from '@/components/CollapsibleSidebar';
 
 // Type definitions for Web Speech API
@@ -693,55 +692,43 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
   if (token) {
     return (
       <>
-        {/* Invitation Manager Sidebar - Always visible when user is authenticated */}
-        {user && createPortal(
+        {/* Manual Notes Sidebar - Replaced Secure Patient Invitations */}
+        {createPortal(
           <CollapsibleSidebar
-            title="Secure Patient Invitations"
-            icon="🔒"
+            title="Manual Notes"
+            icon="📝"
             position="left"
             defaultCollapsed={false}
             width={350}
             collapsedWidth={60}
           >
-            <div style={{ marginBottom: '1rem' }}>
-              <p style={{ 
-                margin: '0', 
-                color: '#6b7280', 
-                fontSize: '0.8rem',
-                marginBottom: '1rem'
-              }}>
-                Create secure, restricted access links for patients
-              </p>
-            </div>
-            
-            <InvitationManager user={user} roomName={roomName} />
-            
-            <div style={{ 
-              marginTop: '1rem', 
-              paddingTop: '1rem', 
-              borderTop: '1px solid #e5e7eb' 
-            }}>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(`https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`);
-                  alert('Legacy patient link copied to clipboard!');
-                }}
-                style={{
-                  backgroundColor: '#6b7280',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.8rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  width: '100%',
-                  marginBottom: '0.5rem'
-                }}
-              >
-                📋 Copy Legacy Link
-              </button>
-            </div>
+            <ManualTranscriptionInput />
+            {manualNotes.length > 0 && (
+              <div style={{ maxHeight: '300px', overflowY: 'auto', marginTop: '0.75rem' }}>
+                <h4 style={{ 
+                  margin: '0 0 0.5rem 0', 
+                  fontSize: '0.875rem', 
+                  fontWeight: '600', 
+                  color: '#374151' 
+                }}>
+                  Recent Notes:
+                </h4>
+                {manualNotes.map((note, index) => (
+                  <div key={index} style={{
+                    padding: '0.5rem',
+                    backgroundColor: '#fef9c3',
+                    border: '1px solid #fde047',
+                    borderRadius: '0.375rem',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.75rem',
+                    color: '#78350f',
+                    wordBreak: 'break-word'
+                  }}>
+                    {note}
+                  </div>
+                ))}
+              </div>
+            )}
           </CollapsibleSidebar>,
           typeof window !== 'undefined' ? document.body : ({} as any)
         )}
@@ -932,51 +919,6 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
                 >
                   🚪 Leave Call
                 </button>
-              </div>
-
-              {/* Manual Notes Section - Inside Doctor Session Control Panel */}
-              <div style={{
-                backgroundColor: '#fef3c7',
-                border: '1px solid #f59e0b',
-                borderRadius: '0.5rem',
-                padding: '0.75rem',
-                marginTop: '0.75rem'
-              }}>
-                <h4 style={{
-                  margin: '0 0 0.5rem 0',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  color: '#92400e'
-                }}>
-                  📝 Manual Notes
-                </h4>
-                <ManualTranscriptionInput />
-                {manualNotes.length > 0 && (
-                  <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '0.75rem' }}>
-                    <h5 style={{ 
-                      margin: '0 0 0.5rem 0', 
-                      fontSize: '0.75rem', 
-                      fontWeight: '600', 
-                      color: '#92400e' 
-                    }}>
-                      Recent Notes:
-                    </h5>
-                    {manualNotes.map((note, index) => (
-                      <div key={index} style={{
-                        padding: '0.5rem',
-                        backgroundColor: '#fef9c3',
-                        border: '1px solid #fde047',
-                        borderRadius: '0.375rem',
-                        marginBottom: '0.5rem',
-                        fontSize: '0.75rem',
-                        color: '#78350f',
-                        wordBreak: 'break-word'
-                      }}>
-                        {note}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           </CollapsibleSidebar>,
