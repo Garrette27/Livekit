@@ -1050,64 +1050,6 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
               gap: '0.75rem',
               flexDirection: 'column'
             }}>
-              {/* Device Controls */}
-              <div style={{
-                backgroundColor: '#f0f9ff',
-                border: '1px solid #0ea5e9',
-                borderRadius: '0.5rem',
-                padding: '0.75rem',
-                marginBottom: '0.75rem'
-              }}>
-                <h4 style={{
-                  margin: '0 0 0.5rem 0',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  color: '#0c4a6e'
-                }}>
-                  Device Controls
-                </h4>
-                <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
-                  <button
-                    onClick={() => {
-                      // Trigger device selection
-                      const micButton = document.querySelector('[data-lk="microphone"]') as HTMLButtonElement;
-                      if (micButton) micButton.click();
-                    }}
-                    style={{
-                      backgroundColor: '#0ea5e9',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.375rem',
-                      padding: '0.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '500',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    🎤 Select Microphone
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Trigger device selection
-                      const camButton = document.querySelector('[data-lk="camera"]') as HTMLButtonElement;
-                      if (camButton) camButton.click();
-                    }}
-                    style={{
-                      backgroundColor: '#0ea5e9',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.375rem',
-                      padding: '0.5rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '500',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    📹 Select Camera
-                  </button>
-                </div>
-              </div>
-
               {/* Patient Link */}
               <div style={{
                 backgroundColor: '#f0fdf4',

@@ -626,58 +626,6 @@ export default function Dashboard() {
               New Call
             </button>
             <button
-              onClick={() => {
-                const roomName = prompt('Enter room name to create:');
-                if (roomName && roomName.trim()) {
-                  // Create the room in Firestore first
-                  if (db && user) {
-                    console.log('Creating room with user:', user.uid);
-                    console.log('Firebase ready:', !!db);
-                    console.log('User authenticated:', !!user);
-                    
-                    const roomRef = doc(db, 'rooms', roomName.trim());
-                    setDoc(roomRef, {
-                      roomName: roomName.trim(),
-                      createdBy: user.uid,
-                      createdAt: serverTimestamp(),
-                      status: 'active',
-                      metadata: {
-                        createdBy: user.uid,
-                        userId: user.uid,
-                        userEmail: user.email,
-                        userName: user.displayName
-                      }
-                    }).then(() => {
-                      console.log('Room created successfully:', roomName.trim());
-                      // Navigate to the room creation page (not the room itself)
-                      window.location.href = `/create-room/${roomName.trim()}`;
-                    }).catch((error: any) => {
-                      console.error('Error creating room:', error);
-                      console.error('Error code:', error.code);
-                      console.error('Error message:', error.message);
-                      alert(`Error creating room: ${error.message}. Please check console for details.`);
-                    });
-                  } else {
-                    console.log('Firestore or user not available, using fallback');
-                    // Fallback if Firestore not available
-                    window.location.href = `/create-room/${roomName.trim()}`;
-                  }
-                }
-              }}
-              style={{
-                backgroundColor: '#059669',
-                color: 'white',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '0.5rem',
-                border: 'none',
-                fontWeight: '600',
-                cursor: 'pointer',
-                fontSize: '1rem'
-              }}
-            >
-              Create Room
-            </button>
-            <button
               onClick={() => window.location.href = '/invitations'}
               style={{
                 backgroundColor: '#7C3AED',

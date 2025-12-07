@@ -143,9 +143,6 @@ export default function DoctorInvitationsPage() {
             <Link href="/doctor/dashboard" style={{ color: '#2563EB', fontSize: '1.125rem', fontWeight: '500', textDecoration: 'none' }}>
               Dashboard
             </Link>
-            <Link href="/" style={{ color: '#059669', fontSize: '1.125rem', fontWeight: '500', textDecoration: 'none' }}>
-              Create Room
-            </Link>
             <button
               onClick={() => auth && auth.signOut()}
               style={{
