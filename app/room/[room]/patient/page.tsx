@@ -117,6 +117,95 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
     return () => unsubscribe();
   }, [db, roomName, token]);
 
+  // Aggressively fix chat panel background - directly manipulate DOM
+  useEffect(() => {
+    if (!token) return;
+
+    const fixChatPanel = () => {
+      // Find all possible chat panel selectors
+      const chatSelectors = [
+        '.lk-chat-panel',
+        '[class*="chat-panel"]',
+        '[class*="ChatPanel"]',
+        '[data-lk="chat-panel"]',
+        '.lk-chat',
+        '[class*="lk-chat"]',
+        'div[role="dialog"][class*="chat"]',
+        'aside[class*="chat"]',
+        'section[class*="chat"]'
+      ];
+
+      chatSelectors.forEach(selector => {
+        try {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach((el: Element) => {
+            const htmlEl = el as HTMLElement;
+            // Force white background with inline styles (highest priority)
+            htmlEl.style.setProperty('background-color', '#ffffff', 'important');
+            htmlEl.style.setProperty('background', '#ffffff', 'important');
+            htmlEl.style.setProperty('color', '#000000', 'important');
+            
+            // Fix all children
+            const allChildren = htmlEl.querySelectorAll('*');
+            allChildren.forEach((child: Element) => {
+              const childEl = child as HTMLElement;
+              // Only fix background/color, not all styles
+              if (childEl.classList.toString().includes('chat') || 
+                  childEl.classList.toString().includes('message') ||
+                  childEl.tagName === 'INPUT' ||
+                  childEl.tagName === 'TEXTAREA') {
+                childEl.style.setProperty('background-color', '#ffffff', 'important');
+                childEl.style.setProperty('color', '#000000', 'important');
+              }
+            });
+
+            // Fix input fields specifically
+            const inputs = htmlEl.querySelectorAll('input, textarea');
+            inputs.forEach((input: Element) => {
+              const inputEl = input as HTMLInputElement | HTMLTextAreaElement;
+              inputEl.style.setProperty('background-color', '#ffffff', 'important');
+              inputEl.style.setProperty('color', '#000000', 'important');
+            });
+
+            // Fix messages
+            const messages = htmlEl.querySelectorAll('[class*="message"], [class*="Message"]');
+            messages.forEach((msg: Element) => {
+              const msgEl = msg as HTMLElement;
+              msgEl.style.setProperty('background-color', '#f8f9fa', 'important');
+              msgEl.style.setProperty('color', '#000000', 'important');
+            });
+          });
+        } catch (e) {
+          // Silently fail for invalid selectors
+        }
+      });
+    };
+
+    // Run immediately
+    fixChatPanel();
+
+    // Watch for new chat panels being created
+    const observer = new MutationObserver(() => {
+      fixChatPanel();
+    });
+
+    // Observe the entire document for changes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    });
+
+    // Also run periodically to catch any missed changes
+    const interval = setInterval(fixChatPanel, 500);
+
+    return () => {
+      observer.disconnect();
+      clearInterval(interval);
+    };
+  }, [token]);
+
   // Handle page unload to track patient leaving
   useEffect(() => {
     const handleBeforeUnload = () => {
