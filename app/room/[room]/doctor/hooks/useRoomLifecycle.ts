@@ -16,9 +16,11 @@ export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLife
   useEffect(() => {
     if (!token || !user || !roomName || !db) return;
 
+    const firestoreDb = db; // Store in const so TypeScript knows it's defined
+
     const createRecords = async () => {
       try {
-        const roomRef = doc(db, 'rooms', roomName);
+        const roomRef = doc(firestoreDb, 'rooms', roomName);
         await setDoc(
           roomRef,
           {
@@ -39,7 +41,7 @@ export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLife
           { merge: true }
         );
 
-        const callRef = doc(db, 'calls', roomName);
+        const callRef = doc(firestoreDb, 'calls', roomName);
         await setDoc(
           callRef,
           {

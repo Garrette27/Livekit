@@ -138,7 +138,8 @@ export default function NotesPanel({ roomName, db, storage }: NotesPanelProps) {
     setIsUploading(false);
 
     if (db && roomName) {
-      const callRef = doc(db, 'calls', roomName);
+      const firestoreDb = db; // Store in const so TypeScript knows it's defined
+      const callRef = doc(firestoreDb, 'calls', roomName);
       setDoc(
         callRef,
         {

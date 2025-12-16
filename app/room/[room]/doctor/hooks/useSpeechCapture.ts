@@ -26,7 +26,8 @@ export function useSpeechCapture({ roomName, token }: SpeechCaptureArgs): Speech
 
   const storeTranscription = useCallback(async (transcription: string[]) => {
     if (!db || !roomName) return;
-    const callRef = doc(db, 'calls', roomName);
+    const firestoreDb = db; // Store in const so TypeScript knows it's defined
+    const callRef = doc(firestoreDb, 'calls', roomName);
     try {
       await setDoc(
         callRef,
