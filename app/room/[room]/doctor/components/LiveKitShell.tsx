@@ -16,8 +16,8 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
       token={token}
       serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
       connect={true}
-      audio={true}
-      video={true}
+      audio
+      video
       style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}
       onDisconnected={onDisconnected}
       onError={(error) => {
