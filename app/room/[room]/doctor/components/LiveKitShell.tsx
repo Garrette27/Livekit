@@ -15,12 +15,19 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
     <LiveKitRoom
       token={token}
       serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
-      connect
-      audio
-      video
+      connect={true}
+      audio={true}
+      video={true}
       style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}
       onDisconnected={onDisconnected}
-      onError={onError}
+      onError={(error) => {
+        console.error('LiveKit error in doctor room:', error);
+        // Handle specific error types
+        if (error.message?.includes('NotReadableError') || error.message?.includes('video source')) {
+          console.error('Camera/video error - may need permission or device check');
+        }
+        onError(error);
+      }}
     >
       <VideoConference />
     </LiveKitRoom>

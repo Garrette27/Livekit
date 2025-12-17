@@ -19,6 +19,11 @@ export function middleware(request: NextRequest) {
     return handlePatientRoomAccess(request);
   }
 
+  // Handle doctor room access
+  if (pathname.startsWith('/room/') && pathname.includes('/doctor')) {
+    return handleDoctorRoomAccess(request);
+  }
+
   // Continue with normal processing for other routes
   return NextResponse.next();
 }
@@ -53,6 +58,15 @@ function handlePatientRoomAccess(request: NextRequest) {
   }
 
   // Add security headers
+  const response = NextResponse.next();
+  addSecurityHeaders(response);
+  
+  return response;
+}
+
+function handleDoctorRoomAccess(request: NextRequest) {
+  // Doctor rooms can be accessed directly (they authenticate separately)
+  // Add security headers to allow camera and microphone access
   const response = NextResponse.next();
   addSecurityHeaders(response);
   
@@ -94,6 +108,7 @@ export const config = {
   matcher: [
     '/invite/:path*',
     '/room/:path*/patient',
+    '/room/:path*/doctor',
     '/access-denied'
   ]
 };
