@@ -1,22 +1,22 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import Link from 'next/link';
 import { doc, setDoc } from 'firebase/firestore';
-import CollapsibleSidebar from '@/components/CollapsibleSidebar';
 import { db, storage } from '@/lib/firebase';
 import NotesPanel from './components/NotesPanel';
 import DoctorControlsPanel from './components/DoctorControlsPanel';
 import LiveKitShell from './components/LiveKitShell';
+import AuthCard from './components/shared/AuthCard';
+import LoadingSpinner from './components/shared/LoadingSpinner';
+import ErrorToast from './components/shared/ErrorToast';
+import SidebarPortal from './components/shared/SidebarPortal';
 import { useDoctorAuth } from './hooks/useDoctorAuth';
 import { useDoctorToken } from './hooks/useDoctorToken';
 import { useRoomLifecycle } from './hooks/useRoomLifecycle';
 import { useSpeechCapture } from './hooks/useSpeechCapture';
+import { useErrorHandler } from './hooks/useErrorHandler';
 
 function DoctorRoomClient({ roomName }: { roomName: string }) {
-  const [pageError, setPageError] = useState<string | null>(null);
-
   const {
     user,
     isAuthenticated,
@@ -41,17 +41,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
 
   useRoomLifecycle({ token, user, roomName, doctorName });
 
-  useEffect(() => {
-    if (authError) setPageError(authError);
-  }, [authError]);
-
-  useEffect(() => {
-    if (tokenError) setPageError(tokenError);
-  }, [tokenError]);
-
-  useEffect(() => {
-    if (captureError) setPageError(captureError);
-  }, [captureError]);
+  const { pageError, setPageError } = useErrorHandler(authError, tokenError, captureError);
 
   useEffect(
     () => () => {
@@ -91,247 +81,100 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
   // Show authentication UI if not signed in
   if (!isAuthenticated) {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          backgroundColor: '#f8fafc',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '2rem'
-        }}
+      <AuthCard
+        icon="🩺"
+        title="Doctor Access"
+        description="Sign in to join the consultation as a doctor"
+        error={pageError}
+        footerLink={{ href: '/invitations', text: '← Back to Invitations' }}
       >
-        <div
+        <button
+          onClick={signIn}
           style={{
-            backgroundColor: 'white',
-            borderRadius: '1rem',
-            padding: '3rem',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            maxWidth: '28rem',
-            width: '100%',
-            textAlign: 'center'
+            backgroundColor: '#2563eb',
+            color: 'white',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '0.5rem',
+            border: 'none',
+            fontWeight: '600',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            marginBottom: '1rem',
+            width: '100%'
           }}
         >
-          <div
-            style={{
-              width: '4rem',
-              height: '4rem',
-              backgroundColor: '#dbeafe',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 2rem'
-            }}
-          >
-            <span style={{ fontSize: '2rem' }}>🩺</span>
-          </div>
-
-          <h1
-            style={{
-              fontSize: '1.875rem',
-              fontWeight: 'bold',
-              color: '#1e40af',
-              marginBottom: '1rem'
-            }}
-          >
-            Doctor Access
-          </h1>
-
-          <p
-            style={{
-              fontSize: '1.125rem',
-              color: '#6b7280',
-              marginBottom: '2rem',
-              lineHeight: '1.6'
-            }}
-          >
-            Sign in to join the consultation as a doctor
-          </p>
-
-          {pageError && (
-            <div
-              style={{
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: '0.5rem',
-                padding: '1rem',
-                marginBottom: '1.5rem',
-                color: '#dc2626'
-              }}
-            >
-              {pageError}
-            </div>
-          )}
-
-          <button
-            onClick={signIn}
-            style={{
-              backgroundColor: '#2563eb',
-              color: 'white',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '0.5rem',
-              border: 'none',
-              fontWeight: '600',
-              cursor: 'pointer',
-              fontSize: '1rem',
-              marginBottom: '1rem',
-              width: '100%'
-            }}
-          >
-            Sign in with Google
-          </button>
-
-          <Link
-            href="/invitations"
-            style={{
-              display: 'inline-block',
-              color: '#6b7280',
-              textDecoration: 'none',
-              fontSize: '0.875rem'
-            }}
-          >
-            ← Back to Invitations
-          </Link>
-        </div>
-      </div>
+          Sign in with Google
+        </button>
+      </AuthCard>
     );
   }
 
   // Show name input if not set and user is authenticated
   if (isAuthenticated && !doctorName.trim() && !token) {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          backgroundColor: '#f8fafc',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '2rem'
-        }}
+      <AuthCard
+        icon="👨‍⚕️"
+        title={`Welcome, Dr. ${user?.displayName || user?.email || 'Anonymous'}`}
+        description="Enter your name to join the consultation"
+        error={pageError}
       >
-        <div
+        <div style={{ marginBottom: '1.5rem' }}>
+          <input
+            type="text"
+            value={doctorName}
+            onChange={(e) => setDoctorName(e.target.value)}
+            placeholder="Dr. Your Name"
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.5rem',
+              fontSize: '1rem',
+              textAlign: 'center'
+            }}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                generateDoctorToken();
+              }
+            }}
+          />
+        </div>
+
+        <button
+          onClick={generateDoctorToken}
+          disabled={isJoining}
           style={{
-            backgroundColor: 'white',
-            borderRadius: '1rem',
-            padding: '3rem',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            maxWidth: '28rem',
-            width: '100%',
-            textAlign: 'center'
+            backgroundColor: isJoining ? '#9ca3af' : '#059669',
+            color: 'white',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '0.5rem',
+            border: 'none',
+            fontWeight: '600',
+            cursor: isJoining ? 'not-allowed' : 'pointer',
+            fontSize: '1rem',
+            marginBottom: '1rem',
+            width: '100%'
           }}
         >
-          <div
-            style={{
-              width: '4rem',
-              height: '4rem',
-              backgroundColor: '#dbeafe',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 2rem'
-            }}
-          >
-            <span style={{ fontSize: '2rem' }}>👨‍⚕️</span>
-          </div>
+          {isJoining ? 'Joining...' : 'Join Consultation'}
+        </button>
 
-          <h1
-            style={{
-              fontSize: '1.875rem',
-              fontWeight: 'bold',
-              color: '#1e40af',
-              marginBottom: '1rem'
-            }}
-          >
-            Welcome, Dr. {user?.displayName || user?.email || 'Anonymous'}
-          </h1>
-
-          <p
-            style={{
-              fontSize: '1.125rem',
-              color: '#6b7280',
-              marginBottom: '2rem',
-              lineHeight: '1.6'
-            }}
-          >
-            Enter your name to join the consultation
-          </p>
-
-          {pageError && (
-            <div
-              style={{
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: '0.5rem',
-                padding: '1rem',
-                marginBottom: '1.5rem',
-                color: '#dc2626'
-              }}
-            >
-              {pageError}
-            </div>
-          )}
-
-          <div style={{ marginBottom: '1.5rem' }}>
-            <input
-              type="text"
-              value={doctorName}
-              onChange={(e) => setDoctorName(e.target.value)}
-              placeholder="Dr. Your Name"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                fontSize: '1rem',
-                textAlign: 'center'
-              }}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  generateDoctorToken();
-                }
-              }}
-            />
-          </div>
-
-          <button
-            onClick={generateDoctorToken}
-            disabled={isJoining}
-            style={{
-              backgroundColor: isJoining ? '#9ca3af' : '#059669',
-              color: 'white',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '0.5rem',
-              border: 'none',
-              fontWeight: '600',
-              cursor: isJoining ? 'not-allowed' : 'pointer',
-              fontSize: '1rem',
-              marginBottom: '1rem',
-              width: '100%'
-            }}
-          >
-            {isJoining ? 'Joining...' : 'Join Consultation'}
-          </button>
-
-          <button
-            onClick={signOutDoctor}
-            style={{
-              backgroundColor: 'transparent',
-              color: '#6b7280',
-              padding: '0.5rem 1rem',
-              borderRadius: '0.5rem',
-              border: '1px solid #d1d5db',
-              fontWeight: '500',
-              cursor: 'pointer',
-              fontSize: '0.875rem'
-            }}
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
+        <button
+          onClick={signOutDoctor}
+          style={{
+            backgroundColor: 'transparent',
+            color: '#6b7280',
+            padding: '0.5rem 1rem',
+            borderRadius: '0.5rem',
+            border: '1px solid #d1d5db',
+            fontWeight: '500',
+            cursor: 'pointer',
+            fontSize: '0.875rem'
+          }}
+        >
+          Sign Out
+        </button>
+      </AuthCard>
     );
   }
 
@@ -339,26 +182,20 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
   if (token) {
     return (
       <>
-        {createPortal(
-          <CollapsibleSidebar title="Manual Notes" icon="📝" position="left" defaultCollapsed={false} width={350} collapsedWidth={60}>
-            <NotesPanel roomName={roomName} db={db ?? null} storage={storage ?? null} />
-          </CollapsibleSidebar>,
-          typeof window !== 'undefined' ? document.body : ({} as any)
-        )}
+        <SidebarPortal title="Manual Notes" icon="📝" position="left" defaultCollapsed={false} width={350} collapsedWidth={60}>
+          <NotesPanel roomName={roomName} db={db ?? null} storage={storage ?? null} />
+        </SidebarPortal>
 
-        {createPortal(
-          <CollapsibleSidebar
-            title="Doctor Session Control"
-            icon="🛠️"
-            position="right"
-            defaultCollapsed={false}
-            width={300}
-            collapsedWidth={60}
-          >
-            <DoctorControlsPanel doctorName={doctorName || user?.displayName || user?.email || 'Doctor'} roomName={roomName} onLeave={handleLeave} />
-          </CollapsibleSidebar>,
-          typeof window !== 'undefined' ? document.body : ({} as any)
-        )}
+        <SidebarPortal
+          title="Doctor Session Control"
+          icon="🛠️"
+          position="right"
+          defaultCollapsed={false}
+          width={300}
+          collapsedWidth={60}
+        >
+          <DoctorControlsPanel doctorName={doctorName || user?.displayName || user?.email || 'Doctor'} roomName={roomName} onLeave={handleLeave} />
+        </SidebarPortal>
 
         <LiveKitShell
           token={token}
@@ -504,81 +341,13 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
           `}</style>
         )}
 
-        {pageError && (
-          <div
-            style={{
-              position: 'fixed',
-              bottom: '20px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: '0.5rem',
-              padding: '1rem',
-              color: '#dc2626',
-              zIndex: 9999,
-              maxWidth: '400px',
-              textAlign: 'center'
-            }}
-          >
-            {pageError}
-            <button
-              onClick={() => setPageError(null)}
-              style={{
-                marginLeft: '1rem',
-                backgroundColor: 'transparent',
-                border: 'none',
-                color: '#dc2626',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              ×
-            </button>
-          </div>
-        )}
+        <ErrorToast error={pageError} onDismiss={() => setPageError(null)} />
       </>
     );
   }
 
   // Loading state
-  return (
-    <div
-      style={{
-        minHeight: '100vh',
-        backgroundColor: '#f8fafc',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}
-    >
-      <div style={{ textAlign: 'center' }}>
-        <div
-          style={{
-            width: '4rem',
-            height: '4rem',
-            border: '2px solid #dbeafe',
-            borderTop: '2px solid #2563eb',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 1.5rem'
-          }}
-        ></div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e40af' }}>Loading...</h2>
-      </div>
-
-      <style jsx>{`
-        @keyframes spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
-    </div>
-  );
+  return <LoadingSpinner />;
 }
 
 export default function DoctorRoomPage({ params }: { params: Promise<{ room: string }> }) {
@@ -599,43 +368,7 @@ function DoctorRoomClientWrapper({ params }: { params: Promise<{ room: string }>
   }, [params]);
 
   if (!roomName) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          backgroundColor: '#f8fafc',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-      >
-        <div style={{ textAlign: 'center' }}>
-          <div
-            style={{
-              width: '4rem',
-              height: '4rem',
-              border: '2px solid #dbeafe',
-              borderTop: '2px solid #2563eb',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 1.5rem'
-            }}
-          ></div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e40af' }}>Loading...</h2>
-        </div>
-
-        <style jsx>{`
-          @keyframes spin {
-            from {
-              transform: rotate(0deg);
-            }
-            to {
-              transform: rotate(360deg);
-            }
-          }
-        `}</style>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return <DoctorRoomClient roomName={roomName} />;

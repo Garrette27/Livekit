@@ -1,0 +1,27 @@
+# Dependencies
+node_modules
+.next
+dist
+build
+
+# Logs
+*.log
+logs/
+
+# Locks (AI should not reason about these)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Firebase
+.firebase
+firebase-debug.log
+
+# Env
+.env
+.env.local
+
+# Media / large files
+*.mp4
+*.webm
+*.zip
