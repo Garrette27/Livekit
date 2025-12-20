@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { LiveKitRoom, VideoConference, useRoom } from '@livekit/components-react';
 
 interface LiveKitShellProps {
@@ -14,8 +14,8 @@ interface LiveKitShellProps {
 function EnableMediaTracks() {
   const room = useRoom();
 
-  useEffect(() => {
-    if (!room || room.state !== 'connected') {
+  React.useEffect(() => {
+    if (!room || !room.localParticipant) {
       return;
     }
 
@@ -36,12 +36,24 @@ function EnableMediaTracks() {
       }
     };
 
-    // Small delay to ensure room is fully connected
-    const timer = setTimeout(() => {
-      enableMedia();
-    }, 500);
+    // Listen for room connection event
+    const handleConnected = () => {
+      // Small delay to ensure room is fully connected
+      setTimeout(() => {
+        enableMedia();
+      }, 500);
+    };
 
-    return () => clearTimeout(timer);
+    // Wait for connection event
+    if (typeof room.on === 'function') {
+      room.on('connected', handleConnected);
+    }
+
+    return () => {
+      if (typeof room.off === 'function') {
+        room.off('connected', handleConnected);
+      }
+    };
   }, [room]);
 
   return null;
