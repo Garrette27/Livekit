@@ -27,19 +27,14 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
 
 
   const handleCreateInvitation = async () => {
-    if (!formData.email.trim()) {
-      setError('Please enter a patient email address');
-      return;
-    }
-
     setIsCreating(true);
     setError(null);
 
     try {
       const request: CreateInvitationRequest = {
         roomName,
-        emailAllowed: formData.email,
-        phoneAllowed: formData.phone?.trim() || undefined,
+        ...(formData.email.trim() && { emailAllowed: formData.email.trim() }), // Only include email if provided
+        ...(formData.phone?.trim() && { phoneAllowed: formData.phone.trim() }), // Only include phone if provided
         expiresInHours: formData.expiresInHours,
       };
 
@@ -218,7 +213,7 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
             color: '#374151',
             marginBottom: '0.5rem'
           }}>
-            Patient Email *
+            Patient Email (Optional)
           </label>
           <input
             type="email"
@@ -227,7 +222,7 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
               const newEmail = e.target.value;
               setFormData(prev => ({ ...prev, email: newEmail }));
             }}
-            placeholder="patient@example.com"
+            placeholder="patient@example.com (leave empty for open invitation)"
             style={{
               width: '100%',
               padding: '0.5rem',
@@ -242,7 +237,10 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
             color: '#6b7280',
             marginTop: '0.25rem'
           }}>
-            The system will automatically verify the patient's device, location, and browser after they register.
+            {formData.email.trim() 
+              ? "The system will automatically verify the patient's device, location, and browser after they register."
+              : "Leave empty to create an open invitation (anyone with the link can join)."
+            }
           </p>
         </div>
 

@@ -260,7 +260,7 @@ export default function DoctorInvitationsPage() {
                         Room: {invitation.roomName}
                       </h3>
                       <p style={{ fontSize: '0.875rem', color: '#6B7280' }}>
-                        Patient: {invitation.emailAllowed}
+                        Patient: {invitation.emailAllowed || 'Open Invitation (No email required)'}
                       </p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -282,7 +282,11 @@ export default function DoctorInvitationsPage() {
                     <p><strong>Created:</strong> {invitation.createdAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
                     <p><strong>Expires:</strong> {invitation.expiresAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
                     <p><strong>Uses:</strong> {invitation.usedAt ? 1 : 0} / {invitation.maxUses || 1}</p>
-                    <p><strong>Email:</strong> {invitation.emailAllowed}</p>
+                    {invitation.emailAllowed ? (
+                      <p><strong>Email:</strong> {invitation.emailAllowed}</p>
+                    ) : (
+                      <p><strong>Type:</strong> <span style={{ color: '#059669', fontWeight: '600' }}>Open Invitation</span> (No email required)</p>
+                    )}
                     {invitation.phoneAllowed && (
                       <p><strong>Phone:</strong> {invitation.phoneAllowed}</p>
                     )}
