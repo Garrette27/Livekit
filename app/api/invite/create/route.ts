@@ -21,10 +21,10 @@ export async function POST(req: NextRequest) {
     const body: CreateInvitationRequest = await req.json();
     const { roomName, emailAllowed, phoneAllowed, expiresInHours } = body;
 
-    // Input validation
-    if (!roomName || !emailAllowed) {
+    // Input validation - only roomName is required
+    if (!roomName) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: roomName and emailAllowed are required' },
+        { success: false, error: 'Missing required field: roomName is required' },
         { status: 400 }
       );
     }
@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!validateEmail(emailAllowed)) {
+    // Validate email only if provided
+    if (emailAllowed && !validateEmail(emailAllowed)) {
       return NextResponse.json(
         { success: false, error: 'Invalid email address' },
         { status: 400 }
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     // Sanitize inputs
     const sanitizedRoomName = sanitizeInput(roomName);
-    const sanitizedEmail = sanitizeInput(emailAllowed.toLowerCase().trim());
+    const sanitizedEmail = emailAllowed ? sanitizeInput(emailAllowed.toLowerCase().trim()) : undefined;
     const sanitizedPhone = phoneAllowed ? sanitizeInput(phoneAllowed.trim()) : undefined;
 
     // Validate expiration time (1-168 hours = 1 hour to 1 week)
@@ -63,20 +64,23 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if email already has an account (optional - for informational purposes)
+    // Only check if email is provided
     let existingAccount = null;
-    try {
-      const existingUserQuery = await db.collection('users').where('email', '==', sanitizedEmail).limit(1).get();
-      if (!existingUserQuery.empty) {
-        existingAccount = {
-          exists: true,
-          uid: existingUserQuery.docs[0].id,
-          userData: existingUserQuery.docs[0].data()
-        };
-        console.log('Email already has an account:', existingAccount);
+    if (sanitizedEmail) {
+      try {
+        const existingUserQuery = await db.collection('users').where('email', '==', sanitizedEmail).limit(1).get();
+        if (!existingUserQuery.empty) {
+          existingAccount = {
+            exists: true,
+            uid: existingUserQuery.docs[0].id,
+            userData: existingUserQuery.docs[0].data()
+          };
+          console.log('Email already has an account:', existingAccount);
+        }
+      } catch (error) {
+        console.log('Could not check for existing account:', error);
+        // Continue with invitation creation even if we can't check
       }
-    } catch (error) {
-      console.log('Could not check for existing account:', error);
-      // Continue with invitation creation even if we can't check
     }
 
     // Generate unique invitation ID
@@ -85,7 +89,6 @@ export async function POST(req: NextRequest) {
     // Create invitation document
     const invitation: any = {
       roomName: sanitizedRoomName,
-      emailAllowed: sanitizedEmail,
       expiresAt: expiresAt as any, // Firestore Timestamp
       maxUses: 1, // Single use
       createdBy: 'system', // TODO: Get from auth context
@@ -97,7 +100,7 @@ export async function POST(req: NextRequest) {
         doctorEmail: 'system@example.com', // TODO: Get from auth context
         roomName: sanitizedRoomName,
         constraints: {
-          email: sanitizedEmail,
+          ...(sanitizedEmail && { email: sanitizedEmail }),
           ...(sanitizedPhone && { phone: sanitizedPhone }),
         },
         security: {
@@ -112,6 +115,11 @@ export async function POST(req: NextRequest) {
         violations: [],
       },
     };
+
+    // Add email if provided
+    if (sanitizedEmail) {
+      invitation.emailAllowed = sanitizedEmail;
+    }
 
     // Add phone if provided
     if (sanitizedPhone) {
@@ -132,7 +140,7 @@ export async function POST(req: NextRequest) {
     const tokenPayload: InvitationToken = {
       invitationId,
       roomName: sanitizedRoomName,
-      email: sanitizedEmail,
+      ...(sanitizedEmail && { email: sanitizedEmail }), // Only include email if provided
       exp: Math.floor(expiresAt.getTime() / 1000),
       iat: Math.floor(Date.now() / 1000),
       oneUse: true,
@@ -171,7 +179,7 @@ export async function POST(req: NextRequest) {
     console.log('Invitation created successfully:', {
       invitationId,
       roomName: sanitizedRoomName,
-      email: sanitizedEmail,
+      email: sanitizedEmail || 'none',
       expiresAt: expiresAt.toISOString(),
     });
 

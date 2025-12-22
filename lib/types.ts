@@ -48,7 +48,7 @@ export interface Consultation {
 export interface Invitation {
   id: string;
   roomName: string;
-  emailAllowed: string;
+  emailAllowed?: string; // Optional email - invitation can be created without email
   phoneAllowed?: string; // Optional phone number
   expiresAt: Timestamp;
   maxUses: number;
@@ -63,7 +63,7 @@ export interface Invitation {
     doctorEmail: string;
     roomName: string;
     constraints: {
-      email: string;
+      email?: string; // Optional email constraint
       phone?: string;
     };
     security: {
@@ -101,7 +101,7 @@ export interface SecurityViolation {
 export interface InvitationToken {
   invitationId: string;
   roomName: string;
-  email: string;
+  email?: string; // Optional email - invitation can work without email
   exp: number;
   iat: number;
   oneUse: boolean;
@@ -131,9 +131,9 @@ export interface GeolocationData {
 // API request/response types
 export interface CreateInvitationRequest {
   roomName: string;
-  emailAllowed: string;
+  emailAllowed?: string; // Optional email - invitation can be created without email
   phoneAllowed?: string; // Optional phone number
-  expiresInHours: number;
+  expiresInHours?: number; // Optional expiration (defaults to 24 hours)
   // Removed: countryAllowlist, browserAllowlist, deviceBinding, allowedIpAddresses, allowedDeviceIds
   // System will automatically verify using registered user's device/location/browser info
 }

@@ -169,51 +169,62 @@ export async function POST(req: NextRequest) {
 
     const violations: SecurityViolation[] = [];
 
-    // Check if user is registered
-    const userEmailToCheck = userEmail || tokenPayload.email || invitation.emailAllowed;
-    const userQuery = await db.collection('users')
-      .where('email', '==', userEmailToCheck.toLowerCase().trim())
-      .limit(1)
-      .get();
+    // Check if user is registered (only if email is provided in invitation)
+    let userEmailToCheck: string | undefined = userEmail || tokenPayload.email || invitation.emailAllowed;
+    let userQuery: any = { empty: true };
+    let userProfile: any = null;
 
-    // If user is not registered, require registration
-    if (userQuery.empty) {
-      return NextResponse.json({
-        success: false,
-        error: 'User not registered. Please register first.',
-        requiresRegistration: true,
-        registeredEmail: invitation.emailAllowed,
-      } as ValidateInvitationResponse, { status: 403 });
+    // Only check user registration if email is provided
+    if (userEmailToCheck) {
+      userEmailToCheck = userEmailToCheck.toLowerCase().trim();
+      userQuery = await db.collection('users')
+        .where('email', '==', userEmailToCheck)
+        .limit(1)
+        .get();
+
+      // If user is not registered, require registration
+      if (userQuery.empty) {
+        return NextResponse.json({
+          success: false,
+          error: 'User not registered. Please register first.',
+          requiresRegistration: true,
+          registeredEmail: invitation.emailAllowed || userEmailToCheck,
+        } as ValidateInvitationResponse, { status: 403 });
+      }
+
+      userProfile = userQuery.docs[0].data();
+
+      // Check if consent was given - if not, require consent again
+      if (!userProfile.consentGiven) {
+        // User is registered but hasn't given consent yet
+        return NextResponse.json({
+          success: false,
+          error: 'Consent required. Please provide consent to store device information.',
+          requiresRegistration: true, // Show registration form to get consent
+          registeredEmail: invitation.emailAllowed || userEmailToCheck,
+        } as ValidateInvitationResponse, { status: 403 });
+      }
+
+      // Validate email matches invitation (only if invitation has email constraint)
+      if (invitation.emailAllowed && userEmailToCheck !== invitation.emailAllowed.toLowerCase().trim()) {
+        violations.push({
+          timestamp: new Date() as any,
+          type: 'wrong_email',
+          details: `Expected: ${invitation.emailAllowed}, Got: ${userEmailToCheck}`,
+          ip: clientIP,
+          userAgent,
+        });
+      }
+    } else {
+      // No email provided - invitation is open (no email constraint)
+      // Allow access without email validation
+      console.log('Open invitation (no email constraint) - allowing access');
     }
 
-    const userProfile = userQuery.docs[0].data();
-
-    // Check if consent was given - if not, require consent again
-    if (!userProfile.consentGiven) {
-      // User is registered but hasn't given consent yet
-      return NextResponse.json({
-        success: false,
-        error: 'Consent required. Please provide consent to store device information.',
-        requiresRegistration: true, // Show registration form to get consent
-        registeredEmail: invitation.emailAllowed,
-      } as ValidateInvitationResponse, { status: 403 });
-    }
-
-    // Validate email matches invitation
-    if (userEmailToCheck.toLowerCase().trim() !== invitation.emailAllowed.toLowerCase().trim()) {
-      violations.push({
-        timestamp: new Date() as any,
-        type: 'wrong_email',
-        details: `Expected: ${invitation.emailAllowed}, Got: ${userEmailToCheck}`,
-        ip: clientIP,
-        userAgent,
-      });
-    }
-
-    // Validate device fingerprint if device info exists
+    // Validate device fingerprint if device info exists (only if user is registered)
     // Note: If user just registered via invitation, device info might not match yet
     // We allow first access after registration, but subsequent accesses must match
-    if (deviceFingerprint && userProfile.deviceInfo) {
+    if (userProfile && deviceFingerprint && userProfile.deviceInfo) {
       const currentDeviceHash = generateDeviceFingerprintHash(deviceFingerprint);
       if (userProfile.deviceInfo.deviceFingerprintHash !== currentDeviceHash) {
         // Check if this is the first access after registration (device info was just set)
@@ -226,7 +237,7 @@ export async function POST(req: NextRequest) {
           userAgent,
         });
       }
-    } else if (deviceFingerprint && !userProfile.deviceInfo) {
+    } else if (userProfile && deviceFingerprint && !userProfile.deviceInfo) {
       // User is registered but device info not set yet - this shouldn't happen if consent was given
       // But allow access and update device info
       const deviceHash = generateDeviceFingerprintHash(deviceFingerprint);
@@ -240,8 +251,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Validate location if location info exists
-    if (geolocation && userProfile.locationInfo) {
+    // Validate location if location info exists (only if user is registered)
+    if (userProfile && geolocation && userProfile.locationInfo) {
       if (userProfile.locationInfo.country !== geolocation.country &&
           userProfile.locationInfo.countryCode !== geolocation.countryCode) {
         violations.push({
@@ -254,8 +265,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Validate browser if browser info exists
-    if (userProfile.browserInfo) {
+    // Validate browser if browser info exists (only if user is registered)
+    if (userProfile && userProfile.browserInfo) {
       if (userProfile.browserInfo.name !== detectedBrowser) {
         violations.push({
           timestamp: new Date() as any,
@@ -270,9 +281,9 @@ export async function POST(req: NextRequest) {
     // Debug logging for validation
     console.log('Validation debug info:', {
       invitationId: tokenPayload.invitationId,
-      userEmail: userEmailToCheck,
-      userRegistered: !userQuery.empty,
-      consentGiven: userProfile.consentGiven,
+      userEmail: userEmailToCheck || 'none (open invitation)',
+      userRegistered: userProfile ? !userQuery.empty : false,
+      consentGiven: userProfile?.consentGiven || false,
       clientIP,
       geolocation: geolocation ? {
         country: geolocation.country,
