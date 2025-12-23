@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body: CreateInvitationRequest = await req.json();
-    const { roomName, emailAllowed, phoneAllowed, expiresInHours, waitingRoomEnabled, maxPatients, maxUses } = body;
+    const { roomName, emailAllowed, phoneAllowed, expiresInHours, waitingRoomEnabled, maxPatients, maxUses, doctorUserId, doctorEmail, doctorName } = body;
 
     // Input validation - only roomName is required
     if (!roomName) {
@@ -99,13 +99,13 @@ export async function POST(req: NextRequest) {
       currentUses: 0, // Initialize current uses counter
       waitingRoomEnabled: isWaitingRoomEnabled,
       ...(isWaitingRoomEnabled && { maxPatients: finalMaxPatients }),
-      createdBy: 'system', // TODO: Get from auth context
+      createdBy: doctorUserId || 'system', // Use provided doctor user ID or fallback to 'system'
       createdAt: new Date() as any,
       status: 'active',
       metadata: {
-        createdBy: 'system', // TODO: Get from auth context
-        doctorName: 'Dr. System', // TODO: Get from auth context
-        doctorEmail: 'system@example.com', // TODO: Get from auth context
+        createdBy: doctorUserId || 'system',
+        doctorName: doctorName || 'Dr. System',
+        doctorEmail: doctorEmail || 'system@example.com',
         roomName: sanitizedRoomName,
         constraints: {
           ...(sanitizedEmail && { email: sanitizedEmail }),

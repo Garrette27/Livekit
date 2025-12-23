@@ -41,6 +41,9 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
         waitingRoomEnabled: formData.waitingRoomEnabled || false,
         maxPatients: formData.waitingRoomEnabled ? (formData.maxPatients || 10) : undefined,
         maxUses: formData.waitingRoomEnabled ? undefined : 1, // Unlimited uses if waiting room enabled, single use otherwise
+        doctorUserId: user.uid, // Pass doctor's user ID
+        doctorEmail: user.email || undefined,
+        doctorName: user.displayName || undefined,
       };
 
       const response = await fetch('/api/invite/create', {

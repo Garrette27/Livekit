@@ -140,6 +140,9 @@ export interface CreateInvitationRequest {
   waitingRoomEnabled?: boolean; // Enable waiting room feature
   maxPatients?: number; // Maximum number of patients allowed (defaults to 1 if waiting room disabled, 10 if enabled)
   maxUses?: number; // Maximum number of times invitation can be used (defaults to 1 if waiting room disabled, unlimited if enabled)
+  doctorUserId?: string; // Doctor's user ID for tracking who created the invitation
+  doctorEmail?: string; // Doctor's email
+  doctorName?: string; // Doctor's name
   // Removed: countryAllowlist, browserAllowlist, deviceBinding, allowedIpAddresses, allowedDeviceIds
   // System will automatically verify using registered user's device/location/browser info
 }

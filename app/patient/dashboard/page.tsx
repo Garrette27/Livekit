@@ -7,6 +7,91 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { isPatient, getUserProfile } from '@/lib/auth-utils';
 
+// Component for joining with invitation link
+function JoinWithInvitationLink() {
+  const [invitationLink, setInvitationLink] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  const handleJoin = () => {
+    if (!invitationLink.trim()) {
+      setError('Please enter an invitation link');
+      return;
+    }
+
+    // Extract token from the full URL or just use the token part
+    let token = invitationLink.trim();
+    
+    // If it's a full URL, extract the token part
+    if (token.includes('/invite/')) {
+      const parts = token.split('/invite/');
+      if (parts.length > 1) {
+        token = parts[1].split('?')[0]; // Remove query params if any
+      }
+    }
+
+    if (!token) {
+      setError('Invalid invitation link format');
+      return;
+    }
+
+    // Navigate to the invitation page
+    router.push(`/invite/${token}`);
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <input
+          type="text"
+          value={invitationLink}
+          onChange={(e) => {
+            setInvitationLink(e.target.value);
+            setError(null);
+          }}
+          placeholder="Paste invitation link here (e.g., https://.../invite/eyJhbGc...)"
+          style={{
+            flex: 1,
+            padding: '0.75rem',
+            border: error ? '1px solid #dc2626' : '1px solid #d1d5db',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem'
+          }}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter') {
+              handleJoin();
+            }
+          }}
+        />
+        <button
+          onClick={handleJoin}
+          style={{
+            backgroundColor: '#059669',
+            color: 'white',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '0.5rem',
+            border: 'none',
+            fontWeight: '600',
+            cursor: 'pointer',
+            fontSize: '0.875rem',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          Join Consultation
+        </button>
+      </div>
+      {error && (
+        <p style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+          {error}
+        </p>
+      )}
+      <p style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: '0.5rem' }}>
+        💡 You can paste the full invitation link or just the token part
+      </p>
+    </div>
+  );
+}
+
 export const dynamic = 'force-dynamic';
 
 interface CallSummary {
@@ -377,6 +462,23 @@ export default function PatientDashboard() {
 
       {/* Main Content */}
       <main style={{ maxWidth: '80rem', margin: '0 auto', padding: '2rem' }}>
+        {/* Join with Invitation Link Section */}
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '0.75rem',
+          padding: '2rem',
+          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+          marginBottom: '2rem'
+        }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>
+            Join Consultation
+          </h2>
+          <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+            Enter the invitation link provided by your doctor to join a consultation
+          </p>
+          <JoinWithInvitationLink />
+        </div>
+
         <div style={{
           backgroundColor: 'white',
           borderRadius: '0.75rem',

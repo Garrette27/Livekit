@@ -106,11 +106,18 @@ export default function DoctorInvitationsPage() {
         setWaitingPatients(prev => {
           // Remove old patients for this invitation and add new ones
           const filtered = prev.filter(p => p.invitationId !== invitationIds[index]);
-          return [...filtered, ...patients].sort((a, b) => {
-            const aTime = a.joinedAt?.toMillis?.() || a.joinedAt?.getTime?.() || new Date(a.joinedAt).getTime();
-            const bTime = b.joinedAt?.toMillis?.() || b.joinedAt?.getTime?.() || new Date(b.joinedAt).getTime();
+          const combined = [...filtered, ...patients];
+          // Sort by joinedAt time
+          const sorted = combined.sort((a, b) => {
+            const aTime = a.joinedAt?.toMillis?.() || 
+                         (a.joinedAt instanceof Date ? a.joinedAt.getTime() : 
+                          (a.joinedAt ? new Date(a.joinedAt as any).getTime() : 0));
+            const bTime = b.joinedAt?.toMillis?.() || 
+                         (b.joinedAt instanceof Date ? b.joinedAt.getTime() : 
+                          (b.joinedAt ? new Date(b.joinedAt as any).getTime() : 0));
             return aTime - bTime;
           });
+          return sorted;
         });
         setLoadingWaiting(false);
       }, (error) => {
