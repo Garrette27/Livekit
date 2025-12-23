@@ -91,6 +91,21 @@ export async function POST(req: NextRequest) {
     const finalMaxUses = maxUses !== undefined ? maxUses : (isWaitingRoomEnabled ? 999999 : 1); // Unlimited uses if waiting room enabled
     const finalMaxPatients = isWaitingRoomEnabled ? (maxPatients || 10) : 1;
 
+    // Validate doctorUserId
+    if (!doctorUserId) {
+      console.error('⚠️ ERROR: doctorUserId is required but not provided in request');
+      return NextResponse.json(
+        { success: false, error: 'Doctor user ID is required' },
+        { status: 400 }
+      );
+    }
+
+    console.log('Creating invitation with doctorUserId:', {
+      doctorUserId,
+      roomName: sanitizedRoomName,
+      waitingRoomEnabled: isWaitingRoomEnabled
+    });
+
     // Create invitation document
     const invitation: any = {
       roomName: sanitizedRoomName,
@@ -99,7 +114,7 @@ export async function POST(req: NextRequest) {
       currentUses: 0, // Initialize current uses counter
       waitingRoomEnabled: isWaitingRoomEnabled,
       ...(isWaitingRoomEnabled && { maxPatients: finalMaxPatients }),
-      createdBy: doctorUserId || 'system', // Use provided doctor user ID or fallback to 'system'
+      createdBy: doctorUserId, // Always use provided doctor user ID
       createdAt: new Date() as any,
       status: 'active',
       metadata: {

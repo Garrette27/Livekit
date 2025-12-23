@@ -133,6 +133,14 @@ export async function POST(req: NextRequest) {
     }
 
     const invitation = invitationDoc.data() as Invitation;
+    
+    // Log invitation details for debugging
+    console.log('Invitation retrieved for waiting room:', {
+      invitationId: tokenPayload.invitationId,
+      createdBy: invitation.createdBy,
+      waitingRoomEnabled: invitation.waitingRoomEnabled,
+      roomName: invitation.roomName
+    });
 
     // Check if invitation is expired (always check this first)
     // Handle both Firestore Timestamp and Date objects
@@ -425,6 +433,17 @@ export async function POST(req: NextRequest) {
     if (isWaitingRoomEnabled) {
       const waitingPatientId = `waiting_${tokenPayload.invitationId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
+      // Ensure doctorUserId is set correctly - use invitation.createdBy
+      const doctorUserId = invitation.createdBy;
+      
+      if (!doctorUserId || doctorUserId === 'system') {
+        console.error('⚠️ WARNING: Invitation createdBy is missing or "system":', {
+          invitationId: tokenPayload.invitationId,
+          createdBy: invitation.createdBy,
+          invitationData: invitation
+        });
+      }
+
       const waitingPatient: any = {
         id: waitingPatientId,
         patientId: userProfile ? userQuery.docs[0].id : `anonymous_${Date.now()}`,
@@ -432,7 +451,7 @@ export async function POST(req: NextRequest) {
         ...(userEmailToCheck && { patientEmail: userEmailToCheck }), // Only include if email exists
         roomName: tokenPayload.roomName,
         invitationId: tokenPayload.invitationId,
-        doctorUserId: invitation.createdBy, // Store doctor's user ID for permission checking
+        doctorUserId: doctorUserId, // Store doctor's user ID for permission checking
         joinedAt: new Date(),
         status: 'waiting',
         metadata: {
@@ -441,6 +460,14 @@ export async function POST(req: NextRequest) {
           userAgent,
         },
       };
+
+      console.log('Creating waiting patient document:', {
+        waitingPatientId,
+        invitationId: tokenPayload.invitationId,
+        doctorUserId: doctorUserId,
+        createdBy: invitation.createdBy,
+        roomName: tokenPayload.roomName
+      });
 
       await db.collection('waitingPatients').doc(waitingPatientId).set(waitingPatient);
 

@@ -46,6 +46,22 @@ export default function WaitingPatientsList({
       inv.createdBy === user.uid
     );
 
+    // Debug: Check if there are invitations with waiting room but wrong createdBy
+    const allWaitingRoomInvitations = invitations.filter(inv => 
+      inv.status === 'active' && inv.waitingRoomEnabled === true
+    );
+    
+    if (allWaitingRoomInvitations.length > 0 && activeInvitations.length === 0) {
+      console.warn('⚠️ Found waiting room invitations but none match user.uid:', {
+        userUid: user.uid,
+        allWaitingRoomInvitations: allWaitingRoomInvitations.map(inv => ({
+          id: inv.id,
+          createdBy: inv.createdBy,
+          matches: inv.createdBy === user.uid
+        }))
+      });
+    }
+
     if (activeInvitations.length === 0) {
       setWaitingPatients([]);
       setLoading(false);
@@ -57,7 +73,12 @@ export default function WaitingPatientsList({
     console.log('Setting up waiting patients query:', {
       userUid: user.uid,
       activeInvitationIds: invitationIds,
-      selectedInvitationId
+      selectedInvitationId,
+      activeInvitations: activeInvitations.map(inv => ({
+        id: inv.id,
+        createdBy: inv.createdBy,
+        roomName: inv.roomName
+      }))
     });
 
     // Query all waiting patients for this doctor
@@ -67,24 +88,43 @@ export default function WaitingPatientsList({
       where('status', '==', 'waiting')
     );
 
+    console.log('Query object:', waitingQuery);
+
     const unsubscribe = onSnapshot(
       waitingQuery,
       (snapshot) => {
-        console.log('Waiting patients snapshot received:', {
+        console.log('✅ Waiting patients snapshot received:', {
           size: snapshot.size,
-          userUid: user.uid
+          userUid: user.uid,
+          empty: snapshot.empty
         });
+
+        if (snapshot.empty) {
+          console.log('⚠️ Snapshot is empty - no waiting patients found for this doctor');
+        }
 
         const allPatients = snapshot.docs.map((doc) => {
           const data = doc.data();
-          console.log('Waiting patient document:', {
+          const matchesUser = data.doctorUserId === user.uid;
+          console.log('📋 Waiting patient document:', {
             id: doc.id,
             invitationId: data.invitationId,
             doctorUserId: data.doctorUserId,
+            userUid: user.uid,
+            matchesUser: matchesUser,
             status: data.status,
             patientName: data.patientName,
-            matchesUser: data.doctorUserId === user.uid
+            roomName: data.roomName
           });
+          
+          if (!matchesUser) {
+            console.error('❌ MISMATCH: doctorUserId does not match user.uid!', {
+              doctorUserId: data.doctorUserId,
+              userUid: user.uid,
+              invitationId: data.invitationId
+            });
+          }
+          
           return {
             id: doc.id,
             ...data
@@ -121,17 +161,34 @@ export default function WaitingPatientsList({
         setError(null);
       },
       (error: any) => {
-        console.error('Error fetching waiting patients:', error);
+        console.error('❌ Error fetching waiting patients:', error);
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          stack: error.stack,
+          userUid: user.uid,
+          activeInvitationIds: invitationIds,
+          activeInvitationsCreatedBy: activeInvitations.map(inv => ({
+            id: inv.id,
+            createdBy: inv.createdBy,
+            matchesUser: inv.createdBy === user.uid
+          }))
+        });
+        
         setError(error.message || 'Failed to fetch waiting patients');
         setLoading(false);
         
         if (error?.code === 'permission-denied') {
-          console.error('Permission denied details:', {
-            code: error.code,
-            message: error.message,
-            userUid: user.uid,
-            errorDetails: error
-          });
+          console.error('🔒 Permission denied - possible causes:');
+          console.error('1. doctorUserId in waiting patient document does not match user.uid');
+          console.error('2. Firestore security rules are blocking the query');
+          console.error('3. The invitation createdBy field does not match user.uid');
+          console.error('Current user UID:', user.uid);
+          console.error('Active invitations createdBy:', activeInvitations.map(inv => inv.createdBy));
+        }
+        
+        if (error?.code === 'failed-precondition') {
+          console.error('📋 Index required. Check the error message for a link to create the index.');
         }
       }
     );
