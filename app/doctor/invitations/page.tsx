@@ -165,10 +165,6 @@ export default function DoctorInvitationsPage() {
     return () => {
       unsubscribe();
     };
-
-    return () => {
-      unsubscribes.forEach(unsub => unsub());
-    };
   }, [invitations, user, db, isAuthorized, selectedInvitationId]);
 
   const admitPatient = async (waitingPatient: WaitingPatient) => {
