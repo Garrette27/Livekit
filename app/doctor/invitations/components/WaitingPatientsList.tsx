@@ -77,8 +77,27 @@ export default function WaitingPatientsList({
       activeInvitations: activeInvitations.map(inv => ({
         id: inv.id,
         createdBy: inv.createdBy,
-        roomName: inv.roomName
+        roomName: inv.roomName,
+        matchesUser: inv.createdBy === user.uid
       }))
+    });
+    
+    // Log detailed comparison
+    activeInvitations.forEach(inv => {
+      if (inv.createdBy !== user.uid) {
+        console.error('❌ INVITATION MISMATCH:', {
+          invitationId: inv.id,
+          invitationCreatedBy: inv.createdBy,
+          currentUserUid: user.uid,
+          match: inv.createdBy === user.uid
+        });
+      } else {
+        console.log('✅ Invitation matches user:', {
+          invitationId: inv.id,
+          createdBy: inv.createdBy,
+          userUid: user.uid
+        });
+      }
     });
 
     // Query all waiting patients for this doctor

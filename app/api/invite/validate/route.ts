@@ -466,8 +466,26 @@ export async function POST(req: NextRequest) {
         invitationId: tokenPayload.invitationId,
         doctorUserId: doctorUserId,
         createdBy: invitation.createdBy,
-        roomName: tokenPayload.roomName
+        roomName: tokenPayload.roomName,
+        invitationData: {
+          id: tokenPayload.invitationId,
+          createdBy: invitation.createdBy,
+          waitingRoomEnabled: invitation.waitingRoomEnabled
+        }
       });
+      
+      // Validate doctorUserId before creating document
+      if (!doctorUserId || doctorUserId === 'system') {
+        console.error('❌ CRITICAL: Cannot create waiting patient - doctorUserId is invalid:', {
+          doctorUserId,
+          invitationCreatedBy: invitation.createdBy,
+          invitationId: tokenPayload.invitationId
+        });
+        return NextResponse.json(
+          { success: false, error: 'Invalid invitation: doctor not associated with invitation' },
+          { status: 500 }
+        );
+      }
 
       await db.collection('waitingPatients').doc(waitingPatientId).set(waitingPatient);
 
