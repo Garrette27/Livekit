@@ -20,6 +20,7 @@ export default function DoctorInvitationsPage() {
   const [loadingWaiting, setLoadingWaiting] = useState(false);
   const [admittingId, setAdmittingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [selectedInvitationId, setSelectedInvitationId] = useState<string | null>(null);
   const router = useRouter();
 
   // Persist room name in localStorage
@@ -80,61 +81,92 @@ export default function DoctorInvitationsPage() {
     return () => unsubscribe();
   }, [user, isAuthorized]);
 
-  // Fetch waiting patients for all active invitations with waiting room enabled
+  // Fetch waiting patients - either for selected invitation or all active invitations
   useEffect(() => {
     if (!user || !db || !isAuthorized) return;
-
-    const activeInvitations = invitations.filter(inv => 
-      inv.status === 'active' && inv.waitingRoomEnabled === true
-    );
-
-    if (activeInvitations.length === 0) {
-      setWaitingPatients([]);
-      return;
-    }
 
     // Type guard - ensure db is not undefined
     if (!db) return;
 
     setLoadingWaiting(true);
-    const roomNames = activeInvitations.map(inv => inv.roomName);
-    const invitationIds = activeInvitations.map(inv => inv.id);
-
-    // Store db in a const to help TypeScript understand it's non-null
     const firestoreDb = db;
 
-    // Fetch waiting patients for all active waiting room invitations
-    const waitingQueries = invitationIds.map(invitationId => {
-      return query(
-        collection(firestoreDb, 'waitingPatients'),
-        where('invitationId', '==', invitationId),
-        where('status', '==', 'waiting')
-        // Note: Removed orderBy to avoid index requirement - we'll sort in JavaScript
+    let waitingQueries: any[] = [];
+
+    if (selectedInvitationId) {
+      // If an invitation is selected, only show waiting patients for that invitation
+      const selectedInv = invitations.find(inv => inv.id === selectedInvitationId);
+      if (selectedInv && selectedInv.waitingRoomEnabled && selectedInv.status === 'active') {
+        waitingQueries = [query(
+          collection(firestoreDb, 'waitingPatients'),
+          where('invitationId', '==', selectedInvitationId),
+          where('status', '==', 'waiting')
+        )];
+      } else {
+        setWaitingPatients([]);
+        setLoadingWaiting(false);
+        return;
+      }
+    } else {
+      // If no invitation selected, show waiting patients for all active invitations with waiting room
+      const activeInvitations = invitations.filter(inv => 
+        inv.status === 'active' && inv.waitingRoomEnabled === true
       );
-    });
+
+      if (activeInvitations.length === 0) {
+        setWaitingPatients([]);
+        setLoadingWaiting(false);
+        return;
+      }
+
+      const invitationIds = activeInvitations.map(inv => inv.id);
+      waitingQueries = invitationIds.map(invitationId => {
+        return query(
+          collection(firestoreDb, 'waitingPatients'),
+          where('invitationId', '==', invitationId),
+          where('status', '==', 'waiting')
+        );
+      });
+    }
 
     const unsubscribes = waitingQueries.map((q, index) => 
-      onSnapshot(q, (snapshot) => {
-        const patients = snapshot.docs.map(doc => ({
+      onSnapshot(q, (snapshot: any) => {
+        const patients = snapshot.docs.map((doc: any) => ({
           id: doc.id,
           ...doc.data()
         })) as WaitingPatient[];
 
         setWaitingPatients(prev => {
-          // Remove old patients for this invitation and add new ones
-          const filtered = prev.filter(p => p.invitationId !== invitationIds[index]);
-          const combined = [...filtered, ...patients];
-          // Sort by joinedAt time
-          const sorted = combined.sort((a, b) => {
-            const aTime = a.joinedAt?.toMillis?.() || 
-                         (a.joinedAt instanceof Date ? a.joinedAt.getTime() : 
-                          (a.joinedAt ? new Date(a.joinedAt as any).getTime() : 0));
-            const bTime = b.joinedAt?.toMillis?.() || 
-                         (b.joinedAt instanceof Date ? b.joinedAt.getTime() : 
-                          (b.joinedAt ? new Date(b.joinedAt as any).getTime() : 0));
-            return aTime - bTime;
-          });
-          return sorted;
+          if (selectedInvitationId) {
+            // If showing selected invitation, replace all
+            return patients.sort((a, b) => {
+              const aTime = a.joinedAt?.toMillis?.() || 
+                           (a.joinedAt instanceof Date ? a.joinedAt.getTime() : 
+                            (a.joinedAt ? new Date(a.joinedAt as any).getTime() : 0));
+              const bTime = b.joinedAt?.toMillis?.() || 
+                           (b.joinedAt instanceof Date ? b.joinedAt.getTime() : 
+                            (b.joinedAt ? new Date(b.joinedAt as any).getTime() : 0));
+              return aTime - bTime;
+            });
+          } else {
+            // Remove old patients for this invitation and add new ones
+            const invitationIds = invitations
+              .filter(inv => inv.status === 'active' && inv.waitingRoomEnabled === true)
+              .map(inv => inv.id);
+            const filtered = prev.filter(p => p.invitationId !== invitationIds[index]);
+            const combined = [...filtered, ...patients];
+            // Sort by joinedAt time
+            const sorted = combined.sort((a, b) => {
+              const aTime = a.joinedAt?.toMillis?.() || 
+                           (a.joinedAt instanceof Date ? a.joinedAt.getTime() : 
+                            (a.joinedAt ? new Date(a.joinedAt as any).getTime() : 0));
+              const bTime = b.joinedAt?.toMillis?.() || 
+                           (b.joinedAt instanceof Date ? b.joinedAt.getTime() : 
+                            (b.joinedAt ? new Date(b.joinedAt as any).getTime() : 0));
+              return aTime - bTime;
+            });
+            return sorted;
+          }
         });
         setLoadingWaiting(false);
       }, (error) => {
@@ -146,7 +178,7 @@ export default function DoctorInvitationsPage() {
     return () => {
       unsubscribes.forEach(unsub => unsub());
     };
-  }, [invitations, user, db, isAuthorized]);
+  }, [invitations, user, db, isAuthorized, selectedInvitationId]);
 
   const admitPatient = async (waitingPatient: WaitingPatient) => {
     try {
@@ -213,13 +245,17 @@ export default function DoctorInvitationsPage() {
   const revokeInvitation = async (invitationId: string) => {
     if (!db) return;
     
+    if (!confirm('Are you sure you want to revoke this invitation? Patients using this link will be denied access.')) {
+      return;
+    }
+    
     try {
       const invitationRef = doc(db, 'invitations', invitationId);
       await updateDoc(invitationRef, {
         status: 'revoked',
         revokedAt: new Date()
       });
-      alert('Invitation revoked successfully');
+      alert('Invitation revoked successfully. Patients using this link will now be denied access.');
     } catch (error) {
       console.error('Error revoking invitation:', error);
       alert('Failed to revoke invitation');
@@ -413,12 +449,25 @@ export default function DoctorInvitationsPage() {
                   <div
                     key={invitation.id}
                     id={`invitation-${invitation.id}`}
+                    onClick={(e) => {
+                      // Don't trigger if clicking on buttons
+                      if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+                      setSelectedInvitationId(prev => 
+                        prev === invitation.id ? null : invitation.id
+                      );
+                    }}
                     style={{
-                      border: '1px solid #E5E7EB',
+                      border: selectedInvitationId === invitation.id 
+                        ? '2px solid #2563eb' 
+                        : '1px solid #E5E7EB',
                       borderRadius: '0.5rem',
                       padding: '1rem',
                       marginBottom: '1rem',
-                      backgroundColor: '#F9FAFB'
+                      backgroundColor: selectedInvitationId === invitation.id 
+                        ? '#eff6ff' 
+                        : '#F9FAFB',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
@@ -472,7 +521,8 @@ export default function DoctorInvitationsPage() {
                       {invitation.status === 'active' && (
                         <>
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent card click
                               const doctorJoinUrl = `/room/${invitation.roomName}/doctor`;
                               window.open(doctorJoinUrl, '_blank');
                             }}
@@ -490,7 +540,10 @@ export default function DoctorInvitationsPage() {
                             🩺 Join as Doctor
                           </button>
                           <button
-                            onClick={() => revokeInvitation(invitation.id)}
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent card click
+                              revokeInvitation(invitation.id);
+                            }}
                             style={{
                               backgroundColor: '#dc2626',
                               color: 'white',
@@ -513,14 +566,76 @@ export default function DoctorInvitationsPage() {
             )}
           </div>
 
-          {/* Waiting Queue Room */}
+          {/* Waiting Queue Room / Invitation Details */}
           <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: '2rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>
-              Waiting Queue Room
-            </h2>
-            <p style={{ color: '#6B7280', marginBottom: '1.5rem' }}>
-              View and manage patients waiting to join consultations
-            </p>
+            {selectedInvitationId ? (
+              <>
+                {(() => {
+                  const selectedInv = invitations.find(inv => inv.id === selectedInvitationId);
+                  if (!selectedInv) return null;
+                  
+                  return (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <div>
+                          <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '0.25rem' }}>
+                            {selectedInv.roomName}
+                          </h2>
+                          <p style={{ color: '#6B7280', fontSize: '0.875rem' }}>
+                            {selectedInv.emailAllowed || 'Open Invitation'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setSelectedInvitationId(null)}
+                          style={{
+                            backgroundColor: '#f3f4f6',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '0.375rem',
+                            padding: '0.25rem 0.75rem',
+                            fontSize: '0.75rem',
+                            cursor: 'pointer',
+                            color: '#6b7280'
+                          }}
+                        >
+                          ✕ Close
+                        </button>
+                      </div>
+                      
+                      <div style={{ 
+                        backgroundColor: '#f0f9ff', 
+                        border: '1px solid #bae6fd', 
+                        borderRadius: '0.5rem', 
+                        padding: '1rem', 
+                        marginBottom: '1.5rem',
+                        fontSize: '0.875rem'
+                      }}>
+                        <p style={{ margin: '0 0 0.5rem 0' }}><strong>Status:</strong> {selectedInv.status}</p>
+                        <p style={{ margin: '0 0 0.5rem 0' }}><strong>Created:</strong> {selectedInv.createdAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
+                        <p style={{ margin: '0 0 0.5rem 0' }}><strong>Expires:</strong> {selectedInv.expiresAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
+                        {selectedInv.waitingRoomEnabled && (
+                          <p style={{ margin: '0', color: '#059669', fontWeight: '500' }}>
+                            🚪 Waiting Room: {selectedInv.currentUses || 0} / {selectedInv.maxPatients || 10} patients
+                          </p>
+                        )}
+                      </div>
+                      
+                      <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', marginBottom: '1rem' }}>
+                        Waiting Patients
+                      </h3>
+                    </>
+                  );
+                })()}
+              </>
+            ) : (
+              <>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>
+                  Waiting Queue Room
+                </h2>
+                <p style={{ color: '#6B7280', marginBottom: '1.5rem' }}>
+                  Click on an invitation card to view its waiting patients, or view all waiting patients below
+                </p>
+              </>
+            )}
 
           {loadingWaiting ? (
             <div style={{ textAlign: 'center', padding: '2rem' }}>
@@ -537,9 +652,11 @@ export default function DoctorInvitationsPage() {
             </div>
           ) : waitingPatients.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>
-              <p>No patients waiting.</p>
+              <p>{selectedInvitationId ? 'No patients waiting for this invitation.' : 'No patients waiting.'}</p>
               <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                Patients with waiting room enabled invitations will appear here when they join.
+                {selectedInvitationId 
+                  ? 'Patients will appear here when they join using this invitation link.'
+                  : 'Click on an invitation card to view its waiting patients, or they will appear here when they join.'}
               </p>
             </div>
           ) : (
@@ -572,6 +689,9 @@ export default function DoctorInvitationsPage() {
                         </p>
                         <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '0.25rem' }}>
                           <strong>Name:</strong> {patient.patientName || 'Unknown'}
+                        </p>
+                        <p style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '0.25rem' }}>
+                          <strong>Joined:</strong> {joinedAt.toLocaleString()}
                         </p>
                         <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.5rem' }}>
                           Waiting for {waitTime} minute{waitTime !== 1 ? 's' : ''}

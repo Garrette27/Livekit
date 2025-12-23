@@ -59,7 +59,7 @@ export interface Invitation {
   usedBy?: string;
   createdBy: string;
   createdAt: Timestamp;
-  status: 'active' | 'used' | 'expired' | 'cancelled';
+  status: 'active' | 'used' | 'expired' | 'cancelled' | 'revoked';
   metadata: {
     createdBy: string;
     doctorName: string;

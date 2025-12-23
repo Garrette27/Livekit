@@ -153,10 +153,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if invitation is cancelled
-    if (invitation.status === 'cancelled') {
+    // Check if invitation is cancelled or revoked
+    if (invitation.status === 'cancelled' || invitation.status === 'revoked') {
       return NextResponse.json(
-        { success: false, error: 'Invitation has been cancelled' },
+        { success: false, error: 'Invitation has been cancelled or revoked' },
         { status: 403 }
       );
     }
