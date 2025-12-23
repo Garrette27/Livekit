@@ -17,7 +17,28 @@ export default function WaitingRoomPanel({ roomName }: WaitingRoomPanelProps) {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/waiting-room/list?roomName=${encodeURIComponent(roomName)}`);
+      
+      // First, get active invitations for this room to get invitation IDs
+      // This avoids the Firestore index requirement
+      const invitationsResponse = await fetch(`/api/invite/get-link?roomName=${encodeURIComponent(roomName)}`);
+      const invitationsResult = await invitationsResponse.json();
+      
+      if (!invitationsResult.success || !invitationsResult.invitationId) {
+        // No active invitation, but still try roomName query as fallback
+        const response = await fetch(`/api/waiting-room/list?roomName=${encodeURIComponent(roomName)}`);
+        const result = await response.json();
+        
+        if (result.success) {
+          setWaitingPatients(result.waitingPatients || []);
+        } else {
+          setError(result.error || 'Failed to fetch waiting patients');
+          setWaitingPatients([]);
+        }
+        return;
+      }
+      
+      // Use invitationId for more efficient query (no index needed)
+      const response = await fetch(`/api/waiting-room/list?invitationId=${encodeURIComponent(invitationsResult.invitationId)}`);
       const result = await response.json();
 
       if (result.success) {

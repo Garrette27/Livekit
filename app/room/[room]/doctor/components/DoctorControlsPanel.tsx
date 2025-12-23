@@ -1,6 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebase';
 
 interface DoctorControlsPanelProps {
   doctorName: string;
@@ -9,7 +11,42 @@ interface DoctorControlsPanelProps {
 }
 
 export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: DoctorControlsPanelProps) {
-  const patientLink = `https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`;
+  const [user] = useAuthState(auth);
+  const [invitationLink, setInvitationLink] = useState<string | null>(null);
+  const [loadingLink, setLoadingLink] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const fallbackLink = `https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`;
+
+  useEffect(() => {
+    const fetchInvitationLink = async () => {
+      if (!user) return;
+      
+      setLoadingLink(true);
+      setLinkError(null);
+      
+      try {
+        const response = await fetch(`/api/invite/get-link?roomName=${encodeURIComponent(roomName)}`);
+        const result = await response.json();
+        
+        if (result.success) {
+          setInvitationLink(result.inviteUrl);
+        } else {
+          setLinkError(result.error || 'No active invitation found');
+          setInvitationLink(null);
+        }
+      } catch (err) {
+        console.error('Error fetching invitation link:', err);
+        setLinkError('Failed to load invitation link');
+        setInvitationLink(null);
+      } finally {
+        setLoadingLink(false);
+      }
+    };
+
+    fetchInvitationLink();
+  }, [roomName, user]);
+
+  const patientLink = invitationLink || fallbackLink;
 
   return (
     <div style={{ marginBottom: '0.75rem' }}>
@@ -53,8 +90,22 @@ export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: D
             color: '#15803d'
           }}
         >
-          Patient Link:
+          {invitationLink ? 'Patient Invitation Link:' : 'Patient Link:'}
         </h4>
+        {loadingLink ? (
+          <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.7rem', color: '#6b7280' }}>
+            Loading invitation link...
+          </p>
+        ) : linkError ? (
+          <div style={{ marginBottom: '0.5rem' }}>
+            <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.7rem', color: '#dc2626' }}>
+              {linkError}
+            </p>
+            <p style={{ margin: '0', fontSize: '0.65rem', color: '#6b7280' }}>
+              Using fallback link (direct room access)
+            </p>
+          </div>
+        ) : null}
         <p
           style={{
             margin: '0 0 0.5rem 0',
@@ -68,22 +119,23 @@ export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: D
         <button
           onClick={() => {
             navigator.clipboard.writeText(patientLink);
-            alert('Patient link copied to clipboard!');
+            alert(invitationLink ? 'Invitation link copied to clipboard!' : 'Patient link copied to clipboard!');
           }}
+          disabled={loadingLink}
           style={{
-            backgroundColor: '#22c55e',
+            backgroundColor: loadingLink ? '#9ca3af' : '#22c55e',
             color: 'white',
             border: 'none',
             borderRadius: '0.5rem',
             padding: '0.5rem 1rem',
             fontSize: '0.75rem',
             fontWeight: '500',
-            cursor: 'pointer',
+            cursor: loadingLink ? 'not-allowed' : 'pointer',
             width: '100%',
             marginBottom: '0.5rem'
           }}
         >
-          📋 Copy Patient Link
+          {loadingLink ? 'Loading...' : '📋 Copy Link'}
         </button>
 
         <button
