@@ -97,10 +97,12 @@ export default function DoctorInvitationsPage() {
       // If an invitation is selected, only show waiting patients for that invitation
       const selectedInv = invitations.find(inv => inv.id === selectedInvitationId);
       if (selectedInv && selectedInv.waitingRoomEnabled && selectedInv.status === 'active') {
+        // Add doctorUserId to query to match security rules
         waitingQueries = [query(
           collection(firestoreDb, 'waitingPatients'),
           where('invitationId', '==', selectedInvitationId),
-          where('status', '==', 'waiting')
+          where('status', '==', 'waiting'),
+          where('doctorUserId', '==', user.uid)
         )];
       } else {
         setWaitingPatients([]);
@@ -110,7 +112,7 @@ export default function DoctorInvitationsPage() {
     } else {
       // If no invitation selected, show waiting patients for all active invitations with waiting room
       const activeInvitations = invitations.filter(inv => 
-        inv.status === 'active' && inv.waitingRoomEnabled === true
+        inv.status === 'active' && inv.waitingRoomEnabled === true && inv.createdBy === user.uid
       );
 
       if (activeInvitations.length === 0) {
@@ -120,11 +122,13 @@ export default function DoctorInvitationsPage() {
       }
 
       const invitationIds = activeInvitations.map(inv => inv.id);
+      // Add doctorUserId to query to match security rules
       waitingQueries = invitationIds.map(invitationId => {
         return query(
           collection(firestoreDb, 'waitingPatients'),
           where('invitationId', '==', invitationId),
-          where('status', '==', 'waiting')
+          where('status', '==', 'waiting'),
+          where('doctorUserId', '==', user.uid)
         );
       });
     }
