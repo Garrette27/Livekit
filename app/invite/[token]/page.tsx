@@ -10,6 +10,59 @@ import {
   DeviceFingerprint 
 } from '@/lib/types';
 
+// Component for waiting room with admission polling
+function WaitingRoomView({ 
+  validationResult, 
+  invitationEmail,
+  setValidationResult 
+}: { 
+  validationResult: ValidateInvitationResponse; 
+  invitationEmail: string;
+  setValidationResult: (result: ValidateInvitationResponse) => void;
+}) {
+  useEffect(() => {
+    if (!validationResult?.invitationId) return;
+
+    const checkAdmission = async () => {
+      try {
+        const response = await fetch('/api/waiting-room/check-admission', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            invitationId: validationResult.invitationId,
+            patientEmail: validationResult.registeredEmail || invitationEmail || undefined,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success && result.admitted && result.liveKitToken) {
+          // Patient has been admitted - update to show consultation room
+          setValidationResult({
+            ...validationResult,
+            liveKitToken: result.liveKitToken,
+            roomName: result.roomName,
+            waitingRoomEnabled: false,
+            waitingRoomToken: false,
+          });
+        }
+      } catch (err) {
+        console.error('Error checking admission:', err);
+      }
+    };
+
+    // Check immediately, then poll every 3 seconds
+    checkAdmission();
+    const interval = setInterval(checkAdmission, 3000);
+
+    return () => clearInterval(interval);
+  }, [validationResult?.invitationId, invitationEmail, validationResult, setValidationResult]);
+
+  return null;
+}
+
 function InvitePageContent() {
   const params = useParams();
   const router = useRouter();
