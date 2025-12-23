@@ -135,7 +135,18 @@ export async function POST(req: NextRequest) {
     const invitation = invitationDoc.data() as Invitation;
 
     // Check if invitation is expired (always check this first)
-    if (invitation.status === 'expired' || new Date() > invitation.expiresAt.toDate()) {
+    // Handle both Firestore Timestamp and Date objects
+    let expiresAtDate: Date;
+    if (invitation.expiresAt && typeof invitation.expiresAt.toDate === 'function') {
+      expiresAtDate = invitation.expiresAt.toDate();
+    } else if (invitation.expiresAt instanceof Date) {
+      expiresAtDate = invitation.expiresAt;
+    } else {
+      // Fallback: try to parse as timestamp
+      expiresAtDate = new Date((invitation.expiresAt as any)?.seconds * 1000 || Date.now());
+    }
+
+    if (invitation.status === 'expired' || new Date() > expiresAtDate) {
       return NextResponse.json(
         { success: false, error: 'Invitation has expired' },
         { status: 403 }
