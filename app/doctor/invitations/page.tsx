@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import InvitationManager from '@/components/InvitationManager';
 import { Invitation, WaitingPatient, AdmitPatientResponse } from '@/lib/types';
 import { isDoctor } from '@/lib/auth-utils';
+import WaitingPatientsList from './components/WaitingPatientsList';
 
 export default function DoctorInvitationsPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -16,8 +17,6 @@ export default function DoctorInvitationsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<string>('');
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [waitingPatients, setWaitingPatients] = useState<WaitingPatient[]>([]);
-  const [loadingWaiting, setLoadingWaiting] = useState(false);
   const [admittingId, setAdmittingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [selectedInvitationId, setSelectedInvitationId] = useState<string | null>(null);
@@ -81,91 +80,7 @@ export default function DoctorInvitationsPage() {
     return () => unsubscribe();
   }, [user, isAuthorized]);
 
-  // Fetch waiting patients - either for selected invitation or all active invitations
-  useEffect(() => {
-    if (!user || !db || !isAuthorized) return;
-
-    // Type guard - ensure db is not undefined
-    if (!db) return;
-
-    setLoadingWaiting(true);
-    const firestoreDb = db;
-
-    let waitingQueries: any[] = [];
-
-    // Query all waiting patients for this doctor, then filter by invitationId in JavaScript
-    // This avoids needing a composite index for invitationId + status + doctorUserId
-    const activeInvitations = invitations.filter(inv => 
-      inv.status === 'active' && inv.waitingRoomEnabled === true && inv.createdBy === user.uid
-    );
-
-    if (activeInvitations.length === 0) {
-      setWaitingPatients([]);
-      setLoadingWaiting(false);
-      return;
-    }
-
-    const invitationIds = activeInvitations.map(inv => inv.id);
-    
-    // Single query for all waiting patients for this doctor
-    // Filter by invitationId in JavaScript to avoid composite index requirement
-    waitingQueries = [query(
-      collection(firestoreDb, 'waitingPatients'),
-      where('doctorUserId', '==', user.uid),
-      where('status', '==', 'waiting')
-    )];
-
-    // Single query for all waiting patients - filter by invitationId in JavaScript
-    const unsubscribe = onSnapshot(waitingQueries[0], (snapshot: any) => {
-      const allPatients = snapshot.docs.map((doc: any) => ({
-        id: doc.id,
-        ...doc.data()
-      })) as WaitingPatient[];
-
-      // Filter by invitationId(s) in JavaScript
-      let filteredPatients: WaitingPatient[];
-      if (selectedInvitationId) {
-        // If showing selected invitation, only show patients for that invitation
-        filteredPatients = allPatients.filter(p => p.invitationId === selectedInvitationId);
-      } else {
-        // Show patients for all active invitations
-        filteredPatients = allPatients.filter(p => invitationIds.includes(p.invitationId));
-      }
-
-      // Sort by joinedAt time
-      const sorted = filteredPatients.sort((a, b) => {
-        const aTime = a.joinedAt?.toMillis?.() || 
-                     (a.joinedAt instanceof Date ? a.joinedAt.getTime() : 
-                      (a.joinedAt ? new Date(a.joinedAt as any).getTime() : 0));
-        const bTime = b.joinedAt?.toMillis?.() || 
-                     (b.joinedAt instanceof Date ? b.joinedAt.getTime() : 
-                      (b.joinedAt ? new Date(b.joinedAt as any).getTime() : 0));
-        return aTime - bTime;
-      });
-
-      setWaitingPatients(sorted);
-      setLoadingWaiting(false);
-    }, (error: any) => {
-      console.error('Error fetching waiting patients:', error);
-      // Log detailed error information
-      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) {
-        console.error('Permission denied details:', {
-          code: error.code,
-          message: error.message,
-          userUid: user?.uid
-        });
-      }
-      if (error?.code === 'failed-precondition') {
-        console.error('Index required. Error details:', error.message);
-        // The error message should contain a link to create the index
-      }
-      setLoadingWaiting(false);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [invitations, user, db, isAuthorized, selectedInvitationId]);
+  // Note: Waiting patients are now handled by WaitingPatientsList component
 
   const admitPatient = async (waitingPatient: WaitingPatient) => {
     try {
@@ -624,107 +539,20 @@ export default function DoctorInvitationsPage() {
               </>
             )}
 
-          {loadingWaiting ? (
-            <div style={{ textAlign: 'center', padding: '2rem' }}>
-              <div style={{
-                width: '2rem',
-                height: '2rem',
-                border: '2px solid #dbeafe',
-                borderTop: '2px solid #2563eb',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-                margin: '0 auto 1rem'
-              }}></div>
-              <p style={{ color: '#6B7280' }}>Loading waiting patients...</p>
-            </div>
-          ) : waitingPatients.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>
-              <p>{selectedInvitationId ? 'No patients waiting for this invitation.' : 'No patients waiting.'}</p>
-              <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                {selectedInvitationId 
-                  ? 'Patients will appear here when they join using this invitation link.'
-                  : 'Click on an invitation card to view its waiting patients, or they will appear here when they join.'}
-              </p>
-            </div>
+          {db && user ? (
+            <WaitingPatientsList
+              db={db}
+              user={user}
+              invitations={invitations}
+              selectedInvitationId={selectedInvitationId}
+              onAdmit={admitPatient}
+              onReject={rejectPatient}
+              admittingId={admittingId}
+              rejectingId={rejectingId}
+            />
           ) : (
-            <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-              {waitingPatients.map((patient) => {
-                const joinedAt = patient.joinedAt?.toDate ? patient.joinedAt.toDate() : 
-                                 patient.joinedAt instanceof Date ? patient.joinedAt : 
-                                 new Date(patient.joinedAt);
-                const waitTime = Math.floor((Date.now() - joinedAt.getTime()) / 1000 / 60); // minutes
-                const invitation = invitations.find(inv => inv.id === patient.invitationId);
-
-                return (
-                  <div
-                    key={patient.id}
-                    style={{
-                      border: '1px solid #E5E7EB',
-                      borderRadius: '0.5rem',
-                      padding: '1rem',
-                      marginBottom: '1rem',
-                      backgroundColor: '#F9FAFB'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                      <div style={{ flex: 1 }}>
-                        <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                          Room: {patient.roomName}
-                        </h3>
-                        <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '0.25rem' }}>
-                          <strong>Email:</strong> {patient.patientEmail || 'Unknown'}
-                        </p>
-                        <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '0.25rem' }}>
-                          <strong>Name:</strong> {patient.patientName || 'Unknown'}
-                        </p>
-                        <p style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '0.25rem' }}>
-                          <strong>Joined:</strong> {joinedAt.toLocaleString()}
-                        </p>
-                        <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.5rem' }}>
-                          Waiting for {waitTime} minute{waitTime !== 1 ? 's' : ''}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <button
-                        onClick={() => admitPatient(patient)}
-                        disabled={admittingId === patient.id}
-                        style={{
-                          backgroundColor: admittingId === patient.id ? '#9ca3af' : '#059669',
-                          color: 'white',
-                          padding: '0.5rem 1rem',
-                          borderRadius: '0.375rem',
-                          border: 'none',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          cursor: admittingId === patient.id ? 'not-allowed' : 'pointer',
-                          flex: 1
-                        }}
-                      >
-                        {admittingId === patient.id ? 'Admitting...' : '✅ Admit'}
-                      </button>
-                      <button
-                        onClick={() => rejectPatient(patient.id)}
-                        disabled={rejectingId === patient.id}
-                        style={{
-                          backgroundColor: rejectingId === patient.id ? '#9ca3af' : '#dc2626',
-                          color: 'white',
-                          padding: '0.5rem 1rem',
-                          borderRadius: '0.375rem',
-                          border: 'none',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          cursor: rejectingId === patient.id ? 'not-allowed' : 'pointer',
-                          flex: 1
-                        }}
-                      >
-                        {rejectingId === patient.id ? 'Removing...' : '❌ Reject'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>
+              <p>Loading...</p>
             </div>
           )}
           </div>
