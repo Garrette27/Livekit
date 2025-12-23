@@ -429,13 +429,13 @@ export async function POST(req: NextRequest) {
         id: waitingPatientId,
         patientId: userProfile ? userQuery.docs[0].id : `anonymous_${Date.now()}`,
         patientName: userProfile?.email || userEmailToCheck || 'Anonymous Patient',
-        patientEmail: userEmailToCheck || undefined,
+        ...(userEmailToCheck && { patientEmail: userEmailToCheck }), // Only include if email exists
         roomName: tokenPayload.roomName,
         invitationId: tokenPayload.invitationId,
         joinedAt: new Date(),
         status: 'waiting',
         metadata: {
-          deviceFingerprint: deviceFingerprint ? JSON.stringify(deviceFingerprint) : undefined,
+          ...(deviceFingerprint && { deviceFingerprint: JSON.stringify(deviceFingerprint) }), // Only include if exists
           ip: clientIP,
           userAgent,
         },
