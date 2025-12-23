@@ -134,18 +134,18 @@ export async function POST(req: NextRequest) {
 
     const invitation = invitationDoc.data() as Invitation;
 
-    // Check if invitation is already used
-    if (invitation.status === 'used') {
+    // Check if invitation is expired (always check this first)
+    if (invitation.status === 'expired' || new Date() > invitation.expiresAt.toDate()) {
       return NextResponse.json(
-        { success: false, error: 'Invitation has already been used' },
+        { success: false, error: 'Invitation has expired' },
         { status: 403 }
       );
     }
 
-    // Check if invitation is expired
-    if (invitation.status === 'expired' || new Date() > invitation.expiresAt.toDate()) {
+    // Check if invitation is cancelled
+    if (invitation.status === 'cancelled') {
       return NextResponse.json(
-        { success: false, error: 'Invitation has expired' },
+        { success: false, error: 'Invitation has been cancelled' },
         { status: 403 }
       );
     }
@@ -357,7 +357,8 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // If waiting room not enabled, check if invitation is already used (single use)
-      if (invitation.status === 'used' || invitation.usedAt) {
+      // Check usedAt instead of status to avoid TypeScript narrowing issues
+      if (invitation.usedAt) {
         return NextResponse.json({
           success: false,
           error: 'This invitation has already been used.',
