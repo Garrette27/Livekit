@@ -76,6 +76,9 @@ export default function DoctorInvitationsPage() {
       return;
     }
 
+    // Type guard - ensure db is not undefined
+    if (!db) return;
+
     setLoadingWaiting(true);
     const roomNames = activeInvitations.map(inv => inv.roomName);
     const invitationIds = activeInvitations.map(inv => inv.id);
