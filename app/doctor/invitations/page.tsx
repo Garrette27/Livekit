@@ -83,10 +83,13 @@ export default function DoctorInvitationsPage() {
     const roomNames = activeInvitations.map(inv => inv.roomName);
     const invitationIds = activeInvitations.map(inv => inv.id);
 
+    // Store db in a const to help TypeScript understand it's non-null
+    const firestoreDb = db;
+
     // Fetch waiting patients for all active waiting room invitations
     const waitingQueries = invitationIds.map(invitationId => {
       return query(
-        collection(db, 'waitingPatients'),
+        collection(firestoreDb, 'waitingPatients'),
         where('invitationId', '==', invitationId),
         where('status', '==', 'waiting')
         // Note: Removed orderBy to avoid index requirement - we'll sort in JavaScript
