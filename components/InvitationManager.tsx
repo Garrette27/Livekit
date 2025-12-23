@@ -13,9 +13,10 @@ import {
 interface InvitationManagerProps {
   user: User;
   roomName: string;
+  onInvitationCreated?: (invitationId: string) => void;
 }
 
-export default function InvitationManager({ user, roomName }: InvitationManagerProps) {
+export default function InvitationManager({ user, roomName, onInvitationCreated }: InvitationManagerProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [createdInvitation, setCreatedInvitation] = useState<CreateInvitationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,14 +59,18 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
 
       if (result.success) {
         setCreatedInvitation(result);
-        // Reset form
+        // Don't reset form - keep room name and settings for easy reuse
+        // Only clear email/phone if user wants to create another invitation
         setFormData({
-          email: '',
-          phone: '',
-          expiresInHours: 24,
-          waitingRoomEnabled: false,
-          maxPatients: 10,
+          ...formData,
+          email: '', // Clear email for next invitation
+          phone: '', // Clear phone for next invitation
+          // Keep: expiresInHours, waitingRoomEnabled, maxPatients
         });
+        // Notify parent component
+        if (onInvitationCreated && result.invitationId) {
+          onInvitationCreated(result.invitationId);
+        }
       } else {
         setError(result.error || 'Failed to create invitation');
       }

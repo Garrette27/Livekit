@@ -123,5 +123,15 @@ service cloud.firestore {
       allow create: if request.auth != null && 
         request.resource.data.createdBy == request.auth.uid;
     }
+    
+    // Waiting patients collection - doctors can read waiting patients for their invitations
+    match /waitingPatients/{waitingPatientId} {
+      // Allow read if the doctor's user ID matches the waiting patient's doctorUserId
+      // This is simpler and more efficient than checking the invitation document
+      allow read: if request.auth != null && 
+        resource.data.doctorUserId == request.auth.uid;
+      // Only server can write (via admin SDK)
+      allow write: if false;
+    }
   }
 }

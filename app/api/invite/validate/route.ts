@@ -432,6 +432,7 @@ export async function POST(req: NextRequest) {
         ...(userEmailToCheck && { patientEmail: userEmailToCheck }), // Only include if email exists
         roomName: tokenPayload.roomName,
         invitationId: tokenPayload.invitationId,
+        doctorUserId: invitation.createdBy, // Store doctor's user ID for permission checking
         joinedAt: new Date(),
         status: 'waiting',
         metadata: {
