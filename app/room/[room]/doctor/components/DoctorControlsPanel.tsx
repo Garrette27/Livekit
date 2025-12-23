@@ -1,8 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '@/lib/firebase';
 
 interface DoctorControlsPanelProps {
   doctorName: string;
@@ -11,7 +9,6 @@ interface DoctorControlsPanelProps {
 }
 
 export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: DoctorControlsPanelProps) {
-  const [user] = useAuthState(auth);
   const [invitationLink, setInvitationLink] = useState<string | null>(null);
   const [loadingLink, setLoadingLink] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
@@ -19,8 +16,6 @@ export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: D
 
   useEffect(() => {
     const fetchInvitationLink = async () => {
-      if (!user) return;
-      
       setLoadingLink(true);
       setLinkError(null);
       
@@ -44,7 +39,7 @@ export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: D
     };
 
     fetchInvitationLink();
-  }, [roomName, user]);
+  }, [roomName]);
 
   const patientLink = invitationLink || fallbackLink;
 
