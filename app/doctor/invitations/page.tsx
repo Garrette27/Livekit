@@ -93,91 +93,78 @@ export default function DoctorInvitationsPage() {
 
     let waitingQueries: any[] = [];
 
-    if (selectedInvitationId) {
-      // If an invitation is selected, only show waiting patients for that invitation
-      const selectedInv = invitations.find(inv => inv.id === selectedInvitationId);
-      if (selectedInv && selectedInv.waitingRoomEnabled && selectedInv.status === 'active') {
-        // Add doctorUserId to query to match security rules
-        waitingQueries = [query(
-          collection(firestoreDb, 'waitingPatients'),
-          where('invitationId', '==', selectedInvitationId),
-          where('status', '==', 'waiting'),
-          where('doctorUserId', '==', user.uid)
-        )];
-      } else {
-        setWaitingPatients([]);
-        setLoadingWaiting(false);
-        return;
-      }
-    } else {
-      // If no invitation selected, show waiting patients for all active invitations with waiting room
-      const activeInvitations = invitations.filter(inv => 
-        inv.status === 'active' && inv.waitingRoomEnabled === true && inv.createdBy === user.uid
-      );
+    // Query all waiting patients for this doctor, then filter by invitationId in JavaScript
+    // This avoids needing a composite index for invitationId + status + doctorUserId
+    const activeInvitations = invitations.filter(inv => 
+      inv.status === 'active' && inv.waitingRoomEnabled === true && inv.createdBy === user.uid
+    );
 
-      if (activeInvitations.length === 0) {
-        setWaitingPatients([]);
-        setLoadingWaiting(false);
-        return;
-      }
-
-      const invitationIds = activeInvitations.map(inv => inv.id);
-      // Add doctorUserId to query to match security rules
-      waitingQueries = invitationIds.map(invitationId => {
-        return query(
-          collection(firestoreDb, 'waitingPatients'),
-          where('invitationId', '==', invitationId),
-          where('status', '==', 'waiting'),
-          where('doctorUserId', '==', user.uid)
-        );
-      });
+    if (activeInvitations.length === 0) {
+      setWaitingPatients([]);
+      setLoadingWaiting(false);
+      return;
     }
 
-    const unsubscribes = waitingQueries.map((q, index) => 
-      onSnapshot(q, (snapshot: any) => {
-        const patients = snapshot.docs.map((doc: any) => ({
-          id: doc.id,
-          ...doc.data()
-        })) as WaitingPatient[];
+    const invitationIds = activeInvitations.map(inv => inv.id);
+    
+    // Single query for all waiting patients for this doctor
+    // Filter by invitationId in JavaScript to avoid composite index requirement
+    waitingQueries = [query(
+      collection(firestoreDb, 'waitingPatients'),
+      where('doctorUserId', '==', user.uid),
+      where('status', '==', 'waiting')
+    )];
 
-        setWaitingPatients(prev => {
-          if (selectedInvitationId) {
-            // If showing selected invitation, replace all
-            return patients.sort((a, b) => {
-              const aTime = a.joinedAt?.toMillis?.() || 
-                           (a.joinedAt instanceof Date ? a.joinedAt.getTime() : 
-                            (a.joinedAt ? new Date(a.joinedAt as any).getTime() : 0));
-              const bTime = b.joinedAt?.toMillis?.() || 
-                           (b.joinedAt instanceof Date ? b.joinedAt.getTime() : 
-                            (b.joinedAt ? new Date(b.joinedAt as any).getTime() : 0));
-              return aTime - bTime;
-            });
-          } else {
-            // Remove old patients for this invitation and add new ones
-            const invitationIds = invitations
-              .filter(inv => inv.status === 'active' && inv.waitingRoomEnabled === true)
-              .map(inv => inv.id);
-            const filtered = prev.filter(p => p.invitationId !== invitationIds[index]);
-            const combined = [...filtered, ...patients];
-            // Sort by joinedAt time
-            const sorted = combined.sort((a, b) => {
-              const aTime = a.joinedAt?.toMillis?.() || 
-                           (a.joinedAt instanceof Date ? a.joinedAt.getTime() : 
-                            (a.joinedAt ? new Date(a.joinedAt as any).getTime() : 0));
-              const bTime = b.joinedAt?.toMillis?.() || 
-                           (b.joinedAt instanceof Date ? b.joinedAt.getTime() : 
-                            (b.joinedAt ? new Date(b.joinedAt as any).getTime() : 0));
-              return aTime - bTime;
-            });
-            return sorted;
-          }
+    // Single query for all waiting patients - filter by invitationId in JavaScript
+    const unsubscribe = onSnapshot(waitingQueries[0], (snapshot: any) => {
+      const allPatients = snapshot.docs.map((doc: any) => ({
+        id: doc.id,
+        ...doc.data()
+      })) as WaitingPatient[];
+
+      // Filter by invitationId(s) in JavaScript
+      let filteredPatients: WaitingPatient[];
+      if (selectedInvitationId) {
+        // If showing selected invitation, only show patients for that invitation
+        filteredPatients = allPatients.filter(p => p.invitationId === selectedInvitationId);
+      } else {
+        // Show patients for all active invitations
+        filteredPatients = allPatients.filter(p => invitationIds.includes(p.invitationId));
+      }
+
+      // Sort by joinedAt time
+      const sorted = filteredPatients.sort((a, b) => {
+        const aTime = a.joinedAt?.toMillis?.() || 
+                     (a.joinedAt instanceof Date ? a.joinedAt.getTime() : 
+                      (a.joinedAt ? new Date(a.joinedAt as any).getTime() : 0));
+        const bTime = b.joinedAt?.toMillis?.() || 
+                     (b.joinedAt instanceof Date ? b.joinedAt.getTime() : 
+                      (b.joinedAt ? new Date(b.joinedAt as any).getTime() : 0));
+        return aTime - bTime;
+      });
+
+      setWaitingPatients(sorted);
+      setLoadingWaiting(false);
+    }, (error: any) => {
+      console.error('Error fetching waiting patients:', error);
+      // Log detailed error information
+      if (error?.code === 'permission-denied' || error?.message?.includes('permission')) {
+        console.error('Permission denied details:', {
+          code: error.code,
+          message: error.message,
+          userUid: user?.uid
         });
-        setLoadingWaiting(false);
-      }, (error) => {
-        console.error('Error fetching waiting patients:', error);
-        setLoadingWaiting(false);
-      })
-    );
+      }
+      if (error?.code === 'failed-precondition') {
+        console.error('Index required. Error details:', error.message);
+        // The error message should contain a link to create the index
+      }
+      setLoadingWaiting(false);
+    });
+
+    return () => {
+      unsubscribe();
+    };
 
     return () => {
       unsubscribes.forEach(unsub => unsub());
