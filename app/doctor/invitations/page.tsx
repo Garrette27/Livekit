@@ -620,6 +620,7 @@ export default function DoctorInvitationsPage() {
               })}
             </div>
           )}
+          </div>
         </div>
       </div>
 
