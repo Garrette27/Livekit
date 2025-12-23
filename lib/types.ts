@@ -52,6 +52,9 @@ export interface Invitation {
   phoneAllowed?: string; // Optional phone number
   expiresAt: Timestamp;
   maxUses: number;
+  currentUses?: number; // Track how many times invitation has been used
+  maxPatients?: number; // Maximum number of patients allowed in waiting room
+  waitingRoomEnabled?: boolean; // Whether waiting room feature is enabled
   usedAt?: Timestamp;
   usedBy?: string;
   createdBy: string;
@@ -134,6 +137,9 @@ export interface CreateInvitationRequest {
   emailAllowed?: string; // Optional email - invitation can be created without email
   phoneAllowed?: string; // Optional phone number
   expiresInHours?: number; // Optional expiration (defaults to 24 hours)
+  waitingRoomEnabled?: boolean; // Enable waiting room feature
+  maxPatients?: number; // Maximum number of patients allowed (defaults to 1 if waiting room disabled, 10 if enabled)
+  maxUses?: number; // Maximum number of times invitation can be used (defaults to 1 if waiting room disabled, unlimited if enabled)
   // Removed: countryAllowlist, browserAllowlist, deviceBinding, allowedIpAddresses, allowedDeviceIds
   // System will automatically verify using registered user's device/location/browser info
 }
@@ -160,11 +166,14 @@ export interface ValidateInvitationRequest {
 export interface ValidateInvitationResponse {
   success: boolean;
   liveKitToken?: string;
-  roomName?: string;
+  roomName?: string; // This will be the waiting room name if waiting room is enabled
+  waitingRoomToken?: boolean; // Indicates this is a waiting room token
+  invitationId?: string; // Invitation ID for checking admission status
   error?: string;
   violations?: SecurityViolation[];
   requiresRegistration?: boolean; // If true, user needs to register first
   registeredEmail?: string; // Email that should be used for registration
+  waitingRoomEnabled?: boolean; // Whether patient is in waiting room
 }
 
 // UI component props
@@ -172,7 +181,39 @@ export interface InvitationFormData {
   email: string;
   phone?: string; // Optional phone number
   expiresInHours: number;
+  waitingRoomEnabled?: boolean; // Enable waiting room
+  maxPatients?: number; // Max patients in waiting room
   // Removed: countries, browsers, deviceBinding, ipAllowlist, deviceIdAllowlist
+}
+
+// Waiting room types
+export interface WaitingPatient {
+  id: string;
+  patientId: string;
+  patientName?: string;
+  patientEmail?: string;
+  roomName: string;
+  invitationId: string;
+  joinedAt: Timestamp | Date | any;
+  status: 'waiting' | 'admitted' | 'left';
+  admittedAt?: Timestamp | Date | any;
+  metadata?: {
+    deviceFingerprint?: string;
+    ip?: string;
+    userAgent?: string;
+  };
+}
+
+export interface AdmitPatientRequest {
+  waitingPatientId: string;
+  roomName: string;
+}
+
+export interface AdmitPatientResponse {
+  success: boolean;
+  liveKitToken?: string; // Token for main consultation room
+  roomName?: string;
+  error?: string;
 }
 
 export interface InvitationListItem {

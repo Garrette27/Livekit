@@ -327,20 +327,61 @@ export async function POST(req: NextRequest) {
       } as ValidateInvitationResponse, { status: 403 });
     }
 
+    // Check if waiting room is enabled
+    const isWaitingRoomEnabled = invitation.waitingRoomEnabled === true;
+    const waitingRoomName = isWaitingRoomEnabled ? `${tokenPayload.roomName}-waiting` : tokenPayload.roomName;
+
+    // If waiting room enabled, check current patients and max capacity
+    if (isWaitingRoomEnabled) {
+      const maxPatients = invitation.maxPatients || 10;
+      const currentWaitingQuery = await db.collection('waitingPatients')
+        .where('roomName', '==', tokenPayload.roomName)
+        .where('invitationId', '==', tokenPayload.invitationId)
+        .where('status', '==', 'waiting')
+        .get();
+      
+      if (currentWaitingQuery.size >= maxPatients) {
+        return NextResponse.json({
+          success: false,
+          error: `Waiting room is full. Maximum ${maxPatients} patients allowed.`,
+        } as ValidateInvitationResponse, { status: 403 });
+      }
+
+      // Check if invitation has reached max uses
+      const currentUses = invitation.currentUses || 0;
+      if (invitation.maxUses && currentUses >= invitation.maxUses) {
+        return NextResponse.json({
+          success: false,
+          error: 'Invitation has reached maximum number of uses.',
+        } as ValidateInvitationResponse, { status: 403 });
+      }
+    } else {
+      // If waiting room not enabled, check if invitation is already used (single use)
+      if (invitation.status === 'used' || invitation.usedAt) {
+        return NextResponse.json({
+          success: false,
+          error: 'This invitation has already been used.',
+        } as ValidateInvitationResponse, { status: 403 });
+      }
+    }
+
     // All validations passed - generate LiveKit token
+    // If waiting room enabled, use waiting room name; otherwise use main room name
+    const targetRoomName = isWaitingRoomEnabled ? waitingRoomName : tokenPayload.roomName;
+    
     const liveKitToken = jwt.sign(
       {
-        sub: `patient_${tokenPayload.invitationId}`,
+        sub: `patient_${tokenPayload.invitationId}_${Date.now()}`,
         video: {
           roomJoin: true,
-          room: tokenPayload.roomName,
+          room: targetRoomName,
           canPublish: true,
           canSubscribe: true,
           canPublishData: true,
         },
         audio: {
           roomJoin: true,
-          room: tokenPayload.roomName,
+          room: targetRoomName,
           canPublish: true,
           canSubscribe: true,
         },
@@ -353,7 +394,7 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    // Mark invitation as used
+    // Mark access attempt as successful
     accessAttempt.success = true;
     accessAttempt.reason = 'Access granted successfully';
     
@@ -367,7 +408,57 @@ export async function POST(req: NextRequest) {
       ...(accessAttempt.country && { country: accessAttempt.country }),
       ...(accessAttempt.deviceFingerprint && { deviceFingerprint: accessAttempt.deviceFingerprint }),
     };
-    
+
+    // If waiting room enabled, create waiting patient entry
+    if (isWaitingRoomEnabled) {
+      const waitingPatientId = `waiting_${tokenPayload.invitationId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const waitingPatient: any = {
+        id: waitingPatientId,
+        patientId: userProfile ? userQuery.docs[0].id : `anonymous_${Date.now()}`,
+        patientName: userProfile?.email || userEmailToCheck || 'Anonymous Patient',
+        patientEmail: userEmailToCheck || undefined,
+        roomName: tokenPayload.roomName,
+        invitationId: tokenPayload.invitationId,
+        joinedAt: new Date(),
+        status: 'waiting',
+        metadata: {
+          deviceFingerprint: deviceFingerprint ? JSON.stringify(deviceFingerprint) : undefined,
+          ip: clientIP,
+          userAgent,
+        },
+      };
+
+      await db.collection('waitingPatients').doc(waitingPatientId).set(waitingPatient);
+
+      // Update invitation - increment currentUses, but don't mark as used
+      const updateData: any = {
+        currentUses: (invitation.currentUses || 0) + 1,
+        'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
+        'audit.lastAccessed': new Date(),
+      };
+
+      await db.collection('invitations').doc(tokenPayload.invitationId).update(updateData);
+
+      const response: ValidateInvitationResponse = {
+        success: true,
+        liveKitToken,
+        roomName: waitingRoomName,
+        waitingRoomToken: true,
+        waitingRoomEnabled: true,
+        invitationId: tokenPayload.invitationId,
+      };
+
+      console.log('Patient added to waiting room:', {
+        waitingPatientId,
+        roomName: tokenPayload.roomName,
+        invitationId: tokenPayload.invitationId,
+      });
+
+      return NextResponse.json(response);
+    }
+
+    // No waiting room - direct access to main room (original behavior)
     await db.collection('invitations').doc(tokenPayload.invitationId).update({
       status: 'used',
       usedAt: new Date(),
@@ -380,6 +471,8 @@ export async function POST(req: NextRequest) {
       success: true,
       liveKitToken,
       roomName: tokenPayload.roomName,
+      waitingRoomEnabled: false,
+      invitationId: tokenPayload.invitationId,
     };
 
     console.log('Invitation validated successfully:', {

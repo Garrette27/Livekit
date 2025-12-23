@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body: CreateInvitationRequest = await req.json();
-    const { roomName, emailAllowed, phoneAllowed, expiresInHours } = body;
+    const { roomName, emailAllowed, phoneAllowed, expiresInHours, waitingRoomEnabled, maxPatients, maxUses } = body;
 
     // Input validation - only roomName is required
     if (!roomName) {
@@ -86,11 +86,19 @@ export async function POST(req: NextRequest) {
     // Generate unique invitation ID
     const invitationId = `invite_${sanitizedRoomName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+    // Determine waiting room settings
+    const isWaitingRoomEnabled = waitingRoomEnabled === true;
+    const finalMaxUses = maxUses !== undefined ? maxUses : (isWaitingRoomEnabled ? 999999 : 1); // Unlimited uses if waiting room enabled
+    const finalMaxPatients = isWaitingRoomEnabled ? (maxPatients || 10) : 1;
+
     // Create invitation document
     const invitation: any = {
       roomName: sanitizedRoomName,
       expiresAt: expiresAt as any, // Firestore Timestamp
-      maxUses: 1, // Single use
+      maxUses: finalMaxUses,
+      currentUses: 0, // Initialize current uses counter
+      waitingRoomEnabled: isWaitingRoomEnabled,
+      ...(isWaitingRoomEnabled && { maxPatients: finalMaxPatients }),
       createdBy: 'system', // TODO: Get from auth context
       createdAt: new Date() as any,
       status: 'active',
@@ -104,7 +112,7 @@ export async function POST(req: NextRequest) {
           ...(sanitizedPhone && { phone: sanitizedPhone }),
         },
         security: {
-          singleUse: true,
+          singleUse: !isWaitingRoomEnabled, // Not single use if waiting room enabled
           timeLimited: true,
           // Removed: geoRestricted, deviceRestricted - now handled via user profile verification
         },

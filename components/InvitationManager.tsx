@@ -23,6 +23,8 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
     email: '',
     phone: '',
     expiresInHours: 24,
+    waitingRoomEnabled: false,
+    maxPatients: 10,
   });
 
 
@@ -36,6 +38,9 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
         ...(formData.email.trim() && { emailAllowed: formData.email.trim() }), // Only include email if provided
         ...(formData.phone?.trim() && { phoneAllowed: formData.phone.trim() }), // Only include phone if provided
         expiresInHours: formData.expiresInHours,
+        waitingRoomEnabled: formData.waitingRoomEnabled || false,
+        maxPatients: formData.waitingRoomEnabled ? (formData.maxPatients || 10) : undefined,
+        maxUses: formData.waitingRoomEnabled ? undefined : 1, // Unlimited uses if waiting room enabled, single use otherwise
       };
 
       const response = await fetch('/api/invite/create', {
@@ -55,6 +60,8 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
           email: '',
           phone: '',
           expiresInHours: 24,
+          waitingRoomEnabled: false,
+          maxPatients: 10,
         });
       } else {
         setError(result.error || 'Failed to create invitation');
@@ -273,6 +280,77 @@ export default function InvitationManager({ user, roomName }: InvitationManagerP
             autoComplete="tel"
           />
         </div>
+
+        {/* Waiting Room Toggle */}
+        <div>
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontSize: '0.75rem',
+            fontWeight: '500',
+            color: '#374151',
+            marginBottom: '0.5rem',
+            cursor: 'pointer'
+          }}>
+            <input
+              type="checkbox"
+              checked={formData.waitingRoomEnabled || false}
+              onChange={(e) => setFormData({ ...formData, waitingRoomEnabled: e.target.checked })}
+              style={{
+                width: '1rem',
+                height: '1rem',
+                cursor: 'pointer'
+              }}
+            />
+            Enable Waiting Room (Multiple patients can join)
+          </label>
+          <p style={{
+            fontSize: '0.65rem',
+            color: '#6b7280',
+            marginTop: '0.25rem',
+            marginLeft: '1.5rem'
+          }}>
+            When enabled, patients join a waiting room and you can admit them one by one to the consultation.
+          </p>
+        </div>
+
+        {/* Max Patients (only shown if waiting room enabled) */}
+        {formData.waitingRoomEnabled && (
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.75rem',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '0.5rem'
+            }}>
+              Maximum Patients in Waiting Room
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="50"
+              value={formData.maxPatients || 10}
+              onChange={(e) => setFormData({ ...formData, maxPatients: parseInt(e.target.value) || 10 })}
+              placeholder="10"
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.8rem'
+              }}
+            />
+            <p style={{
+              fontSize: '0.65rem',
+              color: '#6b7280',
+              marginTop: '0.25rem'
+            }}>
+              Maximum number of patients allowed to join the waiting room at the same time.
+            </p>
+          </div>
+        )}
 
         {/* Expiration Time */}
         <div>

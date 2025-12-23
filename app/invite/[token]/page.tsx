@@ -235,8 +235,137 @@ function InvitePageContent() {
     );
   }
 
-  // Success - show video interface
+  // Success - check if waiting room or direct access
   if (validationResult && validationResult.liveKitToken && validationResult.roomName) {
+    // If waiting room enabled, show waiting room UI
+    if (validationResult.waitingRoomEnabled && validationResult.waitingRoomToken) {
+      return (
+        <div style={{
+          minHeight: '100vh',
+          backgroundColor: '#eff6ff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '1rem',
+            padding: '3rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            maxWidth: '32rem',
+            width: '100%',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '5rem',
+              height: '5rem',
+              backgroundColor: '#dbeafe',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 2rem',
+              animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+            }}>
+              <span style={{ fontSize: '2.5rem' }}>🚪</span>
+            </div>
+
+            <h1 style={{
+              fontSize: '1.875rem',
+              fontWeight: 'bold',
+              color: '#1e40af',
+              marginBottom: '1rem'
+            }}>
+              You're in the Waiting Room
+            </h1>
+
+            <p style={{
+              fontSize: '1.125rem',
+              color: '#6b7280',
+              marginBottom: '2rem',
+              lineHeight: '1.6'
+            }}>
+              Please wait while the doctor admits you to the consultation. This page will automatically update when you're admitted.
+            </p>
+
+            <div style={{
+              backgroundColor: '#f0f9ff',
+              border: '1px solid #bae6fd',
+              borderRadius: '0.5rem',
+              padding: '1rem',
+              marginBottom: '2rem'
+            }}>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#1e40af',
+                margin: 0
+              }}>
+                💡 <strong>Tip:</strong> Keep this page open. You'll automatically join the consultation when the doctor admits you.
+              </p>
+            </div>
+
+            <div style={{
+              display: 'inline-block',
+              width: '3rem',
+              height: '3rem',
+              border: '3px solid #dbeafe',
+              borderTop: '3px solid #2563eb',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              marginBottom: '1rem'
+            }}></div>
+
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#9ca3af',
+              marginTop: '1rem'
+            }}>
+              Waiting for doctor to admit you...
+            </p>
+
+            <WaitingRoomView 
+              validationResult={validationResult} 
+              invitationEmail={invitationEmail}
+              setValidationResult={setValidationResult}
+            />
+
+            {/* Hidden LiveKit connection for waiting room - patients can see each other */}
+            <div style={{ display: 'none' }}>
+              <LiveKitRoom
+                token={validationResult.liveKitToken}
+                serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
+                connect={true}
+                audio={false}
+                video={false}
+                onDisconnected={() => {
+                  console.log('Patient disconnected from waiting room');
+                  router.push('/');
+                }}
+                onError={(error) => {
+                  console.error('Waiting room error:', error);
+                }}
+              >
+                <VideoConference />
+              </LiveKitRoom>
+            </div>
+
+            <style jsx>{`
+              @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+              }
+              @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+              }
+            `}</style>
+          </div>
+        </div>
+      );
+    }
+
+    // Direct access to consultation room (no waiting room)
     return (
       <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}>
         <LiveKitRoom

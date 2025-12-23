@@ -5,6 +5,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import NotesPanel from './components/NotesPanel';
 import DoctorControlsPanel from './components/DoctorControlsPanel';
+import WaitingRoomPanel from './components/WaitingRoomPanel';
 import LiveKitShell from './components/LiveKitShell';
 import AuthCard from './components/shared/AuthCard';
 import LoadingSpinner from './components/shared/LoadingSpinner';
@@ -182,6 +183,10 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
   if (token) {
     return (
       <>
+        <SidebarPortal title="Waiting Room" icon="🚪" position="left" defaultCollapsed={true} width={350} collapsedWidth={60}>
+          <WaitingRoomPanel roomName={roomName} />
+        </SidebarPortal>
+
         <SidebarPortal title="Manual Notes" icon="📝" position="left" defaultCollapsed={false} width={350} collapsedWidth={60}>
             <NotesPanel roomName={roomName} db={db ?? null} storage={storage ?? null} />
         </SidebarPortal>
