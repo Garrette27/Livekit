@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import jwt from 'jsonwebtoken';
+import { WaitingPatient } from '../../../../lib/types';
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,13 +30,13 @@ export async function POST(req: NextRequest) {
     const querySnapshot = await allPatientsQuery.get();
 
     // Find the most recent patient for this invitation
-    let waitingPatient = null;
+    let waitingPatient: WaitingPatient | null = null;
     if (!querySnapshot.empty) {
       // Filter and sort patients
       const patients = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      } as WaitingPatient));
 
       // If email provided, try to match by email first
       if (patientEmail) {
