@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { LiveKitRoom, VideoConference } from '@livekit/components-react';
+import PatientLiveKitRoom from './components/PatientLiveKitRoom';
 import PatientRegistration from '@/components/PatientRegistration';
 import { 
   ValidateInvitationRequest, 
@@ -417,22 +417,16 @@ function InvitePageContent() {
 
             {/* Hidden LiveKit connection for waiting room - patients can see each other */}
             <div style={{ display: 'none' }}>
-              <LiveKitRoom
-                token={validationResult.liveKitToken}
-                serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
-                connect={true}
-                audio={false}
-                video={false}
-                onDisconnected={() => {
-                  console.log('Patient disconnected from waiting room');
-                  router.push('/');
-                }}
-                onError={(error) => {
-                  console.error('Waiting room error:', error);
-                }}
-              >
-                <VideoConference />
-              </LiveKitRoom>
+            <PatientLiveKitRoom
+              token={validationResult.liveKitToken}
+              onDisconnected={() => {
+                console.log('Patient disconnected from waiting room');
+                router.push('/');
+              }}
+              onError={(error) => {
+                console.error('Waiting room error:', error);
+              }}
+            />
             </div>
 
             <style jsx>{`
@@ -453,13 +447,8 @@ function InvitePageContent() {
     // Direct access to consultation room (no waiting room)
     return (
       <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}>
-        <LiveKitRoom
+        <PatientLiveKitRoom
           token={validationResult.liveKitToken}
-          serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
-          connect={true}
-          audio
-          video
-          style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}
           onDisconnected={() => {
             console.log('Patient disconnected from consultation');
             // Redirect to patient dashboard or login page
@@ -495,42 +484,8 @@ function InvitePageContent() {
               }
             }
           }}
-        >
-          <VideoConference />
-          
-          {/* Back to Home Button */}
-          <div
-            style={{
-              position: 'fixed',
-              top: '20px',
-              left: '20px',
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              border: '2px solid #2563eb',
-              borderRadius: '0.75rem',
-              padding: '0.75rem 1rem',
-              zIndex: 9999,
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
-            }}
-          >
-            <button
-              onClick={() => router.push('/')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                color: '#2563eb',
-                textDecoration: 'none',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              ← Leave Consultation
-            </button>
-          </div>
-        </LiveKitRoom>
+          onLeaveClick={() => router.push('/')}
+        />
 
         <style jsx>{`
           @keyframes spin {
