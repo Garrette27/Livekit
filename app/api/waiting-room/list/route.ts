@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const roomName = searchParams.get('roomName');
     const invitationId = searchParams.get('invitationId');
+    const doctorUserId = searchParams.get('doctorUserId'); // Add doctorUserId parameter
 
     const db = getFirebaseAdmin();
     if (!db) {
@@ -18,8 +19,14 @@ export async function GET(req: NextRequest) {
 
     let waitingPatientsQuery;
     
-    // If invitationId is provided, use it (more efficient, no index needed)
-    if (invitationId) {
+    // If doctorUserId is provided, use it (most efficient for security)
+    if (doctorUserId) {
+      waitingPatientsQuery = await db.collection('waitingPatients')
+        .where('doctorUserId', '==', doctorUserId)
+        .where('status', '==', 'waiting')
+        .get();
+    } else if (invitationId) {
+      // If invitationId is provided, use it (more efficient, no index needed)
       waitingPatientsQuery = await db.collection('waitingPatients')
         .where('invitationId', '==', invitationId)
         .where('status', '==', 'waiting')
@@ -73,21 +80,30 @@ export async function GET(req: NextRequest) {
       });
     } else {
       return NextResponse.json(
-        { success: false, error: 'Missing required parameter: roomName or invitationId' },
+        { success: false, error: 'Missing required parameter: roomName, invitationId, or doctorUserId' },
         { status: 400 }
       );
     }
 
-    const waitingPatients = waitingPatientsQuery.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as WaitingPatient));
+    // Process query results for doctorUserId or invitationId paths
+    if (waitingPatientsQuery) {
+      const waitingPatients = waitingPatientsQuery.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as WaitingPatient));
 
-    return NextResponse.json({
-      success: true,
-      waitingPatients,
-      count: waitingPatients.length,
-    });
+      return NextResponse.json({
+        success: true,
+        waitingPatients,
+        count: waitingPatients.length,
+      });
+    }
+
+    // This should never be reached, but TypeScript needs it
+    return NextResponse.json(
+      { success: false, error: 'Unexpected error: no query executed' },
+      { status: 500 }
+    );
 
   } catch (error) {
     console.error('Error fetching waiting patients:', error);
@@ -97,4 +113,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
