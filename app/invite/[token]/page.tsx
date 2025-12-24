@@ -135,7 +135,14 @@ function InvitePageContent() {
         const result: ValidateInvitationResponse = await response.json();
 
         if (result.success) {
+          // If patient was already admitted (waitingRoomEnabled is false), they should go directly to main room
+          // The API now handles this and returns waitingRoomEnabled: false for already-admitted patients
           setValidationResult(result);
+          
+          // If already admitted, log it for debugging
+          if (result.waitingRoomEnabled === false && result.invitationId) {
+            console.log('✅ Patient was already admitted, going directly to main room');
+          }
         } else if (result.requiresRegistration) {
           // User needs to register first
           setRequiresRegistration(true);
