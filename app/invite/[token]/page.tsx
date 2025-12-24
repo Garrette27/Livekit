@@ -14,14 +14,21 @@ import {
 function WaitingRoomView({ 
   validationResult, 
   invitationEmail,
-  setValidationResult 
+  setValidationResult,
+  setError
 }: { 
   validationResult: ValidateInvitationResponse; 
   invitationEmail: string;
   setValidationResult: (result: ValidateInvitationResponse) => void;
+  setError: (error: string | null) => void;
 }) {
   useEffect(() => {
     if (!validationResult?.invitationId) return;
+    
+    // Don't poll if already admitted (waitingRoomEnabled is false)
+    if (!validationResult.waitingRoomEnabled || !validationResult.waitingRoomToken) {
+      return;
+    }
 
     const checkAdmission = async () => {
       try {
@@ -39,6 +46,9 @@ function WaitingRoomView({
         const result = await response.json();
 
         if (result.success && result.admitted && result.liveKitToken) {
+          console.log('✅ Patient admitted! Updating to main consultation room...');
+          // Clear any previous errors
+          setError(null);
           // Patient has been admitted - update to show consultation room
           setValidationResult({
             ...validationResult,
@@ -47,9 +57,17 @@ function WaitingRoomView({
             waitingRoomEnabled: false,
             waitingRoomToken: false,
           });
+        } else if (!result.success && result.error) {
+          console.error('Error checking admission:', result.error);
+          // Don't set error for waiting status - that's expected
+          if (result.error !== 'Waiting patient not found' && !result.error.includes('waiting')) {
+            setError(result.error);
+          }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error checking admission:', err);
+        // Don't set error for network issues during polling - just log it
+        // setError('Network error while checking admission status.');
       }
     };
 
@@ -58,7 +76,7 @@ function WaitingRoomView({
     const interval = setInterval(checkAdmission, 3000);
 
     return () => clearInterval(interval);
-  }, [validationResult?.invitationId, invitationEmail, validationResult, setValidationResult]);
+  }, [validationResult?.invitationId, invitationEmail, validationResult, setValidationResult, setError]);
 
   return null;
 }
@@ -290,6 +308,12 @@ function InvitePageContent() {
 
   // Success - check if waiting room or direct access
   if (validationResult && validationResult.liveKitToken && validationResult.roomName) {
+    // Clear error when we have a valid token and room (patient was admitted)
+    if (error && !validationResult.waitingRoomEnabled) {
+      // Only clear error if transitioning to main room (not in waiting room)
+      setError(null);
+    }
+    
     // If waiting room enabled, show waiting room UI
     if (validationResult.waitingRoomEnabled && validationResult.waitingRoomToken) {
       return (
@@ -381,6 +405,7 @@ function InvitePageContent() {
               validationResult={validationResult} 
               invitationEmail={invitationEmail}
               setValidationResult={setValidationResult}
+              setError={setError}
             />
 
             {/* Hidden LiveKit connection for waiting room - patients can see each other */}
@@ -443,7 +468,25 @@ function InvitePageContent() {
           }}
           onError={(error) => {
             console.error('LiveKit error:', error);
-            setError('Connection error. Please try again.');
+            // Only set error for critical errors, not permission warnings
+            if (error && typeof error === 'object' && 'message' in error) {
+              const errorMessage = (error as any).message || '';
+              // Filter out common non-critical errors that don't prevent connection
+              if (!errorMessage.includes('NotReadableError') && 
+                  !errorMessage.includes('Permission denied') &&
+                  !errorMessage.includes('Could not start video source') &&
+                  !errorMessage.includes('Client initiated disconnect')) {
+                setError('Connection error. Please try again.');
+              } else {
+                console.warn('LiveKit permission/connection warning (non-critical):', errorMessage);
+              }
+            } else {
+              // For non-object errors, be more conservative
+              const errorStr = String(error);
+              if (!errorStr.includes('NotReadableError') && !errorStr.includes('Permission')) {
+                setError('Connection error. Please try again.');
+              }
+            }
           }}
         >
           <VideoConference />
