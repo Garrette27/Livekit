@@ -227,6 +227,38 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
         border-radius: 12px !important;
       }
 
+      /* Hide chat header/title and close button - users control chat via control bar only */
+      .lk-chat-header,
+      [class*="chat-header"],
+      [class*="ChatHeader"],
+      .lk-chat-title,
+      [class*="chat-title"],
+      .lk-chat-close,
+      [class*="chat-close"],
+      [class*="ChatClose"],
+      button[aria-label*="close"][class*="chat"],
+      button[aria-label*="Close"][class*="chat"],
+      .lk-chat-header *,
+      [class*="chat-header"] *,
+      [class*="ChatHeader"] *,
+      /* Hide any header elements that might contain title or close button */
+      .lk-chat > header,
+      [class*="chat-panel"] > header,
+      [class*="ChatPanel"] > header,
+      .lk-chat [role="heading"],
+      [class*="chat-panel"] [role="heading"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        height: 0 !important;
+        width: 0 !important;
+        overflow: hidden !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        font-size: 0 !important;
+        line-height: 0 !important;
+      }
+
       .lk-chat-container,
       .lk-chat-wrapper,
       .lk-chat-entry {

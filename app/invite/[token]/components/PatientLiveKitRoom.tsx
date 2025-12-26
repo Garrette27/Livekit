@@ -363,27 +363,36 @@ export default function PatientLiveKitRoom({
           padding: 0.75rem 1rem !important;
         }
 
-        /* Chat header/title */
+        /* Hide chat header/title and close button - users control chat via control bar only */
         .lk-chat-header,
         [class*="chat-header"],
         [class*="ChatHeader"],
         .lk-chat-title,
-        [class*="chat-title"] {
-          background-color: #f9fafb !important;
-          color: #1f2937 !important;
-          border-bottom: 1px solid #e5e7eb !important;
-          padding: 1rem !important;
-          font-weight: 600 !important;
-        }
-
-        /* Chat close button */
+        [class*="chat-title"],
         .lk-chat-close,
         [class*="chat-close"],
+        [class*="ChatClose"],
         button[aria-label*="close"][class*="chat"],
-        button[aria-label*="Close"][class*="chat"] {
-          background-color: transparent !important;
-          color: #1f2937 !important;
-          border: none !important;
+        button[aria-label*="Close"][class*="chat"],
+        .lk-chat-header *,
+        [class*="chat-header"] *,
+        [class*="ChatHeader"] *,
+        /* Hide any header elements that might contain title or close button */
+        .lk-chat > header,
+        [class*="chat-panel"] > header,
+        [class*="ChatPanel"] > header,
+        .lk-chat [role="heading"],
+        [class*="chat-panel"] [role="heading"] {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          height: 0 !important;
+          width: 0 !important;
+          overflow: hidden !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          font-size: 0 !important;
+          line-height: 0 !important;
         }
 
         /* Ensure all text in chat is readable */
