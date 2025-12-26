@@ -229,7 +229,7 @@ export default function DoctorInvitationsPage() {
             <p style={{ color: '#4B5563' }}>Create and manage secure patient invitations</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            <Link href="/doctor/dashboard" style={{ color: '#2563EB', fontSize: '1.125rem', fontWeight: '500', textDecoration: 'none' }}>
+            <Link href="/dashboard" style={{ color: '#2563EB', fontSize: '1.125rem', fontWeight: '500', textDecoration: 'none' }}>
               Dashboard
             </Link>
             <button

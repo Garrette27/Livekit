@@ -61,26 +61,18 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
           min-height: 100% !important;
         }
 
-        /* Hide empty/loading video tiles to prevent ghost flickering */
+        /* Only hide truly empty tiles - be less aggressive to show all participants */
         .lk-participant-tile:empty,
-        .lk-grid-item:empty,
-        .lk-participant-tile[data-lk-participant-state="connecting"],
-        .lk-participant-tile[data-lk-participant-state="disconnected"],
-        .lk-participant-tile[aria-label*="connecting"],
-        .lk-participant-tile[aria-label*="disconnected"],
-        /* Hide tiles without video tracks */
-        .lk-participant-tile:not(:has(video)),
-        .lk-grid-item:not(:has(video)),
-        /* Hide placeholder/loading states */
-        .lk-participant-placeholder,
-        .lk-participant-tile[class*="placeholder"],
-        .lk-grid-item[class*="placeholder"] {
+        .lk-grid-item:empty {
           display: none !important;
-          visibility: hidden !important;
-          opacity: 0 !important;
-          height: 0 !important;
-          width: 0 !important;
-          overflow: hidden !important;
+        }
+        
+        /* Ensure all participant tiles are visible (including patient) */
+        .lk-participant-tile,
+        .lk-grid-item {
+          display: flex !important;
+          visibility: visible !important;
+          opacity: 1 !important;
         }
 
         /* Ensure video tiles are properly sized and positioned - match patient room */
@@ -126,13 +118,18 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
         /* Fix two-participant layout to ensure equal sizing and horizontal split */
         .lk-focus-layout[data-lk-layout="grid"] .lk-participant-tile,
         .lk-grid-layout[data-participants="2"] .lk-participant-tile,
-        .lk-focus-layout[data-participants="2"] .lk-participant-tile {
+        .lk-focus-layout[data-participants="2"] .lk-participant-tile,
+        /* Ensure all participant tiles in two-participant layout are visible */
+        [data-participants="2"] .lk-participant-tile,
+        [data-participants="2"] .lk-grid-item {
           width: 50% !important;
           height: 100% !important;
           min-width: 50% !important;
           min-height: 100% !important;
           flex: 1 1 50% !important;
           max-width: 50% !important;
+          display: flex !important;
+          visibility: visible !important;
         }
 
         /* Force video tracks to fill their containers */

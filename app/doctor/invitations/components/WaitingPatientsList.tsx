@@ -70,35 +70,35 @@ export default function WaitingPatientsList({
 
     const invitationIds = activeInvitations.map(inv => inv.id);
 
-    console.log('Setting up waiting patients query:', {
-      userUid: user.uid,
-      activeInvitationIds: invitationIds,
-      selectedInvitationId,
-      activeInvitations: activeInvitations.map(inv => ({
-        id: inv.id,
-        createdBy: inv.createdBy,
-        roomName: inv.roomName,
-        matchesUser: inv.createdBy === user.uid
-      }))
-    });
-    
-    // Log detailed comparison
-    activeInvitations.forEach(inv => {
-      if (inv.createdBy !== user.uid) {
-        console.error('❌ INVITATION MISMATCH:', {
-          invitationId: inv.id,
-          invitationCreatedBy: inv.createdBy,
-          currentUserUid: user.uid,
-          match: inv.createdBy === user.uid
-        });
-      } else {
-        console.log('✅ Invitation matches user:', {
-          invitationId: inv.id,
+    // Only log in development mode to reduce console spam
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Setting up waiting patients query:', {
+        userUid: user.uid,
+        activeInvitationIds: invitationIds,
+        selectedInvitationId,
+        activeInvitations: activeInvitations.map(inv => ({
+          id: inv.id,
           createdBy: inv.createdBy,
-          userUid: user.uid
-        });
-      }
-    });
+          roomName: inv.roomName,
+          matchesUser: inv.createdBy === user.uid
+        }))
+      });
+    }
+    
+    // Log detailed comparison - only in development and only once per invitation set
+    if (process.env.NODE_ENV === 'development' && activeInvitations.length > 0) {
+      activeInvitations.forEach(inv => {
+        if (inv.createdBy !== user.uid) {
+          console.error('❌ INVITATION MISMATCH:', {
+            invitationId: inv.id,
+            invitationCreatedBy: inv.createdBy,
+            currentUserUid: user.uid,
+            match: inv.createdBy === user.uid
+          });
+        }
+        // Removed the success log to reduce console spam
+      });
+    }
 
     // Use server-side API instead of direct Firestore query to avoid security rule issues
     // This ensures we can fetch waiting patients even if some have incorrect doctorUserId
@@ -132,11 +132,14 @@ export default function WaitingPatientsList({
             return aTime - bTime;
           });
 
-          console.log('Fetched waiting patients via API:', {
-            total: allPatients.length,
-            filtered: filteredPatients.length,
-            sorted: sorted.length
-          });
+          // Only log in development mode to reduce console spam
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Fetched waiting patients via API:', {
+              total: allPatients.length,
+              filtered: filteredPatients.length,
+              sorted: sorted.length
+            });
+          }
 
           setWaitingPatients(sorted);
           setLoading(false);
