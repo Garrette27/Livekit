@@ -57,6 +57,30 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
           width: 100% !important;
           height: 100% !important;
           object-fit: cover !important;
+          min-width: 100% !important;
+          min-height: 100% !important;
+        }
+
+        /* Hide empty/loading video tiles to prevent ghost flickering */
+        .lk-participant-tile:empty,
+        .lk-grid-item:empty,
+        .lk-participant-tile[data-lk-participant-state="connecting"],
+        .lk-participant-tile[data-lk-participant-state="disconnected"],
+        .lk-participant-tile[aria-label*="connecting"],
+        .lk-participant-tile[aria-label*="disconnected"],
+        /* Hide tiles without video tracks */
+        .lk-participant-tile:not(:has(video)),
+        .lk-grid-item:not(:has(video)),
+        /* Hide placeholder/loading states */
+        .lk-participant-placeholder,
+        .lk-participant-tile[class*="placeholder"],
+        .lk-grid-item[class*="placeholder"] {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          height: 0 !important;
+          width: 0 !important;
+          overflow: hidden !important;
         }
 
         /* Ensure video tiles are properly sized and positioned - match patient room */
@@ -68,6 +92,7 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
           height: 100% !important;
           min-width: 100% !important;
           min-height: 100% !important;
+          box-sizing: border-box !important;
         }
 
         /* Ensure video container takes full available space */
@@ -75,6 +100,7 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
         .lk-video-conference .lk-grid-item {
           width: 100% !important;
           height: 100% !important;
+          flex: 1 1 auto !important;
         }
 
         /* Ensure grid and focus layouts properly size tiles */
@@ -82,12 +108,49 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
         .lk-focus-layout {
           width: 100% !important;
           height: 100% !important;
+          display: flex !important;
+          flex-direction: row !important;
+          box-sizing: border-box !important;
         }
 
-        /* Fix two-participant layout to ensure equal sizing */
+        /* Force horizontal split layout for 2 participants (prevent vertical switching) */
+        .lk-grid-layout[data-participants="2"],
+        .lk-focus-layout[data-participants="2"],
+        .lk-grid-layout[data-lk-layout="grid"][data-participants="2"],
+        .lk-focus-layout[data-lk-layout="grid"][data-participants="2"] {
+          display: flex !important;
+          flex-direction: row !important;
+          flex-wrap: nowrap !important;
+        }
+
+        /* Fix two-participant layout to ensure equal sizing and horizontal split */
         .lk-focus-layout[data-lk-layout="grid"] .lk-participant-tile,
-        .lk-grid-layout[data-participants="2"] .lk-participant-tile {
+        .lk-grid-layout[data-participants="2"] .lk-participant-tile,
+        .lk-focus-layout[data-participants="2"] .lk-participant-tile {
           width: 50% !important;
+          height: 100% !important;
+          min-width: 50% !important;
+          min-height: 100% !important;
+          flex: 1 1 50% !important;
+          max-width: 50% !important;
+        }
+
+        /* Force video tracks to fill their containers */
+        .lk-participant-tile video,
+        .lk-grid-item video,
+        .lk-participant-tile .lk-video-track,
+        .lk-grid-item .lk-video-track {
+          width: 100% !important;
+          height: 100% !important;
+          min-width: 100% !important;
+          min-height: 100% !important;
+          object-fit: cover !important;
+        }
+
+        /* Ensure participant tile containers fill properly */
+        .lk-participant-tile > div,
+        .lk-grid-item > div {
+          width: 100% !important;
           height: 100% !important;
         }
       `}</style>

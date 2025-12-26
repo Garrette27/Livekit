@@ -218,6 +218,28 @@ export default function PatientLiveKitRoom({
           display: none !important;
         }
 
+        /* Hide empty/loading video tiles to prevent ghost flickering */
+        .lk-participant-tile:empty,
+        .lk-grid-item:empty,
+        .lk-participant-tile[data-lk-participant-state="connecting"],
+        .lk-participant-tile[data-lk-participant-state="disconnected"],
+        .lk-participant-tile[aria-label*="connecting"],
+        .lk-participant-tile[aria-label*="disconnected"],
+        /* Hide tiles without video tracks */
+        .lk-participant-tile:not(:has(video)),
+        .lk-grid-item:not(:has(video)),
+        /* Hide placeholder/loading states */
+        .lk-participant-placeholder,
+        .lk-participant-tile[class*="placeholder"],
+        .lk-grid-item[class*="placeholder"] {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          height: 0 !important;
+          width: 0 !important;
+          overflow: hidden !important;
+        }
+
         /* Ensure video tiles are properly sized and positioned */
         .lk-participant-tile,
         .lk-grid-item,
@@ -234,6 +256,27 @@ export default function PatientLiveKitRoom({
         .lk-video-conference .lk-grid-item {
           width: 100% !important;
           height: 100% !important;
+        }
+
+        /* Force horizontal split layout for 2 participants (prevent vertical switching) */
+        .lk-grid-layout[data-participants="2"],
+        .lk-focus-layout[data-participants="2"] {
+          display: flex !important;
+          flex-direction: row !important;
+        }
+
+        .lk-grid-layout[data-participants="2"] .lk-participant-tile,
+        .lk-focus-layout[data-participants="2"] .lk-participant-tile {
+          width: 50% !important;
+          height: 100% !important;
+          flex: 1 1 50% !important;
+        }
+
+        /* Ensure layout container uses full height */
+        .lk-grid-layout,
+        .lk-focus-layout {
+          height: 100% !important;
+          width: 100% !important;
         }
 
         /* CRITICAL: Fix chat panel background - make it white/light with dark text */

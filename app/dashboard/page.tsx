@@ -4,8 +4,6 @@ import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, getFirestore, doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { isDoctor } from '@/lib/auth-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,39 +74,17 @@ export default function Dashboard() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [isCheckingRole, setIsCheckingRole] = useState(true);
-  const router = useRouter();
 
-  // Handle authentication and redirect doctors to /doctor/invitations
+  // Handle authentication
   useEffect(() => {
     if (auth) {
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
         console.log('Dashboard: Auth state changed:', user ? 'User logged in' : 'No user');
-        if (user) {
-          const doctor = await isDoctor(user);
-          if (doctor) {
-            // Immediately redirect doctors to /doctor/invitations
-            router.replace('/doctor/invitations');
-            return;
-          }
-        }
         setUser(user);
-        setIsCheckingRole(false);
       });
       return unsubscribe;
-    } else {
-      setIsCheckingRole(false);
     }
-  }, [router]);
-
-  // Don't render anything while checking if user is a doctor (to prevent flash of dashboard)
-  if (isCheckingRole) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p>Loading...</p>
-      </div>
-    );
-  }
+  }, []);
 
   // Fetch summaries from Firestore (reacts to sortOrder)
   useEffect(() => {
