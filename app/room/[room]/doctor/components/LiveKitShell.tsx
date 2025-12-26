@@ -43,7 +43,7 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
         <VideoConference />
       </LiveKitRoom>
 
-      {/* Doctor room video styling - match patient room tile sizes */}
+      {/* Doctor room video styling - copied from patient room for consistency */}
       <style jsx global>{`
         /* Ensure video elements are properly sized */
         .lk-video-conference {
@@ -52,30 +52,82 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
           position: relative !important;
         }
 
-        /* Ensure participant video tiles are properly sized - match patient room */
+        /* Ensure participant video is visible */
         .lk-participant-video {
           width: 100% !important;
           height: 100% !important;
           object-fit: cover !important;
-          min-width: 100% !important;
-          min-height: 100% !important;
         }
 
-        /* Only hide truly empty tiles - be less aggressive to show all participants */
-        .lk-participant-tile:empty,
-        .lk-grid-item:empty {
+        /* Hide participant name/identifier text under video tiles */
+        .lk-participant-name,
+        .lk-participant-metadata,
+        .lk-participant-tile .lk-participant-name,
+        .lk-participant-tile .lk-participant-metadata,
+        [class*="participant-name"],
+        [class*="participant-metadata"],
+        [class*="participant-identity"],
+        [data-lk="participant-name"],
+        [data-lk="participant-metadata"],
+        [data-lk="participant-identity"],
+        .lk-participant-placeholder,
+        .lk-participant-label,
+        .lk-participant-tile [class*="name"]:not([class*="video"]):not([class*="track"]),
+        .lk-participant-tile [class*="metadata"]:not([class*="video"]):not([class*="track"]),
+        .lk-participant-tile [class*="identity"]:not([class*="video"]):not([class*="track"]),
+        .lk-grid-item [class*="name"]:not([class*="video"]):not([class*="track"]),
+        .lk-grid-item [class*="metadata"]:not([class*="video"]):not([class*="track"]),
+        .lk-grid-item [class*="identity"]:not([class*="video"]):not([class*="track"]),
+        /* Hide text spans/divs that contain participant identifiers */
+        .lk-participant-tile span[class*="patient"],
+        .lk-participant-tile span[class*="doctor"],
+        .lk-participant-tile div[class*="patient"],
+        .lk-participant-tile div[class*="doctor"],
+        .lk-grid-item span[class*="patient"],
+        .lk-grid-item span[class*="doctor"],
+        .lk-grid-item div[class*="patient"],
+        .lk-grid-item div[class*="doctor"] {
           display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          height: 0 !important;
+          overflow: hidden !important;
+          font-size: 0 !important;
+          line-height: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
         }
         
-        /* Ensure all participant tiles are visible (including patient) */
-        .lk-participant-tile,
-        .lk-grid-item {
-          display: flex !important;
-          visibility: visible !important;
-          opacity: 1 !important;
+        /* Hide any overlay text on video tiles */
+        .lk-participant-tile::after,
+        .lk-grid-item::after {
+          content: none !important;
+          display: none !important;
         }
 
-        /* Ensure video tiles are properly sized and positioned - match patient room */
+        /* Hide empty/loading video tiles to prevent ghost flickering */
+        .lk-participant-tile:empty,
+        .lk-grid-item:empty,
+        .lk-participant-tile[data-lk-participant-state="connecting"],
+        .lk-participant-tile[data-lk-participant-state="disconnected"],
+        .lk-participant-tile[aria-label*="connecting"],
+        .lk-participant-tile[aria-label*="disconnected"],
+        /* Hide tiles without video tracks */
+        .lk-participant-tile:not(:has(video)),
+        .lk-grid-item:not(:has(video)),
+        /* Hide placeholder/loading states */
+        .lk-participant-placeholder,
+        .lk-participant-tile[class*="placeholder"],
+        .lk-grid-item[class*="placeholder"] {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          height: 0 !important;
+          width: 0 !important;
+          overflow: hidden !important;
+        }
+
+        /* Ensure video tiles are properly sized and positioned */
         .lk-participant-tile,
         .lk-grid-item,
         .lk-focus-layout .lk-participant-tile,
@@ -84,7 +136,6 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
           height: 100% !important;
           min-width: 100% !important;
           min-height: 100% !important;
-          box-sizing: border-box !important;
         }
 
         /* Ensure video container takes full available space */
@@ -92,63 +143,27 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
         .lk-video-conference .lk-grid-item {
           width: 100% !important;
           height: 100% !important;
-          flex: 1 1 auto !important;
-        }
-
-        /* Ensure grid and focus layouts properly size tiles */
-        .lk-grid-layout,
-        .lk-focus-layout {
-          width: 100% !important;
-          height: 100% !important;
-          display: flex !important;
-          flex-direction: row !important;
-          box-sizing: border-box !important;
         }
 
         /* Force horizontal split layout for 2 participants (prevent vertical switching) */
         .lk-grid-layout[data-participants="2"],
-        .lk-focus-layout[data-participants="2"],
-        .lk-grid-layout[data-lk-layout="grid"][data-participants="2"],
-        .lk-focus-layout[data-lk-layout="grid"][data-participants="2"] {
+        .lk-focus-layout[data-participants="2"] {
           display: flex !important;
           flex-direction: row !important;
-          flex-wrap: nowrap !important;
         }
 
-        /* Fix two-participant layout to ensure equal sizing and horizontal split */
-        .lk-focus-layout[data-lk-layout="grid"] .lk-participant-tile,
         .lk-grid-layout[data-participants="2"] .lk-participant-tile,
-        .lk-focus-layout[data-participants="2"] .lk-participant-tile,
-        /* Ensure all participant tiles in two-participant layout are visible */
-        [data-participants="2"] .lk-participant-tile,
-        [data-participants="2"] .lk-grid-item {
+        .lk-focus-layout[data-participants="2"] .lk-participant-tile {
           width: 50% !important;
           height: 100% !important;
-          min-width: 50% !important;
-          min-height: 100% !important;
           flex: 1 1 50% !important;
-          max-width: 50% !important;
-          display: flex !important;
-          visibility: visible !important;
         }
 
-        /* Force video tracks to fill their containers */
-        .lk-participant-tile video,
-        .lk-grid-item video,
-        .lk-participant-tile .lk-video-track,
-        .lk-grid-item .lk-video-track {
-          width: 100% !important;
+        /* Ensure layout container uses full height */
+        .lk-grid-layout,
+        .lk-focus-layout {
           height: 100% !important;
-          min-width: 100% !important;
-          min-height: 100% !important;
-          object-fit: cover !important;
-        }
-
-        /* Ensure participant tile containers fill properly */
-        .lk-participant-tile > div,
-        .lk-grid-item > div {
           width: 100% !important;
-          height: 100% !important;
         }
       `}</style>
     </>
