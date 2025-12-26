@@ -58,15 +58,15 @@ export default function DoctorDashboard() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const router = useRouter();
 
-  // Handle authentication and role check - redirect to main dashboard
+  // Handle authentication and role check - redirect directly to invitations
   useEffect(() => {
     if (auth) {
       const unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (user) {
           const doctor = await isDoctor(user);
           if (doctor) {
-            // Doctor is logged in - redirect to main dashboard
-            router.replace('/dashboard');
+            // Doctor is logged in - redirect directly to invitations page
+            router.replace('/doctor/invitations');
             return;
           }
         }
