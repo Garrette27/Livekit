@@ -210,6 +210,25 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
         width: 100% !important;
       }
 
+      /* Hide Leave button in LiveKit control bar - redundant since:
+         - Doctor room has "Leave Call" in Doctor Session Control panel
+         - Patient room has "Leave Consultation" button in top left */
+      .lk-control-bar button[aria-label*="leave"],
+      .lk-control-bar button[aria-label*="Leave"],
+      .lk-control-bar [data-lk-kind="leave"],
+      .lk-control-bar [data-lk-kind="Leave"],
+      button[aria-label*="leave"][class*="lk-"],
+      button[aria-label*="Leave"][class*="lk-"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+      }
+
       /* Chat panel styling */
       .lk-chat-panel,
       [class*="chat-panel"],
