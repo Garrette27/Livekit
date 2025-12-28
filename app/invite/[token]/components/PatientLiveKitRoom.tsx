@@ -1,7 +1,7 @@
 'use client';
 
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
-import LiveKitStyles from '../../room/[room]/components/shared/LiveKitStyles';
+import LiveKitStyles from '../../../room/[room]/components/shared/LiveKitStyles';
 
 interface PatientLiveKitRoomProps {
   token: string;
