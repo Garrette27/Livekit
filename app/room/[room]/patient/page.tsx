@@ -1114,11 +1114,39 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
             console.error('Error tracking consultation leave:', error);
           });
           
-          // Redirect to dashboard (which handles both patients and doctors)
-          // Don't redirect to /room/${roomName}/patient as that may redirect doctors
-          window.location.href = '/dashboard';
+          // Redirect to patient-specific page
+          // Check if user is authenticated - if yes, go to patient dashboard, otherwise patient login
+          if (user?.uid) {
+            window.location.href = '/patient/dashboard';
+          } else {
+            // Check if patient just registered
+            const registeredEmail = localStorage.getItem('patientRegisteredEmail');
+            if (registeredEmail) {
+              window.location.href = '/patient/login?registered=true&email=' + encodeURIComponent(registeredEmail);
+            } else {
+              window.location.href = '/patient/login';
+            }
+          }
         }}
         onError={(error) => {
+          // Log detailed error information for debugging video track issues
+          const isCameraPermissionError = 
+            error.message?.includes('NotReadableError') || 
+            error.message?.includes('video source') ||
+            error.message?.includes('Could not start video source') ||
+            error.name === 'NotReadableError';
+          
+          if (isCameraPermissionError) {
+            console.error('⚠️ Camera/video track error in patient room:', {
+              error: error.message || error,
+              name: error.name,
+              stack: error.stack,
+              suggestion: 'Check browser permissions and ensure camera is not in use by another application. You can enable video manually via the Camera button in the control bar.'
+            });
+            // Don't show error to user for permission issues - they can enable manually
+            return;
+          }
+          
           console.error('LiveKit error:', error);
           setError('Connection error. Please try again.');
         }}
@@ -1231,12 +1259,24 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
                   console.error('Error tracking patient leave:', error);
                 }
                 
-                // Clear current token and redirect to dashboard
-                // Don't redirect to /room/${roomName}/patient as that may redirect doctors
+                // Clear current token and redirect to patient-specific page
+                // Route to patient dashboard if logged in, otherwise patient login
                 localStorage.removeItem(`patientToken_${roomName}`);
                 localStorage.removeItem(`patientInCall_${roomName}`);
                 setToken(null);
-                window.location.href = '/dashboard';
+                
+                // Check if user is authenticated - if yes, go to patient dashboard, otherwise patient login
+                if (user?.uid) {
+                  window.location.href = '/patient/dashboard';
+                } else {
+                  // Check if patient just registered
+                  const registeredEmail = localStorage.getItem('patientRegisteredEmail');
+                  if (registeredEmail) {
+                    window.location.href = '/patient/login?registered=true&email=' + encodeURIComponent(registeredEmail);
+                  } else {
+                    window.location.href = '/patient/login';
+                  }
+                }
               }}
               style={{
                 backgroundColor: '#6B7280',

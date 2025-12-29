@@ -23,7 +23,7 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
         style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}
         onDisconnected={onDisconnected}
         onError={(error) => {
-          // Filter out camera permission errors - these may occur but user can enable manually
+          // Log all camera/video errors for debugging - don't suppress them
           const isCameraPermissionError = 
             error.message?.includes('NotReadableError') || 
             error.message?.includes('video source') ||
@@ -31,8 +31,14 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
             error.name === 'NotReadableError';
           
           if (isCameraPermissionError) {
-            console.warn('Camera/microphone permission issue - user can enable via VideoConference controls');
-            // Don't show this as a critical error to the user - they can enable manually
+            console.error('⚠️ Camera/video track error in doctor room:', {
+              error: error.message || error,
+              name: error.name,
+              stack: error.stack,
+              suggestion: 'Check browser permissions and ensure camera is not in use by another application'
+            });
+            // Don't call onError for permission issues - user can enable manually via controls
+            // But log it so we can debug video track publishing failures
             return;
           }
           

@@ -485,9 +485,16 @@ function InvitePageContent() {
             }
           }}
           onLeaveClick={() => {
-            // Route patient to dashboard instead of home page
-            // Home page redirects doctors, so we go directly to dashboard
-            router.push('/dashboard');
+            // Route patient to patient-specific dashboard or login
+            // Check if user is registered by checking localStorage
+            const registeredEmail = localStorage.getItem('patientRegisteredEmail');
+            if (registeredEmail) {
+              // Patient just registered, guide them to sign in
+              router.push('/patient/login?registered=true&email=' + encodeURIComponent(registeredEmail));
+            } else {
+              // Not registered or no email stored, go to patient login
+              router.push('/patient/login');
+            }
           }}
         />
 
