@@ -218,7 +218,31 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
       .lk-control-bar [data-lk-kind="leave"],
       .lk-control-bar [data-lk-kind="Leave"],
       button[aria-label*="leave"][class*="lk-"],
-      button[aria-label*="Leave"][class*="lk-"] {
+      button[aria-label*="Leave"][class*="lk-"],
+      .lk-control-bar button[title*="Leave"],
+      .lk-control-bar button[title*="leave"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+      }
+
+      /* Hide Start Video button - video starts automatically, user can toggle via Camera button */
+      .lk-control-bar button[aria-label*="Start Video"],
+      .lk-control-bar button[aria-label*="start video"],
+      .lk-control-bar button[aria-label*="Start video"],
+      .lk-control-bar [data-lk-kind="toggle-video"],
+      button[aria-label*="Start Video"][class*="lk-"],
+      button[aria-label*="start video"][class*="lk-"],
+      .lk-control-bar button[title*="Start Video"],
+      .lk-control-bar button[title*="start video"],
+      .lk-control-bar button:has(svg[class*="play"]):not([aria-label*="screen"]),
+      .lk-control-bar button[class*="start-video"],
+      .lk-control-bar button[class*="StartVideo"] {
         display: none !important;
         visibility: hidden !important;
         opacity: 0 !important;

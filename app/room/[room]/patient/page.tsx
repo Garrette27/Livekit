@@ -1114,8 +1114,9 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
             console.error('Error tracking consultation leave:', error);
           });
           
-          // Redirect to patient join page instead of main page
-          window.location.href = `/room/${roomName}/patient`;
+          // Redirect to dashboard (which handles both patients and doctors)
+          // Don't redirect to /room/${roomName}/patient as that may redirect doctors
+          window.location.href = '/dashboard';
         }}
         onError={(error) => {
           console.error('LiveKit error:', error);
@@ -1230,11 +1231,12 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
                   console.error('Error tracking patient leave:', error);
                 }
                 
-                // Clear current token and redirect to patient join page
+                // Clear current token and redirect to dashboard
+                // Don't redirect to /room/${roomName}/patient as that may redirect doctors
                 localStorage.removeItem(`patientToken_${roomName}`);
                 localStorage.removeItem(`patientInCall_${roomName}`);
                 setToken(null);
-                window.location.href = `/room/${roomName}/patient`;
+                window.location.href = '/dashboard';
               }}
               style={{
                 backgroundColor: '#6B7280',

@@ -484,7 +484,11 @@ function InvitePageContent() {
               }
             }
           }}
-          onLeaveClick={() => router.push('/')}
+          onLeaveClick={() => {
+            // Route patient to dashboard instead of home page
+            // Home page redirects doctors, so we go directly to dashboard
+            router.push('/dashboard');
+          }}
         />
 
         <style jsx>{`
