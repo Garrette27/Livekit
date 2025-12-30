@@ -1116,7 +1116,8 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
           
           // Redirect to patient-specific page
           // Check if user is authenticated - if yes, go to patient dashboard, otherwise patient login
-          if (user?.uid) {
+          // Use both user state and isAuthenticated state to ensure we catch all authenticated cases
+          if (user?.uid || isAuthenticated) {
             window.location.href = '/patient/dashboard';
           } else {
             // Check if patient just registered
@@ -1266,7 +1267,8 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
                 setToken(null);
                 
                 // Check if user is authenticated - if yes, go to patient dashboard, otherwise patient login
-                if (user?.uid) {
+                // Use both user state and isAuthenticated state to ensure we catch all authenticated cases
+                if (user?.uid || isAuthenticated) {
                   window.location.href = '/patient/dashboard';
                 } else {
                   // Check if patient just registered

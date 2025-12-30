@@ -76,7 +76,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
         console.error('Error updating call status:', error);
       }
     }
-    window.location.href = '/invitations';
+    window.location.href = '/doctor/invitations';
   };
 
   // Show authentication UI if not signed in
@@ -87,7 +87,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
         title="Doctor Access"
         description="Sign in to join the consultation as a doctor"
         error={pageError}
-        footerLink={{ href: '/invitations', text: '← Back to Invitations' }}
+        footerLink={{ href: '/doctor/invitations', text: '← Back to Invitations' }}
             >
           <button
             onClick={signIn}
