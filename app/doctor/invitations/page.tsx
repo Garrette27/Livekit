@@ -20,6 +20,8 @@ export default function DoctorInvitationsPage() {
   const [admittingId, setAdmittingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [selectedInvitationId, setSelectedInvitationId] = useState<string | null>(null);
+  const [invitationLinks, setInvitationLinks] = useState<Record<string, string>>({});
+  const [loadingLinks, setLoadingLinks] = useState<Record<string, boolean>>({});
   const router = useRouter();
 
   // Persist room name in localStorage
@@ -75,10 +77,42 @@ export default function DoctorInvitationsPage() {
       })) as Invitation[];
       setInvitations(invitationData);
       setLoading(false);
+      
+      // Fetch links for all active invitations
+      invitationData.forEach((invitation) => {
+        if (invitation.status === 'active' && !invitationLinks[invitation.id]) {
+          fetchInvitationLink(invitation.id);
+        }
+      });
     });
 
     return () => unsubscribe();
   }, [user, isAuthorized]);
+
+  const fetchInvitationLink = async (invitationId: string) => {
+    setLoadingLinks(prev => ({ ...prev, [invitationId]: true }));
+    try {
+      const response = await fetch(`/api/invite/get-link?invitationId=${encodeURIComponent(invitationId)}`);
+      const result = await response.json();
+      if (result.success && result.inviteUrl) {
+        setInvitationLinks(prev => ({ ...prev, [invitationId]: result.inviteUrl }));
+      }
+    } catch (error) {
+      console.error(`Error fetching link for invitation ${invitationId}:`, error);
+    } finally {
+      setLoadingLinks(prev => ({ ...prev, [invitationId]: false }));
+    }
+  };
+
+  const copyInvitationLink = async (link: string, invitationId: string) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      alert('Invitation link copied to clipboard!');
+    } catch (error) {
+      console.error('Error copying link:', error);
+      alert('Failed to copy link. Please try again.');
+    }
+  };
 
   // Note: Waiting patients are now handled by WaitingPatientsList component
 
@@ -416,6 +450,75 @@ export default function DoctorInvitationsPage() {
                       )}
                       {invitation.phoneAllowed && (
                         <p><strong>Phone:</strong> {invitation.phoneAllowed}</p>
+                      )}
+                      
+                      {/* Invitation Link Section */}
+                      {invitation.status === 'active' && (
+                        <div style={{ 
+                          marginTop: '0.75rem', 
+                          padding: '0.5rem', 
+                          backgroundColor: '#f0f9ff', 
+                          border: '1px solid #bae6fd', 
+                          borderRadius: '0.375rem' 
+                        }}>
+                          <p style={{ margin: '0 0 0.5rem 0', fontWeight: '600', fontSize: '0.75rem', color: '#1e40af' }}>
+                            Invitation Link:
+                          </p>
+                          {loadingLinks[invitation.id] ? (
+                            <p style={{ margin: 0, fontSize: '0.7rem', color: '#6b7280' }}>Loading link...</p>
+                          ) : invitationLinks[invitation.id] ? (
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                              <p style={{ 
+                                margin: 0, 
+                                fontSize: '0.7rem', 
+                                color: '#1e40af', 
+                                wordBreak: 'break-all',
+                                flex: 1
+                              }}>
+                                {invitationLinks[invitation.id]}
+                              </p>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyInvitationLink(invitationLinks[invitation.id], invitation.id);
+                                }}
+                                style={{
+                                  backgroundColor: '#2563eb',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '0.25rem',
+                                  padding: '0.25rem 0.5rem',
+                                  fontSize: '0.7rem',
+                                  fontWeight: '500',
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title="Copy link"
+                              >
+                                📋 Copy
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                fetchInvitationLink(invitation.id);
+                              }}
+                              style={{
+                                backgroundColor: '#6b7280',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '0.25rem',
+                                padding: '0.25rem 0.5rem',
+                                fontSize: '0.7rem',
+                                fontWeight: '500',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Load Link
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
 
