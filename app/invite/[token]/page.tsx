@@ -2,6 +2,8 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import PatientLiveKitRoom from './components/PatientLiveKitRoom';
 import PatientRegistration from '@/components/PatientRegistration';
 import { 
@@ -92,6 +94,18 @@ function InvitePageContent() {
   const [deviceFingerprint, setDeviceFingerprint] = useState<DeviceFingerprint | null>(null);
   const [requiresRegistration, setRequiresRegistration] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+
+  // Handle authentication state
+  useEffect(() => {
+    if (auth) {
+      return onAuthStateChanged(auth, (user) => {
+        setUser(user);
+        setIsAuthenticated(!!user);
+      });
+    }
+  }, []);
 
   // Generate device fingerprint
   useEffect(() => {
@@ -452,14 +466,19 @@ function InvitePageContent() {
           onDisconnected={() => {
             console.log('Patient disconnected from consultation');
             // Redirect to patient dashboard or login page
-            // Check if user is registered by checking localStorage or redirect to patient login
-            const registeredEmail = localStorage.getItem('patientRegisteredEmail');
-            if (registeredEmail) {
-              // Patient just registered, guide them to sign in
-              router.push('/patient/login?registered=true&email=' + encodeURIComponent(registeredEmail));
+            // Check if user is authenticated first - if yes, go to patient dashboard
+            if (user?.uid || isAuthenticated) {
+              router.push('/patient/dashboard');
             } else {
-              // Not registered or no email stored, go to patient login
-              router.push('/patient/login');
+              // Not authenticated - check if patient just registered
+              const registeredEmail = localStorage.getItem('patientRegisteredEmail');
+              if (registeredEmail) {
+                // Patient just registered, guide them to sign in
+                router.push('/patient/login?registered=true&email=' + encodeURIComponent(registeredEmail));
+              } else {
+                // Not registered or no email stored, go to patient login
+                router.push('/patient/login');
+              }
             }
           }}
           onError={(error) => {
@@ -486,14 +505,19 @@ function InvitePageContent() {
           }}
           onLeaveClick={() => {
             // Route patient to patient-specific dashboard or login
-            // Check if user is registered by checking localStorage
-            const registeredEmail = localStorage.getItem('patientRegisteredEmail');
-            if (registeredEmail) {
-              // Patient just registered, guide them to sign in
-              router.push('/patient/login?registered=true&email=' + encodeURIComponent(registeredEmail));
+            // Check if user is authenticated first - if yes, go to patient dashboard
+            if (user?.uid || isAuthenticated) {
+              router.push('/patient/dashboard');
             } else {
-              // Not registered or no email stored, go to patient login
-              router.push('/patient/login');
+              // Not authenticated - check if patient just registered
+              const registeredEmail = localStorage.getItem('patientRegisteredEmail');
+              if (registeredEmail) {
+                // Patient just registered, guide them to sign in
+                router.push('/patient/login?registered=true&email=' + encodeURIComponent(registeredEmail));
+              } else {
+                // Not registered or no email stored, go to patient login
+                router.push('/patient/login');
+              }
             }
           }}
         />
