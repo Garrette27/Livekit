@@ -463,8 +463,29 @@ function InvitePageContent() {
       <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}>
         <PatientLiveKitRoom
           token={validationResult.liveKitToken}
-          onDisconnected={() => {
+          onDisconnected={async () => {
             console.log('Patient disconnected from consultation');
+            
+            // Track patient leaving consultation (only if in main consultation room, not waiting room)
+            if (validationResult?.roomName && !validationResult.waitingRoomEnabled) {
+              try {
+                await fetch('/api/track-consultation', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    roomName: validationResult.roomName,
+                    action: 'leave',
+                    patientName: 'Patient', // Default name, can be improved if patient name is stored
+                    userId: user?.uid || 'anonymous',
+                    patientEmail: user?.email || validationResult.registeredEmail || invitationEmail || null
+                  })
+                });
+                console.log('✅ Patient leave tracked for room:', validationResult.roomName);
+              } catch (error) {
+                console.error('Error tracking patient leave:', error);
+              }
+            }
+            
             // Redirect to patient dashboard or login page
             // Check if user is authenticated first - if yes, go to patient dashboard
             if (user?.uid || isAuthenticated) {
@@ -503,7 +524,27 @@ function InvitePageContent() {
               }
             }
           }}
-          onLeaveClick={() => {
+          onLeaveClick={async () => {
+            // Track patient leaving consultation (only if in main consultation room, not waiting room)
+            if (validationResult?.roomName && !validationResult.waitingRoomEnabled) {
+              try {
+                await fetch('/api/track-consultation', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    roomName: validationResult.roomName,
+                    action: 'leave',
+                    patientName: 'Patient', // Default name, can be improved if patient name is stored
+                    userId: user?.uid || 'anonymous',
+                    patientEmail: user?.email || validationResult.registeredEmail || invitationEmail || null
+                  })
+                });
+                console.log('✅ Patient leave tracked for room:', validationResult.roomName);
+              } catch (error) {
+                console.error('Error tracking patient leave:', error);
+              }
+            }
+            
             // Route patient to patient-specific dashboard or login
             // Check if user is authenticated first - if yes, go to patient dashboard
             if (user?.uid || isAuthenticated) {
