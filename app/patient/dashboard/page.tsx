@@ -595,7 +595,7 @@ export default function PatientDashboard() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      {summary.duration > 0 && (
+                      {summary.duration !== undefined && summary.duration !== null && (
                         <span style={{
                           padding: '0.25rem 0.75rem',
                           borderRadius: '9999px',
@@ -641,7 +641,7 @@ export default function PatientDashboard() {
                     </div>
                   )}
                   <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                    {summary.duration > 0 ? (
+                    {summary.duration !== undefined && summary.duration !== null ? (
                       <p>Duration: {summary.duration} minute{summary.duration !== 1 ? 's' : ''}</p>
                     ) : (
                       <p>Session completed</p>

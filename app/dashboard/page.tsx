@@ -949,7 +949,6 @@ export default function Dashboard() {
                         'Date not available'
                       }</span>
                       <span>👥 {summary.participants || summary.metadata?.totalParticipants || 0} participants</span>
-                      <span>🔒 Auto-delete in 30 days</span>
                     </div>
                     {(summary.doctorEmail || summary.patientEmail) && (
                       <div style={{ 
