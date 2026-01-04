@@ -109,6 +109,73 @@ RELATED FILES:
 - app/room/[room]/doctor/page.tsx - Doctor room page (reference implementation)
 - app/dashboard/page.tsx - Doctor dashboard (displays summaries)
 
+================================================================================
+ISSUE 3: PATIENT EMAIL BEING OVERWRITTEN WHEN JOINING ANONYMOUSLY
+================================================================================
+
+PROBLEM:
+When a patient initially joined a consultation while logged in, their email was 
+recorded in the consultation document. However, if the patient logged out and 
+then joined the same consultation anonymously (without logging in), the consultation 
+document was being updated with patientEmail: null and patientUserId: 'anonymous', 
+overwriting the original patient email. This caused the patient email to disappear 
+from consultation summaries in the doctor dashboard.
+
+ROOT CAUSE:
+In app/api/track-consultation/route.ts, when a patient joined (action: 'join'), 
+the code was using merge: true to update the consultation document. However, it 
+was always setting patientEmail and patientUserId to the current values (which 
+could be null and 'anonymous' for anonymous users), overwriting any existing 
+patient email/userId that was previously stored.
+
+SOLUTION:
+1. Added logic to preserve existing patient email/userId when patient joins anonymously
+2. Only update patient email/userId if the new value is better (non-anonymous, non-null)
+3. Preserve original patient email/userId if new values are anonymous/null
+4. Applied same preservation logic to patient leave action (action: 'leave')
+5. Updated generateConsultationSummary call to use preserved patient email/userId
+
+IMPLEMENTATION DETAILS:
+- When patient joins, code now checks for existing patient email/userId in consultation
+- If existing patient email/userId exists and new values are anonymous/null, preserve existing
+- Only overwrite if new values are better (authenticated user ID, non-null email)
+- Same logic applied when patient leaves to ensure email is preserved in final consultation state
+
+FILES MODIFIED:
+- app/api/track-consultation/route.ts
+  * Updated join action logic (lines ~134-222)
+  * Updated leave action logic (lines ~224-298)
+  * Added patient email/userId preservation logic
+
+EXPECTED BEHAVIOR AFTER FIX:
+- Patient email is preserved even if patient logs out and joins anonymously
+- Consultation summaries maintain original patient email in doctor dashboard
+- Original patient identity is preserved throughout consultation lifecycle
+- Anonymous joins after authenticated joins do not overwrite patient information
+
+TESTING RECOMMENDATIONS:
+1. Test Email Preservation:
+   - Join consultation as logged-in patient (with email)
+   - Log out
+   - Join same consultation anonymously (without logging in)
+   - Complete consultation
+   - Verify original patient email is preserved in doctor dashboard summary
+
+2. Test Multiple Joins:
+   - Join as logged-in patient
+   - Leave consultation
+   - Join same consultation anonymously
+   - Verify original patient email is preserved
+
+NOTES:
+- Preserving original patient email is preferred over displaying "Anonymous" because
+  the consultation is still linked to the original patient identity
+- The fix ensures consultation records maintain patient identity even if patient
+  logs out during the consultation process
+- This maintains data integrity and provides better tracking for doctors
+
+================================================================================
+
 NOTES:
 - The patient name is currently hardcoded as 'Patient' in the API call. This could 
   be improved by storing the patient's name when they join the consultation.

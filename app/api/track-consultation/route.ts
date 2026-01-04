@@ -184,11 +184,41 @@ export async function POST(req: Request) {
           ? existingPatientEmail  // Preserve existing patient email
           : patientEmailToStore;  // Use new email (or null if anonymous)
         
+        // Determine if we should preserve existing joinedAt timestamp
+        // Only preserve if consultation is active and joinedAt is recent (within 3 hours)
+        // If consultation is completed or joinedAt is too old, reset it
+        let finalJoinedAt: Date;
+        if (existingData?.joinedAt) {
+          const existingStatus = existingData?.status;
+          const existingJoinedAt = existingData.joinedAt.toDate ? existingData.joinedAt.toDate() : new Date(existingData.joinedAt);
+          const now = new Date();
+          const hoursSinceJoined = (now.getTime() - existingJoinedAt.getTime()) / (1000 * 60 * 60); // Convert to hours
+          
+          // Only preserve joinedAt if:
+          // 1. Consultation is active (not completed)
+          // 2. JoinedAt is recent (within 3 hours) - handles brief disconnections
+          if (existingStatus === 'active' && hoursSinceJoined < 3) {
+            finalJoinedAt = existingJoinedAt;
+            console.log(`ℹ️ Preserving existing joinedAt (${hoursSinceJoined.toFixed(2)} hours ago) for active consultation`);
+          } else {
+            // Consultation is completed or joinedAt is too old - reset it
+            finalJoinedAt = new Date();
+            if (existingStatus === 'completed') {
+              console.log(`ℹ️ Resetting joinedAt - consultation was already completed`);
+            } else {
+              console.log(`ℹ️ Resetting joinedAt - too old (${hoursSinceJoined.toFixed(2)} hours ago)`);
+            }
+          }
+        } else {
+          // No existing joinedAt - use current time
+          finalJoinedAt = new Date();
+        }
+        
         // Track when patient joins (new consultation or update existing)
         const consultationData: any = {
           roomName,
           patientName: patientName || existingData?.patientName || 'Unknown Patient',
-          joinedAt: existingData?.joinedAt || new Date(),
+          joinedAt: finalJoinedAt,
           status: 'active',
           isRealConsultation: true, // Mark as real consultation, not test
           createdBy: doctorUserId, // Store doctor's user ID for doctor's view
