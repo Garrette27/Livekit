@@ -193,7 +193,108 @@ onLeaveClick={async () => {
 
 ---
 
+## Additional Fix: Patient Email in Doctor Dashboard
+
+### Issue Description
+
+After fixing the session completed status, it was discovered that the patient email was not being displayed in the doctor dashboard's "Recent Consultation Summaries" section. The doctor email was shown correctly, but the patient email was missing.
+
+### Root Cause
+
+The `generateConsultationSummary` function in `app/api/track-consultation/route.ts` was not storing the `patientEmail` and `patientUserId` in the call-summaries collection. The dashboard code was trying to fetch and display the patient email, but it wasn't available in the summary documents.
+
+### Solution Implemented
+
+#### Changes Made to `app/api/track-consultation/route.ts`
+
+1. **Updated `generateConsultationSummary` Function Signature** (Lines 273-292)
+   - Added `patientUserId: string | null = null` parameter
+   - Added `patientEmail: string | null = null` parameter
+
+2. **Updated Function Call** (Lines 232-250)
+   - Extracts patient email from consultation data: `data?.patientEmail || data?.metadata?.patientEmail || patientEmail || null`
+   - Passes `actualPatientUserId` and `patientEmailFromConsultation` to `generateConsultationSummary`
+
+3. **Updated Fallback Summary Data** (Lines 307-340)
+   - Added code to store `patientUserId` and `patientEmail` in summary document
+   - Stores both in top-level fields and in metadata object
+   - Logs when patient email is stored
+
+4. **Updated AI-Generated Summary Data** (Lines 431-460)
+   - Added code to store `patientUserId` and `patientEmail` in summary document
+   - Stores both in top-level fields and in metadata object
+   - Logs when patient email is stored
+
+5. **Updated Consultation Document on Patient Leave** (Lines 208-240)
+   - Extracts patient email from consultation data or request
+   - Stores `patientEmail` in consultation document when patient leaves
+   - Stores `patientEmail` in metadata as well
+   - Ensures patient email is available for summary generation
+
+### Code Changes
+
+#### Before:
+```typescript
+async function generateConsultationSummary(roomName: string, patientName: string, durationMinutes: number, userId: string, transcriptionData: any[] | null = null) {
+  // ... summary generation without patient email
+}
+```
+
+#### After:
+```typescript
+async function generateConsultationSummary(
+  roomName: string, 
+  patientName: string, 
+  durationMinutes: number, 
+  userId: string, 
+  transcriptionData: any[] | null = null,
+  patientUserId: string | null = null,
+  patientEmail: string | null = null
+) {
+  // ... summary generation with patient email stored
+  if (patientEmail) {
+    summaryData.patientEmail = patientEmail;
+    summaryData.metadata.patientEmail = patientEmail;
+  }
+}
+```
+
+### Expected Behavior After Fix
+
+1. ✅ Patient email is stored in consultation document when patient leaves
+2. ✅ Patient email is stored in call-summaries document when summary is generated
+3. ✅ Doctor dashboard can fetch and display patient email from summary
+4. ✅ Both doctor and patient emails are displayed in "Recent Consultation Summaries" section
+5. ✅ Patient email appears alongside doctor email in the summary cards
+
+### Files Modified
+
+- `app/api/track-consultation/route.ts`
+  - Updated `generateConsultationSummary` function signature and implementation
+  - Updated consultation document update to store patient email
+  - Updated both fallback and AI-generated summary data structures
+
+### Testing Recommendations
+
+1. **Test Patient Email Display:**
+   - Complete a consultation as a patient (with email)
+   - Check doctor dashboard "Recent Consultation Summaries"
+   - Verify both doctor and patient emails are displayed
+
+2. **Test Anonymous Patients:**
+   - Complete a consultation as anonymous patient
+   - Verify system handles missing email gracefully
+   - Verify doctor email still displays correctly
+
+3. **Test Email Lookup:**
+   - Verify patient email is fetched from consultation document
+   - Verify fallback to user document lookup works if needed
+
+---
+
 **Date:** January 3, 2026  
-**Issue:** Session completed status not updating in patient consultation history  
-**Status:** ✅ Fixed
+**Issues Fixed:**
+1. ✅ Session completed status not updating in patient consultation history
+2. ✅ Patient email not displaying in doctor dashboard consultation summaries  
+**Status:** ✅ Both Issues Fixed
 

@@ -205,7 +205,10 @@ export async function POST(req: Request) {
         const leftAt = new Date();
         const durationMinutes = Math.round((leftAt.getTime() - joinedAt.getTime()) / (1000 * 60));
         
-        await consultationRef.update({
+        // Get patient email from consultation data or request
+        const patientEmailToStore = data?.patientEmail || data?.metadata?.patientEmail || patientEmail || null;
+        
+        const updateData: any = {
           leftAt,
           duration: durationMinutes,
           status: 'completed',
@@ -225,13 +228,25 @@ export async function POST(req: Request) {
               id !== 'unknown' && id !== 'anonymous' && self.indexOf(id) === index
             )
           }
-        });
+        };
+        
+        // Add patient email if available
+        if (patientEmailToStore) {
+          updateData.patientEmail = patientEmailToStore;
+          updateData.metadata.patientEmail = patientEmailToStore;
+          console.log('✅ Storing patient email in consultation:', patientEmailToStore);
+        }
+        
+        await consultationRef.update(updateData);
         
         console.log(`✅ Patient left consultation: ${roomName}, duration: ${durationMinutes} minutes, linked to doctor: ${doctorUserId}`);
         
         // Generate AI summary for completed consultation
         try {
           console.log(`Generating AI summary for room: ${roomName}, patient: ${data?.patientName || 'Unknown Patient'}, duration: ${durationMinutes}, doctor: ${doctorUserId}`);
+          
+          // Get patient email from consultation data
+          const patientEmailFromConsultation = data?.patientEmail || data?.metadata?.patientEmail || patientEmail || null;
           
           // Try to get transcription data from the calls collection
           let transcriptionData = null;
@@ -247,7 +262,15 @@ export async function POST(req: Request) {
             console.log('Could not fetch transcription data:', transcriptionError);
           }
           
-          await generateConsultationSummary(roomName, data?.patientName || 'Unknown Patient', durationMinutes, doctorUserId, transcriptionData);
+          await generateConsultationSummary(
+            roomName, 
+            data?.patientName || 'Unknown Patient', 
+            durationMinutes, 
+            doctorUserId, 
+            transcriptionData,
+            actualPatientUserId,
+            patientEmailFromConsultation
+          );
         } catch (error) {
           console.error('❌ Error generating consultation summary:', error);
         }
@@ -270,7 +293,15 @@ export async function POST(req: Request) {
   }
 }
 
-async function generateConsultationSummary(roomName: string, patientName: string, durationMinutes: number, userId: string, transcriptionData: any[] | null = null) {
+async function generateConsultationSummary(
+  roomName: string, 
+  patientName: string, 
+  durationMinutes: number, 
+  userId: string, 
+  transcriptionData: any[] | null = null,
+  patientUserId: string | null = null,
+  patientEmail: string | null = null
+) {
   try {
     console.log('Generating AI summary for consultation:', roomName, 'with user ID:', userId);
     
@@ -285,7 +316,7 @@ async function generateConsultationSummary(roomName: string, patientName: string
       console.log('⚠️ OpenAI API key not configured, using fallback summary');
       
       // Store fallback summary
-      const summaryData = {
+      const summaryData: any = {
         roomName,
         summary: `Consultation completed with ${patientName}. Duration: ${durationMinutes} minutes. No AI analysis available - OpenAI not configured.`,
         keyPoints: ['Consultation completed', 'Duration recorded', 'No AI analysis available'],
@@ -306,6 +337,18 @@ async function generateConsultationSummary(roomName: string, patientName: string
           summaryGeneratedAt: new Date()
         }
       };
+      
+      // Add patient information if available
+      if (patientUserId && patientUserId !== 'anonymous' && patientUserId !== 'unknown') {
+        summaryData.patientUserId = patientUserId;
+        summaryData.metadata.patientUserId = patientUserId;
+      }
+      
+      if (patientEmail) {
+        summaryData.patientEmail = patientEmail;
+        summaryData.metadata.patientEmail = patientEmail;
+        console.log('✅ Storing patient email in fallback summary:', patientEmail);
+      }
 
       const summaryRef = db.collection('call-summaries').doc(roomName);
       await summaryRef.set(summaryData);
@@ -397,7 +440,7 @@ async function generateConsultationSummary(roomName: string, patientName: string
       console.log('✅ Successfully parsed AI response');
       
       // Store the summary in Firestore
-      const summaryData = {
+      const summaryData: any = {
         roomName,
         summary: parsedSummary.summary || 'Summary generation failed',
         keyPoints: parsedSummary.keyPoints || ['No key points available'],
@@ -418,6 +461,18 @@ async function generateConsultationSummary(roomName: string, patientName: string
           summaryGeneratedAt: new Date()
         }
       };
+      
+      // Add patient information if available
+      if (patientUserId && patientUserId !== 'anonymous' && patientUserId !== 'unknown') {
+        summaryData.patientUserId = patientUserId;
+        summaryData.metadata.patientUserId = patientUserId;
+      }
+      
+      if (patientEmail) {
+        summaryData.patientEmail = patientEmail;
+        summaryData.metadata.patientEmail = patientEmail;
+        console.log('✅ Storing patient email in AI summary:', patientEmail);
+      }
 
       const summaryRef = db.collection('call-summaries').doc(roomName);
       await summaryRef.set(summaryData);
