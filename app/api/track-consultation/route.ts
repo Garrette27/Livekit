@@ -131,8 +131,13 @@ export async function POST(req: Request) {
       const consultationDoc = await consultationRef.get();
       const existingData = consultationDoc.exists ? consultationDoc.data() : null;
       
+      // Preserve existing patient email/userId if we're getting anonymous values
+      // Only update if we have a better (non-anonymous, non-null) value
+      const existingPatientUserId = existingData?.patientUserId || existingData?.metadata?.patientUserId;
+      const existingPatientEmail = existingData?.patientEmail || existingData?.metadata?.patientEmail;
+      
       // If consultation exists and patientUserId is 'anonymous' but we now have a real user ID, update it
-      if (existingData && existingData.patientUserId === 'anonymous' && actualPatientUserId !== 'anonymous' && actualPatientUserId !== doctorUserId) {
+      if (existingData && existingPatientUserId === 'anonymous' && actualPatientUserId !== 'anonymous' && actualPatientUserId !== doctorUserId) {
         console.log(`Updating existing consultation with patient user ID: ${actualPatientUserId}`);
         const existingVisibleToUsers = existingData.metadata?.visibleToUsers || [];
         const updatedVisibleToUsers = [...new Set([...existingVisibleToUsers, doctorUserId, actualPatientUserId])].filter(
@@ -166,33 +171,53 @@ export async function POST(req: Request) {
           }
         }
         
+        // Preserve existing patient email/userId if joining anonymously
+        // Only use new values if they're better (non-anonymous, non-null)
+        const finalPatientUserId = (actualPatientUserId === 'anonymous' || actualPatientUserId === 'unknown') && 
+                                   existingPatientUserId && 
+                                   existingPatientUserId !== 'anonymous' && 
+                                   existingPatientUserId !== 'unknown'
+          ? existingPatientUserId  // Preserve existing valid patientUserId
+          : actualPatientUserId;    // Use new patientUserId (or anonymous if no existing)
+        
+        const finalPatientEmail = (!patientEmailToStore && existingPatientEmail)
+          ? existingPatientEmail  // Preserve existing patient email
+          : patientEmailToStore;  // Use new email (or null if anonymous)
+        
         // Track when patient joins (new consultation or update existing)
-        const consultationData = {
+        const consultationData: any = {
           roomName,
           patientName: patientName || existingData?.patientName || 'Unknown Patient',
           joinedAt: existingData?.joinedAt || new Date(),
           status: 'active',
           isRealConsultation: true, // Mark as real consultation, not test
           createdBy: doctorUserId, // Store doctor's user ID for doctor's view
-          patientUserId: actualPatientUserId, // Store patient's user ID for patient's view
-          patientEmail: patientEmailToStore, // Store patient email for easy display
+          patientUserId: finalPatientUserId, // Use preserved or new patient user ID
           metadata: {
             source: 'patient_join',
             trackedAt: new Date(),
             createdBy: doctorUserId,
-            patientUserId: actualPatientUserId, // Store patient's user ID if available
-            patientEmail: patientEmailToStore, // Also store in metadata
+            patientUserId: finalPatientUserId, // Use preserved or new patient user ID
             doctorUserId: doctorUserId, // Explicitly store doctor's user ID
             // Add both user IDs so both can see the consultation (remove duplicates)
-            visibleToUsers: [doctorUserId, actualPatientUserId].filter((id, index, self) => 
+            visibleToUsers: [doctorUserId, finalPatientUserId].filter((id, index, self) => 
               id !== 'unknown' && id !== 'anonymous' && self.indexOf(id) === index
             )
           }
         };
         
+        // Only set patient email if we have a value (preserve existing or use new)
+        if (finalPatientEmail) {
+          consultationData.patientEmail = finalPatientEmail;
+          consultationData.metadata.patientEmail = finalPatientEmail;
+        }
+        
         await consultationRef.set(consultationData, { merge: true });
         
-        console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}, patient: ${actualPatientUserId}, email: ${patientEmailToStore || 'not available'}`);
+        console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}, patient: ${finalPatientUserId}, email: ${finalPatientEmail || 'not available'}`);
+        if (actualPatientUserId === 'anonymous' && existingPatientEmail) {
+          console.log(`ℹ️ Preserved existing patient email (${existingPatientEmail}) when patient joined anonymously`);
+        }
         console.log('Consultation data stored:', consultationData);
       }
       
@@ -205,8 +230,21 @@ export async function POST(req: Request) {
         const leftAt = new Date();
         const durationMinutes = Math.round((leftAt.getTime() - joinedAt.getTime()) / (1000 * 60));
         
-        // Get patient email from consultation data or request
-        const patientEmailToStore = data?.patientEmail || data?.metadata?.patientEmail || patientEmail || null;
+        // Preserve existing patient email/userId if leaving anonymously
+        // Get existing patient data from consultation
+        const existingPatientUserId = data?.patientUserId || data?.metadata?.patientUserId;
+        const existingPatientEmail = data?.patientEmail || data?.metadata?.patientEmail;
+        
+        // Preserve existing patientUserId if leaving anonymously and existing is better
+        const finalPatientUserId = (actualPatientUserId === 'anonymous' || actualPatientUserId === 'unknown') && 
+                                   existingPatientUserId && 
+                                   existingPatientUserId !== 'anonymous' && 
+                                   existingPatientUserId !== 'unknown'
+          ? existingPatientUserId  // Preserve existing valid patientUserId
+          : actualPatientUserId;    // Use current patientUserId (or anonymous if no existing)
+        
+        // Get patient email from consultation data or request (preserve existing if available)
+        const patientEmailToStore = existingPatientEmail || patientEmail || null;
         
         const updateData: any = {
           leftAt,
@@ -214,27 +252,30 @@ export async function POST(req: Request) {
           status: 'completed',
           isRealConsultation: true,
           createdBy: doctorUserId, // Ensure doctor's user ID is preserved
-          patientUserId: actualPatientUserId, // Ensure patient's user ID is preserved
+          patientUserId: finalPatientUserId, // Use preserved or current patient user ID
           metadata: {
             ...data?.metadata,
             source: 'patient_leave',
             durationMinutes,
             trackedAt: new Date(),
             createdBy: doctorUserId,
-            patientUserId: actualPatientUserId,
+            patientUserId: finalPatientUserId, // Use preserved or current patient user ID
             doctorUserId: doctorUserId,
             // Add both user IDs so both can see the consultation (remove duplicates)
-            visibleToUsers: [doctorUserId, actualPatientUserId].filter((id, index, self) => 
+            visibleToUsers: [doctorUserId, finalPatientUserId].filter((id, index, self) => 
               id !== 'unknown' && id !== 'anonymous' && self.indexOf(id) === index
             )
           }
         };
         
-        // Add patient email if available
+        // Add patient email if available (preserve existing)
         if (patientEmailToStore) {
           updateData.patientEmail = patientEmailToStore;
           updateData.metadata.patientEmail = patientEmailToStore;
           console.log('✅ Storing patient email in consultation:', patientEmailToStore);
+          if (actualPatientUserId === 'anonymous' && existingPatientEmail) {
+            console.log(`ℹ️ Preserved existing patient email (${existingPatientEmail}) when patient left anonymously`);
+          }
         }
         
         await consultationRef.update(updateData);
@@ -245,8 +286,8 @@ export async function POST(req: Request) {
         try {
           console.log(`Generating AI summary for room: ${roomName}, patient: ${data?.patientName || 'Unknown Patient'}, duration: ${durationMinutes}, doctor: ${doctorUserId}`);
           
-          // Get patient email from consultation data
-          const patientEmailFromConsultation = data?.patientEmail || data?.metadata?.patientEmail || patientEmail || null;
+          // Get patient email from consultation data (use preserved email)
+          const patientEmailFromConsultation = patientEmailToStore || patientEmail || null;
           
           // Try to get transcription data from the calls collection
           let transcriptionData = null;
@@ -268,8 +309,8 @@ export async function POST(req: Request) {
             durationMinutes, 
             doctorUserId, 
             transcriptionData,
-            actualPatientUserId,
-            patientEmailFromConsultation
+            finalPatientUserId, // Use preserved patient user ID
+            patientEmailFromConsultation // Use preserved patient email
           );
         } catch (error) {
           console.error('❌ Error generating consultation summary:', error);

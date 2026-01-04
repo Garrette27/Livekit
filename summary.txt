@@ -1,0 +1,119 @@
+SESSION COMPLETED STATUS FIX - SUMMARY
+========================================
+
+Date: January 3, 2026
+Issues Fixed:
+1. Session completed status not updating in patient consultation history
+2. Patient email not displaying in doctor dashboard consultation summaries
+3. Patient email being overwritten when patient joins anonymously after logging out
+Status: All Issues Fixed
+
+================================================================================
+ISSUE 1: SESSION COMPLETED STATUS NOT UPDATING
+================================================================================
+
+PROBLEM:
+The "session completed" status was not being updated in the patient's consultation 
+history when clicking the "Leave Consultation" button on the top left of the patient 
+video room (invite page). However, the doctor side worked correctly.
+
+ROOT CAUSE:
+- The onLeaveClick handler in app/invite/[token]/page.tsx was missing the API call 
+  to track consultation leave
+- The onDisconnected handler was also missing the API call
+- Both handlers only redirected the user without updating the consultation status
+
+SOLUTION:
+1. Updated onDisconnected handler to call /api/track-consultation with action: 'leave'
+2. Updated onLeaveClick handler to call /api/track-consultation with action: 'leave'
+3. Added safety check to only track when in main consultation room (not waiting room)
+4. Added proper error handling
+
+FILES MODIFIED:
+- app/invite/[token]/page.tsx
+  * Updated onDisconnected handler (lines ~466-483)
+  * Updated onLeaveClick handler (lines ~506-522)
+
+================================================================================
+ISSUE 2: PATIENT EMAIL NOT DISPLAYING IN DOCTOR DASHBOARD
+================================================================================
+
+PROBLEM:
+The patient email was not being displayed in the doctor dashboard's "Recent 
+Consultation Summaries" section. The doctor email was shown correctly, but the 
+patient email was missing.
+
+ROOT CAUSE:
+The generateConsultationSummary function in app/api/track-consultation/route.ts 
+was not storing the patientEmail and patientUserId in the call-summaries collection. 
+The dashboard code was trying to fetch and display the patient email, but it wasn't 
+available in the summary documents.
+
+SOLUTION:
+1. Updated generateConsultationSummary function signature to accept patientUserId 
+   and patientEmail parameters
+2. Updated function call to extract and pass patient email from consultation data
+3. Updated fallback summary data to store patientEmail and patientUserId
+4. Updated AI-generated summary data to store patientEmail and patientUserId
+5. Updated consultation document update to store patientEmail when patient leaves
+
+FILES MODIFIED:
+- app/api/track-consultation/route.ts
+  * Updated generateConsultationSummary function signature (lines 273-292)
+  * Updated function call (lines 232-250)
+  * Updated fallback summary data (lines 307-340)
+  * Updated AI-generated summary data (lines 431-460)
+  * Updated consultation document update (lines 208-240)
+
+EXPECTED BEHAVIOR AFTER FIXES:
+
+Issue 1 - Session Completed:
+- When patient clicks "Leave Consultation" button, API call is made to track leave
+- Consultation status is updated to 'completed' in Firestore
+- Duration is calculated and stored
+- AI summary is generated for the completed consultation
+- Consultation appears in patient's history with "Session completed" status
+
+Issue 2 - Patient Email Display:
+- Patient email is stored in consultation document when patient leaves
+- Patient email is stored in call-summaries document when summary is generated
+- Doctor dashboard can fetch and display patient email from summary
+- Both doctor and patient emails are displayed in "Recent Consultation Summaries" 
+  section
+
+TESTING RECOMMENDATIONS:
+
+1. Test Leave Button Click:
+   - Join consultation as patient via invite link
+   - Click "Leave Consultation" button (top left)
+   - Verify consultation appears in patient dashboard with "Session completed" status
+
+2. Test Patient Email Display:
+   - Complete a consultation as a patient (with email)
+   - Check doctor dashboard "Recent Consultation Summaries"
+   - Verify both doctor and patient emails are displayed
+
+3. Test Disconnection:
+   - Join consultation as patient via invite link
+   - Close browser tab or lose connection
+   - Verify consultation is marked as completed in patient dashboard
+
+4. Test Waiting Room:
+   - Verify that leaving from waiting room does NOT trigger consultation tracking
+   - Only main consultation room leave should be tracked
+
+RELATED FILES:
+- app/api/track-consultation/route.ts - API endpoint that handles consultation tracking
+- app/invite/[token]/page.tsx - Patient invite page (fixed)
+- app/room/[room]/patient/page.tsx - Patient room page (already working correctly)
+- app/room/[room]/doctor/page.tsx - Doctor room page (reference implementation)
+- app/dashboard/page.tsx - Doctor dashboard (displays summaries)
+
+NOTES:
+- The patient name is currently hardcoded as 'Patient' in the API call. This could 
+  be improved by storing the patient's name when they join the consultation.
+- The fix ensures consistency between patient and doctor sides for consultation 
+  completion tracking.
+- The safety check prevents tracking consultation leave from the waiting room, 
+  which is correct behavior.
+
