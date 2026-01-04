@@ -143,6 +143,8 @@ export default function PatientDashboard() {
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [deletingSummary, setDeletingSummary] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const router = useRouter();
 
   // Handle authentication and role check
@@ -194,6 +196,45 @@ export default function PatientDashboard() {
       console.error('Error fetching user email:', error);
     }
     return null;
+  };
+
+  const handleDelete = async (summary: CallSummary) => {
+    if (!user) return;
+    
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete the consultation "${summary.roomName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingSummary(summary.roomName);
+    setDeleteError(null);
+
+    try {
+      // Get Firebase ID token for authentication
+      const token = await user.getIdToken();
+
+      const response = await fetch(`/api/summary/delete?id=${encodeURIComponent(summary.roomName)}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete consultation');
+      }
+
+      // Consultation will be removed from the list automatically by Firestore listener
+      console.log('Consultation deleted successfully');
+    } catch (error) {
+      console.error('Error deleting consultation:', error);
+      setDeleteError(error instanceof Error ? error.message : 'Failed to delete consultation');
+    } finally {
+      setDeletingSummary(null);
+    }
   };
 
   useEffect(() => {
@@ -553,20 +594,52 @@ export default function PatientDashboard() {
                         )}
                       </div>
                     </div>
-                    {summary.duration > 0 && (
-                      <span style={{
-                        padding: '0.25rem 0.75rem',
-                        borderRadius: '9999px',
-                        fontSize: '0.75rem',
-                        fontWeight: '500',
-                        backgroundColor: '#dcfce7',
-                        color: '#166534',
-                        marginLeft: '1rem'
-                      }}>
-                        {summary.duration} min
-                      </span>
-                    )}
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {summary.duration > 0 && (
+                        <span style={{
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '9999px',
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          backgroundColor: '#dcfce7',
+                          color: '#166534'
+                        }}>
+                          {summary.duration} min
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleDelete(summary)}
+                        disabled={deletingSummary === summary.roomName}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          backgroundColor: deletingSummary === summary.roomName ? '#9ca3af' : '#dc2626',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '0.5rem',
+                          cursor: deletingSummary === summary.roomName ? 'not-allowed' : 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          whiteSpace: 'nowrap',
+                          opacity: deletingSummary === summary.roomName ? 0.6 : 1
+                        }}
+                      >
+                        {deletingSummary === summary.roomName ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
                   </div>
+                  {deleteError && summary.roomName === deletingSummary && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      padding: '0.75rem',
+                      backgroundColor: '#fee2e2',
+                      border: '1px solid #fca5a5',
+                      borderRadius: '0.375rem',
+                      color: '#991b1b',
+                      fontSize: '0.875rem'
+                    }}>
+                      Error: {deleteError}
+                    </div>
+                  )}
                   <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
                     {summary.duration > 0 ? (
                       <p>Duration: {summary.duration} minute{summary.duration !== 1 ? 's' : ''}</p>
