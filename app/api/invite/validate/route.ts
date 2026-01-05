@@ -517,11 +517,14 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      // Use invitation email if available (even if patient is anonymous)
+      const finalPatientEmail = userEmailToCheck || invitation.emailAllowed || undefined;
+      
       const waitingPatient: any = {
         id: waitingPatientId,
         patientId: userProfile ? userQuery.docs[0].id : `anonymous_${Date.now()}`,
-        patientName: userProfile?.email || userEmailToCheck || 'Anonymous Patient',
-        ...(userEmailToCheck && { patientEmail: userEmailToCheck }), // Only include if email exists
+        patientName: userProfile?.email || userEmailToCheck || invitation.emailAllowed || 'Anonymous Patient',
+        ...(finalPatientEmail && { patientEmail: finalPatientEmail }), // Include email from user or invitation
         roomName: tokenPayload.roomName,
         invitationId: tokenPayload.invitationId,
         doctorUserId: doctorUserId, // Store doctor's user ID for permission checking

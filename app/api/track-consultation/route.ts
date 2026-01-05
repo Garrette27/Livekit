@@ -38,6 +38,7 @@ export async function POST(req: Request) {
     // If userId is 'anonymous' or missing, try to look up patient by email
     // Also check if this is a doctor joining (should not set patientUserId to doctor's ID)
     let actualPatientUserId = userId || 'anonymous';
+    let invitationEmailForPatient: string | null = null;
     
     // Don't set patientUserId to doctor's ID - only set if it's actually a patient
     if (userId && userId === doctorUserId && action === 'join') {
@@ -97,22 +98,22 @@ export async function POST(req: Request) {
           if (!invitationQuery.empty) {
             // Get the most recent invitation
             const invitation = invitationQuery.docs[0].data();
-            const invitationEmail = invitation?.emailAllowed || invitation?.metadata?.constraints?.email;
-            if (invitationEmail) {
-              console.log(`Found invitation email for room ${roomName}: ${invitationEmail}`);
+            invitationEmailForPatient = invitation?.emailAllowed || invitation?.metadata?.constraints?.email || null;
+            if (invitationEmailForPatient) {
+              console.log(`Found invitation email for room ${roomName}: ${invitationEmailForPatient}`);
               // Look up user by invitation email
               const usersRef = db.collection('users');
-              const userQuery = await usersRef.where('email', '==', invitationEmail.toLowerCase().trim()).limit(1).get();
+              const userQuery = await usersRef.where('email', '==', invitationEmailForPatient.toLowerCase().trim()).limit(1).get();
               if (!userQuery.empty) {
                 const foundUserId = userQuery.docs[0].id;
                 if (foundUserId !== doctorUserId) {
                   actualPatientUserId = foundUserId;
-                  console.log(`Found patient user ID from invitation email: ${actualPatientUserId} for email: ${invitationEmail}`);
+                  console.log(`Found patient user ID from invitation email: ${actualPatientUserId} for email: ${invitationEmailForPatient}`);
                 } else {
                   console.log(`Found user ID from invitation matches doctor ID, keeping patientUserId as anonymous`);
                 }
               } else {
-                console.log(`No user found with invitation email: ${invitationEmail} - patient may not be registered yet`);
+                console.log(`No user found with invitation email: ${invitationEmailForPatient} - patient may not be registered yet, but will store email`);
               }
             }
           } else {
@@ -169,6 +170,10 @@ export async function POST(req: Request) {
           } catch (error) {
             console.error('Error fetching patient email from user document:', error);
           }
+        } else if (invitationEmailForPatient) {
+          // If patient is anonymous but invitation has email, use invitation email
+          patientEmailToStore = invitationEmailForPatient;
+          console.log(`Storing invitation email as patient email: ${invitationEmailForPatient}`);
         }
         
         // Preserve existing patient email/userId if joining anonymously
