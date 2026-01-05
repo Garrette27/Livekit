@@ -451,97 +451,33 @@ export async function POST(req: NextRequest) {
           ...doc.data()
         } as WaitingPatient));
         
-        // Check for admitted patient first (most recent admitted)
-        const admittedPatients = existingPatients.filter(p => p.status === 'admitted');
-        if (admittedPatients.length > 0) {
-          // Sort by admittedAt time, most recent first
-          admittedPatients.sort((a, b) => {
-            const aTime = a.admittedAt?.toMillis?.() || 
-                         (a.admittedAt instanceof Date ? a.admittedAt.getTime() : 
-                          (a.admittedAt ? new Date(a.admittedAt as any).getTime() : 0));
-            const bTime = b.admittedAt?.toMillis?.() || 
-                         (b.admittedAt instanceof Date ? b.admittedAt.getTime() : 
-                          (b.admittedAt ? new Date(b.admittedAt as any).getTime() : 0));
-            return bTime - aTime;
+        // Check for waiting patient with matching device/IP (reuse existing waiting patients to avoid duplicates)
+        // Note: We no longer auto-admit previously admitted patients - they must go through waiting room again
+        const waitingPatients = existingPatients.filter(p => p.status === 'waiting');
+        
+        // Try to match by device fingerprint or IP + userAgent
+        if (deviceFingerprintHash) {
+          existingWaitingPatient = waitingPatients.find(p => {
+            const fingerprint = p.metadata?.deviceFingerprint;
+            if (typeof fingerprint === 'string') {
+              return fingerprint.includes(deviceFingerprintHash.substring(0, 20));
+            }
+            return false;
           });
-          existingAdmittedPatient = admittedPatients[0];
         }
         
-        // If no admitted patient, check for waiting patient with matching device/IP
-        if (!existingAdmittedPatient) {
-          const waitingPatients = existingPatients.filter(p => p.status === 'waiting');
-          
-          // Try to match by device fingerprint or IP + userAgent
-          if (deviceFingerprintHash) {
-            existingWaitingPatient = waitingPatients.find(p => {
-              const fingerprint = p.metadata?.deviceFingerprint;
-              if (typeof fingerprint === 'string') {
-                return fingerprint.includes(deviceFingerprintHash.substring(0, 20));
-              }
-              return false;
-            });
-          }
-          
-          // Fallback: match by IP and userAgent (within last 5 minutes)
-          if (!existingWaitingPatient) {
-            const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-            existingWaitingPatient = waitingPatients.find(p => {
-              const joinedTime = p.joinedAt?.toMillis?.() || 
-                                (p.joinedAt instanceof Date ? p.joinedAt.getTime() : 
-                                 (p.joinedAt ? new Date(p.joinedAt as any).getTime() : 0));
-              return p.metadata?.ip === clientIP && 
-                     p.metadata?.userAgent === userAgent &&
-                     joinedTime > fiveMinutesAgo;
-            });
-          }
+        // Fallback: match by IP and userAgent (within last 5 minutes)
+        if (!existingWaitingPatient) {
+          const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+          existingWaitingPatient = waitingPatients.find(p => {
+            const joinedTime = p.joinedAt?.toMillis?.() || 
+                              (p.joinedAt instanceof Date ? p.joinedAt.getTime() : 
+                               (p.joinedAt ? new Date(p.joinedAt as any).getTime() : 0));
+            return p.metadata?.ip === clientIP && 
+                   p.metadata?.userAgent === userAgent &&
+                   joinedTime > fiveMinutesAgo;
+          });
         }
-      }
-      
-      // If patient was already admitted, return main room token
-      if (existingAdmittedPatient) {
-        console.log('Patient already admitted, returning main room token:', {
-          waitingPatientId: existingAdmittedPatient.id,
-          invitationId: tokenPayload.invitationId,
-          roomName: tokenPayload.roomName
-        });
-        
-        const mainRoomToken = jwt.sign(
-          {
-            sub: `patient_${tokenPayload.invitationId}_${existingAdmittedPatient.id}`,
-            video: {
-              roomJoin: true,
-              room: tokenPayload.roomName,
-              canPublish: true,
-              canSubscribe: true,
-              canPublishData: true,
-            },
-            audio: {
-              roomJoin: true,
-              room: tokenPayload.roomName,
-              canPublish: true,
-              canSubscribe: true,
-            },
-          },
-          process.env.LIVEKIT_API_SECRET || 'fallback-secret',
-          {
-            issuer: process.env.LIVEKIT_API_KEY,
-            expiresIn: '2h',
-            algorithm: 'HS256',
-          }
-        );
-        
-        // Update last accessed time
-        await db.collection('waitingPatients').doc(existingAdmittedPatient.id).update({
-          'metadata.lastAccessed': new Date(),
-        });
-        
-        return NextResponse.json({
-          success: true,
-          liveKitToken: mainRoomToken,
-          roomName: tokenPayload.roomName,
-          invitationId: tokenPayload.invitationId,
-          waitingRoomEnabled: false, // Not in waiting room, already admitted
-        } as ValidateInvitationResponse);
       }
       
       // If there's an existing waiting patient (same device/IP), reuse it instead of creating duplicate
