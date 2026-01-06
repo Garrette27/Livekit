@@ -950,7 +950,7 @@ export default function Dashboard() {
                       }</span>
                       <span>👥 {summary.participants || summary.metadata?.totalParticipants || 0} participants</span>
                     </div>
-                    {(summary.doctorEmail || summary.patientEmail) && (
+                    {(summary.doctorEmail || summary.patientEmail || summary.patientUserId || summary.metadata?.patientUserId) && (
                       <div style={{ 
                         marginTop: '0.75rem',
                         padding: '0.75rem',
@@ -964,10 +964,24 @@ export default function Dashboard() {
                             👨‍⚕️ Doctor: <strong>{summary.doctorEmail}</strong>
                           </div>
                         )}
-                        {summary.patientEmail && (
+                        {summary.patientEmail ? (
                           <div>
                             👤 Patient: <strong>{summary.patientEmail}</strong>
                           </div>
+                        ) : (
+                          // Show Anonymous when patientUserId indicates anonymous or no email available
+                          (summary.patientUserId === 'anonymous' || summary.metadata?.patientUserId === 'anonymous') ? (
+                            <div>
+                              👤 Patient: <strong>Anonymous</strong>
+                            </div>
+                          ) : (
+                            // If we have no email/userId but doctor exists, show Unknown
+                            summary.doctorEmail && (
+                              <div>
+                                👤 Patient: <strong>Unknown</strong>
+                              </div>
+                            )
+                          )
                         )}
                       </div>
                     )}

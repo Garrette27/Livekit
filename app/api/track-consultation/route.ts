@@ -427,7 +427,7 @@ async function generateConsultationSummary(
       }
 
       const summaryRef = db.collection('call-summaries').doc(roomName);
-      await summaryRef.set(summaryData);
+      await summaryRef.set(summaryData, { merge: true });
       console.log('✅ Fallback summary stored successfully with user ID:', userId);
       console.log('Fallback summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
       return;
@@ -551,7 +551,7 @@ async function generateConsultationSummary(
       }
 
       const summaryRef = db.collection('call-summaries').doc(roomName);
-      await summaryRef.set(summaryData);
+      await summaryRef.set(summaryData, { merge: true });
       console.log('✅ AI summary stored successfully in Firestore with user ID:', userId);
       console.log('Summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
       
@@ -582,7 +582,7 @@ async function generateConsultationSummary(
       };
 
       const summaryRef = db.collection('call-summaries').doc(roomName);
-      await summaryRef.set(summaryData);
+      await summaryRef.set(summaryData, { merge: true });
       console.log('✅ Parse error fallback summary stored successfully with user ID:', userId);
       console.log('Parse error fallback summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
     }
@@ -618,7 +618,7 @@ async function generateConsultationSummary(
         };
 
         const summaryRef = db.collection('call-summaries').doc(roomName);
-        await summaryRef.set(summaryData);
+        await summaryRef.set(summaryData, { merge: true });
         console.log('✅ Error summary stored successfully with user ID:', userId);
         console.log('Error summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
       }
