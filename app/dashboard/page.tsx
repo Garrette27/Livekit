@@ -798,7 +798,15 @@ export default function Dashboard() {
               </div>
             ) : (
               <div>
-                {summaries.map((summary) => (
+                {summaries.map((summary) => {
+                  const hasPatientInfo = Boolean(
+                    summary.doctorEmail ||
+                    summary.patientEmail ||
+                    (summary as any).patientUserId ||
+                    (summary.metadata as any)?.patientUserId
+                  );
+
+                  return (
                   <div key={summary.id} style={{
                     padding: '1.5rem 2rem',
                     borderBottom: '1px solid #f3f4f6'
@@ -950,7 +958,7 @@ export default function Dashboard() {
                       }</span>
                       <span>👥 {summary.participants || summary.metadata?.totalParticipants || 0} participants</span>
                     </div>
-                    {(summary.doctorEmail || summary.patientEmail || summary.patientUserId || summary.metadata?.patientUserId) && (
+                    {hasPatientInfo && (
                       <div style={{ 
                         marginTop: '0.75rem',
                         padding: '0.75rem',
