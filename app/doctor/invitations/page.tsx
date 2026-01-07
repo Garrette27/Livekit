@@ -240,6 +240,36 @@ export default function DoctorInvitationsPage() {
     }
   };
 
+  // Helper function to check if invitation is expired
+  const isInvitationExpired = (invitation: Invitation): boolean => {
+    if (!invitation.expiresAt) return false; // No expiration date means never expires
+    
+    let expiresAtDate: Date;
+    if (invitation.expiresAt.toDate) {
+      expiresAtDate = invitation.expiresAt.toDate();
+    } else if (invitation.expiresAt instanceof Date) {
+      expiresAtDate = invitation.expiresAt;
+    } else {
+      return false; // Can't determine expiration
+    }
+    
+    return new Date() > expiresAtDate;
+  };
+
+  // Get effective status (checking expiration even if status is 'active')
+  const getEffectiveStatus = (invitation: Invitation): string => {
+    if (invitation.status === 'revoked' || invitation.status === 'used' || invitation.status === 'cancelled') {
+      return invitation.status;
+    }
+    
+    // If status is 'active' but invitation is expired, return 'expired'
+    if (invitation.status === 'active' && isInvitationExpired(invitation)) {
+      return 'expired';
+    }
+    
+    return invitation.status;
+  };
+
   if (!isAuthorized) {
     return (
       <div style={{
@@ -443,17 +473,24 @@ export default function DoctorInvitationsPage() {
                         )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '1.25rem' }}>
-                          {getStatusIcon(invitation.status)}
-                        </span>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          color: getStatusColor(invitation.status),
-                          textTransform: 'uppercase'
-                        }}>
-                          {invitation.status}
-                        </span>
+                        {(() => {
+                          const effectiveStatus = getEffectiveStatus(invitation);
+                          return (
+                            <>
+                              <span style={{ fontSize: '1.25rem' }}>
+                                {getStatusIcon(effectiveStatus)}
+                              </span>
+                              <span style={{
+                                fontSize: '0.75rem',
+                                fontWeight: '500',
+                                color: getStatusColor(effectiveStatus),
+                                textTransform: 'uppercase'
+                              }}>
+                                {effectiveStatus}
+                              </span>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -475,7 +512,7 @@ export default function DoctorInvitationsPage() {
                       )}
                       
                       {/* Invitation Link Section */}
-                      {invitation.status === 'active' && (
+                      {getEffectiveStatus(invitation) === 'active' && (
                         <div style={{ 
                           marginTop: '0.75rem', 
                           padding: '0.5rem', 
@@ -574,47 +611,53 @@ export default function DoctorInvitationsPage() {
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {invitation.status === 'active' && (
-                        <>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent card click
-                              const doctorJoinUrl = `/room/${invitation.roomName}/doctor`;
-                              window.open(doctorJoinUrl, '_blank');
-                            }}
-                            style={{
-                              backgroundColor: '#059669',
-                              color: 'white',
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.375rem',
-                              border: 'none',
-                              fontSize: '0.75rem',
-                              fontWeight: '500',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            🩺 Join as Doctor
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent card click
-                              revokeInvitation(invitation.id);
-                            }}
-                            style={{
-                              backgroundColor: '#dc2626',
-                              color: 'white',
-                              padding: '0.5rem 1rem',
-                              borderRadius: '0.375rem',
-                              border: 'none',
-                              fontSize: '0.75rem',
-                              fontWeight: '500',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Revoke
-                          </button>
-                        </>
-                      )}
+                      {(() => {
+                        const effectiveStatus = getEffectiveStatus(invitation);
+                        if (effectiveStatus === 'active') {
+                          return (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Prevent card click
+                                  const doctorJoinUrl = `/room/${invitation.roomName}/doctor`;
+                                  window.open(doctorJoinUrl, '_blank');
+                                }}
+                                style={{
+                                  backgroundColor: '#059669',
+                                  color: 'white',
+                                  padding: '0.5rem 1rem',
+                                  borderRadius: '0.375rem',
+                                  border: 'none',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '500',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                🩺 Join as Doctor
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Prevent card click
+                                  revokeInvitation(invitation.id);
+                                }}
+                                style={{
+                                  backgroundColor: '#dc2626',
+                                  color: 'white',
+                                  padding: '0.5rem 1rem',
+                                  borderRadius: '0.375rem',
+                                  border: 'none',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '500',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Revoke
+                              </button>
+                            </>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
                 ))}
@@ -665,7 +708,12 @@ export default function DoctorInvitationsPage() {
                         marginBottom: '1.5rem',
                         fontSize: '0.875rem'
                       }}>
-                        <p style={{ margin: '0 0 0.5rem 0' }}><strong>Status:</strong> {selectedInv.status}</p>
+                        <p style={{ margin: '0 0 0.5rem 0' }}>
+                          <strong>Status:</strong> {(() => {
+                            const effectiveStatus = getEffectiveStatus(selectedInv);
+                            return effectiveStatus;
+                          })()}
+                        </p>
                         <p style={{ margin: '0 0 0.5rem 0' }}><strong>Created:</strong> {selectedInv.createdAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
                         <p style={{ margin: '0 0 0.5rem 0' }}><strong>Expires:</strong> {selectedInv.expiresAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
                         {selectedInv.waitingRoomEnabled && (
