@@ -302,7 +302,7 @@ export async function POST(req: NextRequest) {
               console.log('⚠️ Storing summary without patientUserId (not found or invalid)');
             }
             
-            await summaryRef.set(summaryDataToStore, { merge: true });
+            await summaryRef.set(summaryDataToStore);
             
             console.log('✅ Summary stored successfully in Firestore');
           } else {
