@@ -62,19 +62,68 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Check if invitation is expired
-    let expiresAtDate: Date;
-    if (invitation.expiresAt && typeof invitation.expiresAt.toDate === 'function') {
-      expiresAtDate = invitation.expiresAt.toDate();
-    } else if (invitation.expiresAt instanceof Date) {
-      expiresAtDate = invitation.expiresAt;
-    } else {
-      expiresAtDate = new Date(0);
+    // Check invitation status first
+    if (invitation.status !== 'active') {
+      console.error('Invitation not active:', {
+        invitationId: invitationDoc.id,
+        roomName: invitation.roomName,
+        status: invitation.status
+      });
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Invitation is not active. Current status: ${invitation.status}`,
+          details: {
+            status: invitation.status
+          }
+        },
+        { status: 403 }
+      );
     }
 
-    if (new Date() > expiresAtDate || invitation.status !== 'active') {
+    // Check if invitation is expired - handle Firestore Timestamp properly
+    let expiresAtDate: Date;
+    if (invitation.expiresAt) {
+      if (typeof invitation.expiresAt.toDate === 'function') {
+        expiresAtDate = invitation.expiresAt.toDate();
+      } else if (invitation.expiresAt instanceof Date) {
+        expiresAtDate = invitation.expiresAt;
+      } else if (invitation.expiresAt.seconds) {
+        // Handle Firestore Timestamp format
+        expiresAtDate = new Date(invitation.expiresAt.seconds * 1000);
+      } else {
+        // Try parsing as ISO string
+        try {
+          expiresAtDate = new Date(invitation.expiresAt);
+        } catch {
+          expiresAtDate = new Date(0);
+        }
+      }
+    } else {
+      // No expiration date means it never expires
+      expiresAtDate = new Date('2099-12-31');
+    }
+
+    const now = new Date();
+    const isExpired = expiresAtDate.getTime() > 0 && now > expiresAtDate;
+
+    if (isExpired) {
+      console.error('Invitation expired:', {
+        invitationId: invitationDoc.id,
+        roomName: invitation.roomName,
+        expiresAt: expiresAtDate.toISOString(),
+        now: now.toISOString(),
+        expiresAtRaw: invitation.expiresAt
+      });
       return NextResponse.json(
-        { success: false, error: 'Invitation is expired or not active' },
+        { 
+          success: false, 
+          error: 'Invitation is expired',
+          details: {
+            expiresAt: expiresAtDate.toISOString(),
+            now: now.toISOString()
+          }
+        },
         { status: 403 }
       );
     }

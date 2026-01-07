@@ -22,6 +22,8 @@ export default function DoctorInvitationsPage() {
   const [selectedInvitationId, setSelectedInvitationId] = useState<string | null>(null);
   const [invitationLinks, setInvitationLinks] = useState<Record<string, string>>({});
   const [loadingLinks, setLoadingLinks] = useState<Record<string, boolean>>({});
+  const [linkErrors, setLinkErrors] = useState<Record<string, string>>({});
+  const [waitingPatientsCounts, setWaitingPatientsCounts] = useState<Record<string, number>>({});
   const router = useRouter();
 
   // Persist room name in localStorage
@@ -91,14 +93,34 @@ export default function DoctorInvitationsPage() {
 
   const fetchInvitationLink = async (invitationId: string) => {
     setLoadingLinks(prev => ({ ...prev, [invitationId]: true }));
+    setLinkErrors(prev => ({ ...prev, [invitationId]: '' })); // Clear previous error
     try {
       const response = await fetch(`/api/invite/get-link?invitationId=${encodeURIComponent(invitationId)}`);
       const result = await response.json();
       if (result.success && result.inviteUrl) {
         setInvitationLinks(prev => ({ ...prev, [invitationId]: result.inviteUrl }));
+        setLinkErrors(prev => ({ ...prev, [invitationId]: '' })); // Clear error on success
+      } else {
+        console.error(`Failed to fetch link for invitation ${invitationId}:`, result.error, result.details);
+        
+        // Provide user-friendly error messages
+        let errorMessage = 'Unable to load invitation link.';
+        if (result.error) {
+          if (result.error.includes('expired') || result.error.includes('Expired')) {
+            errorMessage = 'This invitation has expired. Please create a new invitation to generate a new link.';
+          } else if (result.error.includes('not active') || result.error.includes('not active')) {
+            errorMessage = 'This invitation is no longer active. It may have been revoked or used.';
+          } else {
+            errorMessage = `Unable to load link: ${result.error}`;
+          }
+        }
+        
+        // Store error message to display in UI
+        setLinkErrors(prev => ({ ...prev, [invitationId]: errorMessage }));
       }
     } catch (error) {
       console.error(`Error fetching link for invitation ${invitationId}:`, error);
+      setLinkErrors(prev => ({ ...prev, [invitationId]: 'Network error. Please check your connection and try again.' }));
     } finally {
       setLoadingLinks(prev => ({ ...prev, [invitationId]: false }));
     }
@@ -416,7 +438,7 @@ export default function DoctorInvitationsPage() {
                         </p>
                         {invitation.waitingRoomEnabled && (
                           <p style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '500', marginTop: '0.25rem' }}>
-                            🚪 Waiting Room Enabled (Max: {invitation.maxPatients || 10} patients)
+                            🚪 Waiting Room: {waitingPatientsCounts[invitation.id] ?? 0} / {invitation.maxPatients || 10} patients
                           </p>
                         )}
                       </div>
@@ -466,6 +488,35 @@ export default function DoctorInvitationsPage() {
                           </p>
                           {loadingLinks[invitation.id] ? (
                             <p style={{ margin: 0, fontSize: '0.7rem', color: '#6b7280' }}>Loading link...</p>
+                          ) : linkErrors[invitation.id] ? (
+                            <div>
+                              <p style={{ 
+                                margin: '0 0 0.5rem 0', 
+                                fontSize: '0.7rem', 
+                                color: '#dc2626',
+                                lineHeight: '1.4'
+                              }}>
+                                {linkErrors[invitation.id]}
+                              </p>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  fetchInvitationLink(invitation.id);
+                                }}
+                                style={{
+                                  backgroundColor: '#6b7280',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '0.25rem',
+                                  padding: '0.25rem 0.5rem',
+                                  fontSize: '0.7rem',
+                                  fontWeight: '500',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Try Again
+                              </button>
+                            </div>
                           ) : invitationLinks[invitation.id] ? (
                             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                               <p style={{ 
@@ -619,7 +670,7 @@ export default function DoctorInvitationsPage() {
                         <p style={{ margin: '0 0 0.5rem 0' }}><strong>Expires:</strong> {selectedInv.expiresAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
                         {selectedInv.waitingRoomEnabled && (
                           <p style={{ margin: '0', color: '#059669', fontWeight: '500' }}>
-                            🚪 Waiting Room: {selectedInv.currentUses || 0} / {selectedInv.maxPatients || 10} patients
+                            🚪 Waiting Room: {waitingPatientsCounts[selectedInv.id] ?? 0} / {selectedInv.maxPatients || 10} patients
                           </p>
                         )}
                       </div>
@@ -652,6 +703,9 @@ export default function DoctorInvitationsPage() {
               onReject={rejectPatient}
               admittingId={admittingId}
               rejectingId={rejectingId}
+              onCountUpdate={(invitationId, count) => {
+                setWaitingPatientsCounts(prev => ({ ...prev, [invitationId]: count }));
+              }}
             />
           ) : (
             <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>

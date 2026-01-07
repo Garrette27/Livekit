@@ -14,6 +14,7 @@ interface WaitingPatientsListProps {
   onReject: (patientId: string) => Promise<void>;
   admittingId: string | null;
   rejectingId: string | null;
+  onCountUpdate?: (invitationId: string, count: number) => void;
 }
 
 export default function WaitingPatientsList({
@@ -24,7 +25,8 @@ export default function WaitingPatientsList({
   onAdmit,
   onReject,
   admittingId,
-  rejectingId
+  rejectingId,
+  onCountUpdate
 }: WaitingPatientsListProps) {
   const [waitingPatients, setWaitingPatients] = useState<WaitingPatient[]>([]);
   const [loading, setLoading] = useState(false);
@@ -144,6 +146,28 @@ export default function WaitingPatientsList({
           setWaitingPatients(sorted);
           setLoading(false);
           setError(null);
+          
+          // Update counts for each invitation
+          if (onCountUpdate) {
+            // Group patients by invitationId and update counts
+            const countsByInvitation: Record<string, number> = {};
+            
+            // Count patients for each invitation (only count waiting patients)
+            allPatients.forEach(patient => {
+              if (patient.status === 'waiting') {
+                const invId = patient.invitationId;
+                if (invId) {
+                  countsByInvitation[invId] = (countsByInvitation[invId] || 0) + 1;
+                }
+              }
+            });
+            
+            // Update counts for all active invitations
+            activeInvitations.forEach(inv => {
+              const count = countsByInvitation[inv.id] || 0;
+              onCountUpdate(inv.id, count);
+            });
+          }
         } else {
           setError(result.error || 'Failed to fetch waiting patients');
           setLoading(false);

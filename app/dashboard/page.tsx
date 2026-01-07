@@ -5,8 +5,6 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, getFirestore, doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 
-export const dynamic = 'force-dynamic';
-
 interface CallSummary {
   id: string;
   roomName: string;
