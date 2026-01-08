@@ -72,20 +72,63 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
       font-weight: 600 !important;
     }
     
-    /* Ensure control bar is visible */
-    .lk-control-bar {
-      position: fixed !important;
-      bottom: 20px !important;
-      left: 50% !important;
-      transform: translateX(-50%) !important;
-      z-index: 1000 !important;
-      background-color: rgba(0, 0, 0, 0.8) !important;
-      border-radius: 1rem !important;
-      padding: 1rem !important;
-      display: flex !important;
-      gap: 0.5rem !important;
-      align-items: center !important;
-    }
+      /* Ensure control bar is visible */
+      .lk-control-bar {
+        position: fixed !important;
+        bottom: 20px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 1000 !important;
+        background-color: rgba(0, 0, 0, 0.8) !important;
+        border-radius: 1rem !important;
+        padding: 1rem !important;
+        display: flex !important;
+        gap: 0.5rem !important;
+        align-items: center !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+      
+      /* Mobile-specific fixes for control bar visibility */
+      @media (max-width: 768px) {
+        .lk-control-bar {
+          display: flex !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          width: auto !important;
+          max-width: 95vw !important;
+          overflow-x: auto !important;
+          overflow-y: visible !important;
+          flex-wrap: nowrap !important;
+          gap: 0.25rem !important;
+          padding: 0.75rem !important;
+          bottom: 10px !important;
+        }
+        
+        .lk-control-bar button {
+          flex-shrink: 0 !important;
+          min-width: 44px !important;
+          padding: 0.5rem !important;
+          font-size: 0.75rem !important;
+        }
+        
+        /* Ensure microphone and camera controls are always visible on mobile */
+        .lk-control-bar button[aria-label*="microphone"],
+        .lk-control-bar button[aria-label*="Microphone"],
+        .lk-control-bar button[aria-label*="camera"],
+        .lk-control-bar button[aria-label*="Camera"],
+        .lk-control-bar [data-lk-kind="toggle-mic"],
+        .lk-control-bar [data-lk-kind="toggle-camera"],
+        .lk-control-bar [data-lk-kind="toggle-video"] {
+          display: flex !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          width: auto !important;
+          height: auto !important;
+          min-width: 44px !important;
+          min-height: 44px !important;
+        }
+      }
   ` : '';
 
   return (
