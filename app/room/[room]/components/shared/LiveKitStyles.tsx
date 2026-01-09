@@ -237,6 +237,8 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
       .lk-focus-layout[data-participants="2"] {
         display: flex !important;
         flex-direction: row !important;
+        height: 100% !important;
+        width: 100% !important;
       }
 
       .lk-grid-layout[data-participants="2"] .lk-participant-tile,
@@ -244,6 +246,8 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
         width: 50% !important;
         height: 100% !important;
         flex: 1 1 50% !important;
+        min-width: 50% !important;
+        min-height: 100% !important;
       }
 
       /* Layout containers */
@@ -251,6 +255,90 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
       .lk-focus-layout {
         height: 100% !important;
         width: 100% !important;
+        display: flex !important;
+        flex-direction: row !important;
+      }
+
+      /* Mobile-specific layout fixes */
+      @media (max-width: 1024px) {
+        /* Ensure side-by-side layout on mobile and tablet */
+        .lk-grid-layout,
+        .lk-focus-layout,
+        .lk-grid-layout[data-participants="2"],
+        .lk-focus-layout[data-participants="2"] {
+          display: flex !important;
+          flex-direction: row !important;
+          height: 100vh !important;
+          width: 100vw !important;
+        }
+
+        /* Ensure participant tiles take equal width */
+        .lk-grid-layout .lk-participant-tile,
+        .lk-focus-layout .lk-participant-tile,
+        .lk-grid-layout[data-participants="2"] .lk-participant-tile,
+        .lk-focus-layout[data-participants="2"] .lk-participant-tile {
+          width: 50% !important;
+          height: 100% !important;
+          flex: 1 1 50% !important;
+          min-width: 50% !important;
+          min-height: 100% !important;
+          max-width: 50% !important;
+        }
+
+        /* Ensure participant containers are side by side */
+        .lk-participant,
+        .lk-grid-item {
+          width: 50% !important;
+          height: 100% !important;
+          flex: 1 1 50% !important;
+          min-width: 50% !important;
+        }
+      }
+
+      @media (max-width: 768px) {
+        /* Force side-by-side on phones as well */
+        .lk-grid-layout,
+        .lk-focus-layout,
+        .lk-grid-layout[data-participants="2"],
+        .lk-focus-layout[data-participants="2"] {
+          display: flex !important;
+          flex-direction: row !important;
+          flex-wrap: nowrap !important;
+          height: 100vh !important;
+          width: 100vw !important;
+        }
+
+        .lk-grid-layout .lk-participant-tile,
+        .lk-focus-layout .lk-participant-tile,
+        .lk-grid-layout[data-participants="2"] .lk-participant-tile,
+        .lk-focus-layout[data-participants="2"] .lk-participant-tile {
+          width: 50% !important;
+          height: 100% !important;
+          flex: 0 0 50% !important;
+          min-width: 50% !important;
+          min-height: 100% !important;
+          max-width: 50% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        .lk-participant,
+        .lk-grid-item {
+          width: 50% !important;
+          height: 100% !important;
+          flex: 0 0 50% !important;
+          min-width: 50% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        /* Ensure videos fill tiles completely */
+        .lk-participant-video,
+        .lk-participant-tile video {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
+        }
       }
 
       /* Hide Leave button in LiveKit control bar - redundant since:

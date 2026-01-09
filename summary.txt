@@ -183,4 +183,31 @@ NOTES:
   completion tracking.
 - The safety check prevents tracking consultation leave from the waiting room, 
   which is correct behavior.
-
+Summary of Fixes
+Issue 1: Patient sent back to waiting room when desktop view is disabled
+Solution: Store admission status in localStorage and restore it on page reload
+Store admission status — When a patient is admitted, save admission state to localStorage with:
+Admission flag
+Room name
+LiveKit token
+Timestamp
+Check stored status on validation — Before re-validating, check localStorage:
+If the patient was admitted and the token is less than 1 hour old, restore admission state and skip re-validation
+Prevents re-redirect to the waiting room on page reload/viewport changes
+Clear on leave — Clear localStorage when the patient leaves the consultation
+Issue 2: Microphone control not visible on mobile (non-desktop view)
+Solution: Add mobile-specific CSS for LiveKit controls
+Mobile responsive styles — Added @media (max-width: 768px) rules to:
+Ensure the control bar is visible on mobile
+Set explicit visibility and opacity
+Adjust sizing and padding for mobile screens
+Enable horizontal scrolling if needed
+Microphone/camera controls — Explicit styles to ensure microphone and camera buttons are visible on mobile:
+display: flex !important
+visibility: visible !important
+opacity: 1 !important
+Minimum touch target size (44px)
+Changes made:
+app/invite/[token]/page.tsx — Added localStorage persistence for admission status
+app/room/[room]/components/shared/LiveKitStyles.tsx — Added mobile-specific CSS for control visibility
+Patients admitted to the consultation will stay in the main room even if they toggle desktop view on/off, and the microphone control will be visible on mobile devices.
