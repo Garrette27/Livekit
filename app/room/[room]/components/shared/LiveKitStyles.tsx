@@ -128,6 +128,69 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
           min-width: 44px !important;
           min-height: 44px !important;
         }
+
+        /* Device selector menu - fix z-index and positioning */
+        .lk-device-menu,
+        [class*="device-menu"],
+        [class*="DeviceMenu"],
+        .lk-device-selector,
+        [class*="device-selector"],
+        [class*="DeviceSelector"],
+        div[role="listbox"],
+        div[role="menu"][class*="device"],
+        div[class*="menu"][class*="device"] {
+          position: absolute !important;
+          z-index: 2000 !important;
+          max-height: 200px !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+          top: auto !important;
+          bottom: auto !important;
+          left: auto !important;
+          right: auto !important;
+          transform: none !important;
+        }
+
+        /* Device menu items */
+        .lk-device-menu-item,
+        [class*="device-menu-item"],
+        [class*="DeviceMenuItem"],
+        div[role="option"],
+        li[role="option"] {
+          z-index: 2001 !important;
+          padding: 0.5rem !important;
+          border-radius: 4px !important;
+        }
+
+        /* Ensure dropdowns appear above everything on mobile */
+        .lk-control-bar button:focus ~ div[role="listbox"],
+        .lk-control-bar button:focus ~ div[role="menu"],
+        .lk-control-bar button[aria-haspopup="listbox"][aria-expanded="true"] ~ ul,
+        .lk-control-bar button[aria-haspopup="menu"][aria-expanded="true"] ~ div {
+          z-index: 2000 !important;
+          position: absolute !important;
+        }
+
+        /* Share screen button - ensure visibility on mobile */
+        .lk-control-bar button[aria-label*="share"],
+        .lk-control-bar button[aria-label*="Share"],
+        .lk-control-bar button[aria-label*="screen"],
+        .lk-control-bar button[aria-label*="Screen"],
+        .lk-control-bar [data-lk-kind="toggle-screen-share"],
+        .lk-control-bar [data-lk-kind="share-screen"],
+        button[aria-label*="share"][class*="lk-"],
+        button[aria-label*="Share"][class*="lk-"],
+        button[aria-label*="screen"][class*="lk-"],
+        button[aria-label*="Screen"][class*="lk-"] {
+          display: flex !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          width: auto !important;
+          height: auto !important;
+          min-width: 44px !important;
+          min-height: 44px !important;
+          flex-shrink: 0 !important;
+        }
       }
   ` : '';
 
@@ -399,6 +462,51 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
         color: #000000 !important;
         border: 1px solid #e5e7eb !important;
         border-radius: 12px !important;
+        z-index: 500 !important;
+      }
+
+      /* Mobile chat panel positioning - appears as bottom sheet overlay */
+      @media (max-width: 768px) {
+        .lk-chat-panel,
+        [class*="chat-panel"],
+        [class*="ChatPanel"],
+        [data-lk="chat-panel"],
+        .lk-chat,
+        [class*="lk-chat"],
+        div[role="dialog"][class*="chat"],
+        aside[class*="chat"],
+        section[class*="chat"] {
+          position: fixed !important;
+          bottom: 70px !important;
+          left: 0 !important;
+          right: 0 !important;
+          width: 100vw !important;
+          max-width: 100vw !important;
+          height: 40vh !important;
+          max-height: 40vh !important;
+          margin: 0 !important;
+          border-radius: 16px 16px 0 0 !important;
+          z-index: 900 !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+          box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.15) !important;
+        }
+
+        /* Chat input at bottom stays above chat panel but below control bar */
+        .lk-chat-entry,
+        .lk-chat-input-group,
+        [class*="chat-input-group"],
+        .lk-chat input[type="text"],
+        .lk-chat textarea {
+          position: relative !important;
+          z-index: 901 !important;
+        }
+
+        /* Ensure control bar is above chat */
+        .lk-control-bar {
+          z-index: 950 !important;
+          bottom: 10px !important;
+        }
       }
 
       /* Hide chat header/title and close button - users control chat via control bar only */
