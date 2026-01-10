@@ -467,6 +467,24 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
 
       /* Mobile chat panel positioning - appears as bottom sheet overlay */
       @media (max-width: 768px) {
+        /* Ensure chat button is clickable on mobile */
+        .lk-control-bar button[aria-label*="chat"],
+        .lk-control-bar button[aria-label*="Chat"],
+        .lk-control-bar [data-lk-kind="chat"],
+        .lk-control-bar [data-lk-kind="toggle-chat"],
+        button[aria-label*="chat"][class*="lk-"],
+        button[aria-label*="Chat"][class*="lk-"] {
+          display: flex !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          pointer-events: auto !important;
+          touch-action: manipulation !important;
+          -webkit-tap-highlight-color: rgba(37, 99, 235, 0.3) !important;
+          min-width: 44px !important;
+          min-height: 44px !important;
+          z-index: 1000 !important;
+        }
+
         .lk-chat-panel,
         [class*="chat-panel"],
         [class*="ChatPanel"],
@@ -477,19 +495,38 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
         aside[class*="chat"],
         section[class*="chat"] {
           position: fixed !important;
-          bottom: 70px !important;
+          bottom: 80px !important; /* Above control bar */
           left: 0 !important;
           right: 0 !important;
           width: 100vw !important;
           max-width: 100vw !important;
-          height: 40vh !important;
-          max-height: 40vh !important;
+          height: 50vh !important; /* Increased from 40vh */
+          max-height: 50vh !important;
           margin: 0 !important;
           border-radius: 16px 16px 0 0 !important;
-          z-index: 900 !important;
+          z-index: 1000 !important; /* Increased from 900 */
           overflow-y: auto !important;
           overflow-x: hidden !important;
           box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.15) !important;
+          display: block !important; /* Ensure it's displayed */
+          visibility: visible !important;
+          opacity: 1 !important;
+          pointer-events: auto !important;
+          touch-action: pan-y !important; /* Allow vertical scrolling */
+          -webkit-overflow-scrolling: touch !important; /* Smooth iOS scrolling */
+          transform: translateY(0) !important; /* Ensure it's visible */
+          transition: transform 0.3s ease !important;
+        }
+
+        /* When chat is hidden, slide it down */
+        .lk-chat-panel[aria-hidden="true"],
+        .lk-chat[aria-hidden="true"],
+        [class*="chat-panel"][aria-hidden="true"],
+        .lk-chat-panel[style*="display: none"],
+        .lk-chat[style*="display: none"] {
+          transform: translateY(100%) !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
         }
 
         /* Chat input at bottom stays above chat panel but below control bar */
@@ -499,13 +536,19 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
         .lk-chat input[type="text"],
         .lk-chat textarea {
           position: relative !important;
-          z-index: 901 !important;
+          z-index: 1001 !important;
+          touch-action: manipulation !important;
+          -webkit-appearance: none !important;
+          border-radius: 8px !important;
+          font-size: 16px !important; /* Prevents iOS zoom on focus */
         }
 
         /* Ensure control bar is above chat */
         .lk-control-bar {
-          z-index: 950 !important;
+          z-index: 1100 !important; /* Increased from 950 */
           bottom: 10px !important;
+          pointer-events: auto !important;
+          touch-action: manipulation !important;
         }
       }
 

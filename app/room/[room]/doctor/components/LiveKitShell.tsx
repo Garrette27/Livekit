@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import LiveKitStyles from '../../components/shared/LiveKitStyles';
 
@@ -12,6 +12,73 @@ interface LiveKitShellProps {
 }
 
 export default function LiveKitShell({ token, roomName, onDisconnected, onError }: LiveKitShellProps) {
+  // Fix chat button on mobile - ensure it's clickable and works
+  useEffect(() => {
+    if (!token) return;
+
+    const handledButtons = new WeakSet<HTMLElement>();
+
+    const fixChatButton = () => {
+      const chatButtonSelectors = [
+        'button[aria-label*="chat"]',
+        'button[aria-label*="Chat"]',
+        '[data-lk-kind="chat"]',
+        '[data-lk-kind="toggle-chat"]',
+        'button[class*="chat"]',
+        '[data-lk="chat-toggle"]'
+      ];
+
+      chatButtonSelectors.forEach(selector => {
+        const buttons = document.querySelectorAll(selector);
+        buttons.forEach(button => {
+          const btn = button as HTMLElement;
+          
+          // Skip if already handled
+          if (handledButtons.has(btn)) return;
+          
+          // Ensure button is clickable
+          btn.style.pointerEvents = 'auto';
+          btn.style.touchAction = 'manipulation';
+          btn.style.cursor = 'pointer';
+          btn.style.webkitTapHighlightColor = 'rgba(37, 99, 235, 0.3)';
+          
+          // Add explicit touch event handlers (don't clone to preserve LiveKit handlers)
+          const handleTouchEnd = (e: TouchEvent) => {
+            e.stopPropagation();
+            // Don't prevent default to allow LiveKit's click handler to work
+            // Just ensure the click event fires
+            setTimeout(() => {
+              if (!btn.click) return;
+              btn.click();
+            }, 0);
+          };
+          
+          btn.addEventListener('touchend', handleTouchEnd, { passive: true });
+          handledButtons.add(btn);
+        });
+      });
+    };
+
+    fixChatButton();
+    
+    // Watch for chat buttons being added dynamically
+    const observer = new MutationObserver(fixChatButton);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'aria-label']
+    });
+
+    // Also check periodically
+    const interval = setInterval(fixChatButton, 1000);
+
+    return () => {
+      observer.disconnect();
+      clearInterval(interval);
+    };
+  }, [token]);
+
   return (
     <>
       <LiveKitRoom
