@@ -40,7 +40,7 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
           btn.style.pointerEvents = 'auto';
           btn.style.touchAction = 'manipulation';
           btn.style.cursor = 'pointer';
-          btn.style.webkitTapHighlightColor = 'rgba(37, 99, 235, 0.3)';
+          btn.style.setProperty('-webkit-tap-highlight-color', 'rgba(37, 99, 235, 0.3)');
           
           // Add explicit touch event handlers (don't clone to preserve LiveKit handlers)
           const handleTouchEnd = (e: TouchEvent) => {
