@@ -181,12 +181,37 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
         button[aria-label*="share"][class*="lk-"],
         button[aria-label*="Share"][class*="lk-"],
         button[aria-label*="screen"][class*="lk-"],
-        button[aria-label*="Screen"][class*="lk-"] {
+        button[aria-label*="Screen"][class*="lk-"],
+        button[title*="share"][class*="lk-"],
+        button[title*="Share"][class*="lk-"],
+        button[title*="screen"][class*="lk-"],
+        button[title*="Screen"][class*="lk-"] {
           display: flex !important;
           visibility: visible !important;
           opacity: 1 !important;
           width: auto !important;
           height: auto !important;
+          min-width: 44px !important;
+          min-height: 44px !important;
+          flex-shrink: 0 !important;
+          pointer-events: auto !important;
+          touch-action: manipulation !important;
+        }
+        
+        /* Ensure chat button is also visible and clickable on mobile */
+        .lk-control-bar button[aria-label*="chat"],
+        .lk-control-bar button[aria-label*="Chat"],
+        .lk-control-bar [data-lk-kind="chat"],
+        .lk-control-bar [data-lk-kind="toggle-chat"],
+        button[aria-label*="chat"][class*="lk-"],
+        button[aria-label*="Chat"][class*="lk-"],
+        button[title*="chat"][class*="lk-"],
+        button[title*="Chat"][class*="lk-"] {
+          display: flex !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          pointer-events: auto !important;
+          touch-action: manipulation !important;
           min-width: 44px !important;
           min-height: 44px !important;
           flex-shrink: 0 !important;
@@ -473,7 +498,9 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
         .lk-control-bar [data-lk-kind="chat"],
         .lk-control-bar [data-lk-kind="toggle-chat"],
         button[aria-label*="chat"][class*="lk-"],
-        button[aria-label*="Chat"][class*="lk-"] {
+        button[aria-label*="Chat"][class*="lk-"],
+        button[title*="chat"][class*="lk-"],
+        button[title*="Chat"][class*="lk-"] {
           display: flex !important;
           visibility: visible !important;
           opacity: 1 !important;
@@ -549,6 +576,48 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
           bottom: 10px !important;
           pointer-events: auto !important;
           touch-action: manipulation !important;
+        }
+      }
+      
+      /* Desktop view on mobile - ensure chat works even in desktop mode */
+      /* This handles the case where mobile Chrome shows desktop view */
+      @media (pointer: coarse) {
+        /* Touch device - ensure chat button works */
+        .lk-control-bar button[aria-label*="chat"],
+        .lk-control-bar button[aria-label*="Chat"],
+        .lk-control-bar [data-lk-kind="chat"],
+        .lk-control-bar [data-lk-kind="toggle-chat"],
+        button[aria-label*="chat"][class*="lk-"],
+        button[aria-label*="Chat"][class*="lk-"],
+        button[title*="chat"][class*="lk-"],
+        button[title*="Chat"][class*="lk-"] {
+          pointer-events: auto !important;
+          touch-action: manipulation !important;
+          cursor: pointer !important;
+        }
+        
+        /* Ensure screen share is visible on touch devices */
+        .lk-control-bar button[aria-label*="share"],
+        .lk-control-bar button[aria-label*="Share"],
+        .lk-control-bar button[aria-label*="screen"],
+        .lk-control-bar button[aria-label*="Screen"],
+        .lk-control-bar [data-lk-kind="toggle-screen-share"],
+        .lk-control-bar [data-lk-kind="share-screen"],
+        button[aria-label*="share"][class*="lk-"],
+        button[aria-label*="Share"][class*="lk-"],
+        button[aria-label*="screen"][class*="lk-"],
+        button[aria-label*="Screen"][class*="lk-"],
+        button[title*="share"][class*="lk-"],
+        button[title*="Share"][class*="lk-"],
+        button[title*="screen"][class*="lk-"],
+        button[title*="Screen"][class*="lk-"] {
+          display: flex !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          pointer-events: auto !important;
+          touch-action: manipulation !important;
+          min-width: 44px !important;
+          min-height: 44px !important;
         }
       }
 

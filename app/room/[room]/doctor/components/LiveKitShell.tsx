@@ -25,37 +25,45 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
         '[data-lk-kind="chat"]',
         '[data-lk-kind="toggle-chat"]',
         'button[class*="chat"]',
-        '[data-lk="chat-toggle"]'
+        '[data-lk="chat-toggle"]',
+        'button[title*="chat"]',
+        'button[title*="Chat"]'
       ];
 
       chatButtonSelectors.forEach(selector => {
-        const buttons = document.querySelectorAll(selector);
-        buttons.forEach(button => {
-          const btn = button as HTMLElement;
-          
-          // Skip if already handled
-          if (handledButtons.has(btn)) return;
-          
-          // Ensure button is clickable
-          btn.style.pointerEvents = 'auto';
-          btn.style.touchAction = 'manipulation';
-          btn.style.cursor = 'pointer';
-          btn.style.setProperty('-webkit-tap-highlight-color', 'rgba(37, 99, 235, 0.3)');
-          
-          // Add explicit touch event handlers (don't clone to preserve LiveKit handlers)
-          const handleTouchEnd = (e: TouchEvent) => {
-            e.stopPropagation();
-            // Don't prevent default to allow LiveKit's click handler to work
-            // Just ensure the click event fires
-            setTimeout(() => {
-              if (!btn.click) return;
-              btn.click();
-            }, 0);
-          };
-          
-          btn.addEventListener('touchend', handleTouchEnd, { passive: true });
-          handledButtons.add(btn);
-        });
+        try {
+          const buttons = document.querySelectorAll(selector);
+          buttons.forEach(button => {
+            const btn = button as HTMLElement;
+            
+            // Skip if already handled
+            if (handledButtons.has(btn)) return;
+            
+            // Ensure button is clickable
+            btn.style.pointerEvents = 'auto';
+            btn.style.touchAction = 'manipulation';
+            btn.style.cursor = 'pointer';
+            btn.style.setProperty('-webkit-tap-highlight-color', 'rgba(37, 99, 235, 0.3)');
+            
+            // Add explicit touch event handlers (don't clone to preserve LiveKit handlers)
+            const handleTouchEnd = (e: TouchEvent) => {
+              e.stopPropagation();
+              // Trigger click immediately - LiveKit will handle the toggle
+              const clickEvent = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                detail: 1
+              });
+              btn.dispatchEvent(clickEvent);
+            };
+            
+            btn.addEventListener('touchend', handleTouchEnd, { passive: false });
+            handledButtons.add(btn);
+          });
+        } catch (e) {
+          // Silently fail for invalid selectors
+        }
       });
     };
 
@@ -67,11 +75,11 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'aria-label']
+      attributeFilter: ['class', 'aria-label', 'title', 'data-lk-kind']
     });
 
     // Also check periodically
-    const interval = setInterval(fixChatButton, 1000);
+    const interval = setInterval(fixChatButton, 500);
 
     return () => {
       observer.disconnect();
