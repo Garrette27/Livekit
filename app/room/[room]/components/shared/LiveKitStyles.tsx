@@ -570,12 +570,91 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
           font-size: 16px !important; /* Prevents iOS zoom on focus */
         }
 
-        /* Ensure control bar is above chat */
+/* Ensure control bar is above chat and enhance touch targets */
         .lk-control-bar {
           z-index: 1100 !important; /* Increased from 950 */
           bottom: 10px !important;
           pointer-events: auto !important;
           touch-action: manipulation !important;
+          padding: 8px !important; /* Add padding for better touch */
+          gap: 8px !important; /* Add gap between buttons */
+        }
+
+        /* Enhanced touch targets for all control bar buttons on mobile */
+        .lk-control-bar button,
+        .lk-control-bar .lk-button,
+        .lk-control-bar [role="button"] {
+          min-width: 48px !important; /* Increased from 44px */
+          min-height: 48px !important; /* Increased from 44px */
+          padding: 12px !important; /* Add padding */
+          margin: 2px !important; /* Add margin */
+          border-radius: 8px !important; /* Rounded corners */
+          touch-action: manipulation !important;
+          -webkit-tap-highlight-color: rgba(37, 99, 235, 0.3) !important;
+          transition: all 0.2s ease !important;
+          position: relative !important;
+        }
+
+        /* Enhanced sidebar touch targets for mobile */
+        .collapsible-sidebar .sidebar-toggle,
+        .collapsible-sidebar .drag-handle,
+        [class*="sidebar"] button,
+        [class*="sidebar"] [role="button"] {
+          min-width: 44px !important;
+          min-height: 44px !important;
+          padding: 8px !important;
+          touch-action: manipulation !important;
+          -webkit-tap-highlight-color: rgba(37, 99, 235, 0.3) !important;
+          cursor: pointer !important;
+        }
+
+        /* Enhanced form inputs for mobile */
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"],
+        input[type="number"],
+        textarea,
+        select {
+          min-height: 44px !important;
+          padding: 12px !important;
+          font-size: 16px !important; /* Prevents iOS zoom */
+          touch-action: manipulation !important;
+          -webkit-appearance: none !important;
+          border-radius: 8px !important;
+        }
+
+        /* Enhanced button touch targets in sidebars and forms */
+        button:not(.lk-control-bar button),
+        .btn,
+        [class*="button"] {
+          min-height: 44px !important;
+          padding: 12px 16px !important;
+          touch-action: manipulation !important;
+          -webkit-tap-highlight-color: rgba(37, 99, 235, 0.3) !important;
+          border-radius: 8px !important;
+          font-size: 16px !important;
+        }
+
+        /* Enhanced hover and active states for touch */
+        .lk-control-bar button:hover,
+        .lk-control-bar .lk-button:hover,
+        .lk-control-bar [role="button"]:hover {
+          transform: scale(1.05) !important;
+          box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3) !important;
+        }
+
+        .lk-control-bar button:active,
+        .lk-control-bar .lk-button:active,
+        .lk-control-bar [role="button"]:active {
+          transform: scale(0.95) !important;
+          transition: transform 0.1s ease !important;
+        }
+
+        /* Ensure all control bar buttons are visible on touch devices */
+        .lk-control-bar > * {
+          display: flex !important;
+          visibility: visible !important;
+          opacity: 1 !important;
         }
       }
       
@@ -596,13 +675,15 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
           cursor: pointer !important;
         }
         
-        /* Ensure screen share is visible on touch devices */
+/* Ensure screen share is visible on touch devices */
         .lk-control-bar button[aria-label*="share"],
         .lk-control-bar button[aria-label*="Share"],
         .lk-control-bar button[aria-label*="screen"],
         .lk-control-bar button[aria-label*="Screen"],
         .lk-control-bar [data-lk-kind="toggle-screen-share"],
         .lk-control-bar [data-lk-kind="share-screen"],
+        .lk-control-bar [data-lk-kind="screen-share"],
+        .lk-control-bar button[data-lk-kind="screen-share"],
         button[aria-label*="share"][class*="lk-"],
         button[aria-label*="Share"][class*="lk-"],
         button[aria-label*="screen"][class*="lk-"],
@@ -610,7 +691,19 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
         button[title*="share"][class*="lk-"],
         button[title*="Share"][class*="lk-"],
         button[title*="screen"][class*="lk-"],
-        button[title*="Screen"][class*="lk-"] {
+        button[title*="Screen"][class*="lk-"],
+        /* Additional selectors for better detection */
+        .lk-button[data-lk-kind="screen-share"],
+        .lk-button[data-lk-kind="toggle-screen-share"],
+        button.lk-button[aria-label*="share"],
+        button.lk-button[aria-label*="Share"],
+        button.lk-button[aria-label*="screen"],
+        button.lk-button[aria-label*="Screen"],
+        /* Icon-based detection */
+        button svg[class*="share"],
+        button svg[class*="screen"],
+        button[aria-label*="presentation"],
+        button[aria-label*="Presentation"] {
           display: flex !important;
           visibility: visible !important;
           opacity: 1 !important;
@@ -618,6 +711,9 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
           touch-action: manipulation !important;
           min-width: 44px !important;
           min-height: 44px !important;
+          -webkit-tap-highlight-color: rgba(37, 99, 235, 0.3) !important;
+          position: relative !important;
+          z-index: 1000 !important;
         }
       }
 

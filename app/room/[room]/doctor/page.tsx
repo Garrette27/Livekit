@@ -6,6 +6,7 @@ import { db, storage } from '@/lib/firebase';
 import NotesPanel from './components/NotesPanel';
 import DoctorControlsPanel from './components/DoctorControlsPanel';
 import WaitingRoomPanel from './components/WaitingRoomPanel';
+import InvitationManagementPanel from './components/InvitationManagementPanel';
 import LiveKitShell from './components/LiveKitShell';
 import AuthCard from './components/shared/AuthCard';
 import LoadingSpinner from './components/shared/LoadingSpinner';
@@ -185,6 +186,10 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
       <>
         <SidebarPortal title="Waiting Room" icon="🚪" position="left" defaultCollapsed={true} width={350} collapsedWidth={60}>
           <WaitingRoomPanel roomName={roomName} />
+        </SidebarPortal>
+
+        <SidebarPortal title="Invitation Management" icon="📧" position="left" defaultCollapsed={true} width={400} collapsedWidth={60}>
+          <InvitationManagementPanel user={user!} roomName={roomName} />
         </SidebarPortal>
 
         <SidebarPortal title="Manual Notes" icon="📝" position="left" defaultCollapsed={false} width={350} collapsedWidth={60}>

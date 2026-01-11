@@ -222,7 +222,12 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         'button[class*="chat"]',
         '[data-lk="chat-toggle"]',
         'button[title*="chat"]',
-        'button[title*="Chat"]'
+        'button[title*="Chat"]',
+        // More specific LiveKit selectors
+        '.lk-button[data-lk-kind="chat"]',
+        '.lk-button[data-lk-kind="toggle-chat"]',
+        'button.lk-button[aria-label*="chat"]',
+        'button.lk-button[aria-label*="Chat"]'
       ];
 
       chatButtonSelectors.forEach(selector => {
@@ -240,20 +245,67 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
             btn.style.cursor = 'pointer';
             btn.style.setProperty('-webkit-tap-highlight-color', 'rgba(37, 99, 235, 0.3)');
             
-            // Add explicit touch event handlers (don't clone to preserve LiveKit handlers)
+            // Remove any existing touch handlers to avoid duplicates
+            const originalOnTouchEnd = (btn as any).__originalOnTouchEnd;
+            if (originalOnTouchEnd) {
+              btn.removeEventListener('touchend', originalOnTouchEnd);
+            }
+            
+            // Add explicit touch event handlers
+            const handleTouchStart = (e: TouchEvent) => {
+              e.stopPropagation();
+            };
+            
             const handleTouchEnd = (e: TouchEvent) => {
               e.stopPropagation();
-              // Trigger click immediately - LiveKit will handle the toggle
+              e.preventDefault();
+              
+              // Try multiple methods to trigger chat
+              // Method 1: Direct click
+              if (btn.click) {
+                btn.click();
+              }
+              
+              // Method 2: Dispatch click event
               const clickEvent = new MouseEvent('click', {
                 bubbles: true,
                 cancelable: true,
                 view: window,
-                detail: 1
+                detail: 1,
+                buttons: 1
               });
               btn.dispatchEvent(clickEvent);
+              
+              // Method 3: Try to find and trigger LiveKit's chat toggle
+              setTimeout(() => {
+                // Look for chat panel and toggle it
+                const chatPanel = document.querySelector('.lk-chat-panel, [class*="chat-panel"], .lk-chat, [class*="lk-chat"]') as HTMLElement;
+                if (chatPanel) {
+                  const isHidden = chatPanel.style.display === 'none' || 
+                                 chatPanel.hasAttribute('aria-hidden') ||
+                                 chatPanel.style.visibility === 'hidden' ||
+                                 chatPanel.style.opacity === '0';
+                  
+                  if (isHidden) {
+                    chatPanel.style.display = 'block';
+                    chatPanel.style.visibility = 'visible';
+                    chatPanel.style.opacity = '1';
+                    chatPanel.removeAttribute('aria-hidden');
+                    chatPanel.style.setProperty('transform', 'translateY(0)', 'important');
+                  } else {
+                    chatPanel.style.display = 'none';
+                    chatPanel.style.visibility = 'hidden';
+                    chatPanel.style.opacity = '0';
+                    chatPanel.setAttribute('aria-hidden', 'true');
+                    chatPanel.style.setProperty('transform', 'translateY(100%)', 'important');
+                  }
+                }
+              }, 50);
             };
             
+            btn.addEventListener('touchstart', handleTouchStart, { passive: true });
             btn.addEventListener('touchend', handleTouchEnd, { passive: false });
+            (btn as any).__originalOnTouchEnd = handleTouchEnd;
             handledButtons.add(btn);
           });
         } catch (e) {
@@ -270,11 +322,11 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'aria-label', 'title', 'data-lk-kind']
+      attributeFilter: ['class', 'aria-label', 'title', 'data-lk-kind', 'style']
     });
 
     // Also check periodically
-    const interval = setInterval(fixChatButton, 500);
+    const interval = setInterval(fixChatButton, 300);
 
     return () => {
       observer.disconnect();
