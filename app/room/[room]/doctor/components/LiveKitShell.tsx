@@ -12,7 +12,7 @@ interface LiveKitShellProps {
 }
 
 export default function LiveKitShell({ token, roomName, onDisconnected, onError }: LiveKitShellProps) {
-// Fix chat button and screen share on mobile - ensure they're clickable and work
+  // Fix chat button and screen share on mobile - ensure they're clickable and work
   useEffect(() => {
     if (!token) return;
 
@@ -22,28 +22,28 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
     const fixChatButton = () => {
       // Enhanced chat button selectors for better detection
       const chatButtonSelectors = [
-        'button[aria-label*="chat"]',
+        'button[aria-label*="chat" i]',
         'button[aria-label*="Chat"]',
         '[data-lk-kind="chat"]',
         '[data-lk-kind="toggle-chat"]',
         'button[class*="chat"]',
         '[data-lk="chat-toggle"]',
-        'button[title*="chat"]',
+        'button[title*="chat" i]',
         'button[title*="Chat"]',
         // More specific LiveKit selectors
         '.lk-button[data-lk-kind="chat"]',
         '.lk-button[data-lk-kind="toggle-chat"]',
-        'button.lk-button[aria-label*="chat"]',
+        'button.lk-button[aria-label*="chat" i]',
         'button.lk-button[aria-label*="Chat"]',
         // Additional selectors for LiveKit components
         '.lk-control-bar button[data-lk-kind="chat"]',
         '.lk-control-bar button[data-lk-kind="toggle-chat"]',
-        'div.lk-control-bar button[aria-label*="chat"]',
+        'div.lk-control-bar button[aria-label*="chat" i]',
         'div.lk-control-bar button[aria-label*="Chat"]',
         // Icon-based detection
-        'button svg[class*="chat"]',
-        'button svg[class*="message"]',
-        'button[aria-label*="message"]',
+        'button:has(svg[class*="chat"])',
+        'button:has(svg[class*="message"])',
+        'button[aria-label*="message" i]',
         'button[aria-label*="Message"]'
       ];
 
@@ -128,14 +128,7 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
               e.preventDefault();
               btn.style.backgroundColor = '';
               
-              // Method 1: Direct click simulation
-              try {
-                btn.click();
-              } catch (e) {
-                // Continue to next method
-              }
-              
-              // Method 2: Dispatch synthetic click event
+              // Method 1: Dispatch synthetic click event (more reliable)
               try {
                 const clickEvent = new MouseEvent('click', {
                   bubbles: true,
@@ -146,7 +139,16 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
                 });
                 btn.dispatchEvent(clickEvent);
               } catch (e) {
-                // Continue to next method
+                console.warn('Error dispatching click event:', e);
+              }
+              
+              // Method 2: Direct click simulation (fallback)
+              try {
+                if (typeof btn.click === 'function') {
+                  btn.click();
+                }
+              } catch (e) {
+                console.warn('Error triggering click:', e);
               }
               
               // Method 3: Enhanced functionality based on button type
@@ -174,21 +176,28 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
                   }
                   
                   if (chatPanel) {
-                    // Check current visibility state
+                    // Check current visibility state using multiple methods
                     const computedStyle = window.getComputedStyle(chatPanel);
+                    const rect = chatPanel.getBoundingClientRect();
                     const isVisible = computedStyle.display !== 'none' && 
                                      computedStyle.visibility !== 'hidden' && 
-                                     computedStyle.opacity !== '0';
+                                     parseFloat(computedStyle.opacity) > 0 &&
+                                     rect.height > 0 &&
+                                     rect.width > 0;
                     
                     if (!isVisible || !chatPanelVisible) {
-                      // Show chat panel
-                      chatPanel.style.display = 'block';
-                      chatPanel.style.visibility = 'visible';
-                      chatPanel.style.opacity = '1';
+                      // Show chat panel with stronger styles
+                      chatPanel.style.setProperty('display', 'block', 'important');
+                      chatPanel.style.setProperty('visibility', 'visible', 'important');
+                      chatPanel.style.setProperty('opacity', '1', 'important');
                       chatPanel.removeAttribute('aria-hidden');
                       chatPanel.style.setProperty('transform', 'translateY(0)', 'important');
                       chatPanel.style.setProperty('position', 'fixed', 'important');
                       chatPanel.style.setProperty('z-index', '1000', 'important');
+                      chatPanel.style.setProperty('bottom', '80px', 'important');
+                      chatPanel.style.setProperty('left', '0', 'important');
+                      chatPanel.style.setProperty('right', '0', 'important');
+                      chatPanel.style.setProperty('width', '100vw', 'important');
                       chatPanelVisible = true;
                       
                       // Also try to trigger LiveKit's internal chat state
@@ -196,9 +205,9 @@ export default function LiveKitShell({ token, roomName, onDisconnected, onError 
                       document.dispatchEvent(chatEvent);
                     } else {
                       // Hide chat panel
-                      chatPanel.style.display = 'none';
-                      chatPanel.style.visibility = 'hidden';
-                      chatPanel.style.opacity = '0';
+                      chatPanel.style.setProperty('display', 'none', 'important');
+                      chatPanel.style.setProperty('visibility', 'hidden', 'important');
+                      chatPanel.style.setProperty('opacity', '0', 'important');
                       chatPanel.setAttribute('aria-hidden', 'true');
                       chatPanel.style.setProperty('transform', 'translateY(100%)', 'important');
                       chatPanelVisible = false;

@@ -88,8 +88,11 @@ export function useSpeechCapture({ roomName, token }: SpeechCaptureArgs): Speech
       }
 
       if (event.error === 'not-allowed') {
+        // Only log as warning, don't show error to user - they can enable manually
+        console.warn('Microphone permission not granted for speech recognition. Users can enable it manually in browser settings.');
         setSpeechStatus('permission-required');
-        setCaptureError('Microphone permission is required to capture speech.');
+        // Don't set error message - this is expected behavior if user hasn't granted permission
+        // setCaptureError('Microphone permission is required to capture speech.');
         return;
       }
 
