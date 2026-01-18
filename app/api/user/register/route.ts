@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import { validateEmail, sanitizeInput } from '../../../../lib/validation';
+import { generateDeviceFingerprintHash, hashIP, getClientIP, getGeolocationFromIP } from '../../../../lib/device-utils';
 import crypto from 'crypto';
 import { 
   RegisterUserRequest, 
@@ -9,25 +10,6 @@ import {
   DeviceFingerprint,
   GeolocationData
 } from '../../../../lib/types';
-
-// Helper function to generate device fingerprint hash
-function generateDeviceFingerprintHash(deviceData: DeviceFingerprint): string {
-  const fingerprintString = [
-    deviceData.userAgent,
-    deviceData.language,
-    deviceData.platform,
-    deviceData.screenResolution,
-    deviceData.timezone,
-    deviceData.cookieEnabled.toString(),
-    deviceData.doNotTrack,
-  ].join('|');
-  
-  return crypto.createHash('sha256').update(fingerprintString).digest('hex');
-}
-
-// Helper function to hash IP address for privacy
-function hashIP(ip: string): string {
-  return crypto.createHash('sha256').update(ip).digest('hex');
 }
 
 // Helper function to detect browser from user agent

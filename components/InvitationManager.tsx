@@ -1,14 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { auth, db } from '@/lib/firebase';
 import { User } from 'firebase/auth';
-import { 
-  InvitationFormData, 
-  CreateInvitationRequest, 
-  CreateInvitationResponse,
-  InvitationListItem 
-} from '@/lib/types';
+import { useInvitationForm } from '@/hooks/useInvitationForm';
+import InvitationForm from './InvitationForm';
+import InvitationResult from './InvitationResult';
 
 interface InvitationManagerProps {
   user: User;
@@ -17,78 +12,27 @@ interface InvitationManagerProps {
 }
 
 export default function InvitationManager({ user, roomName, onInvitationCreated }: InvitationManagerProps) {
-  const [isCreating, setIsCreating] = useState(false);
-  const [createdInvitation, setCreatedInvitation] = useState<CreateInvitationResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<InvitationFormData>({
-    email: '',
-    phone: '',
-    expiresInHours: 24,
-    waitingRoomEnabled: false,
-    maxPatients: 10,
-  });
+  const {
+    formData,
+    setFormData,
+    isCreating,
+    createdInvitation,
+    error,
+    handleCreateInvitation,
+    resetForm,
+  } = useInvitationForm({ user, roomName });
 
-
-  const handleCreateInvitation = async () => {
-    setIsCreating(true);
-    setError(null);
-
+  const handleSubmit = async () => {
     try {
-      const request: CreateInvitationRequest = {
-        roomName,
-        ...(formData.email.trim() && { emailAllowed: formData.email.trim() }), // Only include email if provided
-        ...(formData.phone?.trim() && { phoneAllowed: formData.phone.trim() }), // Only include phone if provided
-        expiresInHours: formData.expiresInHours,
-        waitingRoomEnabled: formData.waitingRoomEnabled || false,
-        maxPatients: formData.waitingRoomEnabled ? (formData.maxPatients || 10) : undefined,
-        maxUses: formData.waitingRoomEnabled ? undefined : 1, // Unlimited uses if waiting room enabled, single use otherwise
-        doctorUserId: user.uid, // Pass doctor's user ID
-        doctorEmail: user.email || undefined,
-        doctorName: user.displayName || undefined,
-      };
-
-      const response = await fetch('/api/invite/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      });
-
-      const result: CreateInvitationResponse = await response.json();
-
-      if (result.success) {
-        setCreatedInvitation(result);
-        // Don't reset form - keep room name and settings for easy reuse
-        // Only clear email/phone if user wants to create another invitation
-        setFormData({
-          ...formData,
-          email: '', // Clear email for next invitation
-          phone: '', // Clear phone for next invitation
-          // Keep: expiresInHours, waitingRoomEnabled, maxPatients
-        });
-        // Notify parent component
-        if (onInvitationCreated && result.invitationId) {
-          onInvitationCreated(result.invitationId);
-        }
-      } else {
-        setError(result.error || 'Failed to create invitation');
-      }
+      const invitation = await handleCreateInvitation();
+      onInvitationCreated?.(invitation.invitationId);
     } catch (err) {
-      setError('Network error. Please try again.');
-      console.error('Error creating invitation:', err);
-    } finally {
-      setIsCreating(false);
+      console.error('Failed to create invitation:', err);
     }
   };
 
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      alert('Invitation link copied to clipboard!');
-    } catch (err) {
-      console.error('Failed to copy to clipboard:', err);
-    }
+  const handleCopySuccess = () => {
+    alert('Invitation link copied to clipboard!');
   };
 
   return (
@@ -98,7 +42,6 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
       padding: '0',
       marginBottom: '0'
     }}>
-
       {error && (
         <div style={{
           backgroundColor: '#fef2f2',
@@ -113,323 +56,39 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
         </div>
       )}
 
-      {createdInvitation && (
-        <div style={{
-          backgroundColor: '#f0fdf4',
-          border: '1px solid #bbf7d0',
-          borderRadius: '0.5rem',
-          padding: '1rem',
-          marginBottom: '1rem'
-        }}>
-          <h4 style={{
-            fontSize: '0.9rem',
-            fontWeight: '600',
-            color: '#166534',
-            marginBottom: '0.75rem'
-          }}>
-            ✅ Invitation Created!
-          </h4>
-          
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '0.75rem',
-              fontWeight: '500',
-              color: '#374151',
-              marginBottom: '0.5rem'
-            }}>
-              Patient Invitation Link:
-            </label>
-            <div style={{
-              display: 'flex',
-              gap: '0.5rem',
-              alignItems: 'center'
-            }}>
-              <input
-                type="text"
-                value={createdInvitation.inviteUrl}
-                readOnly
-                style={{
-                  flex: '1',
-                  padding: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem',
-                  fontSize: '0.7rem',
-                  backgroundColor: '#f9fafb'
-                }}
-              />
-              <button
-                onClick={() => copyToClipboard(createdInvitation.inviteUrl)}
-                style={{
-                  backgroundColor: '#059669',
-                  color: 'white',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.375rem',
-                  border: 'none',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  fontSize: '0.7rem'
-                }}
-              >
-                📋
-              </button>
-            </div>
-          </div>
-
-          <div style={{
-            fontSize: '0.7rem',
-            color: '#6b7280'
-          }}>
-            <p><strong>Expires:</strong> {new Date(createdInvitation.expiresAt).toLocaleString()}</p>
-            <p><strong>ID:</strong> {createdInvitation.invitationId}</p>
-            {createdInvitation.existingAccount && (
-              <p style={{ color: '#059669', fontWeight: '500', marginTop: '0.5rem' }}>
-                ℹ️ {createdInvitation.existingAccount.message}
-              </p>
-            )}
-          </div>
-
-          <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <button
-              onClick={() => {
-                const doctorJoinUrl = `/room/${roomName}/doctor`;
-                window.open(doctorJoinUrl, '_blank');
-              }}
-              style={{
-                backgroundColor: '#059669',
-                color: 'white',
-                padding: '0.5rem 1rem',
-                borderRadius: '0.375rem',
-                border: 'none',
-                fontSize: '0.75rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                flex: '1'
-              }}
-            >
-              🩺 Join as Doctor
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1rem',
-        marginBottom: '1rem'
-      }}>
-        {/* Email Input */}
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '0.75rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}>
-            Patient Email (Optional)
-          </label>
-          <input
-            type="email"
-            value={formData.email}
-            onChange={(e) => {
-              const newEmail = e.target.value;
-              setFormData(prev => ({ ...prev, email: newEmail }));
-            }}
-            placeholder="patient@example.com (leave empty for open invitation)"
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.375rem',
-              fontSize: '0.8rem'
-            }}
-            autoComplete="email"
+      {createdInvitation ? (
+        <div style={{ marginBottom: '1rem' }}>
+          <InvitationResult 
+            invitation={createdInvitation} 
+            user={user}
+            onCopyLink={handleCopySuccess}
           />
-          <p style={{
-            fontSize: '0.65rem',
-            color: '#6b7280',
-            marginTop: '0.25rem'
-          }}>
-            {formData.email.trim() 
-              ? "The system will automatically verify the patient's device, location, and browser after they register."
-              : "Leave empty to create an open invitation (anyone with the link can join)."
-            }
-          </p>
-        </div>
-
-        {/* Phone Input (Optional) */}
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '0.75rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}>
-            Patient Phone (Optional)
-          </label>
-          <input
-            type="tel"
-            value={formData.phone || ''}
-            onChange={(e) => {
-              const newPhone = e.target.value;
-              setFormData(prev => ({ ...prev, phone: newPhone }));
-            }}
-            placeholder="+1234567890"
+          <button
+            onClick={resetForm}
             style={{
               width: '100%',
-              padding: '0.5rem',
-              border: '1px solid #d1d5db',
+              padding: '0.75rem',
+              backgroundColor: '#6b7280',
+              color: 'white',
+              border: 'none',
               borderRadius: '0.375rem',
-              fontSize: '0.8rem'
-            }}
-            autoComplete="tel"
-          />
-        </div>
-
-        {/* Waiting Room Toggle */}
-        <div>
-          <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.75rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem',
-            cursor: 'pointer'
-          }}>
-            <input
-              type="checkbox"
-              checked={formData.waitingRoomEnabled || false}
-              onChange={(e) => setFormData({ ...formData, waitingRoomEnabled: e.target.checked })}
-              style={{
-                width: '1rem',
-                height: '1rem',
-                cursor: 'pointer'
-              }}
-            />
-            Enable Waiting Room (Multiple patients can join)
-          </label>
-          <p style={{
-            fontSize: '0.65rem',
-            color: '#6b7280',
-            marginTop: '0.25rem',
-            marginLeft: '1.5rem'
-          }}>
-            When enabled, patients join a waiting room and you can admit them one by one to the consultation.
-          </p>
-        </div>
-
-        {/* Max Patients (only shown if waiting room enabled) */}
-        {formData.waitingRoomEnabled && (
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '0.75rem',
+              fontSize: '0.875rem',
               fontWeight: '500',
-              color: '#374151',
-              marginBottom: '0.5rem'
-            }}>
-              Maximum Patients in Waiting Room
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="50"
-              value={formData.maxPatients || 10}
-              onChange={(e) => setFormData({ ...formData, maxPatients: parseInt(e.target.value) || 10 })}
-              placeholder="10"
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '0.8rem'
-              }}
-            />
-            <p style={{
-              fontSize: '0.65rem',
-              color: '#6b7280',
-              marginTop: '0.25rem'
-            }}>
-              Maximum number of patients allowed to join the waiting room at the same time.
-            </p>
-          </div>
-        )}
-
-        {/* Expiration Time */}
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '0.75rem',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}>
-            Expires In
-          </label>
-          <select
-            value={formData.expiresInHours}
-            onChange={(e) => setFormData({ ...formData, expiresInHours: parseInt(e.target.value) })}
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.375rem',
-              fontSize: '0.8rem'
+              cursor: 'pointer',
+              marginTop: '0.5rem'
             }}
           >
-            <option value={1}>1 Hour</option>
-            <option value={6}>6 Hours</option>
-            <option value={12}>12 Hours</option>
-            <option value={24}>24 Hours</option>
-            <option value={48}>48 Hours</option>
-            <option value={72}>72 Hours</option>
-            <option value={168}>1 Week</option>
-          </select>
+            Create Another Invitation
+          </button>
         </div>
-      </div>
-
-      {/* Info Box */}
-      <div style={{
-        marginBottom: '1rem',
-        padding: '0.75rem',
-        backgroundColor: '#eff6ff',
-        border: '1px solid #bfdbfe',
-        borderRadius: '0.375rem'
-      }}>
-        <p style={{
-          fontSize: '0.7rem',
-          color: '#1e40af',
-          margin: 0,
-          lineHeight: '1.5'
-        }}>
-          <strong>ℹ️ Privacy-Compliant System:</strong> Device ID, location, and browser information are only collected after the patient provides consent during registration. The system will automatically verify these details when the patient accesses the invitation link.
-        </p>
-      </div>
-
-      {/* Create Button */}
-      <button
-        onClick={handleCreateInvitation}
-        disabled={isCreating}
-        style={{
-          backgroundColor: isCreating ? '#9ca3af' : '#059669',
-          color: 'white',
-          padding: '0.75rem 1rem',
-          borderRadius: '0.375rem',
-          border: 'none',
-          fontWeight: '600',
-          fontSize: '0.8rem',
-          cursor: isCreating ? 'not-allowed' : 'pointer',
-          width: '100%',
-          transition: 'background-color 0.2s ease'
-        }}
-      >
-        {isCreating ? 'Creating...' : '🔐 Create Invitation'}
-      </button>
+      ) : (
+        <InvitationForm
+          formData={formData}
+          setFormData={setFormData}
+          isCreating={isCreating}
+          onSubmit={handleSubmit}
+        />
+      )}
     </div>
   );
 }
