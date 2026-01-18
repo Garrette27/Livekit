@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { getFirebaseAdmin } from '../../../../lib/firebase-factory';
+import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -14,6 +14,10 @@ import {
   GeolocationData,
   WaitingPatient
 } from '../../../../lib/types';
+
+// Helper function to get client IP
+function getClientIP(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for');
   const realIP = request.headers.get('x-real-ip');
   const cfConnectingIP = request.headers.get('cf-connecting-ip');
   
