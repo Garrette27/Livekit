@@ -20,24 +20,58 @@ export default function InvitationResult({ invitation, user, onCopyLink }: Invit
   const accessCode = invitation.inviteUrl.split('/').pop() || '';
 
   return (
-    <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-      <h3 className="text-lg font-semibold text-green-800 mb-4">Invitation Created Successfully!</h3>
+    <div style={{
+      backgroundColor: '#f0fdf4',
+      border: '1px solid #bbf7d0',
+      borderRadius: '0.5rem',
+      padding: '1.5rem'
+    }}>
+      <h3 style={{
+        fontSize: '1.125rem',
+        fontWeight: '600',
+        color: '#15803d',
+        marginBottom: '1rem'
+      }}>
+        Invitation Created Successfully!
+      </h3>
       
-      <div className="space-y-4">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label style={{
+            display: 'block',
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            color: '#374151',
+            marginBottom: '0.5rem'
+          }}>
             Invitation Link
           </label>
-          <div className="flex gap-2">
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
             <input
               type="text"
               value={invitation.inviteUrl}
               readOnly
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+              style={{
+                flex: 1,
+                padding: '0.5rem 0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                backgroundColor: '#f9fafb',
+                fontSize: '0.875rem'
+              }}
             />
             <button
               onClick={handleCopyLink}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: '#2563eb',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
             >
               Copy
             </button>
@@ -45,26 +79,52 @@ export default function InvitationResult({ invitation, user, onCopyLink }: Invit
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label style={{
+            display: 'block',
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            color: '#374151',
+            marginBottom: '0.5rem'
+          }}>
             Access Code
           </label>
-          <div className="flex gap-2">
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
             <input
               type="text"
               value={accessCode}
               readOnly
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 font-mono"
+              style={{
+                flex: 1,
+                padding: '0.5rem 0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                backgroundColor: '#f9fafb',
+                fontSize: '0.875rem',
+                fontFamily: 'monospace'
+              }}
             />
             <button
               onClick={() => navigator.clipboard.writeText(accessCode)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: '#2563eb',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
             >
               Copy
             </button>
           </div>
         </div>
 
-        <div className="text-sm text-gray-600">
+        <div style={{
+          fontSize: '0.875rem',
+          color: '#4b5563'
+        }}>
           <p><strong>Expires:</strong> {new Date(invitation.expiresAt).toLocaleString()}</p>
         </div>
       </div>

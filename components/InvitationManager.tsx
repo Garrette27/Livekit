@@ -50,7 +50,7 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
           padding: '0.75rem',
           marginBottom: '1rem',
           color: '#dc2626',
-          fontSize: '0.8rem'
+          fontSize: '0.875rem'
         }}>
           <strong>Error:</strong> {error}
         </div>
