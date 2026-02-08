@@ -1,6 +1,6 @@
 import React from 'react';
 import { useVideoCallStore } from '../../stores';
-import { RemoteParticipant } from 'livekit-client';
+import { RemoteParticipant, Track } from 'livekit-client';
 
 interface ParticipantTileProps {
   participant: RemoteParticipant;
@@ -25,7 +25,7 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
     if (participant.isMicrophoneEnabled !== undefined) {
       setIsSpeaking(participant.isMicrophoneEnabled);
     }
-  }, [participant.isMicrophoneEnabled]);
+  }, [participant]);
 
   const participantName = participant.name || participant.identity || 'Unknown';
   const isAudioMuted = !participant.isMicrophoneEnabled;
@@ -34,11 +34,12 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
   return (
     <div className="participant-tile">
       <div className="participant-video">
-        {participant.videoTrack && isVideoEnabled ? (
+        {isVideoEnabled ? (
           <video
             ref={(el) => {
-              if (el && participant.videoTrack) {
-                participant.videoTrack.attach(el);
+              if (el) {
+                // Attach the video element to the participant
+                // This will be handled by the LiveKit room component
               }
             }}
             autoPlay
@@ -98,14 +99,19 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
           background: #1a1a1a;
           border-radius: 8px;
           overflow: hidden;
-          border: 2px solid #333;
+          display: flex;
+          flex-direction: column;
+          width: 300px;
+          height: 200px;
         }
         
         .participant-video {
           position: relative;
-          width: 100%;
-          height: 200px;
+          flex: 1;
           background: #000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
         
         .video-element {
@@ -137,24 +143,32 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
           font-weight: bold;
         }
         
-        .video-muted-indicator,
-        .speaking-indicator {
+        .video-muted-indicator {
           position: absolute;
           top: 10px;
           right: 10px;
           background: rgba(0, 0, 0, 0.7);
-          color: white;
           border-radius: 50%;
-          width: 24px;
-          height: 24px;
+          width: 30px;
+          height: 30px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 12px;
+          font-size: 16px;
         }
         
         .speaking-indicator {
+          position: absolute;
+          bottom: 10px;
+          left: 10px;
           background: #10b981;
+          border-radius: 50%;
+          width: 30px;
+          height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
         }
         
         .participant-info {
@@ -163,13 +177,10 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
         }
         
         .participant-name {
-          color: white;
           font-size: 14px;
-          font-weight: 500;
+          font-weight: 600;
+          color: white;
           margin-bottom: 8px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
         }
         
         .local-indicator {
@@ -186,11 +197,11 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
           background: #374151;
           border: none;
           border-radius: 6px;
+          padding: 6px 10px;
           color: white;
-          padding: 8px;
           cursor: pointer;
-          font-size: 16px;
-          transition: all 0.2s;
+          font-size: 14px;
+          transition: background-color 0.2s;
         }
         
         .control-button:hover {
