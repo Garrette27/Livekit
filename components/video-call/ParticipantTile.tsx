@@ -1,5 +1,7 @@
 import React from 'react';
-import { useVideoCallStore } from '../../stores';
+import { useSelector } from 'react-redux';
+import { selectVideoCall } from '../../store';
+import { videoCallActions } from '../../store';
 import { RemoteParticipant, Track } from 'livekit-client';
 
 interface ParticipantTileProps {
