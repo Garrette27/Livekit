@@ -8,6 +8,7 @@ interface ParticipantGridProps {
   localParticipant: any;
   onToggleAudio?: (participant: any) => void;
   onToggleVideo?: (participant: any) => void;
+  onToggleScreenShare?: () => Promise<void>;
 }
 
 export const ParticipantGrid: React.FC<ParticipantGridProps> = ({
@@ -15,6 +16,7 @@ export const ParticipantGrid: React.FC<ParticipantGridProps> = ({
   localParticipant,
   onToggleAudio,
   onToggleVideo,
+  onToggleScreenShare,
 }) => {
   const videoCallState = useSelector(selectVideoCall);
 

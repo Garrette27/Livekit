@@ -48,7 +48,7 @@ export function RoomClient({ roomName }: RoomClientProps) {
           const roomDoc = await getDoc(roomRef);
           if (roomDoc.exists()) {
             const roomData = roomDoc.data();
-            if (roomData?.createdBy === authState.user.uid) {
+            if (roomData?.createdBy === authState.user?.uid) {
               console.log('Doctor detected, auto-joining room:', roomName);
               handleJoinRoom();
               localStorage.setItem(`doctorGeneratedLink_${roomName}`, 'true');
@@ -60,7 +60,7 @@ export function RoomClient({ roomName }: RoomClientProps) {
       };
       checkRoomOwnership();
     }
-  }, [authState.user, roomName, db]);
+  }, [authState.user?.uid, roomName, db]);
 
   // Check for existing token on page load
   useEffect(() => {
@@ -81,7 +81,7 @@ export function RoomClient({ roomName }: RoomClientProps) {
     setTokenError(null);
 
     try {
-      const identity = authState.user.displayName || authState.user.email || authState.user.uid;
+      const identity = authState.user?.displayName || authState.user?.email || authState.user?.uid || 'Anonymous';
 
       const res = await fetch('/api/token', {
         method: 'POST',
@@ -337,37 +337,24 @@ export function RoomClient({ roomName }: RoomClientProps) {
   return (
     <div className="room-container">
       <LiveKitRoom
-        token={videoCallState.token}
+        token={videoCallState.token || ''}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
         connect={true}
         onConnected={handleRoomConnected}
         onDisconnected={handleRoomDisconnected}
-        onParticipantConnected={handleParticipantConnected}
-        onParticipantDisconnected={handleParticipantDisconnected}
-        onLocalParticipant={handleLocalParticipant}
-        onParticipantsChanged={handleParticipantsChanged}
-      >
-        <VideoConference />
-      </LiveKitRoom>
-
+      />
       <ParticipantGrid
         participants={videoCallState.participants}
         localParticipant={videoCallState.localParticipant}
-        onToggleAudio={handleToggleAudio}
-        onToggleVideo={handleToggleVideo}
-      />
-
-      <ControlBar
-        onToggleAudio={() => handleToggleAudio(videoCallState.localParticipant)}
-        onToggleVideo={() => handleToggleVideo(videoCallState.localParticipant)}
+        onToggleAudio={(participant) => handleToggleAudio(participant)}
+        onToggleVideo={(participant) => handleToggleVideo(participant)}
         onToggleScreenShare={handleToggleScreenShare}
-        onLeaveRoom={handleLeaveRoom}
-        isAudioEnabled={videoCallState.localParticipant?.isMicrophoneEnabled}
-        isVideoEnabled={videoCallState.localParticipant?.isCameraEnabled}
-        isScreenSharing={videoCallState.localParticipant?.isScreenShareEnabled}
-        isConnecting={videoCallState.isConnecting}
       />
-
+      <ControlBar
+        onToggleAudio={() => videoCallState.localParticipant && handleToggleAudio(videoCallState.localParticipant)}
+        onToggleVideo={() => videoCallState.localParticipant && handleToggleVideo(videoCallState.localParticipant)}
+        onLeaveRoom={handleLeaveRoom}
+      />
       <TranscriptionOverlay
         isVisible={true}
         onAddManualNote={handleAddManualNote}
