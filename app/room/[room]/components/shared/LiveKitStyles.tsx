@@ -862,6 +862,51 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
         --lk-chat-bg: #ffffff !important;
         --chat-background: #ffffff !important;
       }
+
+      /* Ensure screen share tracks are visible */
+      .lk-participant-tile[data-lk-source="screen_share"],
+      .lk-grid-item[data-lk-source="screen_share"],
+      .lk-participant-tile[data-lk-screen-share],
+      .lk-grid-item[data-lk-screen-share],
+      video[data-lk-source="screen_share"],
+      video[data-lk-screen-share] {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain !important;
+        background-color: #000000 !important;
+      }
+
+      /* Ensure screen share video tracks appear in participant tiles */
+      .lk-participant-tile:has(video[data-lk-source="screen_share"]),
+      .lk-participant-tile:has(video[data-lk-screen-share]),
+      .lk-grid-item:has(video[data-lk-source="screen_share"]),
+      .lk-grid-item:has(video[data-lk-screen-share]) {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background-color: #000000 !important;
+      }
+
+      /* Mobile-specific: Ensure screen share works on mobile */
+      @media (max-width: 768px) {
+        .lk-participant-tile[data-lk-source="screen_share"],
+        .lk-grid-item[data-lk-source="screen_share"],
+        .lk-participant-tile:has(video[data-lk-source="screen_share"]),
+        .lk-grid-item:has(video[data-lk-source="screen_share"]) {
+          display: flex !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          width: 100% !important;
+          height: 100% !important;
+          min-width: 100% !important;
+          min-height: 100% !important;
+        }
+      }
     `}</style>
   );
 }
