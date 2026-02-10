@@ -258,49 +258,90 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
             
             const handleTouchEnd = (e: TouchEvent) => {
               e.stopPropagation();
-              e.preventDefault();
               
-              // Try multiple methods to trigger chat
-              // Method 1: Direct click
-              if (btn.click) {
-                btn.click();
+              // Method 1: Dispatch synthetic click event (more reliable)
+              try {
+                const clickEvent = new MouseEvent('click', {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window,
+                  detail: 1,
+                  buttons: 1
+                });
+                btn.dispatchEvent(clickEvent);
+              } catch (err) {
+                console.warn('Error dispatching click event:', err);
               }
               
-              // Method 2: Dispatch click event
-              const clickEvent = new MouseEvent('click', {
-                bubbles: true,
-                cancelable: true,
-                view: window,
-                detail: 1,
-                buttons: 1
-              });
-              btn.dispatchEvent(clickEvent);
+              // Method 2: Direct click simulation (fallback)
+              try {
+                if (typeof btn.click === 'function') {
+                  btn.click();
+                }
+              } catch (err) {
+                console.warn('Error triggering click:', err);
+              }
               
               // Method 3: Try to find and trigger LiveKit's chat toggle
               setTimeout(() => {
-                // Look for chat panel and toggle it
-                const chatPanel = document.querySelector('.lk-chat-panel, [class*="chat-panel"], .lk-chat, [class*="lk-chat"]') as HTMLElement;
+                // Enhanced chat panel detection
+                const chatPanelSelectors = [
+                  '.lk-chat-panel',
+                  '[class*="chat-panel"]',
+                  '[class*="ChatPanel"]',
+                  '[data-lk="chat-panel"]',
+                  '.lk-chat',
+                  '[class*="lk-chat"]',
+                  'div[role="dialog"][class*="chat"]',
+                  'aside[class*="chat"]',
+                  'section[class*="chat"]',
+                  '.lk-chat-container',
+                  '[class*="chat-container"]'
+                ];
+                
+                let chatPanel: HTMLElement | null = null;
+                for (const selector of chatPanelSelectors) {
+                  try {
+                    chatPanel = document.querySelector(selector) as HTMLElement;
+                    if (chatPanel) break;
+                  } catch (e) {
+                    continue;
+                  }
+                }
+                
                 if (chatPanel) {
-                  const isHidden = chatPanel.style.display === 'none' || 
+                  // Check current visibility state using multiple methods
+                  const computedStyle = window.getComputedStyle(chatPanel);
+                  const rect = chatPanel.getBoundingClientRect();
+                  const isHidden = computedStyle.display === 'none' || 
                                  chatPanel.hasAttribute('aria-hidden') ||
-                                 chatPanel.style.visibility === 'hidden' ||
-                                 chatPanel.style.opacity === '0';
+                                 computedStyle.visibility === 'hidden' ||
+                                 parseFloat(computedStyle.opacity) === 0 ||
+                                 rect.height === 0 ||
+                                 rect.width === 0;
                   
                   if (isHidden) {
-                    chatPanel.style.display = 'block';
-                    chatPanel.style.visibility = 'visible';
-                    chatPanel.style.opacity = '1';
+                    // Show chat panel with stronger styles
+                    chatPanel.style.setProperty('display', 'block', 'important');
+                    chatPanel.style.setProperty('visibility', 'visible', 'important');
+                    chatPanel.style.setProperty('opacity', '1', 'important');
                     chatPanel.removeAttribute('aria-hidden');
                     chatPanel.style.setProperty('transform', 'translateY(0)', 'important');
+                    chatPanel.style.setProperty('position', 'fixed', 'important');
+                    chatPanel.style.setProperty('z-index', '1000', 'important');
+                    chatPanel.style.setProperty('bottom', '80px', 'important');
+                    chatPanel.style.setProperty('left', '0', 'important');
+                    chatPanel.style.setProperty('right', '0', 'important');
+                    chatPanel.style.setProperty('width', '100vw', 'important');
                   } else {
-                    chatPanel.style.display = 'none';
-                    chatPanel.style.visibility = 'hidden';
-                    chatPanel.style.opacity = '0';
+                    chatPanel.style.setProperty('display', 'none', 'important');
+                    chatPanel.style.setProperty('visibility', 'hidden', 'important');
+                    chatPanel.style.setProperty('opacity', '0', 'important');
                     chatPanel.setAttribute('aria-hidden', 'true');
                     chatPanel.style.setProperty('transform', 'translateY(100%)', 'important');
                   }
                 }
-              }, 50);
+              }, 150);
             };
             
             btn.addEventListener('touchstart', handleTouchStart, { passive: true });
