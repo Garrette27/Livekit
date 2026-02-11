@@ -16,9 +16,9 @@ export default function InvitationForm({ user, roomName, onInvitationCreated }: 
   const [formData, setFormData] = useState<CreateInvitationRequest>({
     roomName,
     expiresInHours: 24,
-    waitingRoomEnabled: false,
-    maxPatients: 1,
-    maxUses: 1,
+    waitingRoomEnabled: true, // Enable waiting room by default
+    maxPatients: 10, // Default to 10 patients
+    maxUses: 999999, // Unlimited uses for waiting room
   });
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,11 +139,11 @@ export default function InvitationForm({ user, roomName, onInvitationCreated }: 
             color: '#374151', 
             marginBottom: '0.5rem' 
           }}>
-            Role
+            Expires in
           </label>
           <select
-            name="role"
-            value="participant"
+            name="expiresInHours"
+            value={formData.expiresInHours}
             onChange={handleInputChange}
             style={{
               width: '100%',
@@ -153,9 +153,13 @@ export default function InvitationForm({ user, roomName, onInvitationCreated }: 
               fontSize: '1rem',
             }}
           >
-            <option value="participant">Participant</option>
-            <option value="moderator">Moderator</option>
-            <option value="observer">Observer</option>
+            <option value={1}>1 hour</option>
+            <option value={6}>6 hours</option>
+            <option value={12}>12 hours</option>
+            <option value={24}>24 hours</option>
+            <option value={48}>48 hours</option>
+            <option value={72}>3 days</option>
+            <option value={168}>1 week</option>
           </select>
         </div>
 
@@ -167,21 +171,22 @@ export default function InvitationForm({ user, roomName, onInvitationCreated }: 
             color: '#374151', 
             marginBottom: '0.5rem' 
           }}>
-            Message (Optional)
+            🚪 Waiting Room: Maximum patients
           </label>
-          <textarea
-            name="message"
-            value=""
+          <input
+            type="number"
+            name="maxPatients"
+            value={formData.maxPatients || 10}
             onChange={handleInputChange}
-            placeholder="Add a personal message..."
-            rows={3}
+            min="1"
+            max="100"
+            placeholder="Maximum number of patients"
             style={{
               width: '100%',
               padding: '0.75rem',
               border: '1px solid #d1d5db',
               borderRadius: '0.375rem',
               fontSize: '1rem',
-              resize: 'vertical',
             }}
           />
         </div>
