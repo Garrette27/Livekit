@@ -241,18 +241,20 @@ export async function POST(req: NextRequest) {
       console.log('Open invitation (no email constraint) - allowing access');
     }
 
+    // Check if waiting room is enabled
+    const isWaitingRoomEnabled = invitation.waitingRoomEnabled === true;
+    const waitingRoomName = isWaitingRoomEnabled ? `${tokenPayload.roomName}-waiting` : tokenPayload.roomName;
+
     // Validate device fingerprint if device info exists (only if user is registered)
-    // Note: If user just registered via invitation, device info might not match yet
-    // We allow first access after registration, but subsequent accesses must match
-    if (userProfile && deviceFingerprint && userProfile.deviceInfo) {
+    // Note: For waiting room invitations, we allow device flexibility
+    // Only enforce strict device validation for direct room access
+    if (userProfile && deviceFingerprint && userProfile.deviceInfo && !isWaitingRoomEnabled) {
       const currentDeviceHash = generateDeviceFingerprintHash(deviceFingerprint);
       if (userProfile.deviceInfo.deviceFingerprintHash !== currentDeviceHash) {
-        // Check if this is the first access after registration (device info was just set)
-        // Allow slight flexibility for first-time access
         violations.push({
           timestamp: new Date() as any,
           type: 'wrong_device',
-          details: 'Device fingerprint does not match registered device',
+          details: `Device fingerprint does not match registered device`,
           ip: clientIP,
           userAgent,
         });
@@ -346,10 +348,6 @@ export async function POST(req: NextRequest) {
         violations,
       } as ValidateInvitationResponse, { status: 403 });
     }
-
-    // Check if waiting room is enabled
-    const isWaitingRoomEnabled = invitation.waitingRoomEnabled === true;
-    const waitingRoomName = isWaitingRoomEnabled ? `${tokenPayload.roomName}-waiting` : tokenPayload.roomName;
 
     // If waiting room enabled, check current patients and max capacity
     if (isWaitingRoomEnabled) {
