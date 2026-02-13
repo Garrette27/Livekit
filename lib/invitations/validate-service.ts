@@ -11,6 +11,7 @@ import {
 import { getGeolocationFromIP } from './geolocation-utils';
 import { signLiveKitRoomToken, verifyInvitationToken } from './token-utils';
 import { detectBrowser, generateDeviceFingerprintHash, toDate } from './utils';
+import { buildWaitingPatientIdentity } from './waiting-patient-identity';
 
 export interface ValidateInvitationContext {
   token: string;
@@ -331,6 +332,7 @@ async function handleWaitingRoomAccess(params: {
   tokenPayload: InvitationToken;
   invitation: Invitation;
   lookup: UserLookupContext;
+  explicitUserEmail?: string;
   accessAttemptData: Record<string, any>;
   liveKitToken: string;
   waitingRoomName: string;
@@ -343,6 +345,7 @@ async function handleWaitingRoomAccess(params: {
     tokenPayload,
     invitation,
     lookup,
+    explicitUserEmail,
     accessAttemptData,
     liveKitToken,
     waitingRoomName,
@@ -395,12 +398,18 @@ async function handleWaitingRoomAccess(params: {
     });
   }
 
-  const finalPatientEmail = lookup.userEmailToCheck || invitation.emailAllowed || undefined;
+  const identity = buildWaitingPatientIdentity({
+    explicitUserEmail,
+    profileEmail: lookup.userProfile?.email,
+    invitationEmail: lookup.userEmailToCheck || invitation.emailAllowed,
+    userDocId: lookup.userDocId,
+  });
+
   const waitingPatient: any = {
     id: waitingPatientId,
-    patientId: lookup.userDocId || `anonymous_${Date.now()}`,
-    patientName: lookup.userProfile?.email || lookup.userEmailToCheck || invitation.emailAllowed || 'Anonymous Patient',
-    ...(finalPatientEmail && { patientEmail: finalPatientEmail }),
+    patientId: identity.patientId,
+    patientName: identity.patientName,
+    ...(identity.patientEmail && { patientEmail: identity.patientEmail }),
     roomName: tokenPayload.roomName,
     invitationId: tokenPayload.invitationId,
     doctorUserId,
@@ -550,6 +559,7 @@ export async function validateInvitationAndIssueToken(
         tokenPayload,
         invitation,
         lookup: userResolution.lookup,
+        explicitUserEmail: context.userEmail,
         accessAttemptData,
         liveKitToken,
         waitingRoomName,

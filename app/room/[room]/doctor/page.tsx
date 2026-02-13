@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import DoctorSessionPanel from './components/DoctorSessionPanel';
 import LiveKitShell from './components/LiveKitShell';
 import AuthCard from './components/shared/AuthCard';
@@ -181,8 +181,6 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
           roomName={roomName}
           user={user!}
           doctorName={doctorName}
-          db={db ?? null}
-          storage={storage ?? null}
           onLeave={handleLeave}
         />
 

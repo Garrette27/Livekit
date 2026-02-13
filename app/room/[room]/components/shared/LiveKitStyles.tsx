@@ -1,12 +1,25 @@
 ﻿'use client';
 
 import React from 'react';
+import { RoomControlsPolicy } from './room-controls-policy';
 
 interface LiveKitStylesProps {
   controlBarColor?: 'blue' | 'default';
+  controlsPolicy?: RoomControlsPolicy;
+  chatEnabled?: boolean;
 }
 
-export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStylesProps) {
+const DEFAULT_CONTROLS_POLICY: RoomControlsPolicy = {
+  hideLeaveControl: true,
+  hideStartVideoControl: true,
+  hideSettingsControl: true,
+};
+
+export default function LiveKitStyles({
+  controlBarColor = 'blue',
+  controlsPolicy = DEFAULT_CONTROLS_POLICY,
+  chatEnabled = true,
+}: LiveKitStylesProps) {
   const controlButtonStyles =
     controlBarColor === 'blue'
       ? `
@@ -39,9 +52,58 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
       `
       : '';
 
+  const hideLeaveControlStyles = controlsPolicy.hideLeaveControl
+    ? `
+      .lk-control-bar button[aria-label*='leave' i],
+      .lk-control-bar button[title*='leave' i],
+      .lk-control-bar [data-lk-kind='leave'] {
+        display: none !important;
+      }
+    `
+    : '';
+
+  const hideStartVideoControlStyles = controlsPolicy.hideStartVideoControl
+    ? `
+      .lk-control-bar button[aria-label*='start video' i],
+      .lk-control-bar button[title*='start video' i] {
+        display: none !important;
+      }
+    `
+    : '';
+
+  const hideSettingsControlStyles = controlsPolicy.hideSettingsControl
+    ? `
+      .lk-control-bar .lk-settings-toggle,
+      .lk-control-bar button[aria-label*='settings' i],
+      .lk-control-bar button[title*='settings' i] {
+        display: none !important;
+      }
+    `
+    : '';
+
+  const hideChatControlStyles = !chatEnabled
+    ? `
+      .lk-control-bar .lk-chat-toggle,
+      .lk-control-bar button[aria-label*='chat' i],
+      .lk-control-bar button[title*='chat' i] {
+        display: none !important;
+      }
+
+      .lk-chat,
+      .lk-chat-panel,
+      .lk-chat-container {
+        display: none !important;
+      }
+    `
+    : '';
+
   return (
     <style jsx global>{`
       ${controlButtonStyles}
+      ${hideLeaveControlStyles}
+      ${hideStartVideoControlStyles}
+      ${hideSettingsControlStyles}
+      ${hideChatControlStyles}
 
       .lk-video-conference,
       .lk-stage,
@@ -84,17 +146,6 @@ export default function LiveKitStyles({ controlBarColor = 'blue' }: LiveKitStyle
         display: flex !important;
         align-items: center !important;
         gap: 0.5rem !important;
-      }
-
-      .lk-control-bar button[aria-label*='leave' i],
-      .lk-control-bar button[title*='leave' i],
-      .lk-control-bar [data-lk-kind='leave'] {
-        display: none !important;
-      }
-
-      .lk-control-bar button[aria-label*='start video' i],
-      .lk-control-bar button[title*='start video' i] {
-        display: none !important;
       }
 
       .lk-chat,

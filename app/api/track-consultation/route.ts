@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../lib/firebase-admin';
 import { buildVisibleUserIds, choosePatientUserId, isKnownUserId } from '../../../lib/consultations/identity-utils';
+import { calculateDurationMinutes, resolveJoinTiming } from '../../../lib/consultations/session-timing';
 import { generateAndStoreConsultationSummary } from '../../../lib/consultations/summary-service';
 
 export async function POST(req: Request) {
@@ -183,34 +184,21 @@ export async function POST(req: Request) {
         const finalPatientEmail = (!patientEmailToStore && existingPatientEmail)
           ? existingPatientEmail  // Preserve existing patient email
           : patientEmailToStore;  // Use new email (or null if anonymous)
-        // Preserve start time only for short reconnects of the same known patient.
-        let finalJoinedAt: Date;
-        let finalSessionStartedAt: Date;
-        if (existingData?.joinedAt) {
-          const existingStatus = existingData?.status;
-          const existingJoinedAt = existingData.joinedAt.toDate ? existingData.joinedAt.toDate() : new Date(existingData.joinedAt);
-          const now = new Date();
-          const hoursSinceJoined = (now.getTime() - existingJoinedAt.getTime()) / (1000 * 60 * 60);
-          const isSameKnownPatient =
-            isKnownUserId(existingPatientUserId) &&
-            isKnownUserId(finalPatientUserId) &&
-            existingPatientUserId === finalPatientUserId;
+        const now = new Date();
+        const timing = resolveJoinTiming({
+          existingData,
+          existingPatientUserId,
+          nextPatientUserId: finalPatientUserId,
+          now,
+        });
+        const finalJoinedAt = timing.joinedAt;
+        const finalSessionStartedAt = timing.sessionStartedAt;
 
-          if (existingStatus === 'active' && hoursSinceJoined < 3 && isSameKnownPatient) {
-            finalJoinedAt = existingJoinedAt;
-            finalSessionStartedAt = existingData.sessionStartedAt?.toDate
-              ? existingData.sessionStartedAt.toDate()
-              : finalJoinedAt;
-            console.log(`Preserving joinedAt for same-patient reconnect (${hoursSinceJoined.toFixed(2)}h)`);
-          } else {
-            finalJoinedAt = new Date();
-            finalSessionStartedAt = finalJoinedAt;
-            console.log('Resetting joinedAt/sessionStartedAt for new or stale session');
-          }
-        } else {
-          finalJoinedAt = new Date();
-          finalSessionStartedAt = finalJoinedAt;
-        }
+        console.log(
+          timing.reusedExistingStart
+            ? 'Preserving joinedAt/sessionStartedAt for short same-patient reconnect'
+            : 'Resetting joinedAt/sessionStartedAt for new session'
+        );
         
         // Track when patient joins (new consultation or update existing)
         const consultationData: any = {
@@ -253,12 +241,12 @@ export async function POST(req: Request) {
       const consultationDoc = await consultationRef.get();
       if (consultationDoc.exists) {
         const data = consultationDoc.data();
-        const joinedAt = data?.sessionStartedAt?.toDate?.() || data?.joinedAt?.toDate?.() || (data?.joinedAt ? new Date(data.joinedAt) : new Date());
+        const joinedAt = data?.sessionStartedAt || data?.joinedAt;
         const leftAt = new Date();
-        let durationMinutes = Math.round((leftAt.getTime() - joinedAt.getTime()) / (1000 * 60));
-        if (!Number.isFinite(durationMinutes) || durationMinutes < 0) {
-          durationMinutes = 0;
-        }
+        const durationMinutes = calculateDurationMinutes({
+          startedAt: joinedAt,
+          endedAt: leftAt,
+        });
         
         // Preserve existing patient email/userId if leaving anonymously
         // Get existing patient data from consultation

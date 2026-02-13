@@ -2,10 +2,11 @@
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, Timestamp, where, limit, doc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { isPatient, getUserProfile } from '@/lib/auth-utils';
+import { isPatient } from '@/lib/auth-utils';
+import { calculateDurationMinutes } from '@/lib/consultations/session-timing';
 
 // Component for joining with invitation link
 function JoinWithInvitationLink() {
@@ -290,11 +291,10 @@ export default function PatientDashboard() {
           const leftAt = consultation.leftAt?.toDate?.() || consultation.leftAt;
           const createdAt = leftAt || joinedAt || new Date();
 
-          // Calculate duration in minutes
-          let durationMinutes = consultation.duration || 0;
-          if (joinedAt && leftAt && !durationMinutes) {
-            durationMinutes = Math.round((leftAt.getTime() - joinedAt.getTime()) / (1000 * 60));
-          }
+          const durationMinutes = consultation.duration || calculateDurationMinutes({
+            startedAt: joinedAt,
+            endedAt: leftAt || createdAt,
+          });
 
           return {
             id: consultation.id,
@@ -432,7 +432,7 @@ export default function PatientDashboard() {
               Sign In to View History
             </Link>
             <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-              Don't have an account? You can join consultations using invitation links from your doctor.
+              Don&apos;t have an account? You can join consultations using invitation links from your doctor.
             </p>
           </div>
         </div>

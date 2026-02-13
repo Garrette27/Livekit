@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 
+const SIDEBAR_Z_INDEX = 10020;
+
 interface CollapsibleSidebarProps {
   children: React.ReactNode;
   title: string;
@@ -153,7 +155,8 @@ export default function CollapsibleSidebar({
     backgroundColor: '#ffffff',
     border: `2px solid ${position === 'left' ? '#059669' : '#3b82f6'}`,
     borderRadius: '0.75rem',
-    zIndex: 100000,
+    // Keep room sidebars below LiveKit chat panel so chat remains visible when toggled.
+    zIndex: SIDEBAR_Z_INDEX,
     boxShadow: '0 8px 25px rgba(0, 0, 0, 0.12)',
     backdropFilter: 'blur(10px)',
     transition: 'all 0.3s ease',

@@ -2,21 +2,22 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { auth, provider, db, storage } from '@/lib/firebase';
+import { useRouter } from 'next/navigation';
+import { auth, provider } from '@/lib/firebase';
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
 import RoomShell from '../components/shared/RoomShell';
 import PatientSessionPanels from './components/PatientSessionPanels';
-import NotesPanel from '../doctor/components/NotesPanel';
+import { PATIENT_ROOM_CONTROLS } from '../components/shared/room-controls-policy';
+import { PATIENT_ROOM_CHAT } from '../components/shared/room-chat-policy';
 
 function PatientRoomClient({ roomName }: { roomName: string }) {
+  const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
   const [patientName, setPatientName] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isInfoPanelCollapsed, setIsInfoPanelCollapsed] = useState(false);
-  const [showRoomControlPanel, setShowRoomControlPanel] = useState(false);
   const isLeavingRef = useRef(false);
 
   useEffect(() => {
@@ -82,10 +83,6 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
       setToken(savedToken);
     }
   }, [patientName, roomName]);
-
-  useEffect(() => {
-    setShowRoomControlPanel(localStorage.getItem(`doctorGeneratedLink_${roomName}`) === 'true');
-  }, [roomName]);
 
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -256,8 +253,8 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
     localStorage.removeItem(`patientToken_${roomName}`);
     localStorage.removeItem(`patientInCall_${roomName}`);
     setToken(null);
-    window.location.href = getPostCallRedirectPath();
-  }, [getPostCallRedirectPath, roomName, trackPatientLeave]);
+    router.replace(getPostCallRedirectPath());
+  }, [getPostCallRedirectPath, roomName, router, trackPatientLeave]);
 
   if (!token) {
     return (
@@ -403,17 +400,9 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
       <PatientSessionPanels
         roomName={roomName}
         patientName={patientName}
-        isInfoPanelCollapsed={isInfoPanelCollapsed}
-        onToggleInfoPanel={() => setIsInfoPanelCollapsed((value) => !value)}
-        showRoomControlPanel={showRoomControlPanel}
-        onHideRoomControlPanel={() => {
-          localStorage.removeItem(`doctorGeneratedLink_${roomName}`);
-          setShowRoomControlPanel(false);
-        }}
         onLeave={() => {
           void leaveConsultation();
         }}
-        notesPanel={<NotesPanel roomName={roomName} db={db ?? null} storage={storage ?? null} />}
       />
 
       <RoomShell
@@ -444,6 +433,8 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
           setError('Connection error. Please try again.');
         }}
         controlBarColor="blue"
+        controlsPolicy={PATIENT_ROOM_CONTROLS}
+        chatPolicy={PATIENT_ROOM_CHAT}
       />
     </div>
   );

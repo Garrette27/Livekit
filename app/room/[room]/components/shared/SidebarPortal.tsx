@@ -21,7 +21,7 @@ export default function SidebarPortal({
   defaultCollapsed = false,
   width = 350,
   collapsedWidth = 60,
-  children
+  children,
 }: SidebarPortalProps) {
   return createPortal(
     <CollapsibleSidebar
@@ -34,7 +34,6 @@ export default function SidebarPortal({
     >
       {children}
     </CollapsibleSidebar>,
-    typeof window !== 'undefined' ? document.body : ({} as any)
+    typeof window !== 'undefined' ? document.body : ({} as never)
   );
 }
-

@@ -2,19 +2,15 @@
 
 import React from 'react';
 import { User } from 'firebase/auth';
-import { Firestore } from 'firebase/firestore';
-import { FirebaseStorage } from 'firebase/storage';
-import NotesPanel from './NotesPanel';
 import DoctorControlsPanel from './DoctorControlsPanel';
 import WaitingRoomPanel from './WaitingRoomPanel';
-import SidebarPortal from './shared/SidebarPortal';
+import SidebarPortal from '../../components/shared/SidebarPortal';
+import { getRoomSessionPolicy } from '../../components/shared/room-session-policy';
 
 interface DoctorSessionPanelProps {
   roomName: string;
   user: User;
   doctorName: string;
-  db: Firestore | null;
-  storage: FirebaseStorage | null;
   onLeave: () => void;
 }
 
@@ -22,48 +18,41 @@ export default function DoctorSessionPanel({
   roomName,
   user,
   doctorName,
-  db,
-  storage,
   onLeave,
 }: DoctorSessionPanelProps) {
+  const policy = getRoomSessionPolicy('doctor');
+
   return (
     <>
-      <SidebarPortal
-        title="Waiting Queue"
-        icon="Queue"
-        position="left"
-        defaultCollapsed={false}
-        width={360}
-        collapsedWidth={60}
-      >
-        <WaitingRoomPanel roomName={roomName} />
-      </SidebarPortal>
+      {policy.panels.waitingQueue.enabled && (
+        <SidebarPortal
+          title={policy.panels.waitingQueue.title}
+          icon={policy.panels.waitingQueue.icon}
+          position={policy.panels.waitingQueue.position}
+          defaultCollapsed={policy.panels.waitingQueue.defaultCollapsed}
+          width={policy.panels.waitingQueue.width}
+          collapsedWidth={policy.panels.waitingQueue.collapsedWidth}
+        >
+          <WaitingRoomPanel roomName={roomName} />
+        </SidebarPortal>
+      )}
 
-      <SidebarPortal
-        title="Manual Notes"
-        icon="Notes"
-        position="left"
-        defaultCollapsed={true}
-        width={350}
-        collapsedWidth={60}
-      >
-        <NotesPanel roomName={roomName} db={db} storage={storage} />
-      </SidebarPortal>
-
-      <SidebarPortal
-        title="Doctor Session Panel"
-        icon="Doctor"
-        position="right"
-        defaultCollapsed={false}
-        width={300}
-        collapsedWidth={60}
-      >
-        <DoctorControlsPanel
-          doctorName={doctorName || user.displayName || user.email || 'Doctor'}
-          roomName={roomName}
-          onLeave={onLeave}
-        />
-      </SidebarPortal>
+      {policy.panels.doctorSession.enabled && (
+        <SidebarPortal
+          title={policy.panels.doctorSession.title}
+          icon={policy.panels.doctorSession.icon}
+          position={policy.panels.doctorSession.position}
+          defaultCollapsed={policy.panels.doctorSession.defaultCollapsed}
+          width={policy.panels.doctorSession.width}
+          collapsedWidth={policy.panels.doctorSession.collapsedWidth}
+        >
+          <DoctorControlsPanel
+            doctorName={doctorName || user.displayName || user.email || 'Doctor'}
+            roomName={roomName}
+            onLeave={onLeave}
+          />
+        </SidebarPortal>
+      )}
     </>
   );
 }

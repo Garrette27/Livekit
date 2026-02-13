@@ -1,0 +1,100 @@
+export type RoomRole = 'doctor' | 'patient';
+
+export interface RoomControlsPolicy {
+  hideLeaveControl: boolean;
+  hideStartVideoControl: boolean;
+  hideSettingsControl: boolean;
+}
+
+export interface RoomChatPolicy {
+  enabled: boolean;
+  defaultOpen: boolean;
+}
+
+export interface SidebarPolicy {
+  enabled: boolean;
+  title: string;
+  icon: string;
+  position: 'left' | 'right';
+  width: number;
+  collapsedWidth: number;
+  defaultCollapsed: boolean;
+}
+
+export interface RoomSessionPolicy {
+  controls: RoomControlsPolicy;
+  chat: RoomChatPolicy;
+  panels: {
+    waitingQueue: SidebarPolicy;
+    doctorSession: SidebarPolicy;
+    patientSession: SidebarPolicy;
+    notes: SidebarPolicy;
+  };
+}
+
+const DISABLED_PANEL: SidebarPolicy = {
+  enabled: false,
+  title: '',
+  icon: '',
+  position: 'right',
+  width: 320,
+  collapsedWidth: 60,
+  defaultCollapsed: false,
+};
+
+const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
+  doctor: {
+    controls: {
+      hideLeaveControl: true,
+      hideStartVideoControl: false,
+      hideSettingsControl: true,
+    },
+    chat: {
+      enabled: true,
+      defaultOpen: false,
+    },
+    panels: {
+      waitingQueue: {
+        enabled: true,
+        title: 'Waiting Queue',
+        icon: '🚪',
+        position: 'left',
+        width: 360,
+        collapsedWidth: 60,
+        defaultCollapsed: false,
+      },
+      doctorSession: {
+        enabled: true,
+        title: 'Doctor Session Panel',
+        icon: '🩺',
+        position: 'right',
+        width: 300,
+        collapsedWidth: 60,
+        defaultCollapsed: false,
+      },
+      patientSession: DISABLED_PANEL,
+      notes: DISABLED_PANEL,
+    },
+  },
+  patient: {
+    controls: {
+      hideLeaveControl: true,
+      hideStartVideoControl: true,
+      hideSettingsControl: true,
+    },
+    chat: {
+      enabled: true,
+      defaultOpen: false,
+    },
+    panels: {
+      waitingQueue: DISABLED_PANEL,
+      doctorSession: DISABLED_PANEL,
+      patientSession: DISABLED_PANEL,
+      notes: DISABLED_PANEL,
+    },
+  },
+};
+
+export function getRoomSessionPolicy(role: RoomRole): RoomSessionPolicy {
+  return ROOM_SESSION_POLICIES[role];
+}

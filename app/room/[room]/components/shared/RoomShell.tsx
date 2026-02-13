@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import LiveKitStyles from './LiveKitStyles';
+import { RoomControlsPolicy } from './room-controls-policy';
+import { RoomChatPolicy } from './room-chat-policy';
 import { useRoomChatController } from './room-chat-controller';
 
 interface RoomShellProps {
@@ -10,16 +12,37 @@ interface RoomShellProps {
   onDisconnected: (reason?: unknown) => void;
   onError: (error: Error) => void;
   controlBarColor?: 'blue' | 'default';
+  controlsPolicy?: RoomControlsPolicy;
+  chatPolicy?: RoomChatPolicy;
 }
+
+const DEFAULT_CHAT_POLICY: RoomChatPolicy = {
+  enabled: true,
+  defaultOpen: false,
+};
 
 export default function RoomShell({
   token,
   onDisconnected,
   onError,
   controlBarColor = 'blue',
+  controlsPolicy,
+  chatPolicy = DEFAULT_CHAT_POLICY,
 }: RoomShellProps) {
   const roomScopeRef = useRef<HTMLDivElement | null>(null);
-  useRoomChatController({ enabled: Boolean(token), scopeRef: roomScopeRef });
+  const chatEnabled = chatPolicy.enabled;
+  const chatDefaultOpen = chatPolicy.defaultOpen;
+  // LiveKit's chat state lives in VideoConference's internal layout context.
+  // Mount this bridge inside that context so chat behavior stays policy-driven.
+  const ChatControllerSettingsBridge = useMemo(() => {
+    function RoomChatSettingsBridge() {
+      useRoomChatController({ enabled: chatEnabled, defaultOpen: chatDefaultOpen });
+      return null;
+    }
+
+    RoomChatSettingsBridge.displayName = 'RoomChatSettingsBridge';
+    return RoomChatSettingsBridge;
+  }, [chatDefaultOpen, chatEnabled]);
 
   return (
     <div ref={roomScopeRef} style={{ width: '100vw', height: '100vh', position: 'relative' }}>
@@ -33,10 +56,14 @@ export default function RoomShell({
         onDisconnected={(reason) => onDisconnected(reason)}
         onError={onError}
       >
-        <VideoConference />
+        <VideoConference SettingsComponent={ChatControllerSettingsBridge} />
       </LiveKitRoom>
 
-      <LiveKitStyles controlBarColor={controlBarColor} />
+      <LiveKitStyles
+        controlBarColor={controlBarColor}
+        controlsPolicy={controlsPolicy}
+        chatEnabled={chatEnabled}
+      />
     </div>
   );
 }

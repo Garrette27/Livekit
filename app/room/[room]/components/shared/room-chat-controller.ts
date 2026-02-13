@@ -1,223 +1,91 @@
-import { RefObject, useCallback, useEffect, useState } from 'react';
+'use client';
+
+import { useMaybeLayoutContext } from '@livekit/components-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface UseRoomChatControllerArgs {
   enabled: boolean;
-  scopeRef: RefObject<HTMLElement | null>;
+  defaultOpen?: boolean;
 }
 
-interface RoomChatController {
+export interface RoomChatController {
   enabled: boolean;
   isOpen: boolean;
   toggle: () => void;
   close: () => void;
 }
 
-const STYLE_ID = 'room-chat-controller-style';
+export function useRoomChatController({
+  enabled,
+  defaultOpen = false,
+}: UseRoomChatControllerArgs): RoomChatController {
+  const layoutContext = useMaybeLayoutContext();
+  const dispatch = layoutContext?.widget.dispatch;
+  const layoutIsOpen = Boolean(layoutContext?.widget.state?.showChat);
 
-const CHAT_PANEL_SELECTORS = ['.lk-chat', '.lk-chat-panel', '.lk-chat-container'];
-const CHAT_PANEL_QUERY = CHAT_PANEL_SELECTORS.join(', ');
+  const [fallbackIsOpen, setFallbackIsOpen] = useState(false);
+  const defaultAppliedRef = useRef(false);
 
-const CHAT_TOGGLE_BUTTON_SELECTORS = [
-  '.lk-control-bar button[data-lk-kind="chat"]',
-  '.lk-control-bar button[data-lk-kind="toggle-chat"]',
-  '.lk-control-bar button[aria-label*="chat" i]',
-  '.lk-control-bar button[title*="chat" i]',
-];
-const CHAT_TOGGLE_BUTTON_QUERY = CHAT_TOGGLE_BUTTON_SELECTORS.join(', ');
-
-const CHAT_CLOSE_BUTTON_SELECTORS = ['.lk-chat button[aria-label*="close" i]', '.lk-chat-panel button[aria-label*="close" i]'];
-const CHAT_CLOSE_BUTTON_QUERY = CHAT_CLOSE_BUTTON_SELECTORS.join(', ');
-
-const CHAT_OBSERVER_ATTRIBUTE_FILTER = ['aria-hidden', 'hidden', 'style', 'class'];
-
-function installScopedStyles() {
-  if (document.getElementById(STYLE_ID)) {
-    return;
-  }
-
-  const style = document.createElement('style');
-  style.id = STYLE_ID;
-  style.textContent = `
-    [data-room-chat-scope="true"][data-room-chat-enabled="true"] .lk-chat,
-    [data-room-chat-scope="true"][data-room-chat-enabled="true"] .lk-chat-panel,
-    [data-room-chat-scope="true"][data-room-chat-enabled="true"] .lk-chat-container {
-      z-index: 10050 !important;
-      background-color: #ffffff !important;
-      color: #111827 !important;
-      border: 1px solid #e5e7eb !important;
-      border-radius: 12px !important;
-      transition: opacity 120ms ease, transform 120ms ease !important;
+  const open = useCallback(() => {
+    if (!enabled) {
+      return;
     }
 
-    [data-room-chat-scope="true"][data-room-chat-enabled="true"] .lk-chat textarea,
-    [data-room-chat-scope="true"][data-room-chat-enabled="true"] .lk-chat input,
-    [data-room-chat-scope="true"][data-room-chat-enabled="true"] .lk-chat-panel textarea,
-    [data-room-chat-scope="true"][data-room-chat-enabled="true"] .lk-chat-panel input {
-      background-color: #ffffff !important;
-      color: #111827 !important;
+    if (dispatch) {
+      dispatch({ msg: 'show_chat' });
+      return;
     }
-  `;
 
-  document.head.appendChild(style);
-}
-
-function isElementWithinScope(scope: HTMLElement, element: Element | null): element is HTMLElement {
-  return element instanceof HTMLElement && scope.contains(element);
-}
-
-function isChatPanelVisible(panel: HTMLElement | null): boolean {
-  if (!panel) {
-    return false;
-  }
-
-  if (panel.hidden || panel.getAttribute('aria-hidden') === 'true') {
-    return false;
-  }
-
-  const styles = window.getComputedStyle(panel);
-  return styles.display !== 'none' && styles.visibility !== 'hidden' && styles.opacity !== '0';
-}
-
-function findChatPanel(scope: HTMLElement): HTMLElement | null {
-  const panel = scope.querySelector(CHAT_PANEL_QUERY);
-  return panel instanceof HTMLElement ? panel : null;
-}
-
-function findChatToggleButton(scope: HTMLElement): HTMLElement | null {
-  const button = scope.querySelector(CHAT_TOGGLE_BUTTON_QUERY);
-  return button instanceof HTMLElement ? button : null;
-}
-
-export function useRoomChatController({ enabled, scopeRef }: UseRoomChatControllerArgs): RoomChatController {
-  const [isOpen, setIsOpen] = useState(false);
+    setFallbackIsOpen(true);
+  }, [dispatch, enabled]);
 
   const close = useCallback(() => {
-    const scope = scopeRef.current;
-    if (!scope) {
-      setIsOpen(false);
-      return;
+    if (dispatch) {
+      dispatch({ msg: 'hide_chat' });
     }
 
-    const panel = findChatPanel(scope);
-    if (!isChatPanelVisible(panel)) {
-      setIsOpen(false);
-      return;
-    }
-
-    const closeButton = panel?.querySelector(CHAT_CLOSE_BUTTON_QUERY);
-    if (closeButton instanceof HTMLElement) {
-      closeButton.click();
-      return;
-    }
-
-    const toggleButton = findChatToggleButton(scope);
-    if (toggleButton) {
-      toggleButton.click();
-      return;
-    }
-
-    setIsOpen(false);
-  }, [scopeRef]);
+    setFallbackIsOpen(false);
+  }, [dispatch]);
 
   const toggle = useCallback(() => {
-    const scope = scopeRef.current;
-    if (!scope) {
-      setIsOpen((previous) => !previous);
-      return;
-    }
-
-    const toggleButton = findChatToggleButton(scope);
-    if (toggleButton) {
-      toggleButton.click();
-      return;
-    }
-
-    setIsOpen((previous) => !previous);
-  }, [scopeRef]);
-
-  useEffect(() => {
-    installScopedStyles();
-  }, []);
-
-  useEffect(() => {
-    const scope = scopeRef.current;
-    if (!scope) {
-      return;
-    }
-
-    scope.setAttribute('data-room-chat-scope', 'true');
-    scope.setAttribute('data-room-chat-enabled', enabled ? 'true' : 'false');
-    scope.setAttribute('data-room-chat-open', enabled && isOpen ? 'true' : 'false');
-
-    if (!enabled) {
-      setIsOpen(false);
-    }
-  }, [enabled, isOpen, scopeRef]);
-
-  useEffect(() => {
     if (!enabled) {
       return;
     }
 
-    const scope = scopeRef.current;
-    if (!scope) {
+    if (dispatch) {
+      dispatch({ msg: 'toggle_chat' });
       return;
     }
 
-    const syncIsOpenFromDom = () => {
-      const panel = findChatPanel(scope);
-      setIsOpen(isChatPanelVisible(panel));
-    };
+    setFallbackIsOpen((previous) => !previous);
+  }, [dispatch, enabled]);
 
-    syncIsOpenFromDom();
+  useEffect(() => {
+    if (!enabled) {
+      defaultAppliedRef.current = false;
+      close();
+      return;
+    }
 
-    const observer = new MutationObserver(syncIsOpenFromDom);
-    observer.observe(scope, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: CHAT_OBSERVER_ATTRIBUTE_FILTER,
-    });
+    if (defaultAppliedRef.current) {
+      return;
+    }
 
-    const handleClickCapture = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) {
-        return;
-      }
+    defaultAppliedRef.current = true;
+    if (defaultOpen) {
+      open();
+    }
+  }, [close, defaultOpen, enabled, open]);
 
-      const toggleButton = target.closest(CHAT_TOGGLE_BUTTON_QUERY);
-      if (isElementWithinScope(scope, toggleButton)) {
-        window.setTimeout(syncIsOpenFromDom, 0);
-        return;
-      }
+  const isOpen = enabled && (layoutContext ? layoutIsOpen : fallbackIsOpen);
 
-      const closeButton = target.closest(CHAT_CLOSE_BUTTON_QUERY);
-      if (isElementWithinScope(scope, closeButton)) {
-        window.setTimeout(syncIsOpenFromDom, 0);
-      }
-    };
-
-    const handleKeydownCapture = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        const panel = findChatPanel(scope);
-        if (!isChatPanelVisible(panel)) {
-          setIsOpen(false);
-          return;
-        }
-
-        close();
-      }
-    };
-
-    document.addEventListener('click', handleClickCapture, true);
-    document.addEventListener('keydown', handleKeydownCapture, true);
-
-    return () => {
-      observer.disconnect();
-      document.removeEventListener('click', handleClickCapture, true);
-      document.removeEventListener('keydown', handleKeydownCapture, true);
-    };
-  }, [close, enabled, scopeRef]);
-
-  return { enabled, isOpen, toggle, close };
+  return useMemo(
+    () => ({
+      enabled,
+      isOpen,
+      toggle,
+      close,
+    }),
+    [close, enabled, isOpen, toggle]
+  );
 }
