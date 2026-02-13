@@ -31,21 +31,63 @@ export async function GET(req: NextRequest) {
       invitationDoc = await db.collection('invitations').doc(invitationId).get();
     } else {
       // Find the most recent active invitation for this room
-      const invitationsQuery = await db.collection('invitations')
-        .where('roomName', '==', roomName)
-        .where('status', '==', 'active')
-        .orderBy('createdAt', 'desc')
-        .limit(1)
-        .get();
-      
-      if (invitationsQuery.empty) {
-        return NextResponse.json(
-          { success: false, error: 'No active invitation found for this room' },
-          { status: 404 }
-        );
+      try {
+        const invitationsQuery = await db.collection('invitations')
+          .where('roomName', '==', roomName)
+          .where('status', '==', 'active')
+          .orderBy('createdAt', 'desc')
+          .limit(1)
+          .get();
+        
+        if (invitationsQuery.empty) {
+          return NextResponse.json(
+            { success: false, error: 'No active invitation found for this room' },
+            { status: 404 }
+          );
+        }
+        
+        invitationDoc = invitationsQuery.docs[0];
+      } catch (queryError: any) {
+        const isMissingIndexError =
+          queryError?.code === 9 ||
+          queryError?.details?.includes?.('requires an index') ||
+          queryError?.message?.includes?.('requires an index');
+
+        if (!isMissingIndexError) {
+          throw queryError;
+        }
+
+        console.warn('Primary invitation query requires index. Falling back to roomName-only query.');
+
+        const fallbackQuery = await db.collection('invitations')
+          .where('roomName', '==', roomName)
+          .limit(20)
+          .get();
+
+        if (fallbackQuery.empty) {
+          return NextResponse.json(
+            { success: false, error: 'No invitation found for this room' },
+            { status: 404 }
+          );
+        }
+
+        const activeInvitations = fallbackQuery.docs
+          .filter((doc) => (doc.data()?.status || 'active') === 'active')
+          .sort((a, b) => {
+            const aDate = toDate(a.data()?.createdAt, new Date(0)).getTime();
+            const bDate = toDate(b.data()?.createdAt, new Date(0)).getTime();
+            return bDate - aDate;
+          });
+
+        if (activeInvitations.length === 0) {
+          return NextResponse.json(
+            { success: false, error: 'No active invitation found for this room' },
+            { status: 404 }
+          );
+        }
+
+        invitationDoc = activeInvitations[0];
       }
-      
-      invitationDoc = invitationsQuery.docs[0];
     }
 
     if (!invitationDoc.exists) {

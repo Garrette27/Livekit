@@ -12,6 +12,7 @@ import InvitationManager from '@/components/InvitationManager';
 import CollapsibleSidebar from '@/components/CollapsibleSidebar';
 import { useLiveKitControlsFix } from '@/hooks/useLiveKitControlsFix';
 import { useLiveKitSpeechUiGuard } from '@/hooks/useLiveKitSpeechUiGuard';
+import { useLiveKitChatUiFix } from '@/hooks/useLiveKitChatUiFix';
 
 // Type definitions for Web Speech API
 declare global {
@@ -955,6 +956,7 @@ function RoomClient({ roomName }: { roomName: string }) {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [roomName, user?.uid]);
   useLiveKitControlsFix({ enabled: Boolean(token), cleanupOrphanedMenus });
+  useLiveKitChatUiFix({ enabled: Boolean(token) });
 
   // Function to properly disconnect from LiveKit
   const handleDisconnect = () => {
