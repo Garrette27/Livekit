@@ -2,7 +2,8 @@ import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import { validateEmail, validateRoomName, sanitizeInput } from '../../../../lib/validation';
-import jwt from 'jsonwebtoken';
+import { signInvitationToken } from '../../../../lib/invitations/token-utils';
+import { buildInviteUrl, getInviteBaseUrl } from '../../../../lib/invitations/utils';
 import { 
   CreateInvitationRequest, 
   CreateInvitationResponse, 
@@ -169,16 +170,11 @@ export async function POST(req: NextRequest) {
       oneUse: true,
     };
 
-    const inviteToken = jwt.sign(
-      tokenPayload,
-      process.env.LIVEKIT_API_SECRET || 'fallback-secret',
-      { algorithm: 'HS256' }
-    );
+    const inviteToken = signInvitationToken(tokenPayload);
 
     // Generate invite URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-    const inviteUrl = `${baseUrl}/invite/${inviteToken}`;
+    const baseUrl = getInviteBaseUrl();
+    const inviteUrl = buildInviteUrl(inviteToken);
 
     // Debug logging for URL generation
     console.log('Environment variables for URL generation:', {

@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
-import jwt from 'jsonwebtoken';
+import { signInvitationToken } from '../../../../lib/invitations/token-utils';
+import { buildInviteUrl, toDate } from '../../../../lib/invitations/utils';
 import { InvitationToken } from '../../../../lib/types';
 
 export async function GET(req: NextRequest) {
@@ -82,27 +83,9 @@ export async function GET(req: NextRequest) {
     }
 
     // Check if invitation is expired - handle Firestore Timestamp properly
-    let expiresAtDate: Date;
-    if (invitation.expiresAt) {
-      if (typeof invitation.expiresAt.toDate === 'function') {
-        expiresAtDate = invitation.expiresAt.toDate();
-      } else if (invitation.expiresAt instanceof Date) {
-        expiresAtDate = invitation.expiresAt;
-      } else if (invitation.expiresAt.seconds) {
-        // Handle Firestore Timestamp format
-        expiresAtDate = new Date(invitation.expiresAt.seconds * 1000);
-      } else {
-        // Try parsing as ISO string
-        try {
-          expiresAtDate = new Date(invitation.expiresAt);
-        } catch {
-          expiresAtDate = new Date(0);
-        }
-      }
-    } else {
-      // No expiration date means it never expires
-      expiresAtDate = new Date('2099-12-31');
-    }
+    const expiresAtDate = invitation.expiresAt
+      ? toDate(invitation.expiresAt, new Date(0))
+      : new Date('2099-12-31');
 
     const now = new Date();
     const isExpired = expiresAtDate.getTime() > 0 && now > expiresAtDate;
@@ -138,16 +121,10 @@ export async function GET(req: NextRequest) {
       oneUse: !invitation.waitingRoomEnabled, // Not single use if waiting room enabled
     };
 
-    const inviteToken = jwt.sign(
-      tokenPayload,
-      process.env.LIVEKIT_API_SECRET || 'fallback-secret',
-      { algorithm: 'HS256' }
-    );
+    const inviteToken = signInvitationToken(tokenPayload);
 
     // Generate invite URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-    const inviteUrl = `${baseUrl}/invite/${inviteToken}`;
+    const inviteUrl = buildInviteUrl(inviteToken);
 
     return NextResponse.json({
       success: true,

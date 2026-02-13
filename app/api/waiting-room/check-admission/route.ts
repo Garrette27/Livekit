@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
-import jwt from 'jsonwebtoken';
+import { signLiveKitRoomToken } from '../../../../lib/invitations/token-utils';
 import { WaitingPatient } from '../../../../lib/types';
 
 export async function POST(req: NextRequest) {
@@ -70,30 +70,11 @@ export async function POST(req: NextRequest) {
     // Check if patient has been admitted
     if (waitingPatient.status === 'admitted') {
       // Generate token for main consultation room
-      const liveKitToken = jwt.sign(
-        {
-          sub: `patient_${waitingPatient.invitationId}_${waitingPatient.id}`,
-          video: {
-            roomJoin: true,
-            room: waitingPatient.roomName,
-            canPublish: true,
-            canSubscribe: true,
-            canPublishData: true,
-          },
-          audio: {
-            roomJoin: true,
-            room: waitingPatient.roomName,
-            canPublish: true,
-            canSubscribe: true,
-          },
-        },
-        process.env.LIVEKIT_API_SECRET || 'fallback-secret',
-        {
-          issuer: process.env.LIVEKIT_API_KEY,
-          expiresIn: '2h',
-          algorithm: 'HS256',
-        }
-      );
+      const liveKitToken = signLiveKitRoomToken({
+        subject: `patient_${waitingPatient.invitationId}_${waitingPatient.id}`,
+        roomName: waitingPatient.roomName,
+        expiresIn: '2h',
+      });
 
       return NextResponse.json({
         success: true,

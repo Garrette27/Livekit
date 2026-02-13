@@ -1,8 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
+import { signLiveKitRoomToken, verifyInvitationToken } from '../../../../lib/invitations/token-utils';
+import { detectBrowser, generateDeviceFingerprintHash, getClientIP, toDate } from '../../../../lib/invitations/utils';
 import { 
   ValidateInvitationRequest, 
   ValidateInvitationResponse, 
@@ -10,31 +10,9 @@ import {
   InvitationToken,
   AccessAttempt,
   SecurityViolation,
-  DeviceFingerprint,
   GeolocationData,
   WaitingPatient
 } from '../../../../lib/types';
-
-// Helper function to get client IP
-function getClientIP(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  const realIP = request.headers.get('x-real-ip');
-  const cfConnectingIP = request.headers.get('cf-connecting-ip');
-  
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
-  
-  if (realIP) {
-    return realIP;
-  }
-  
-  if (cfConnectingIP) {
-    return cfConnectingIP;
-  }
-  
-  return (request as any).ip || 'unknown';
-}
 
 // Helper function to get geolocation from IP
 async function getGeolocationFromIP(ip: string): Promise<GeolocationData | null> {
@@ -61,31 +39,6 @@ async function getGeolocationFromIP(ip: string): Promise<GeolocationData | null>
   return null;
 }
 
-// Helper function to generate device fingerprint hash
-function generateDeviceFingerprintHash(deviceData: DeviceFingerprint): string {
-  const fingerprintString = [
-    deviceData.userAgent,
-    deviceData.language,
-    deviceData.platform,
-    deviceData.screenResolution,
-    deviceData.timezone,
-    deviceData.cookieEnabled.toString(),
-    deviceData.doNotTrack,
-  ].join('|');
-  
-  return crypto.createHash('sha256').update(fingerprintString).digest('hex');
-}
-
-// Helper function to detect browser from user agent
-function detectBrowser(userAgent: string): string {
-  if (userAgent.includes('Chrome')) return 'Chrome';
-  if (userAgent.includes('Firefox')) return 'Firefox';
-  if (userAgent.includes('Safari')) return 'Safari';
-  if (userAgent.includes('Edge')) return 'Edge';
-  if (userAgent.includes('Opera')) return 'Opera';
-  return 'Unknown';
-}
-
 export async function POST(req: NextRequest) {
   try {
     // Apply rate limiting
@@ -107,7 +60,7 @@ export async function POST(req: NextRequest) {
     // Verify JWT token
     let tokenPayload: InvitationToken;
     try {
-      tokenPayload = jwt.verify(token, process.env.LIVEKIT_API_SECRET || 'fallback-secret') as InvitationToken;
+      tokenPayload = verifyInvitationToken(token);
     } catch (error) {
       return NextResponse.json(
         { success: false, error: 'Invalid or expired invitation token' },
@@ -145,15 +98,7 @@ export async function POST(req: NextRequest) {
 
     // Check if invitation is expired (always check this first)
     // Handle both Firestore Timestamp and Date objects
-    let expiresAtDate: Date;
-    if (invitation.expiresAt && typeof invitation.expiresAt.toDate === 'function') {
-      expiresAtDate = invitation.expiresAt.toDate();
-    } else if (invitation.expiresAt instanceof Date) {
-      expiresAtDate = invitation.expiresAt;
-    } else {
-      // Fallback: try to parse as timestamp
-      expiresAtDate = new Date((invitation.expiresAt as any)?.seconds * 1000 || Date.now());
-    }
+    const expiresAtDate = toDate(invitation.expiresAt, new Date());
 
     if (invitation.status === 'expired' || new Date() > expiresAtDate) {
       return NextResponse.json(
@@ -388,30 +333,11 @@ export async function POST(req: NextRequest) {
     // If waiting room enabled, use waiting room name; otherwise use main room name
     const targetRoomName = isWaitingRoomEnabled ? waitingRoomName : tokenPayload.roomName;
     
-    const liveKitToken = jwt.sign(
-      {
-        sub: `patient_${tokenPayload.invitationId}_${Date.now()}`,
-        video: {
-          roomJoin: true,
-          room: targetRoomName,
-          canPublish: true,
-          canSubscribe: true,
-          canPublishData: true,
-        },
-        audio: {
-          roomJoin: true,
-          room: targetRoomName,
-          canPublish: true,
-          canSubscribe: true,
-        },
-      },
-      process.env.LIVEKIT_API_SECRET || 'fallback-secret',
-      {
-        issuer: process.env.LIVEKIT_API_KEY,
-        expiresIn: '1h',
-        algorithm: 'HS256',
-      }
-    );
+    const liveKitToken = signLiveKitRoomToken({
+      subject: `patient_${tokenPayload.invitationId}_${Date.now()}`,
+      roomName: targetRoomName,
+      expiresIn: '1h',
+    });
 
     // Mark access attempt as successful
     accessAttempt.success = true;
@@ -440,7 +366,6 @@ export async function POST(req: NextRequest) {
         .where('invitationId', '==', tokenPayload.invitationId)
         .get();
       
-      let existingAdmittedPatient = null;
       let existingWaitingPatient = null;
       
       if (!existingPatientsQuery.empty) {

@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
-import jwt from "jsonwebtoken";
 import { withRateLimit, RateLimitConfigs } from "../../../lib/rate-limit";
 import { validateRoomName, validateParticipantName, sanitizeInput } from "../../../lib/validation";
+import { signLiveKitRoomToken } from "../../../lib/invitations/token-utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -69,41 +69,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate input parameters
-    if (!roomName || !participantName) {
-      return NextResponse.json(
-        { error: 'Room name and participant name are required' },
-        { status: 400 }
-      );
-    }
-
     console.log('Generating token for:', { roomName: sanitizedRoomName, participantName: sanitizedParticipantName });
 
-    // Create JWT token manually with explicit HS256 algorithm
-    const token = jwt.sign(
-      {
-        sub: sanitizedParticipantName,
-        video: {
-          roomJoin: true,
-          room: sanitizedRoomName,
-          canPublish: true,
-          canSubscribe: true,
-          canPublishData: true,
-        },
-        audio: {
-          roomJoin: true,
-          room: sanitizedRoomName,
-          canPublish: true,
-          canSubscribe: true,
-        },
-      },
-      process.env.LIVEKIT_API_SECRET,
-      {
-        issuer: process.env.LIVEKIT_API_KEY,
-        expiresIn: "1h",
-        algorithm: "HS256", // Explicitly set HS256 algorithm
-      }
-    );
+    const token = signLiveKitRoomToken({
+      subject: sanitizedParticipantName,
+      roomName: sanitizedRoomName,
+      expiresIn: "1h",
+    });
 
     console.log('Token generated successfully');
     console.log('Token type:', typeof token);
