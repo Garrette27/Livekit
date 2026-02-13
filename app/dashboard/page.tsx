@@ -2,8 +2,17 @@
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, getFirestore, doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, doc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
+import {
+  isInCurrentMonth,
+  isTestConsultationSummary,
+  isTestDataSummary,
+  isVisibleConsultationForUser,
+  mergeUniqueByRoomName,
+  sortSummariesByCreatedAt,
+  shouldIncludeUserSummary,
+} from './utils/summary-logic';
 
 interface CallSummary {
   id: string;
@@ -144,62 +153,14 @@ export default function Dashboard() {
             };
           })
         );
-        
-          // Filter by user on the client side - show summaries for current user and exclude test data
-    const userSummaries = summariesWithEmails.filter(summary => {
-      const summaryUserId = summary.createdBy || summary.metadata?.createdBy;
-      const isUserSummary = summaryUserId === user.uid;
-      
-      // Only show summaries that belong to the current user
-      // Remove legacy summary logic that was showing summaries from other users
-      const isLegacySummary = false; // Disabled to prevent showing other users' summaries
-      
-      // Exclude test data - be more comprehensive in detecting test data
-      // But allow test-consultation summaries to be shown for testing purposes
-      const isTestData = (summary.metadata as any)?.testData || 
-                        (summary as any).testData || 
-                        (summary.metadata as any)?.source === 'test' ||
-                        (summary.metadata as any)?.test === true ||
-                        summary.roomName?.includes('test-room-') ||
-                        summary.roomName?.includes('test-transcription-') ||
-                        summary.roomName?.includes('test_');
-      
-      // Allow test-consultation summaries to be shown (they have source: 'test_consultation')
-      const isTestConsultation = (summary.metadata as any)?.source === 'test_consultation';
-      
-      // Reduced logging to prevent console spam
-      if (isUserSummary && !isTestData) {
-        // Only log once per summary to reduce noise
-        if (!summary._logged) {
-          console.log('Dashboard: Found user summary:', summary.roomName, 'User ID:', summaryUserId);
-          summary._logged = true;
-        }
-      } else if (isTestConsultation && isUserSummary) {
-        if (!summary._logged) {
-          console.log('Dashboard: Found test consultation summary:', summary.roomName, 'User ID:', summaryUserId);
-          summary._logged = true;
-        }
-      } else if (isTestData) {
-        // Skip logging test data exclusions to reduce noise
-      } else {
-        // Skip logging different user exclusions to reduce noise
-      }
-      
-      return (isUserSummary || isLegacySummary) && (!isTestData || isTestConsultation); // Show user summaries, legacy summaries, and test consultations
-    });
 
+        const userSummaries = summariesWithEmails.filter((summary) => shouldIncludeUserSummary(summary, user.uid));
 
-        
         console.log('Dashboard: Received summaries:', userSummaries.length, 'summaries for user', user.uid);
         console.log('Dashboard: Total summaries in database:', allSummaries.length);
         console.log('Dashboard: User ID:', user.uid);
         console.log('Dashboard: All summaries user IDs:', allSummaries.map(s => ({ room: s.roomName, userId: s.createdBy || s.metadata?.createdBy })));
-        // Firestore already orders by createdAt, but keep a defensive client-side reorder
-        const ordered = [...userSummaries].sort((a, b) => {
-          const ad = a.createdAt?.toDate?.() ? a.createdAt.toDate().getTime() : 0;
-          const bd = b.createdAt?.toDate?.() ? b.createdAt.toDate().getTime() : 0;
-          return sortOrder === 'desc' ? bd - ad : ad - bd;
-        });
+        const ordered = sortSummariesByCreatedAt(userSummaries, sortOrder);
         setSummaries(ordered);
         setLoading(false);
       }, 500); // 500ms debounce
@@ -382,19 +343,7 @@ export default function Dashboard() {
     const processAndMerge = async (consultations: Consultation[]) => {
       console.log('Dashboard: Found real consultations:', consultations.length);
 
-      const filtered = consultations.filter(consultation => {
-        const consultationUserId = consultation.createdBy || consultation.metadata?.createdBy;
-        const patientUserId = consultation.patientUserId || consultation.metadata?.patientUserId;
-        const visibleToUsers = consultation.metadata?.visibleToUsers || [];
-
-        const isDoctorConsultation = consultationUserId === user.uid;
-        const isPatientConsultation = patientUserId === user.uid;
-        const isVisibleToUser = visibleToUsers.includes(user.uid);
-        const isRealConsultation = consultation.isRealConsultation === true;
-        const isCompleted = consultation.status === 'completed';
-
-        return (isDoctorConsultation || isPatientConsultation || isVisibleToUser) && isRealConsultation && isCompleted;
-      });
+      const filtered = consultations.filter((consultation) => isVisibleConsultationForUser(consultation, user.uid));
 
       // Fetch emails for all consultations - prefer stored email, fallback to user document lookup
       const consultationSummaries = await Promise.all(
@@ -452,15 +401,8 @@ export default function Dashboard() {
 
       setSummaries(prevSummaries => {
         const allSummaries = [...prevSummaries, ...consultationSummaries];
-        const uniqueSummaries = allSummaries.filter((summary, index, self) =>
-          index === self.findIndex(s => s.roomName === summary.roomName)
-        );
-
-        return uniqueSummaries.sort((a, b) => {
-          const ad = a.createdAt?.toDate?.() ? a.createdAt.toDate().getTime() : 0;
-          const bd = b.createdAt?.toDate?.() ? b.createdAt.toDate().getTime() : 0;
-          return sortOrder === 'desc' ? bd - ad : ad - bd;
-        });
+        const uniqueSummaries = mergeUniqueByRoomName(allSummaries);
+        return sortSummariesByCreatedAt(uniqueSummaries, sortOrder);
       });
     };
 
@@ -570,26 +512,11 @@ export default function Dashboard() {
     );
   }
 
-  // Filter out test data for statistics - use same logic as main filtering
-  const realSummaries = summaries.filter(summary => {
-    const isTestData = (summary.metadata as any)?.testData || 
-                      (summary as any).testData || 
-                      (summary.metadata as any)?.source === 'test' ||
-                      (summary.metadata as any)?.test === true ||
-                      summary.roomName?.includes('test-room-') ||
-                      summary.roomName?.includes('test-transcription-') ||
-                      summary.roomName?.includes('test_');
-    const isTestConsultation = (summary.metadata as any)?.source === 'test_consultation';
-    return !isTestData || isTestConsultation; // Include test consultations in statistics
-  });
+  const realSummaries = summaries.filter((summary) => !isTestDataSummary(summary) || isTestConsultationSummary(summary));
 
   const totalCalls = realSummaries.length;
-  const thisMonth = realSummaries.filter(s => {
-    const now = new Date();
-    const summaryDate = s.createdAt?.toDate?.() ? s.createdAt.toDate() : (s.createdAt instanceof Date ? s.createdAt : new Date());
-    return summaryDate.getMonth() === now.getMonth() && 
-           summaryDate.getFullYear() === now.getFullYear();
-  }).length;
+  const now = new Date();
+  const thisMonth = realSummaries.filter((summary) => isInCurrentMonth(summary, now)).length;
   const avgDuration = realSummaries.length > 0 
     ? Math.round(realSummaries.reduce((acc, s) => acc + (s.duration || 0), 0) / realSummaries.length)
     : 0;

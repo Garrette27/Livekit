@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { Firestore } from 'firebase/firestore';
 import { FirebaseStorage } from 'firebase/storage';
@@ -25,6 +26,32 @@ export default function NotesPanel({ roomName, db, storage }: NotesPanelProps) {
   const MAX_FILE_SIZE_IMAGE = 10 * 1024 * 1024; // 10MB
   const MAX_FILE_SIZE_PDF = 5 * 1024 * 1024; // 5MB
   const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+
+  useEffect(() => {
+    if (!db || !roomName) {
+      return;
+    }
+
+    const callRef = doc(db, 'calls', roomName);
+    const unsubscribe = onSnapshot(
+      callRef,
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          return;
+        }
+
+        const data = snapshot.data();
+        if (Array.isArray(data.manualNotes)) {
+          setManualNotes(data.manualNotes as ManualNote[]);
+        }
+      },
+      (error) => {
+        console.error('Error loading manual notes:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [db, roomName]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -350,12 +377,17 @@ export default function NotesPanel({ roomName, db, storage }: NotesPanelProps) {
                     <div key={attIndex} style={{ marginBottom: '0.25rem' }}>
                       {attachment.type.startsWith('image/') ? (
                         <div>
-                          <img
+                          <Image
                             src={attachment.url}
                             alt={attachment.name}
+                            width={800}
+                            height={450}
+                            unoptimized
                             style={{
                               maxWidth: '100%',
+                              width: '100%',
                               maxHeight: '150px',
+                              height: 'auto',
                               borderRadius: '0.25rem',
                               marginBottom: '0.25rem',
                               cursor: 'pointer'
