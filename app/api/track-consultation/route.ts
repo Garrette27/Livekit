@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import type {
   DocumentReference,
   Firestore,
-  QueryDocumentSnapshot,
 } from 'firebase-admin/firestore';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import {
@@ -27,6 +26,7 @@ interface TrackConsultationRequest {
   patientName?: string;
   userId?: string;
   patientEmail?: string;
+  consultationSessionId?: string;
 }
 
 interface DateLike {
@@ -65,18 +65,6 @@ function toDate(value: unknown): Date | null {
   return parsed;
 }
 
-function getLatestByCreatedAt(docs: QueryDocumentSnapshot[]): QueryDocumentSnapshot | null {
-  if (docs.length === 0) {
-    return null;
-  }
-
-  return [...docs].sort((left, right) => {
-    const leftMillis = toDate(left.data().createdAt)?.getTime() || 0;
-    const rightMillis = toDate(right.data().createdAt)?.getTime() || 0;
-    return rightMillis - leftMillis;
-  })[0];
-}
-
 async function lookupDoctorUserId(
   db: Firestore,
   roomName: string
@@ -95,114 +83,41 @@ async function lookupDoctorUserId(
   }
 }
 
-async function lookupUserIdByEmail(
-  db: Firestore,
-  email: string
-): Promise<string | null> {
-  const normalizedEmail = email.trim().toLowerCase();
-  if (!normalizedEmail) {
-    return null;
-  }
-
-  try {
-    const querySnapshot = await db
-      .collection('users')
-      .where('email', '==', normalizedEmail)
-      .limit(1)
-      .get();
-
-    if (querySnapshot.empty) {
-      return null;
-    }
-
-    return querySnapshot.docs[0].id;
-  } catch (error) {
-    console.error('Error looking up user by email:', error);
-    return null;
-  }
-}
-
-async function lookupLatestInvitationEmail(
-  db: Firestore,
-  roomName: string
-): Promise<string | null> {
-  try {
-    const invitationsSnapshot = await db
-      .collection('invitations')
-      .where('roomName', '==', roomName)
-      .limit(20)
-      .get();
-
-    if (invitationsSnapshot.empty) {
-      return null;
-    }
-
-    const latestInvitationDoc = getLatestByCreatedAt(invitationsSnapshot.docs);
-    if (!latestInvitationDoc) {
-      return null;
-    }
-
-    const invitationData = latestInvitationDoc.data();
-    const invitationEmail =
-      invitationData?.emailAllowed ||
-      invitationData?.metadata?.constraints?.email ||
-      null;
-
-    return invitationEmail ? String(invitationEmail).trim().toLowerCase() : null;
-  } catch (error) {
-    console.error('Error resolving invitation email:', error);
-    return null;
-  }
-}
-
-async function resolvePatientIdentity(
-  db: Firestore,
-  params: {
+function resolvePatientIdentity(params: {
     roomName: string;
     userId?: string;
     patientEmail?: string;
     doctorUserId: string;
     existingPatientUserId?: string | null;
     existingPatientEmail?: string | null;
+    preferExistingKnownPatient?: boolean;
   }
-): Promise<ResolvedPatientIdentity> {
+): ResolvedPatientIdentity {
   const {
-    roomName,
     userId,
     patientEmail,
     doctorUserId,
     existingPatientUserId,
     existingPatientEmail,
+    preferExistingKnownPatient = false,
   } = params;
 
-  let resolvedPatientUserId = userId || 'anonymous';
+  let resolvedPatientUserId = isKnownUserId(userId) ? userId : 'anonymous';
   let resolvedPatientEmail: string | null = patientEmail?.trim().toLowerCase() || null;
 
   if (resolvedPatientUserId === doctorUserId) {
     resolvedPatientUserId = 'anonymous';
   }
 
-  if (!isKnownUserId(resolvedPatientUserId) && resolvedPatientEmail) {
-    const matchedUserId = await lookupUserIdByEmail(db, resolvedPatientEmail);
-    if (matchedUserId && matchedUserId !== doctorUserId) {
-      resolvedPatientUserId = matchedUserId;
-    }
-  }
-
-  if (!isKnownUserId(resolvedPatientUserId) && !resolvedPatientEmail) {
-    const invitationEmail = await lookupLatestInvitationEmail(db, roomName);
-    if (invitationEmail) {
-      resolvedPatientEmail = invitationEmail;
-      const matchedUserId = await lookupUserIdByEmail(db, invitationEmail);
-      if (matchedUserId && matchedUserId !== doctorUserId) {
-        resolvedPatientUserId = matchedUserId;
-      }
-    }
+  if (preferExistingKnownPatient && !resolvedPatientEmail) {
+    resolvedPatientEmail = existingPatientEmail || null;
   }
 
   return {
-    patientUserId: choosePatientUserId(resolvedPatientUserId, existingPatientUserId || null),
-    patientEmail: resolvedPatientEmail || existingPatientEmail || null,
+    patientUserId: preferExistingKnownPatient
+      ? choosePatientUserId(resolvedPatientUserId, existingPatientUserId || null)
+      : resolvedPatientUserId || 'anonymous',
+    patientEmail: resolvedPatientEmail || null,
   };
 }
 
@@ -299,6 +214,7 @@ async function handleJoinEvent(
     metadata: {
       source: 'track-consultation-join',
       patientName,
+      patientEmail,
     },
   });
 
@@ -330,6 +246,7 @@ async function handleLeaveEvent(
     doctorUserId: string;
     consultationRef: DocumentReference;
     existingData: Record<string, any> | null;
+    preferredConsultationSessionId?: string;
   }
 ) {
   const {
@@ -340,6 +257,7 @@ async function handleLeaveEvent(
     doctorUserId,
     consultationRef,
     existingData,
+    preferredConsultationSessionId,
   } = params;
 
   if (!existingData) {
@@ -350,12 +268,27 @@ async function handleLeaveEvent(
   }
 
   const now = new Date();
-  const sessionStartedAt = toDate(existingData.sessionStartedAt || existingData.joinedAt) || now;
-  const consultationSessionId = resolveLeaveSessionId({
-    roomName,
-    existingData,
-    now,
-  });
+  const consultationSessionId =
+    preferredConsultationSessionId?.trim() ||
+    resolveLeaveSessionId({
+      roomName,
+      existingData,
+      now,
+    });
+  let sessionStartedAt = toDate(existingData.sessionStartedAt || existingData.joinedAt) || now;
+
+  try {
+    const sessionDoc = await db.collection('consultationSessions').doc(consultationSessionId).get();
+    if (sessionDoc.exists) {
+      const sessionData = sessionDoc.data() as Record<string, unknown>;
+      const sessionSnapshotStartedAt = toDate(sessionData?.sessionStartedAt);
+      if (sessionSnapshotStartedAt) {
+        sessionStartedAt = sessionSnapshotStartedAt;
+      }
+    }
+  } catch (sessionLookupError) {
+    console.error('Error resolving sessionStartedAt from session snapshot:', sessionLookupError);
+  }
   const durationMinutes = calculateDurationMinutes({
     startedAt: sessionStartedAt,
     endedAt: now,
@@ -403,6 +336,7 @@ async function handleLeaveEvent(
     metadata: {
       source: 'track-consultation-leave',
       patientName,
+      patientEmail,
       durationMinutes,
     },
   });
@@ -447,6 +381,7 @@ export async function POST(req: Request) {
     const patientName = body.patientName?.trim() || 'Unknown Patient';
     const userId = body.userId?.trim() || 'anonymous';
     const patientEmail = body.patientEmail?.trim().toLowerCase() || undefined;
+    const preferredConsultationSessionId = body.consultationSessionId?.trim() || undefined;
 
     if (!roomName || !action) {
       return NextResponse.json(
@@ -491,13 +426,14 @@ export async function POST(req: Request) {
     const existingPatientUserId = existingData?.patientUserId || existingData?.metadata?.patientUserId || null;
     const existingPatientEmail = existingData?.patientEmail || existingData?.metadata?.patientEmail || null;
 
-    const resolvedPatient = await resolvePatientIdentity(db, {
+    const resolvedPatient = resolvePatientIdentity({
       roomName,
       userId,
       patientEmail,
       doctorUserId,
       existingPatientUserId,
       existingPatientEmail,
+      preferExistingKnownPatient: action === 'leave',
     });
 
     if (action === 'join') {
@@ -528,6 +464,7 @@ export async function POST(req: Request) {
       doctorUserId,
       consultationRef,
       existingData,
+      preferredConsultationSessionId,
     });
 
     return NextResponse.json({

@@ -74,6 +74,7 @@ export function useWaitingQueue({
   const [error, setError] = useState<string | null>(null);
   const [admittingId, setAdmittingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [scopeInitialized, setScopeInitialized] = useState(false);
   const dispatch = useAppDispatch();
   const isFetchingRef = useRef(false);
 
@@ -95,9 +96,24 @@ export function useWaitingQueue({
   );
 
   const snapshot = useAppSelector((state) => state.waitingQueue.byScopeKey[scopeKey]);
-  const waitingPatients = snapshot?.waitingPatients ?? EMPTY_WAITING_PATIENTS;
-  const waitingPatientCounts = snapshot?.waitingPatientCounts ?? EMPTY_WAITING_COUNTS;
+  const previousScopeKeyRef = useRef(scopeKey);
+  const isScopeChanged = previousScopeKeyRef.current !== scopeKey;
+  const waitingPatients =
+    scopeInitialized && !isScopeChanged
+      ? snapshot?.waitingPatients ?? EMPTY_WAITING_PATIENTS
+      : EMPTY_WAITING_PATIENTS;
+  const waitingPatientCounts =
+    scopeInitialized && !isScopeChanged
+      ? snapshot?.waitingPatientCounts ?? EMPTY_WAITING_COUNTS
+      : EMPTY_WAITING_COUNTS;
   const lastUpdatedAtMs = snapshot?.lastUpdatedAtMs || null;
+
+  useEffect(() => {
+    if (previousScopeKeyRef.current !== scopeKey) {
+      previousScopeKeyRef.current = scopeKey;
+      setScopeInitialized(false);
+    }
+  }, [scopeKey]);
 
   const refresh = useCallback(
     async (showLoading = false) => {
@@ -159,6 +175,7 @@ export function useWaitingQueue({
         console.error('Failed to fetch waiting queue:', fetchError);
         setError('Failed to load waiting queue');
       } finally {
+        setScopeInitialized(true);
         isFetchingRef.current = false;
         if (showLoading) {
           setLoading(false);

@@ -227,7 +227,19 @@ export default function Page() {
             <p style={{ color: '#4B5563' }}>Welcome, Dr. {user.displayName?.split(' ')[0] || user.email?.split('@')[0]}</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            <Link href="/doctor/dashboard" style={{ color: '#2563EB', fontSize: '1.125rem', fontWeight: '500', textDecoration: 'none' }}>
+            <Link
+              href="/dashboard"
+              style={{
+                backgroundColor: 'transparent',
+                border: 'none',
+                padding: 0,
+                color: '#2563EB',
+                fontSize: '1.125rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                textDecoration: 'none',
+              }}
+            >
               View History
             </Link>
             <button

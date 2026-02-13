@@ -11,6 +11,7 @@ interface UseRoomChatControllerArgs {
 export interface RoomChatController {
   enabled: boolean;
   isOpen: boolean;
+  open: () => void;
   toggle: () => void;
   close: () => void;
 }
@@ -83,9 +84,10 @@ export function useRoomChatController({
     () => ({
       enabled,
       isOpen,
+      open,
       toggle,
       close,
     }),
-    [close, enabled, isOpen, toggle]
+    [close, enabled, isOpen, open, toggle]
   );
 }

@@ -7,6 +7,16 @@ export interface ConsultationEventInput {
   userId?: string | null;
   patientEmail?: string | null;
   duration?: number;
+  consultationSessionId?: string | null;
+}
+
+export interface TrackConsultationEventResponse {
+  success: boolean;
+  message?: string;
+  consultationSessionId?: string | null;
+  durationMinutes?: number;
+  error?: string;
+  details?: string;
 }
 
 interface TrackConsultationRequestBody {
@@ -16,6 +26,7 @@ interface TrackConsultationRequestBody {
   userId: string;
   patientEmail?: string | null;
   duration?: number;
+  consultationSessionId?: string | null;
 }
 
 interface TrackConsultationOptions {
@@ -34,13 +45,14 @@ function buildBody(input: ConsultationEventInput): TrackConsultationRequestBody 
     userId: normalizeUserId(input.userId),
     patientEmail: input.patientEmail ?? null,
     duration: input.duration,
+    consultationSessionId: input.consultationSessionId ?? null,
   };
 }
 
 export async function trackConsultationEvent(
   input: ConsultationEventInput,
   { keepalive = false }: TrackConsultationOptions = {}
-): Promise<void> {
+): Promise<TrackConsultationEventResponse> {
   const response = await fetch('/api/track-consultation', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -48,10 +60,20 @@ export async function trackConsultationEvent(
     keepalive,
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || 'Failed to track consultation event');
+  let result: TrackConsultationEventResponse | null = null;
+  try {
+    result = (await response.json()) as TrackConsultationEventResponse;
+  } catch {
+    result = null;
   }
+
+  if (!response.ok) {
+    const errorMessage =
+      result?.error || result?.details || 'Failed to track consultation event';
+    throw new Error(errorMessage);
+  }
+
+  return result || { success: true };
 }
 
 export function trackConsultationEventWithBeacon(input: ConsultationEventInput): boolean {
@@ -61,4 +83,3 @@ export function trackConsultationEventWithBeacon(input: ConsultationEventInput):
 
   return navigator.sendBeacon('/api/track-consultation', JSON.stringify(buildBody(input)));
 }
-

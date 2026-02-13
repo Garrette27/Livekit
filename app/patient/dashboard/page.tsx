@@ -5,8 +5,11 @@ import { User } from 'firebase/auth';
 import { collection, onSnapshot, query, Timestamp, where, limit, doc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { calculateDurationMinutes } from '@/lib/consultations/session-timing';
 import { useAuthSession } from '@/hooks/useAuthSession';
+import {
+  getPendingConsultationSessionIds,
+  removePendingConsultationSessionIds,
+} from '@/lib/consultations/pending-session-client';
 
 // Component for joining with invitation link
 function JoinWithInvitationLink() {
@@ -119,38 +122,24 @@ interface CallSummary {
   patientEmail?: string;
 }
 
-interface Consultation {
-  id: string;
-  roomName: string;
-  patientName?: string;
-  duration?: number;
-  status?: string;
-  joinedAt?: any;
-  leftAt?: any;
-  createdBy?: string;
-  patientUserId?: string;
-  isRealConsultation?: boolean;
-  metadata?: {
-    createdBy?: string;
-    patientUserId?: string;
-    doctorUserId?: string;
-    visibleToUsers?: string[];
-  };
-}
-
 export default function PatientDashboard() {
   const router = useRouter();
 
   const handleAuthenticated = useCallback(async (authenticatedUser: User) => {
     try {
-      await fetch('/api/link-patient-consultations', {
+      const pendingSessionIds = getPendingConsultationSessionIds();
+      const response = await fetch('/api/link-patient-consultations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: authenticatedUser.uid,
           userEmail: authenticatedUser.email,
+          pendingSessionIds,
         }),
       });
+      if (response.ok && pendingSessionIds.length > 0) {
+        removePendingConsultationSessionIds(pendingSessionIds);
+      }
       console.log('Linked patient consultations');
     } catch (error) {
       console.error('Error linking consultations:', error);
@@ -206,14 +195,14 @@ export default function PatientDashboard() {
       return;
     }
 
-    setDeletingSummary(summary.roomName);
+    setDeletingSummary(summary.id);
     setDeleteError(null);
 
     try {
       // Get Firebase ID token for authentication
       const token = await user.getIdToken();
 
-      const response = await fetch(`/api/summary/delete?id=${encodeURIComponent(summary.roomName)}`, {
+      const response = await fetch(`/api/summary/delete?id=${encodeURIComponent(summary.id)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -243,140 +232,105 @@ export default function PatientDashboard() {
       return;
     }
 
-    // NOTE: Patients should NOT see AI summaries - only doctors see those
-    // We only fetch consultations (session history), not call-summaries
-
-    // Fetch consultations to show ALL sessions (even without summaries)
-    const consultationsRef = collection(db, 'consultations');
-    const consultationsQuery1 = query(
-      consultationsRef,
-      where('metadata.visibleToUsers', 'array-contains', user.uid),
-      limit(100)
-    );
-
-    const consultationsQuery2 = query(
-      consultationsRef,
+    const summariesRef = collection(db, 'call-summaries');
+    const byPatientUserIdQuery = query(
+      summariesRef,
       where('patientUserId', '==', user.uid),
-      limit(100)
+      limit(200)
+    );
+    const byMetadataPatientUserIdQuery = query(
+      summariesRef,
+      where('metadata.patientUserId', '==', user.uid),
+      limit(200)
     );
 
-    let allConsultationSummaries: CallSummary[] = [];
+    let directMatches: CallSummary[] = [];
+    let metadataMatches: CallSummary[] = [];
 
-    // NOTE: We don't process call-summaries for patients - only doctors see AI summaries
-
-    // Process consultations
-    const processConsultations = async (consultationData: Consultation[]) => {
-      // Filter to show ALL real consultations (even 1-second sessions)
-      // Show if patient joined (joinedAt exists) - this ensures even brief sessions are included
-      const filtered = consultationData.filter(consultation => {
-        const isReal = consultation.isRealConsultation === true;
-        const hasJoined = consultation.joinedAt; // Patient joined the session
-        const isVisible = consultation.metadata?.visibleToUsers?.includes(user.uid) || 
-                         consultation.patientUserId === user.uid;
-        // Show all real consultations where patient joined, regardless of duration
-        return isReal && hasJoined && isVisible;
+    const sortByCreatedAt = (items: CallSummary[]) =>
+      [...items].sort((left, right) => {
+        const leftMillis =
+          left.createdAt instanceof Date
+            ? left.createdAt.getTime()
+            : left.createdAt?.toDate?.().getTime() || 0;
+        const rightMillis =
+          right.createdAt instanceof Date
+            ? right.createdAt.getTime()
+            : right.createdAt?.toDate?.().getTime() || 0;
+        return sortOrder === 'desc' ? rightMillis - leftMillis : leftMillis - rightMillis;
       });
 
-      // Convert consultations to simple consultation format (NO summaries - only basic info)
-      const consultationSummaries = await Promise.all(
-        filtered.map(async (consultation) => {
-          const doctorUserId = consultation.createdBy || consultation.metadata?.createdBy || consultation.metadata?.doctorUserId;
-          const patientUserId = consultation.patientUserId || consultation.metadata?.patientUserId || user.uid;
-          
-          const doctorEmail = await fetchUserEmail(doctorUserId);
-          const patientEmail = await fetchUserEmail(patientUserId);
+    const refreshSummaries = async () => {
+      const mergedById = new Map<string, CallSummary>();
+      [...directMatches, ...metadataMatches].forEach((summary) => {
+        mergedById.set(summary.id, summary);
+      });
 
-          const joinedAt = consultation.joinedAt?.toDate?.() || consultation.joinedAt;
-          const leftAt = consultation.leftAt?.toDate?.() || consultation.leftAt;
-          const createdAt = leftAt || joinedAt || new Date();
+      const hydratedSummaries = await Promise.all(
+        Array.from(mergedById.values()).map(async (summary) => {
+          const doctorUserId = summary.createdBy || summary.metadata?.createdBy;
+          const patientUserId =
+            summary.patientUserId || summary.metadata?.patientUserId || user.uid;
 
-          const durationMinutes = consultation.duration || calculateDurationMinutes({
-            startedAt: joinedAt,
-            endedAt: leftAt || createdAt,
-          });
+          const doctorEmail =
+            summary.doctorEmail || (await fetchUserEmail(doctorUserId)) || undefined;
+          const patientEmail =
+            summary.patientEmail || (await fetchUserEmail(patientUserId)) || undefined;
 
           return {
-            id: consultation.id,
-            roomName: consultation.roomName,
-            // No summary text - patients don't see AI summaries
-            summary: undefined,
-            keyPoints: undefined,
-            recommendations: undefined,
-            followUpActions: undefined,
-            riskLevel: undefined,
-            category: undefined,
-            participants: [consultation.patientName || 'Unknown Patient'],
-            duration: durationMinutes,
-            createdAt: createdAt,
+            ...summary,
+            roomName: summary.roomName || 'Unknown Room',
+            duration: Number(summary.duration || 0),
             createdBy: doctorUserId,
-            patientUserId: patientUserId,
-            doctorEmail: doctorEmail || undefined,
-            patientEmail: patientEmail || undefined,
-            metadata: {
-              totalParticipants: 1,
-              createdBy: doctorUserId,
-              patientUserId: patientUserId,
-              source: 'consultation_tracking',
-              hasTranscriptionData: false,
-              consultationData: true
-            }
+            patientUserId,
+            doctorEmail,
+            patientEmail,
           } as CallSummary;
         })
       );
 
-      allConsultationSummaries = consultationSummaries;
-      updateDisplay();
-    };
-
-    const updateDisplay = () => {
-      // Only show consultations (no AI summaries for patients)
-      const unique = allConsultationSummaries.filter((item, index, self) => 
-        index === self.findIndex(t => t.roomName === item.roomName)
-      );
-
-      // Sort by date
-      const sorted = unique.sort((a, b) => {
-        const aTime = (a.createdAt instanceof Date ? a.createdAt.getTime() : 
-                      (a.createdAt && typeof a.createdAt === 'object' && 'toDate' in a.createdAt ? 
-                       (a.createdAt as any).toDate().getTime() : 0)) || 0;
-        const bTime = (b.createdAt instanceof Date ? b.createdAt.getTime() : 
-                      (b.createdAt && typeof b.createdAt === 'object' && 'toDate' in b.createdAt ? 
-                       (b.createdAt as any).toDate().getTime() : 0)) || 0;
-        return sortOrder === 'desc' ? bTime - aTime : aTime - bTime;
-      });
-
-      setSummaries(sorted);
+      setSummaries(sortByCreatedAt(hydratedSummaries));
       setLoading(false);
     };
 
-    // NOTE: No listeners for call-summaries - patients don't see AI summaries
+    const unsubscribeByPatientUserId = onSnapshot(
+      byPatientUserIdQuery,
+      async (snapshot) => {
+        directMatches = snapshot.docs.map((summaryDoc) => ({
+          id: summaryDoc.id,
+          ...summaryDoc.data(),
+        })) as CallSummary[];
+        await refreshSummaries();
+      },
+      (snapshotError) => {
+        console.error('Error fetching patient summaries (patientUserId):', snapshotError);
+        setLoading(false);
+      }
+    );
 
-    // Listen to consultations
-    const unsubscribe3 = onSnapshot(consultationsQuery1, async (snapshot) => {
-      const consultationData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Consultation[];
-      await processConsultations(consultationData);
-    }, (error) => {
-      console.error('Error fetching consultations:', error);
-    });
-
-    const unsubscribe4 = onSnapshot(consultationsQuery2, async (snapshot) => {
-      const consultationData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Consultation[];
-      await processConsultations(consultationData);
-    }, (error) => {
-      console.error('Error fetching consultations by patientUserId:', error);
-    });
+    const unsubscribeByMetadataPatientUserId = onSnapshot(
+      byMetadataPatientUserIdQuery,
+      async (snapshot) => {
+        metadataMatches = snapshot.docs.map((summaryDoc) => ({
+          id: summaryDoc.id,
+          ...summaryDoc.data(),
+        })) as CallSummary[];
+        await refreshSummaries();
+      },
+      (snapshotError) => {
+        console.error(
+          'Error fetching patient summaries (metadata.patientUserId):',
+          snapshotError
+        );
+        setLoading(false);
+      }
+    );
 
     return () => {
-      unsubscribe3();
-      unsubscribe4();
+      unsubscribeByPatientUserId();
+      unsubscribeByMetadataPatientUserId();
     };
-  }, [user, sortOrder, isAuthorized]);
+  }, [isAuthorized, sortOrder, user]);
 
   if (authLoading) {
     return (
@@ -632,25 +586,25 @@ export default function PatientDashboard() {
                       )}
                       <button
                         onClick={() => handleDelete(summary)}
-                        disabled={deletingSummary === summary.roomName}
+                        disabled={deletingSummary === summary.id}
                         style={{
                           padding: '0.5rem 1rem',
-                          backgroundColor: deletingSummary === summary.roomName ? '#9ca3af' : '#dc2626',
+                          backgroundColor: deletingSummary === summary.id ? '#9ca3af' : '#dc2626',
                           color: 'white',
                           border: 'none',
                           borderRadius: '0.5rem',
-                          cursor: deletingSummary === summary.roomName ? 'not-allowed' : 'pointer',
+                          cursor: deletingSummary === summary.id ? 'not-allowed' : 'pointer',
                           fontSize: '0.875rem',
                           fontWeight: '500',
                           whiteSpace: 'nowrap',
-                          opacity: deletingSummary === summary.roomName ? 0.6 : 1
+                          opacity: deletingSummary === summary.id ? 0.6 : 1
                         }}
                       >
-                        {deletingSummary === summary.roomName ? 'Deleting...' : 'Delete'}
+                        {deletingSummary === summary.id ? 'Deleting...' : 'Delete'}
                       </button>
                     </div>
                   </div>
-                  {deleteError && summary.roomName === deletingSummary && (
+                  {deleteError && summary.id === deletingSummary && (
                     <div style={{
                       marginTop: '0.5rem',
                       padding: '0.75rem',

@@ -15,6 +15,11 @@ import {
   trackConsultationEvent,
   trackConsultationEventWithBeacon,
 } from '@/lib/consultations/consultation-event-client';
+import {
+  addPendingConsultationSessionId,
+  getPendingConsultationSessionIds,
+  removePendingConsultationSessionIds,
+} from '@/lib/consultations/pending-session-client';
 
 function PatientRoomClient({ roomName }: { roomName: string }) {
   const router = useRouter();
@@ -24,11 +29,22 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isLeavingRef = useRef(false);
+  const consultationSessionIdRef = useRef<string | null>(null);
+  const consultationSessionStorageKey = `patientConsultationSessionId_${roomName}`;
+
+  useEffect(() => {
+    const storedConsultationSessionId = localStorage.getItem(consultationSessionStorageKey);
+    if (storedConsultationSessionId) {
+      consultationSessionIdRef.current = storedConsultationSessionId;
+    }
+  }, [consultationSessionStorageKey]);
 
   useEffect(() => {
     if (!user || !roomName) {
       return;
     }
+
+    const pendingSessionIds = getPendingConsultationSessionIds();
 
     if (user.email) {
       void fetch('/api/link-patient-consultations', {
@@ -37,10 +53,21 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         body: JSON.stringify({
           userId: user.uid,
           userEmail: user.email,
+          pendingSessionIds,
         }),
-      }).catch((linkError) => {
-        console.error('Error linking consultations after sign-in:', linkError);
-      });
+      })
+        .then((response) => {
+          if (response.ok && pendingSessionIds.length > 0) {
+            removePendingConsultationSessionIds(pendingSessionIds);
+          }
+        })
+        .catch((linkError) => {
+          console.error('Error linking consultations after sign-in:', linkError);
+        });
+    }
+
+    if (!token) {
+      return;
     }
 
     const wasInCall = localStorage.getItem(`patientInCall_${roomName}`);
@@ -54,10 +81,19 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
       patientName: patientName || localStorage.getItem(`patientName_${roomName}`) || 'Patient',
       userId: user.uid,
       patientEmail: user.email || null,
-    }).catch((updateError) => {
-      console.error('Error updating consultation after sign-in:', updateError);
-    });
-  }, [patientName, roomName, user]);
+      consultationSessionId: consultationSessionIdRef.current,
+    })
+      .then((result) => {
+        consultationSessionIdRef.current = result.consultationSessionId || consultationSessionIdRef.current;
+        if (consultationSessionIdRef.current) {
+          localStorage.setItem(consultationSessionStorageKey, consultationSessionIdRef.current);
+        }
+        addPendingConsultationSessionId(result.consultationSessionId);
+      })
+      .catch((updateError) => {
+        console.error('Error updating consultation after sign-in:', updateError);
+      });
+  }, [consultationSessionStorageKey, patientName, roomName, token, user]);
 
   useEffect(() => {
     const savedName = localStorage.getItem(`patientName_${roomName}`);
@@ -85,9 +121,13 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         patientName,
         userId: user?.uid,
         patientEmail: user?.email || null,
+        consultationSessionId: consultationSessionIdRef.current,
       });
 
       if (trackedWithBeacon) {
+        if (consultationSessionIdRef.current) {
+          addPendingConsultationSessionId(consultationSessionIdRef.current);
+        }
         return;
       }
 
@@ -98,6 +138,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
           patientName,
           userId: user?.uid,
           patientEmail: user?.email || null,
+          consultationSessionId: consultationSessionIdRef.current,
         },
         { keepalive: true }
       ).catch((trackError) => {
@@ -107,27 +148,6 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [patientName, roomName, token, user?.email, user?.uid]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden || !token) {
-        return;
-      }
-
-      void trackConsultationEvent({
-        roomName,
-        action: 'leave',
-        patientName,
-        userId: user?.uid,
-        patientEmail: user?.email || null,
-      }).catch((trackError) => {
-        console.error('Error tracking consultation leave (visibility change):', trackError);
-      });
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [patientName, roomName, token, user?.email, user?.uid]);
 
   const handleGoogleSignIn = async () => {
@@ -174,13 +194,18 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
       localStorage.setItem(`patientToken_${roomName}`, data.token);
       setToken(data.token);
 
-      await trackConsultationEvent({
+      const result = await trackConsultationEvent({
         roomName,
         action: 'join',
         patientName,
         userId: user?.uid,
         patientEmail: user?.email || null,
       });
+      consultationSessionIdRef.current = result.consultationSessionId || consultationSessionIdRef.current;
+      if (consultationSessionIdRef.current) {
+        localStorage.setItem(consultationSessionStorageKey, consultationSessionIdRef.current);
+      }
+      addPendingConsultationSessionId(result.consultationSessionId);
     } catch (joinError) {
       const message = joinError instanceof Error ? joinError.message : 'Failed to join room';
       setError(message);
@@ -210,9 +235,13 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
       patientName,
       userId: user?.uid,
       patientEmail: user?.email || null,
+      consultationSessionId: consultationSessionIdRef.current,
     });
 
     if (trackedWithBeacon) {
+      if (consultationSessionIdRef.current) {
+        addPendingConsultationSessionId(consultationSessionIdRef.current);
+      }
       return;
     }
 
@@ -223,12 +252,21 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         patientName,
         userId: user?.uid,
         patientEmail: user?.email || null,
+        consultationSessionId: consultationSessionIdRef.current,
       },
       { keepalive: true }
-    ).catch((trackError) => {
-      console.error('Error tracking patient leave:', trackError);
-    });
-  }, [patientName, roomName, user?.email, user?.uid]);
+    )
+      .then((result) => {
+        consultationSessionIdRef.current = result.consultationSessionId || consultationSessionIdRef.current;
+        if (consultationSessionIdRef.current) {
+          localStorage.setItem(consultationSessionStorageKey, consultationSessionIdRef.current);
+        }
+        addPendingConsultationSessionId(result.consultationSessionId);
+      })
+      .catch((trackError) => {
+        console.error('Error tracking patient leave:', trackError);
+      });
+  }, [consultationSessionStorageKey, patientName, roomName, user?.email, user?.uid]);
 
   const leaveConsultation = useCallback(() => {
     if (isLeavingRef.current) {
@@ -240,9 +278,11 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
 
     localStorage.removeItem(`patientToken_${roomName}`);
     localStorage.removeItem(`patientInCall_${roomName}`);
+    localStorage.removeItem(consultationSessionStorageKey);
+    consultationSessionIdRef.current = null;
     setToken(null);
     router.replace(getPostCallRedirectPath());
-  }, [getPostCallRedirectPath, roomName, router, trackPatientLeave]);
+  }, [consultationSessionStorageKey, getPostCallRedirectPath, roomName, router, trackPatientLeave]);
 
   if (!token) {
     return (

@@ -9,6 +9,7 @@ export interface RoomControlsPolicy {
 export interface RoomChatPolicy {
   enabled: boolean;
   defaultOpen: boolean;
+  autoOpenOnIncomingMessage: boolean;
 }
 
 export interface RoomGridPolicy {
@@ -78,6 +79,7 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
     chat: {
       enabled: true,
       defaultOpen: false,
+      autoOpenOnIncomingMessage: true,
     },
     grid: DEFAULT_GRID_POLICY,
     panels: {
@@ -115,6 +117,7 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
     chat: {
       enabled: true,
       defaultOpen: false,
+      autoOpenOnIncomingMessage: true,
     },
     grid: DEFAULT_GRID_POLICY,
     panels: {

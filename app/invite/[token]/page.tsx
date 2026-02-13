@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import PatientLiveKitRoom from './components/PatientLiveKitRoom';
 import PatientRegistration from '@/components/PatientRegistration';
@@ -9,6 +9,7 @@ import {
   trackConsultationEvent,
   trackConsultationEventWithBeacon,
 } from '@/lib/consultations/consultation-event-client';
+import { addPendingConsultationSessionId } from '@/lib/consultations/pending-session-client';
 import { 
   ValidateInvitationRequest, 
   ValidateInvitationResponse, 
@@ -109,6 +110,8 @@ function InvitePageContent() {
   const [deviceFingerprint, setDeviceFingerprint] = useState<DeviceFingerprint | null>(null);
   const [requiresRegistration, setRequiresRegistration] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
+  const trackedJoinKeyRef = useRef<string | null>(null);
+  const activeConsultationSessionIdRef = useRef<string | null>(null);
 
   // Generate device fingerprint
   useEffect(() => {
@@ -231,6 +234,48 @@ function InvitePageContent() {
     validateInvitation();
   }, [token, deviceFingerprint]);
 
+  useEffect(() => {
+    if (!validationResult?.roomName || validationResult.waitingRoomEnabled) {
+      trackedJoinKeyRef.current = null;
+      activeConsultationSessionIdRef.current = null;
+      return;
+    }
+
+    const joinTrackingKey = `${validationResult.invitationId || 'invite'}:${validationResult.roomName}:${validationResult.liveKitToken || 'token'}`;
+    if (trackedJoinKeyRef.current === joinTrackingKey) {
+      return;
+    }
+    trackedJoinKeyRef.current = joinTrackingKey;
+    activeConsultationSessionIdRef.current = null;
+
+    void trackConsultationEvent({
+      roomName: validationResult.roomName,
+      action: 'join',
+      patientName: 'Patient',
+      userId: user?.uid,
+      patientEmail: user?.email || validationResult.registeredEmail || invitationEmail || null,
+    })
+      .then((result) => {
+        activeConsultationSessionIdRef.current = result.consultationSessionId || null;
+        addPendingConsultationSessionId(result.consultationSessionId);
+      })
+      .catch((trackingError) => {
+        if (trackedJoinKeyRef.current === joinTrackingKey) {
+          trackedJoinKeyRef.current = null;
+        }
+        console.error('Error tracking patient join:', trackingError);
+      });
+  }, [
+    invitationEmail,
+    user?.email,
+    user?.uid,
+    validationResult?.invitationId,
+    validationResult?.liveKitToken,
+    validationResult?.registeredEmail,
+    validationResult?.roomName,
+    validationResult?.waitingRoomEnabled,
+  ]);
+
   const getPostCallRedirectPath = () => {
     if (user?.uid || isAuthenticated) {
       return '/patient/dashboard';
@@ -252,6 +297,7 @@ function InvitePageContent() {
         patientName: 'Patient',
         userId: user?.uid,
         patientEmail: user?.email || validationResult.registeredEmail || invitationEmail || null,
+        consultationSessionId: activeConsultationSessionIdRef.current,
       });
 
       if (!trackedWithBeacon) {
@@ -262,13 +308,24 @@ function InvitePageContent() {
             patientName: 'Patient',
             userId: user?.uid,
             patientEmail: user?.email || validationResult.registeredEmail || invitationEmail || null,
+            consultationSessionId: activeConsultationSessionIdRef.current,
           },
           { keepalive: true }
-        ).catch((trackingError) => {
-          console.error('Error tracking patient leave:', trackingError);
-        });
+        )
+          .then((result) => {
+            activeConsultationSessionIdRef.current = result.consultationSessionId || null;
+            addPendingConsultationSessionId(result.consultationSessionId);
+          })
+          .catch((trackingError) => {
+            console.error('Error tracking patient leave:', trackingError);
+          });
+      } else if (activeConsultationSessionIdRef.current) {
+        addPendingConsultationSessionId(activeConsultationSessionIdRef.current);
       }
     }
+
+    activeConsultationSessionIdRef.current = null;
+    trackedJoinKeyRef.current = null;
 
     router.push(getPostCallRedirectPath());
   };
