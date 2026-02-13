@@ -1,15 +1,17 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { useAuthSession } from '@/hooks/useAuthSession';
+import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 interface CreateRoomClientProps {
   room: string;
 }
 
 export default function CreateRoomClient({ room }: CreateRoomClientProps) {
+  const { showToast } = useToast();
   const { user, isLoading: authLoading } = useAuthSession();
   const [shareUrl, setShareUrl] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
@@ -25,13 +27,7 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
     }
   }, []);
 
-  useEffect(() => {
-    if (user && room && db) {
-      createRoom();
-    }
-  }, [user, room, db]);
-
-  const createRoom = async () => {
+  const createRoom = useCallback(async () => {
     if (!room.trim()) {
       setError('Invalid room name');
       return;
@@ -70,9 +66,17 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
       // Copy to clipboard
       try {
         await navigator.clipboard.writeText(shareUrl);
-        alert('Room created! Share URL copied to clipboard.');
-      } catch (err) {
-        alert('Room created! Share URL: ' + shareUrl);
+        showToast({
+          kind: 'success',
+          title: 'Room created',
+          message: 'Patient link copied to clipboard.',
+        });
+      } catch {
+        showToast({
+          kind: 'info',
+          title: 'Room created',
+          message: 'Patient link is ready below. Copy it manually if needed.',
+        });
       }
       
     } catch (error) {
@@ -81,7 +85,13 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
     } finally {
       setIsCreating(false);
     }
-  };
+  }, [db, room, showToast, user?.displayName, user?.email, user?.uid]);
+
+  useEffect(() => {
+    if (user && room && db) {
+      void createRoom();
+    }
+  }, [createRoom, db, room, user]);
 
   // Loading state while Firebase initializes
   if (!isFirebaseReady || authLoading) {
@@ -172,9 +182,17 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(shareUrl);
-                  alert('Link copied to clipboard!');
-                } catch (err) {
-                  alert('Failed to copy. Please copy manually: ' + shareUrl);
+                  showToast({
+                    kind: 'success',
+                    title: 'Link copied',
+                    message: 'Patient link copied to clipboard.',
+                  });
+                } catch {
+                  showToast({
+                    kind: 'error',
+                    title: 'Copy failed',
+                    message: 'Unable to copy link. Please copy it manually.',
+                  });
                 }
               }}
               style={{
@@ -232,7 +250,7 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
 
         {/* Navigation */}
         <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-          <Link href="/dashboard" style={{
+          <Link href="/doctor/history" style={{
             backgroundColor: '#6B7280',
             color: 'white',
             padding: '0.75rem 1.5rem',
@@ -245,7 +263,7 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
             display: 'inline-block',
             marginRight: '1rem'
           }}>
-            📊 Back to Dashboard
+            📊 Back to Consultation History
           </Link>
           <Link href="/" style={{
             backgroundColor: '#374151',

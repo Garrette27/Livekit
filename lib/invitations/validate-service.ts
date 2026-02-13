@@ -543,9 +543,14 @@ export async function validateInvitationAndIssueToken(
     }
 
     const targetRoomName = isWaitingRoomEnabled ? waitingRoomName : tokenPayload.roomName;
+    const participantDisplayName =
+      userResolution.lookup.userProfile?.displayName
+      || userResolution.lookup.userEmailToCheck
+      || 'Anonymous Patient';
     const liveKitToken = signLiveKitRoomToken({
       subject: `patient_${tokenPayload.invitationId}_${Date.now()}`,
       roomName: targetRoomName,
+      participantName: participantDisplayName,
       expiresIn: '1h',
     });
 

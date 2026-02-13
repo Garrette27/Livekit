@@ -7,18 +7,18 @@ import {
   DeviceFingerprint,
   GeolocationData
 } from '@/lib/types';
+import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 interface PatientRegistrationProps {
   invitationEmail: string;
-  invitationToken: string;
   onRegistrationComplete: (email: string) => void;
 }
 
 export default function PatientRegistration({ 
   invitationEmail, 
-  invitationToken,
   onRegistrationComplete 
 }: PatientRegistrationProps) {
+  const { showToast } = useToast();
   const [email, setEmail] = useState(invitationEmail);
   const [phone, setPhone] = useState('');
   const [consentGiven, setConsentGiven] = useState(false);
@@ -108,9 +108,11 @@ export default function PatientRegistration({
         if (typeof window !== 'undefined') {
           localStorage.setItem('patientRegisteredEmail', email.trim());
         }
-        // Registration successful, now validate the invitation
-        // Show a brief message before proceeding
-        alert('Registration successful! You can now join the consultation. After the consultation, you can sign in to view your consultation history.');
+        showToast({
+          kind: 'success',
+          title: 'Registration complete',
+          message: 'You can now join the consultation room.',
+        });
         onRegistrationComplete(email.trim());
       } else {
         setError(result.error || 'Registration failed. Please try again.');

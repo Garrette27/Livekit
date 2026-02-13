@@ -28,6 +28,8 @@ function WaitingRoomView({
   setValidationResult: (result: ValidateInvitationResponse) => void;
   setError: (error: string | null) => void;
 }) {
+  const waitingPatientIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!validationResult?.invitationId) return;
     
@@ -46,12 +48,14 @@ function WaitingRoomView({
           body: JSON.stringify({
             invitationId: validationResult.invitationId,
             patientEmail: validationResult.registeredEmail || invitationEmail || undefined,
+            waitingPatientId: waitingPatientIdRef.current || undefined,
           }),
         });
 
         const result = await response.json();
 
         if (result.success && result.admitted && result.liveKitToken) {
+          waitingPatientIdRef.current = result.waitingPatientId || waitingPatientIdRef.current;
           console.log('✅ Patient admitted! Updating to main consultation room...');
           // Clear any previous errors
           setError(null);
@@ -65,21 +69,14 @@ function WaitingRoomView({
           };
           setValidationResult(admittedState);
           
-          // Store admission status in localStorage to prevent re-redirect to waiting room on page reload/viewport change
-          if (typeof window !== 'undefined' && validationResult?.invitationId) {
-            localStorage.setItem(`patient_admitted_${validationResult.invitationId}`, JSON.stringify({
-              admitted: true,
-              roomName: result.roomName,
-              liveKitToken: result.liveKitToken,
-              timestamp: Date.now()
-            }));
-          }
         } else if (!result.success && result.error) {
           console.error('Error checking admission:', result.error);
           // Don't set error for waiting status - that's expected
           if (result.error !== 'Waiting patient not found' && !result.error.includes('waiting')) {
             setError(result.error);
           }
+        } else if (result.success && !result.admitted && result.waitingPatientId) {
+          waitingPatientIdRef.current = result.waitingPatientId;
         }
       } catch (err: any) {
         console.error('Error checking admission:', err);
@@ -93,7 +90,17 @@ function WaitingRoomView({
     const interval = setInterval(checkAdmission, 3000);
 
     return () => clearInterval(interval);
-  }, [validationResult?.invitationId, invitationEmail, validationResult, setValidationResult, setError]);
+  }, [
+    invitationEmail,
+    setError,
+    setValidationResult,
+    validationResult?.invitationId,
+    validationResult?.liveKitToken,
+    validationResult?.registeredEmail,
+    validationResult?.roomName,
+    validationResult?.waitingRoomEnabled,
+    validationResult?.waitingRoomToken,
+  ]);
 
   return null;
 }
@@ -139,50 +146,6 @@ function InvitePageContent() {
         setIsValidating(true);
         setError(null);
 
-        // Check if patient was already admitted (stored in localStorage)
-        // This prevents re-redirect to waiting room on page reload/viewport change
-        if (typeof window !== 'undefined') {
-          try {
-            // Parse token to get invitationId
-            const tokenParts = token.split('.');
-            if (tokenParts.length === 3) {
-              const payload = JSON.parse(atob(tokenParts[1]));
-              const invitationId = payload.invitationId;
-              
-              if (invitationId) {
-                const storedAdmission = localStorage.getItem(`patient_admitted_${invitationId}`);
-                if (storedAdmission) {
-                  const admissionData = JSON.parse(storedAdmission);
-                  // Check if admission is still valid (less than 1 hour old)
-                  const admissionAge = Date.now() - admissionData.timestamp;
-                  const oneHour = 60 * 60 * 1000;
-                  
-                  if (admissionData.admitted && admissionAge < oneHour && admissionData.liveKitToken) {
-                    console.log('✅ Patient was already admitted, restoring admission state...');
-                    // Restore admission state without re-validating
-                    setValidationResult({
-                      success: true,
-                      liveKitToken: admissionData.liveKitToken,
-                      roomName: admissionData.roomName,
-                      waitingRoomEnabled: false,
-                      waitingRoomToken: false,
-                      invitationId: invitationId
-                    } as ValidateInvitationResponse);
-                    setIsValidating(false);
-                    return; // Skip API validation
-                  } else {
-                    // Admission expired or invalid, clear it
-                    localStorage.removeItem(`patient_admitted_${invitationId}`);
-                  }
-                }
-              }
-            }
-          } catch (e) {
-            // If we can't parse token or check localStorage, continue with normal validation
-            console.log('Could not check stored admission, proceeding with validation:', e);
-          }
-        }
-
         const request: ValidateInvitationRequest = {
           token,
           deviceFingerprint,
@@ -199,20 +162,7 @@ function InvitePageContent() {
         const result: ValidateInvitationResponse = await response.json();
 
         if (result.success) {
-          // If patient was already admitted (waitingRoomEnabled is false), they should go directly to main room
-          // The API now handles this and returns waitingRoomEnabled: false for already-admitted patients
           setValidationResult(result);
-          
-          // Store admission status if admitted
-          if (result.waitingRoomEnabled === false && result.invitationId && result.liveKitToken && typeof window !== 'undefined') {
-            console.log('✅ Patient was already admitted, going directly to main room');
-            localStorage.setItem(`patient_admitted_${result.invitationId}`, JSON.stringify({
-              admitted: true,
-              roomName: result.roomName,
-              liveKitToken: result.liveKitToken,
-              timestamp: Date.now()
-            }));
-          }
         } else if (result.requiresRegistration) {
           // User needs to register first
           setRequiresRegistration(true);
@@ -335,7 +285,6 @@ function InvitePageContent() {
     return (
       <PatientRegistration
         invitationEmail={invitationEmail}
-        invitationToken={token}
         onRegistrationComplete={async (registeredEmail: string) => {
           // After registration, re-validate the invitation
           if (!deviceFingerprint) return;
@@ -481,12 +430,6 @@ function InvitePageContent() {
 
   // Success - check if waiting room or direct access
   if (validationResult && validationResult.liveKitToken && validationResult.roomName) {
-    // Clear error when we have a valid token and room (patient was admitted)
-    if (error && !validationResult.waitingRoomEnabled) {
-      // Only clear error if transitioning to main room (not in waiting room)
-      setError(null);
-    }
-    
     // If waiting room enabled, show waiting room UI
     if (validationResult.waitingRoomEnabled && validationResult.waitingRoomToken) {
       return (

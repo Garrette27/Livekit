@@ -50,13 +50,32 @@ function isChatPanelVisible(): boolean {
     return false;
   }
 
+  const chatToggleButton = findChatToggleButton();
+  if (chatToggleButton) {
+    const ariaPressed = chatToggleButton.getAttribute('aria-pressed');
+    const isPressed = ariaPressed === 'true'
+      || chatToggleButton.getAttribute('data-lk-active') === 'true'
+      || chatToggleButton.classList.contains('lk-active');
+    if (!isPressed) {
+      return false;
+    }
+  }
+
   const chatPanel = document.querySelector<HTMLElement>('.lk-chat');
   if (!chatPanel) {
     return false;
   }
 
   const styles = window.getComputedStyle(chatPanel);
-  return styles.display !== 'none' && styles.visibility !== 'hidden' && styles.opacity !== '0';
+  const bounds = chatPanel.getBoundingClientRect();
+  const hasSize = bounds.width > 16 && bounds.height > 16;
+
+  return (
+    styles.display !== 'none' &&
+    styles.visibility !== 'hidden' &&
+    styles.opacity !== '0' &&
+    hasSize
+  );
 }
 
 function findChatToggleButton(): HTMLButtonElement | null {
@@ -90,6 +109,13 @@ function openChatPanel(attempt = 0): void {
 
   const chatToggleButton = findChatToggleButton();
   if (chatToggleButton) {
+    const ariaPressed = chatToggleButton.getAttribute('aria-pressed');
+    const isPressed = ariaPressed === 'true'
+      || chatToggleButton.getAttribute('data-lk-active') === 'true'
+      || chatToggleButton.classList.contains('lk-active');
+    if (isPressed) {
+      return;
+    }
     chatToggleButton.click();
     return;
   }
@@ -116,6 +142,28 @@ function ChatBehaviorBridge({
   const defaultAppliedRef = React.useRef(false);
   const lastProcessedMessageKeyRef = React.useRef<string | null>(null);
 
+  const isLikelyRemoteMessage = React.useCallback(
+    (message: (typeof chatMessages)[number] | undefined): boolean => {
+      if (!message) {
+        return false;
+      }
+
+      if (message.from?.isLocal === true) {
+        return false;
+      }
+
+      const localIdentity = localParticipant?.identity;
+      const senderIdentity = message.from?.identity;
+      if (localIdentity && senderIdentity) {
+        return localIdentity !== senderIdentity;
+      }
+
+      // If sender metadata is incomplete, treat the message as remote so users do not miss first replies.
+      return true;
+    },
+    [localParticipant?.identity]
+  );
+
   React.useEffect(() => {
     if (!enabled || defaultAppliedRef.current) {
       return;
@@ -129,8 +177,25 @@ function ChatBehaviorBridge({
 
   React.useEffect(() => {
     const latestMessage = chatMessages[chatMessages.length - 1];
+    const latestTimestamp = (() => {
+      const value = latestMessage?.timestamp as unknown;
+      if (!value) {
+        return 0;
+      }
+      if (value instanceof Date) {
+        return value.getTime();
+      }
+      if (typeof value === 'number') {
+        return value;
+      }
+      if (typeof value === 'string') {
+        const parsed = Date.parse(value);
+        return Number.isNaN(parsed) ? 0 : parsed;
+      }
+      return 0;
+    })();
     const latestMessageKey = latestMessage
-      ? `${latestMessage.timestamp}-${latestMessage.from?.identity || 'unknown'}-${latestMessage.message}`
+      ? `${chatMessages.length}:${latestTimestamp}:${latestMessage.from?.identity || 'unknown'}:${latestMessage.message}`
       : null;
 
     if (!initializedRef.current) {
@@ -148,13 +213,11 @@ function ChatBehaviorBridge({
     }
 
     lastProcessedMessageKeyRef.current = latestMessageKey;
-    const senderIdentity = latestMessage.from?.identity;
-    const isRemoteMessage = Boolean(senderIdentity && senderIdentity !== localParticipant?.identity);
 
-    if (isRemoteMessage && !isChatPanelVisible()) {
+    if (isLikelyRemoteMessage(latestMessage) && !isChatPanelVisible()) {
       openChatPanel();
     }
-  }, [autoOpenOnIncomingMessage, chatMessages, enabled, localParticipant?.identity]);
+  }, [autoOpenOnIncomingMessage, chatMessages, enabled, isLikelyRemoteMessage]);
 
   return null;
 }

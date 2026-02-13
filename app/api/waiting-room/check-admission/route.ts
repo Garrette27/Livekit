@@ -6,11 +6,15 @@ import { WaitingPatient } from '../../../../lib/types';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { invitationId, patientEmail } = body;
+    const { invitationId, patientEmail, waitingPatientId } = body as {
+      invitationId?: string;
+      patientEmail?: string;
+      waitingPatientId?: string;
+    };
 
-    if (!invitationId) {
+    if (!invitationId && !waitingPatientId) {
       return NextResponse.json(
-        { success: false, error: 'Missing required field: invitationId' },
+        { success: false, error: 'Missing required field: invitationId or waitingPatientId' },
         { status: 400 }
       );
     }
@@ -23,39 +27,96 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Find patient by invitation ID - check both waiting and admitted statuses
-    let allPatientsQuery = db.collection('waitingPatients')
+    const buildAdmissionResponse = (waitingPatient: WaitingPatient) => {
+      const liveKitToken = signLiveKitRoomToken({
+        subject: `patient_${waitingPatient.invitationId}_${waitingPatient.id}`,
+        roomName: waitingPatient.roomName,
+        participantName: waitingPatient.patientName || waitingPatient.patientEmail || 'Anonymous Patient',
+        expiresIn: '2h',
+      });
+
+      return NextResponse.json({
+        success: true,
+        admitted: true,
+        waitingPatientId: waitingPatient.id,
+        liveKitToken,
+        roomName: waitingPatient.roomName,
+      });
+    };
+
+    if (waitingPatientId) {
+      const waitingPatientDoc = await db.collection('waitingPatients').doc(waitingPatientId).get();
+      if (!waitingPatientDoc.exists) {
+        return NextResponse.json({
+          success: false,
+          admitted: false,
+          error: 'Waiting patient not found',
+        });
+      }
+
+      const waitingPatient = {
+        id: waitingPatientDoc.id,
+        ...waitingPatientDoc.data(),
+      } as WaitingPatient;
+
+      if (invitationId && waitingPatient.invitationId !== invitationId) {
+        return NextResponse.json({
+          success: false,
+          admitted: false,
+          error: 'Waiting patient invitation mismatch',
+        });
+      }
+
+      if (waitingPatient.status === 'admitted') {
+        return buildAdmissionResponse(waitingPatient);
+      }
+
+      return NextResponse.json({
+        success: true,
+        admitted: false,
+        waitingPatientId: waitingPatient.id,
+      });
+    }
+
+    // Find patient by invitation ID across both waiting and admitted statuses.
+    const allPatientsQuery = db.collection('waitingPatients')
       .where('invitationId', '==', invitationId);
 
     const querySnapshot = await allPatientsQuery.get();
 
-    // Find the most recent patient for this invitation
+    // Resolve the most relevant record for this visit.
+    // Priority: newest waiting -> newest admitted -> newest any.
     let waitingPatient: WaitingPatient | null = null;
     if (!querySnapshot.empty) {
-      // Filter and sort patients
-      const patients = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as WaitingPatient));
+      const allPatients = querySnapshot.docs.map((snapshotDoc) => ({
+        id: snapshotDoc.id,
+        ...snapshotDoc.data(),
+      })) as WaitingPatient[];
 
-      // If email provided, try to match by email first
-      if (patientEmail) {
-        const patientByEmail = patients.find(p => 
-          p.patientEmail?.toLowerCase() === patientEmail.toLowerCase()
-        );
-        if (patientByEmail) {
-          waitingPatient = patientByEmail;
-        }
-      }
-      
-      // If not found by email, use the most recent one
-      if (!waitingPatient && patients.length > 0) {
-        const mostRecent = patients.sort((a, b) => {
-          const aTime = a.joinedAt?.toMillis?.() || a.joinedAt?.getTime?.() || new Date(a.joinedAt).getTime();
-          const bTime = b.joinedAt?.toMillis?.() || b.joinedAt?.getTime?.() || new Date(b.joinedAt).getTime();
-          return bTime - aTime;
-        })[0];
-        waitingPatient = mostRecent;
+      const normalizedEmail = typeof patientEmail === 'string' ? patientEmail.toLowerCase() : '';
+      const scopedPatients = normalizedEmail
+        ? allPatients.filter((patient) => patient.patientEmail?.toLowerCase() === normalizedEmail)
+        : allPatients;
+
+      const sortedPatients = [...scopedPatients].sort((a, b) => {
+        const aTime =
+          a.joinedAt?.toMillis?.()
+          || a.joinedAt?.getTime?.()
+          || new Date(a.joinedAt as unknown as string).getTime()
+          || 0;
+        const bTime =
+          b.joinedAt?.toMillis?.()
+          || b.joinedAt?.getTime?.()
+          || new Date(b.joinedAt as unknown as string).getTime()
+          || 0;
+        return bTime - aTime;
+      });
+
+      if (sortedPatients.length > 0) {
+        waitingPatient =
+          sortedPatients.find((patient) => patient.status === 'waiting')
+          || sortedPatients.find((patient) => patient.status === 'admitted')
+          || sortedPatients[0];
       }
     }
 
@@ -69,19 +130,7 @@ export async function POST(req: NextRequest) {
 
     // Check if patient has been admitted
     if (waitingPatient.status === 'admitted') {
-      // Generate token for main consultation room
-      const liveKitToken = signLiveKitRoomToken({
-        subject: `patient_${waitingPatient.invitationId}_${waitingPatient.id}`,
-        roomName: waitingPatient.roomName,
-        expiresIn: '2h',
-      });
-
-      return NextResponse.json({
-        success: true,
-        admitted: true,
-        liveKitToken,
-        roomName: waitingPatient.roomName,
-      });
+      return buildAdmissionResponse(waitingPatient);
     }
 
     // Patient is still waiting

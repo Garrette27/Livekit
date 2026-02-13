@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { User } from 'firebase/auth';
 import { Invitation } from '@/lib/types';
 import { useWaitingQueue } from '@/hooks/useWaitingQueue';
+import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 interface WaitingPatientsListProps {
   user: User;
@@ -38,6 +39,8 @@ export default function WaitingPatientsList({
   selectedInvitationId,
   onCountUpdate,
 }: WaitingPatientsListProps) {
+  const { showToast } = useToast();
+  const [pendingRejectId, setPendingRejectId] = useState<string | null>(null);
   const activeInvitations = useMemo(
     () =>
       invitations.filter(
@@ -77,6 +80,18 @@ export default function WaitingPatientsList({
       onCountUpdate(invitation.id, waitingPatientCounts[invitation.id] || 0);
     });
   }, [activeInvitations, onCountUpdate, waitingPatientCounts]);
+
+  useEffect(() => {
+    if (!pendingRejectId) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setPendingRejectId(null);
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [pendingRejectId]);
 
   if (loading) {
     return (
@@ -154,7 +169,7 @@ export default function WaitingPatientsList({
                   <strong>Email:</strong> {patient.patientEmail || 'Unknown'}
                 </p>
                 <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '0.25rem' }}>
-                  <strong>Name:</strong> {patient.patientName || 'Unknown'}
+                  <strong>Name:</strong> {patient.patientName || 'Anonymous Patient'}
                 </p>
                 <p style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '0.25rem' }}>
                   <strong>Joined:</strong> {joinedAt.toLocaleString()}
@@ -170,7 +185,11 @@ export default function WaitingPatientsList({
                 onClick={async () => {
                   const admitted = await admitPatient(patient.id, patient.roomName);
                   if (admitted) {
-                    alert(`Patient ${patient.patientName || patient.patientEmail || 'Unknown'} admitted to consultation room.`);
+                    showToast({
+                      kind: 'success',
+                      title: 'Patient admitted',
+                      message: `${patient.patientName || patient.patientEmail || 'Anonymous patient'} can now join the consultation room.`,
+                    });
                   }
                 }}
                 disabled={admittingId === patient.id}
@@ -190,10 +209,25 @@ export default function WaitingPatientsList({
               </button>
               <button
                 onClick={async () => {
-                  if (!confirm('Are you sure you want to remove this patient from the waiting room?')) {
+                  if (pendingRejectId !== patient.id) {
+                    setPendingRejectId(patient.id);
+                    showToast({
+                      kind: 'info',
+                      title: 'Confirm removal',
+                      message: 'Click Reject again within 5 seconds to remove this patient.',
+                    });
                     return;
                   }
-                  await rejectPatient(patient.id);
+
+                  const rejected = await rejectPatient(patient.id);
+                  setPendingRejectId(null);
+                  if (rejected) {
+                    showToast({
+                      kind: 'success',
+                      title: 'Patient removed',
+                      message: `${patient.patientName || patient.patientEmail || 'Patient'} was removed from the waiting room.`,
+                    });
+                  }
                 }}
                 disabled={rejectingId === patient.id}
                 style={{
@@ -208,7 +242,11 @@ export default function WaitingPatientsList({
                   flex: 1,
                 }}
               >
-                {rejectingId === patient.id ? 'Removing...' : 'Reject'}
+                {rejectingId === patient.id
+                  ? 'Removing...'
+                  : pendingRejectId === patient.id
+                  ? 'Confirm Reject'
+                  : 'Reject'}
               </button>
             </div>
           </div>

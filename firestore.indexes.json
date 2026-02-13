@@ -75,6 +75,62 @@
       ]
     },
     {
+      "collectionGroup": "admin-activity-feed",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "sourceCollection",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "occurredAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "admin-activity-feed",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "actorUserId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "occurredAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "admin-activity-feed",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "roomName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "occurredAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "admin-activity-feed",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "consultationSessionId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "occurredAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "waitingPatients",
       "queryScope": "COLLECTION",
       "fields": [

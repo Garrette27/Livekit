@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useWaitingQueue } from '@/hooks/useWaitingQueue';
+import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 interface WaitingRoomPanelProps {
   roomName: string;
@@ -18,6 +19,7 @@ export default function WaitingRoomPanel({
   pollIntervalMs = 15_000,
   showRefreshButton = false,
 }: WaitingRoomPanelProps) {
+  const { showToast } = useToast();
   const {
     waitingPatients,
     loading,
@@ -170,7 +172,11 @@ export default function WaitingRoomPanel({
                     onClick={async () => {
                       const admitted = await admitPatient(patient.id);
                       if (admitted) {
-                        alert('Patient admitted to consultation room. They can now join the main room.');
+                        showToast({
+                          kind: 'success',
+                          title: 'Patient admitted',
+                          message: `${patient.patientName || 'Anonymous patient'} can now join the main room.`,
+                        });
                       }
                     }}
                     disabled={admittingId === patient.id}

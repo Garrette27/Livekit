@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     const liveKitToken = jwt.sign(
       {
         sub: `doctor_${Date.now()}`,
+        name: doctorName,
         video: {
           roomJoin: true,
           room: roomName,

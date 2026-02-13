@@ -10,8 +10,10 @@ import { Invitation } from '@/lib/types';
 import WaitingPatientsList from './components/WaitingPatientsList';
 import { useAuthSession } from '@/hooks/useAuthSession';
 import { copyTextToClipboard, fetchInvitationLink as getInvitationLink } from '@/lib/invitations/invitation-link-client';
+import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 export default function DoctorInvitationsPage() {
+  const { showToast } = useToast();
   const { user, isAuthenticated, isAuthorized, isLoading: authLoading } = useAuthSession({
     requiredRole: 'doctor',
   });
@@ -23,8 +25,22 @@ export default function DoctorInvitationsPage() {
   const [loadingLinks, setLoadingLinks] = useState<Record<string, boolean>>({});
   const [linkErrors, setLinkErrors] = useState<Record<string, string>>({});
   const [waitingPatientsCounts, setWaitingPatientsCounts] = useState<Record<string, number>>({});
+  const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null);
+  const [pendingRevokeId, setPendingRevokeId] = useState<string | null>(null);
   const requestedInvitationLinksRef = useRef<Set<string>>(new Set());
   const router = useRouter();
+
+  useEffect(() => {
+    if (!pendingRevokeId) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setPendingRevokeId(null);
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [pendingRevokeId]);
 
   // Persist room name in localStorage
   useEffect(() => {
@@ -155,13 +171,25 @@ export default function DoctorInvitationsPage() {
     }
   }
 
-  const copyInvitationLink = async (link: string) => {
+  const copyInvitationLink = async (invitationId: string, link: string) => {
     try {
       await copyTextToClipboard(link);
-      alert('Invitation link copied to clipboard!');
+      setCopiedInvitationId(invitationId);
+      window.setTimeout(() => {
+        setCopiedInvitationId((currentValue) => (currentValue === invitationId ? null : currentValue));
+      }, 1600);
+      showToast({
+        kind: 'success',
+        title: 'Link copied',
+        message: 'Invitation link copied to clipboard.',
+      });
     } catch (error) {
       console.error('Error copying link:', error);
-      alert('Failed to copy link. Please try again.');
+      showToast({
+        kind: 'error',
+        title: 'Copy failed',
+        message: 'Failed to copy invitation link. Please try again.',
+      });
     }
   };
 
@@ -169,21 +197,36 @@ export default function DoctorInvitationsPage() {
 
   const revokeInvitation = async (invitationId: string) => {
     if (!db) return;
-    
-    if (!confirm('Are you sure you want to revoke this invitation? Patients using this link will be denied access.')) {
+
+    if (pendingRevokeId !== invitationId) {
+      setPendingRevokeId(invitationId);
+      showToast({
+        kind: 'info',
+        title: 'Confirm revoke',
+        message: 'Click Revoke again within 5 seconds to confirm.',
+      });
       return;
     }
-    
+
     try {
       const invitationRef = doc(db, 'invitations', invitationId);
       await updateDoc(invitationRef, {
         status: 'revoked',
         revokedAt: new Date()
       });
-      alert('Invitation revoked successfully. Patients using this link will now be denied access.');
+      setPendingRevokeId(null);
+      showToast({
+        kind: 'success',
+        title: 'Invitation revoked',
+        message: 'Patients using this link will now be denied access.',
+      });
     } catch (error) {
       console.error('Error revoking invitation:', error);
-      alert('Failed to revoke invitation');
+      showToast({
+        kind: 'error',
+        title: 'Revoke failed',
+        message: 'Failed to revoke invitation.',
+      });
     }
   };
 
@@ -283,10 +326,10 @@ export default function DoctorInvitationsPage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
             <Link
-              href="/dashboard"
+              href="/doctor/history"
               style={{
                 backgroundColor: 'transparent',
-                border: 'none',
+                border: 0,
                 padding: 0,
                 color: '#2563EB',
                 fontSize: '1.125rem',
@@ -295,7 +338,7 @@ export default function DoctorInvitationsPage() {
                 textDecoration: 'none',
               }}
             >
-              Dashboard
+              Consultation History
             </Link>
             <button
               onClick={() => auth && auth.signOut()}
@@ -547,10 +590,10 @@ export default function DoctorInvitationsPage() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  copyInvitationLink(invitationLinks[invitation.id]);
+                                  copyInvitationLink(invitation.id, invitationLinks[invitation.id]);
                                 }}
                                 style={{
-                                  backgroundColor: '#2563eb',
+                                  backgroundColor: copiedInvitationId === invitation.id ? '#16a34a' : '#2563eb',
                                   color: 'white',
                                   border: 'none',
                                   borderRadius: '0.25rem',
@@ -558,11 +601,13 @@ export default function DoctorInvitationsPage() {
                                   fontSize: '0.7rem',
                                   fontWeight: '500',
                                   cursor: 'pointer',
-                                  whiteSpace: 'nowrap'
+                                  whiteSpace: 'nowrap',
+                                  transform: copiedInvitationId === invitation.id ? 'translateY(1px) scale(0.98)' : 'none',
+                                  transition: 'all 140ms ease'
                                 }}
                                 title="Copy link"
                               >
-                                📋 Copy
+                                {copiedInvitationId === invitation.id ? 'Copied' : 'Copy'}
                               </button>
                             </div>
                           ) : (
@@ -620,7 +665,7 @@ export default function DoctorInvitationsPage() {
                                   revokeInvitation(invitation.id);
                                 }}
                                 style={{
-                                  backgroundColor: '#dc2626',
+                                  backgroundColor: pendingRevokeId === invitation.id ? '#b91c1c' : '#dc2626',
                                   color: 'white',
                                   padding: '0.5rem 1rem',
                                   borderRadius: '0.375rem',
@@ -630,7 +675,7 @@ export default function DoctorInvitationsPage() {
                                   cursor: 'pointer'
                                 }}
                               >
-                                Revoke
+                                {pendingRevokeId === invitation.id ? 'Confirm Revoke' : 'Revoke'}
                               </button>
                             </>
                           );

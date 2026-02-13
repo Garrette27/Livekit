@@ -73,7 +73,7 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
   doctor: {
     controls: {
       hideLeaveControl: true,
-      hideStartVideoControl: true,
+      hideStartVideoControl: false,
       hideSettingsControl: true,
     },
     chat: {
@@ -111,7 +111,7 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
   patient: {
     controls: {
       hideLeaveControl: true,
-      hideStartVideoControl: true,
+      hideStartVideoControl: false,
       hideSettingsControl: true,
     },
     chat: {

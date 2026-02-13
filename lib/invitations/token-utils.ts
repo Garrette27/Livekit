@@ -22,31 +22,39 @@ export function verifyInvitationToken(token: string): InvitationToken {
 interface LiveKitTokenOptions {
   subject: string;
   roomName: string;
+  participantName?: string;
   expiresIn?: jwt.SignOptions['expiresIn'];
 }
 
 export function signLiveKitRoomToken({
   subject,
   roomName,
+  participantName,
   expiresIn = '1h',
 }: LiveKitTokenOptions): string {
-  return jwt.sign(
-    {
-      sub: subject,
-      video: {
-        roomJoin: true,
-        room: roomName,
-        canPublish: true,
-        canSubscribe: true,
-        canPublishData: true,
-      },
-      audio: {
-        roomJoin: true,
-        room: roomName,
-        canPublish: true,
-        canSubscribe: true,
-      },
+  const payload: Record<string, unknown> = {
+    sub: subject,
+    video: {
+      roomJoin: true,
+      room: roomName,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
     },
+    audio: {
+      roomJoin: true,
+      room: roomName,
+      canPublish: true,
+      canSubscribe: true,
+    },
+  };
+
+  if (participantName) {
+    payload.name = participantName;
+  }
+
+  return jwt.sign(
+    payload,
     getJwtSecret(),
     {
       issuer: getLiveKitIssuer(),

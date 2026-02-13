@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
-import jwt from 'jsonwebtoken';
+import { signLiveKitRoomToken } from '../../../../lib/invitations/token-utils';
 import { AdmitPatientRequest, AdmitPatientResponse, WaitingPatient } from '../../../../lib/types';
 
 export async function POST(req: NextRequest) {
@@ -50,31 +50,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Generate LiveKit token for main consultation room
-    const liveKitToken = jwt.sign(
-      {
-        sub: `patient_${waitingPatient.invitationId}_${waitingPatient.id}`,
-        video: {
-          roomJoin: true,
-          room: roomName,
-          canPublish: true,
-          canSubscribe: true,
-          canPublishData: true,
-        },
-        audio: {
-          roomJoin: true,
-          room: roomName,
-          canPublish: true,
-          canSubscribe: true,
-        },
-      },
-      process.env.LIVEKIT_API_SECRET || 'fallback-secret',
-      {
-        issuer: process.env.LIVEKIT_API_KEY,
-        expiresIn: '2h', // Longer duration for consultation
-        algorithm: 'HS256',
-      }
-    );
+    // Generate LiveKit token for main consultation room.
+    const liveKitToken = signLiveKitRoomToken({
+      subject: `patient_${waitingPatient.invitationId}_${waitingPatient.id}`,
+      roomName,
+      participantName: waitingPatient.patientName || waitingPatient.patientEmail || 'Anonymous Patient',
+      expiresIn: '2h',
+    });
 
     // Update waiting patient status to admitted
     await db.collection('waitingPatients').doc(waitingPatientId).update({

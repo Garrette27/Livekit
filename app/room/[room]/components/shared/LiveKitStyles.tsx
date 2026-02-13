@@ -15,7 +15,7 @@ interface LiveKitStylesProps {
 
 const DEFAULT_CONTROLS_POLICY: RoomControlsPolicy = {
   hideLeaveControl: true,
-  hideStartVideoControl: true,
+  hideStartVideoControl: false,
   hideSettingsControl: true,
 };
 

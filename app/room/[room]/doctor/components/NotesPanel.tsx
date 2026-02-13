@@ -6,6 +6,7 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { Firestore } from 'firebase/firestore';
 import { FirebaseStorage } from 'firebase/storage';
+import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 type Attachment = { url: string; name: string; type: string; size: number };
 type ManualNote = { text: string; timestamp: string; attachments?: Attachment[] };
@@ -17,6 +18,7 @@ interface NotesPanelProps {
 }
 
 export default function NotesPanel({ roomName, db, storage }: NotesPanelProps) {
+  const { showToast } = useToast();
   const [note, setNote] = useState('');
   const [manualNotes, setManualNotes] = useState<ManualNote[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -76,7 +78,11 @@ export default function NotesPanel({ roomName, db, storage }: NotesPanelProps) {
     });
 
     if (errors.length > 0) {
-      alert('File selection errors:\n' + errors.join('\n'));
+      showToast({
+        kind: 'error',
+        title: 'Invalid files',
+        message: errors[0],
+      });
     }
 
     if (validFiles.length > 0) {
@@ -145,7 +151,11 @@ export default function NotesPanel({ roomName, db, storage }: NotesPanelProps) {
         attachments.push(...uploadedFiles);
       } catch (error) {
         console.error('Error uploading files:', error);
-        alert('Error uploading files. Please try again.');
+        showToast({
+          kind: 'error',
+          title: 'Upload failed',
+          message: 'Error uploading files. Please try again.',
+        });
         setIsUploading(false);
         return;
       }

@@ -33,16 +33,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
-    if (isRoomEndEvent(event)) {
-      console.log(
-        event.event === 'participant_left'
-          ? 'Processing participant_left event (early summary mode)'
-          : 'Processing room_finished event'
-      );
+    if (event?.event === 'room_finished') {
+      console.log('Processing room_finished event');
       const result = await processRoomEndEvent(event);
       if (result.skipped) {
         return NextResponse.json({ success: true, skipped: true });
       }
+    } else if (isRoomEndEvent(event)) {
+      console.log(`Skipping ${event.event} summary generation; handled by consultation session tracking.`);
     }
 
     return NextResponse.json({ success: true });

@@ -1,7 +1,9 @@
-const functions = require('firebase-functions');
+/* eslint-disable @typescript-eslint/no-require-imports */
+const functions = require('firebase-functions/v1');
 const { AccessToken } = require('livekit-server-sdk');
 const fetch = require('node-fetch');
 const admin = require('firebase-admin');
+const activityLogPipeline = require('./activity-log-pipeline');
 
 admin.initializeApp();
 
@@ -171,3 +173,12 @@ exports.getDeletionStats = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('internal', 'Failed to get deletion statistics');
   }
 });
+
+// Firestore onWrite audit trail + admin activity feed pipeline.
+exports.auditConsultationDocuments = activityLogPipeline.auditConsultationDocuments;
+exports.auditConsultationSessions = activityLogPipeline.auditConsultationSessions;
+exports.auditConsultationSessionEvents = activityLogPipeline.auditConsultationSessionEvents;
+exports.auditCallSummaries = activityLogPipeline.auditCallSummaries;
+exports.auditInvitations = activityLogPipeline.auditInvitations;
+exports.auditWaitingPatients = activityLogPipeline.auditWaitingPatients;
+exports.auditUsers = activityLogPipeline.auditUsers;

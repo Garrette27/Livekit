@@ -234,19 +234,57 @@ export async function POST(req: Request) {
       }
     }
 
+    const sessionEmailQueries = await Promise.all([
+      db.collection('consultationSessions').where('patientEmail', '==', userEmail).limit(200).get(),
+      db.collection('consultationSessions').where('metadata.patientEmail', '==', userEmail).limit(200).get(),
+    ]);
+
+    const sessionIdsFromEmail = new Set<string>();
+    sessionEmailQueries.forEach((snapshot) => {
+      snapshot.docs.forEach((sessionDoc) => {
+        const sessionData = sessionDoc.data() || {};
+        const sessionId =
+          (typeof sessionData.consultationSessionId === 'string' && sessionData.consultationSessionId.trim())
+            ? sessionData.consultationSessionId.trim()
+            : sessionDoc.id;
+        sessionIdsFromEmail.add(sessionId);
+      });
+    });
+
+    for (const sessionId of sessionIdsFromEmail) {
+      try {
+        await linkSessionById(sessionId, { forceRelink: true });
+      } catch (sessionRelinkError) {
+        console.error(`Failed to relink session ${sessionId}:`, sessionRelinkError);
+      }
+    }
+
     const invitationSnapshot = await db
       .collection('invitations')
       .where('emailAllowed', '==', userEmail)
       .limit(200)
       .get();
 
-    const roomNames = Array.from(
+    const roomNamesFromInvitations = Array.from(
       new Set(
         invitationSnapshot.docs
           .map((invitationDoc) => invitationDoc.data()?.roomName)
           .filter((roomName): roomName is string => typeof roomName === 'string' && roomName.trim().length > 0)
       )
     );
+
+    const consultationEmailQueries = await Promise.all([
+      db.collection('consultations').where('patientEmail', '==', userEmail).limit(200).get(),
+      db.collection('consultations').where('metadata.patientEmail', '==', userEmail).limit(200).get(),
+    ]);
+
+    const roomNamesFromConsultations = consultationEmailQueries.flatMap((snapshot) =>
+      snapshot.docs
+        .map((consultationDoc) => consultationDoc.id)
+        .filter((roomName): roomName is string => typeof roomName === 'string' && roomName.trim().length > 0)
+    );
+
+    const roomNames = Array.from(new Set([...roomNamesFromInvitations, ...roomNamesFromConsultations]));
 
     for (const roomName of roomNames) {
       try {

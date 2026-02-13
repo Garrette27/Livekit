@@ -5,7 +5,8 @@ import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPass
 import { auth, provider } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
-import { doc, setDoc, getDoc, serverTimestamp, query, where, getDocs, collection } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { checkRoleConflictByEmail } from "@/lib/auth/role-conflict";
 
 export const dynamic = 'force-dynamic';
 
@@ -45,9 +46,55 @@ export default function DoctorLoginPage() {
       if (user && db) {
         const userRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userRef);
-        
-        if (!userDoc.exists()) {
-          // First login - create doctor profile
+
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.role !== 'doctor') {
+            setError('This account is registered as a patient. Please use patient login.');
+            await auth.signOut();
+            return;
+          }
+
+          const normalizedEmail = (user.email || '').toLowerCase().trim();
+          if (normalizedEmail) {
+            const conflictResult = await checkRoleConflictByEmail({
+              db,
+              email: normalizedEmail,
+              expectedRole: 'doctor',
+              currentUserId: user.uid,
+            });
+
+            if (conflictResult.hasConflict) {
+              setError('This email is linked to both patient and doctor profiles. Please contact support to resolve account roles.');
+              await auth.signOut();
+              return;
+            }
+          }
+
+          await setDoc(
+            userRef,
+            {
+              lastLoginAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        } else {
+          const normalizedEmail = (user.email || '').toLowerCase().trim();
+          if (normalizedEmail) {
+            const conflictResult = await checkRoleConflictByEmail({
+              db,
+              email: normalizedEmail,
+              expectedRole: 'doctor',
+              currentUserId: user.uid,
+            });
+
+            if (conflictResult.hasConflict) {
+              setError('This email is already registered as a patient account. Please use patient login.');
+              await auth.signOut();
+              return;
+            }
+          }
+
           await setDoc(userRef, {
             email: user.email,
             role: 'doctor',
@@ -57,11 +104,6 @@ export default function DoctorLoginPage() {
             lastLoginAt: serverTimestamp(),
           });
           console.log('Doctor profile created');
-        } else {
-          // Update last login
-          await setDoc(userRef, { 
-            lastLoginAt: serverTimestamp() 
-          }, { merge: true });
         }
       }
 
@@ -82,6 +124,7 @@ export default function DoctorLoginPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    const normalizedEmail = email.toLowerCase().trim();
 
     if (!auth || !db) {
       setError('System not ready. Please refresh the page.');
@@ -125,12 +168,26 @@ export default function DoctorLoginPage() {
             return;
           }
 
+          const conflictResult = await checkRoleConflictByEmail({
+            db,
+            email: normalizedEmail,
+            expectedRole: 'doctor',
+            currentUserId: user.uid,
+          });
+
+          if (conflictResult.hasConflict) {
+            setError('This email is already registered as a patient account. Please use patient login.');
+            await auth.signOut();
+            setLoading(false);
+            return;
+          }
+
           // Create doctor profile - user is now authenticated so Firestore rules allow this
           await setDoc(doc(db, 'users', user.uid), {
-            email: email.toLowerCase().trim(),
+            email: normalizedEmail,
             role: 'doctor',
             doctorName: 'Dr. ' + (email.split('@')[0] || 'User'),
-            doctorEmail: email.toLowerCase().trim(),
+            doctorEmail: normalizedEmail,
             registeredAt: serverTimestamp(),
             lastLoginAt: serverTimestamp(),
           });
@@ -171,6 +228,19 @@ export default function DoctorLoginPage() {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             if (userData.role === 'doctor') {
+              const conflictResult = await checkRoleConflictByEmail({
+                db,
+                email: normalizedEmail,
+                expectedRole: 'doctor',
+                currentUserId: user.uid,
+              });
+
+              if (conflictResult.hasConflict) {
+                setError('This email is linked to both patient and doctor profiles. Please contact support to resolve account roles.');
+                await auth.signOut();
+                return;
+              }
+
               // Update last login
               await setDoc(doc(db, 'users', user.uid), { 
                 lastLoginAt: serverTimestamp() 
@@ -182,6 +252,33 @@ export default function DoctorLoginPage() {
                 await auth.signOut();
               }
             }
+          } else {
+            const conflictResult = await checkRoleConflictByEmail({
+              db,
+              email: normalizedEmail,
+              expectedRole: 'doctor',
+              currentUserId: user.uid,
+            });
+
+            if (conflictResult.hasConflict) {
+              setError('This account is linked to a patient profile. Please use patient login.');
+              await auth.signOut();
+              return;
+            }
+
+            await setDoc(
+              doc(db, 'users', user.uid),
+              {
+                email: normalizedEmail,
+                role: 'doctor',
+                doctorName: 'Dr. ' + (normalizedEmail.split('@')[0] || 'User'),
+                doctorEmail: normalizedEmail,
+                registeredAt: serverTimestamp(),
+                lastLoginAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+            router.push('/doctor/invitations');
           }
         }
       }
@@ -529,7 +626,7 @@ export default function DoctorLoginPage() {
                       marginBottom: '1rem',
                       lineHeight: '1.5'
                     }}>
-                      Enter your email address and we'll send you a link to reset your password.
+                      Enter your email address and we&apos;ll send you a link to reset your password.
                     </p>
                     <button
                       type="button"

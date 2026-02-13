@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Invitation } from '@/lib/types';
+import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 interface InvitationResultProps {
   invitation: Invitation;
@@ -9,13 +11,33 @@ interface InvitationResultProps {
 }
 
 export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: InvitationResultProps) {
+  const { showToast } = useToast();
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setCopied(false);
+    }, 1500);
+
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
   const copyInvitationLink = async () => {
     try {
       await navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
       onCopyLink();
     } catch (error) {
       console.error('Error copying link:', error);
-      alert('Failed to copy link. Please try again.');
+      showToast({
+        kind: 'error',
+        title: 'Copy failed',
+        message: 'Failed to copy link. Please try again.',
+      });
     }
   };
 
@@ -122,7 +144,7 @@ export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: 
           <button
             onClick={copyInvitationLink}
             style={{
-              backgroundColor: '#3b82f6',
+              backgroundColor: copied ? '#16a34a' : '#3b82f6',
               color: 'white',
               border: 'none',
               borderRadius: '0.25rem',
@@ -130,11 +152,13 @@ export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: 
               fontSize: '0.875rem',
               fontWeight: '500',
               cursor: 'pointer',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              transform: copied ? 'translateY(1px) scale(0.98)' : 'none',
+              transition: 'all 140ms ease'
             }}
             title="Copy link"
           >
-            📋 Copy
+            {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
       </div>

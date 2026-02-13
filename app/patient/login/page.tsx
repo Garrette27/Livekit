@@ -3,8 +3,9 @@
 import { useState, useEffect, Suspense } from "react";
 import { auth, db, provider } from "@/lib/firebase";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithPopup } from "firebase/auth";
-import { useRouter, useSearchParams } from "next/navigation";
-import { doc, getDoc, setDoc, serverTimestamp, query, where, getDocs, collection } from "firebase/firestore";
+import { useSearchParams } from "next/navigation";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { checkRoleConflictByEmail } from "@/lib/auth/role-conflict";
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,6 @@ function PatientLoginContent() {
   const [resetLoading, setResetLoading] = useState(false);
   const [loginMethod, setLoginMethod] = useState<'email' | 'google'>('email');
   const [googleLoading, setGoogleLoading] = useState(false);
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   // Check if user just registered
@@ -42,6 +42,7 @@ function PatientLoginContent() {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    const normalizedEmail = email.toLowerCase().trim();
 
     if (!auth || !db) {
       setError('System not ready. Please refresh the page.');
@@ -72,10 +73,24 @@ function PatientLoginContent() {
 
         // Now that user is authenticated, create user document in Firestore
         try {
+          const conflictResult = await checkRoleConflictByEmail({
+            db,
+            email: normalizedEmail,
+            expectedRole: 'patient',
+            currentUserId: user.uid,
+          });
+
+          if (conflictResult.hasConflict) {
+            setError('This email is already registered as a doctor account. Please use doctor login.');
+            await auth.signOut();
+            setLoading(false);
+            return;
+          }
+
           // Create new patient profile
           // Use setDoc without merge to ensure it's a create operation
           await setDoc(doc(db, 'users', user.uid), {
-            email: email.toLowerCase().trim(),
+            email: normalizedEmail,
             role: 'patient',
             registeredAt: serverTimestamp(),
             lastLoginAt: serverTimestamp(),
@@ -124,6 +139,19 @@ function PatientLoginContent() {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             if (userData.role === 'patient') {
+              const conflictResult = await checkRoleConflictByEmail({
+                db,
+                email: normalizedEmail,
+                expectedRole: 'patient',
+                currentUserId: user.uid,
+              });
+
+              if (conflictResult.hasConflict) {
+                setError('This email is linked to both doctor and patient profiles. Please contact support to resolve account roles.');
+                await auth.signOut();
+                return;
+              }
+
               // Use window.location for more reliable navigation
               window.location.href = '/patient/dashboard';
             } else {
@@ -136,8 +164,23 @@ function PatientLoginContent() {
             // User document doesn't exist - create it
             // This can happen if sign-up partially failed or user was created via Google
             try {
+              const conflictResult = await checkRoleConflictByEmail({
+                db,
+                email: normalizedEmail,
+                expectedRole: 'patient',
+                currentUserId: user.uid,
+              });
+
+              if (conflictResult.hasConflict) {
+                setError('This account is linked to a doctor profile. Please use doctor login.');
+                if (auth) {
+                  await auth.signOut();
+                }
+                return;
+              }
+
               await setDoc(doc(db, 'users', user.uid), {
-                email: email.toLowerCase().trim(),
+                email: normalizedEmail,
                 role: 'patient',
                 registeredAt: serverTimestamp(),
                 lastLoginAt: serverTimestamp(),
@@ -280,15 +323,45 @@ function PatientLoginContent() {
         if (userDoc.exists()) {
           const userData = userDoc.data();
           if (userData.role === 'patient') {
+            const normalizedGoogleEmail = user.email?.toLowerCase().trim() || '';
+            if (normalizedGoogleEmail) {
+              const conflictResult = await checkRoleConflictByEmail({
+                db,
+                email: normalizedGoogleEmail,
+                expectedRole: 'patient',
+                currentUserId: user.uid,
+              });
+
+              if (conflictResult.hasConflict) {
+                setError('This email is linked to both doctor and patient profiles. Please contact support to resolve account roles.');
+                await auth.signOut();
+                return;
+              }
+            }
+
             window.location.href = '/patient/dashboard';
           } else {
             setError('This account is for doctors. Please use doctor login.');
             await auth.signOut();
           }
         } else {
+          const normalizedGoogleEmail = user.email?.toLowerCase().trim() || '';
+          const conflictResult = await checkRoleConflictByEmail({
+            db,
+            email: normalizedGoogleEmail,
+            expectedRole: 'patient',
+            currentUserId: user.uid,
+          });
+
+          if (conflictResult.hasConflict) {
+            setError('This email is already registered as a doctor account. Please use doctor login.');
+            await auth.signOut();
+            return;
+          }
+
           // Create new patient profile for Google sign-in
           await setDoc(doc(db, 'users', user.uid), {
-            email: user.email?.toLowerCase().trim() || '',
+            email: normalizedGoogleEmail,
             role: 'patient',
             registeredAt: serverTimestamp(),
             lastLoginAt: serverTimestamp(),
@@ -373,7 +446,7 @@ function PatientLoginContent() {
             marginBottom: '1.5rem'
           }}>
             <p style={{ fontSize: '0.875rem', color: '#166534', margin: 0, lineHeight: '1.5' }}>
-              ✅ <strong>Registration Complete!</strong> You've successfully registered. Please create a password below to sign in and access your consultation dashboard.
+              ✅ <strong>Registration Complete!</strong> You&apos;ve successfully registered. Please create a password below to sign in and access your consultation dashboard.
             </p>
           </div>
         )}
@@ -581,7 +654,7 @@ function PatientLoginContent() {
                   marginBottom: '1rem'
                 }}>
                   <p style={{ fontSize: '0.875rem', color: '#166534', margin: 0, lineHeight: '1.5' }}>
-                    ✅ <strong>Password reset email sent!</strong> Please check your inbox at <strong>{email}</strong> (including spam/junk folder) and follow the instructions to reset your password. If you don't receive the email within a few minutes, please try again or contact support.
+                    ✅ <strong>Password reset email sent!</strong> Please check your inbox at <strong>{email}</strong> (including spam/junk folder) and follow the instructions to reset your password. If you don&apos;t receive the email within a few minutes, please try again or contact support.
                   </p>
                 </div>
               ) : (
@@ -592,7 +665,7 @@ function PatientLoginContent() {
                     marginBottom: '1rem',
                     lineHeight: '1.5'
                   }}>
-                    Enter your email address and we'll send you a link to reset your password.
+                    Enter your email address and we&apos;ll send you a link to reset your password.
                   </p>
                   <button
                     type="button"

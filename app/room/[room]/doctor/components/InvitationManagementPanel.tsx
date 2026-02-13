@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { auth, db } from '@/lib/firebase';
 import { User } from 'firebase/auth';
 import { 
   InvitationFormData, 
@@ -9,6 +8,7 @@ import {
   CreateInvitationResponse,
   InvitationListItem 
 } from '@/lib/types';
+import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 interface InvitationManagementPanelProps {
   user: User;
@@ -17,6 +17,7 @@ interface InvitationManagementPanelProps {
 }
 
 export default function InvitationManagementPanel({ user, roomName, onInvitationCreated }: InvitationManagementPanelProps) {
+  const { showToast } = useToast();
   const [isCreating, setIsCreating] = useState(false);
   const [createdInvitation, setCreatedInvitation] = useState<CreateInvitationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -113,9 +114,22 @@ export default function InvitationManagementPanel({ user, roomName, onInvitation
     }
   };
 
-  const handleCopyLink = (link: string) => {
-    navigator.clipboard.writeText(link);
-    alert('Invitation link copied to clipboard!');
+  const handleCopyLink = async (link: string) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      showToast({
+        kind: 'success',
+        title: 'Link copied',
+        message: 'Invitation link copied to clipboard.',
+      });
+    } catch (copyError) {
+      console.error('Failed to copy invitation link:', copyError);
+      showToast({
+        kind: 'error',
+        title: 'Copy failed',
+        message: 'Unable to copy invitation link. Please try again.',
+      });
+    }
   };
 
   const handleRevokeInvitation = async (invitationId: string) => {

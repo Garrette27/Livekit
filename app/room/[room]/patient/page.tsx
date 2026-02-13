@@ -152,7 +152,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
 
   const handleGoogleSignIn = async () => {
     if (!auth || !provider) {
-      alert('Authentication service not available. Please refresh the page.');
+      setError('Authentication service is not available. Please refresh the page.');
       return;
     }
 
@@ -160,13 +160,13 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
       await signInWithPopup(auth, provider);
     } catch (signInError) {
       console.error('Google sign-in error:', signInError);
-      alert('Sign-in failed. Please try again.');
+      setError('Sign-in failed. Please try again.');
     }
   };
 
   const handleJoinAsPatient = async () => {
     if (!patientName.trim()) {
-      alert('Please enter your name');
+      setError('Please enter your name before joining.');
       return;
     }
 

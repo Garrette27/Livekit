@@ -23,8 +23,250 @@ interface ParsedSummary {
   category: string;
 }
 
+type PresenceEventType = 'joined' | 'left' | 'rejoined';
+
+interface PresenceTimelineEvent {
+  eventType: PresenceEventType;
+  actorType: 'patient' | 'doctor' | 'system' | 'unknown';
+  eventAt: Date;
+  label: string;
+}
+
+interface PresenceTimeline {
+  events: PresenceTimelineEvent[];
+  joinedCount: number;
+  leftCount: number;
+  rejoinCount: number;
+  hadDisconnect: boolean;
+  hadRejoin: boolean;
+  promptContext: string;
+  narrative: string;
+}
+
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_MODEL = 'gpt-4o-mini';
+
+function toDate(value: unknown): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof (value as { toDate?: () => Date }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate();
+  }
+
+  if (typeof (value as { toMillis?: () => number }).toMillis === 'function') {
+    return new Date((value as { toMillis: () => number }).toMillis());
+  }
+
+  const parsed = new Date(value as string | number | Date);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatPromptTimestamp(date: Date): string {
+  return date.toISOString().replace('T', ' ').replace('Z', ' UTC');
+}
+
+function getPresenceEventLabel(eventType: PresenceEventType): string {
+  if (eventType === 'joined') {
+    return 'Patient joined consultation';
+  }
+
+  if (eventType === 'rejoined') {
+    return 'Patient rejoined consultation';
+  }
+
+  return 'Patient left consultation';
+}
+
+function buildPresenceTimelineNarrative(timeline: PresenceTimeline | null): string | null {
+  if (!timeline || timeline.events.length === 0) {
+    return null;
+  }
+
+  const sequence = timeline.events
+    .map((event) => `${event.eventType}@${event.eventAt.toISOString()}`)
+    .join(' -> ');
+
+  const eventSummary = [
+    `joined=${timeline.joinedCount}`,
+    `left=${timeline.leftCount}`,
+    `rejoined=${timeline.rejoinCount}`,
+  ].join(', ');
+
+  return `Patient presence timeline (${eventSummary}): ${sequence}.`;
+}
+
+function buildPresenceTimelinePromptContext(timelineEvents: PresenceTimelineEvent[]): string {
+  if (!timelineEvents.length) {
+    return 'No explicit patient join/leave timeline events were captured.';
+  }
+
+  return timelineEvents
+    .map((event, index) => `${index + 1}. ${event.label} at ${formatPromptTimestamp(event.eventAt)}`)
+    .join('\n');
+}
+
+function buildPresenceTimelineMetadata(timeline: PresenceTimeline | null): Record<string, unknown> {
+  if (!timeline) {
+    return {
+      hasPresenceTimeline: false,
+      presenceTimelineEvents: 0,
+      patientJoinedCount: 0,
+      patientLeftCount: 0,
+      patientRejoinCount: 0,
+      patientHadDisconnect: false,
+      patientHadRejoin: false,
+    };
+  }
+
+  return {
+    hasPresenceTimeline: timeline.events.length > 0,
+    presenceTimelineEvents: timeline.events.length,
+    patientJoinedCount: timeline.joinedCount,
+    patientLeftCount: timeline.leftCount,
+    patientRejoinCount: timeline.rejoinCount,
+    patientHadDisconnect: timeline.hadDisconnect,
+    patientHadRejoin: timeline.hadRejoin,
+  };
+}
+
+function augmentKeyPointsWithPresenceTimeline(
+  keyPoints: string[],
+  timeline: PresenceTimeline | null
+): string[] {
+  if (!timeline || timeline.events.length === 0) {
+    return keyPoints;
+  }
+
+  const timelineKeyPoint = `Patient connection timeline: ${timeline.events
+    .map((event) => event.eventType)
+    .join(' -> ')}`;
+
+  const hasSimilarPoint = keyPoints.some((point) =>
+    point.toLowerCase().includes('connection timeline') || point.toLowerCase().includes('rejoined')
+  );
+
+  if (hasSimilarPoint) {
+    return keyPoints;
+  }
+
+  return [...keyPoints, timelineKeyPoint];
+}
+
+function serializePresenceTimelineForSummary(
+  timeline: PresenceTimeline | null
+): Array<{ eventType: PresenceEventType; actorType: string; eventAt: Date; label: string }> {
+  if (!timeline) {
+    return [];
+  }
+
+  return timeline.events.map((event) => ({
+    eventType: event.eventType,
+    actorType: event.actorType,
+    eventAt: event.eventAt,
+    label: event.label,
+  }));
+}
+
+async function loadPresenceTimeline(
+  db: any,
+  consultationSessionId: string | null | undefined
+): Promise<PresenceTimeline | null> {
+  if (!consultationSessionId) {
+    return null;
+  }
+
+  try {
+    const eventsRef = db
+      .collection('consultationSessions')
+      .doc(consultationSessionId)
+      .collection('events');
+
+    let snapshot;
+    try {
+      snapshot = await eventsRef.orderBy('eventAt', 'asc').limit(200).get();
+    } catch (orderingError) {
+      console.warn('Presence timeline orderBy fallback triggered:', orderingError);
+      snapshot = await eventsRef.limit(200).get();
+    }
+
+    if (snapshot.empty) {
+      return null;
+    }
+
+    const events: PresenceTimelineEvent[] = snapshot.docs
+      .map((doc: QueryDocumentSnapshot) => {
+        const data = doc.data() as {
+          eventType?: string;
+          actorType?: string;
+          eventAt?: unknown;
+          createdAt?: unknown;
+        };
+
+        const eventType = data.eventType;
+        if (eventType !== 'joined' && eventType !== 'left' && eventType !== 'rejoined') {
+          return null;
+        }
+
+        const actorType =
+          data.actorType === 'patient' || data.actorType === 'doctor' || data.actorType === 'system'
+            ? data.actorType
+            : 'unknown';
+
+        // Keep timeline focused on patient presence transitions.
+        if (actorType !== 'patient' && actorType !== 'unknown') {
+          return null;
+        }
+
+        const eventAt = toDate(data.eventAt) || toDate(data.createdAt);
+        if (!eventAt) {
+          return null;
+        }
+
+        return {
+          eventType,
+          actorType,
+          eventAt,
+          label: getPresenceEventLabel(eventType),
+        } as PresenceTimelineEvent;
+      })
+      .filter((event: PresenceTimelineEvent | null): event is PresenceTimelineEvent => Boolean(event))
+      .sort(
+        (left: PresenceTimelineEvent, right: PresenceTimelineEvent) =>
+          left.eventAt.getTime() - right.eventAt.getTime()
+      );
+
+    if (events.length === 0) {
+      return null;
+    }
+
+    const joinedCount = events.filter((event) => event.eventType === 'joined').length;
+    const leftCount = events.filter((event) => event.eventType === 'left').length;
+    const rejoinCount = events.filter((event) => event.eventType === 'rejoined').length;
+
+    const timeline: PresenceTimeline = {
+      events,
+      joinedCount,
+      leftCount,
+      rejoinCount,
+      hadDisconnect: leftCount > 0,
+      hadRejoin: rejoinCount > 0,
+      promptContext: buildPresenceTimelinePromptContext(events),
+      narrative: '',
+    };
+    timeline.narrative = buildPresenceTimelineNarrative(timeline) || '';
+
+    return timeline;
+  } catch (error) {
+    console.error('Error loading presence timeline:', error);
+    return null;
+  }
+}
 
 function defaultMetadata(
   userId: string,
@@ -69,7 +311,8 @@ function buildPrompt(
   patientName: string,
   durationMinutes: number,
   transcriptionData: any[] | null,
-  attachmentContext: string | null
+  attachmentContext: string | null,
+  presenceTimelineContext: string | null
 ): string {
   const conversationContext = transcriptionData && transcriptionData.length > 0
     ? `\n\nActual conversation transcript:\n${transcriptionData.join('\n')}`
@@ -78,6 +321,10 @@ function buildPrompt(
   const attachmentSummaryContext = attachmentContext
     ? `\n\nExtracted attachment context:\n${attachmentContext}`
     : '\n\nNo extracted attachment text available.';
+
+  const patientPresenceContext = presenceTimelineContext
+    ? `\n\nPatient presence timeline events:\n${presenceTimelineContext}`
+    : '\n\nNo patient join/leave timeline available.';
 
   return `You are a medical AI assistant specializing in summarizing telehealth consultations. 
     
@@ -88,6 +335,7 @@ Consultation details:
 - Patient: ${patientName}
 ${conversationContext}
 ${attachmentSummaryContext}
+${patientPresenceContext}
 
 Please provide the following structured response in JSON format:
 
@@ -101,6 +349,7 @@ Please provide the following structured response in JSON format:
 }
 
 IMPORTANT: Base your summary on the actual conversation content provided. If no conversation transcript is available, indicate this clearly in the summary.
+If the patient left and rejoined, explicitly mention this in both the summary and key points.
 
 Focus on medical accuracy, patient privacy, and actionable insights.`;
 }
@@ -193,9 +442,19 @@ export async function generateAndStoreConsultationSummary({
     console.error('Firebase Admin not initialized for summary generation');
     return;
   }
+  let presenceTimeline: PresenceTimeline | null = null;
+  let presenceTimelineMetadata = buildPresenceTimelineMetadata(null);
+  let serializedPresenceTimeline = serializePresenceTimelineForSummary(null);
+  let presenceTimelineNarrativeSuffix = '';
 
   try {
     console.log('Generating AI summary for consultation:', roomName, 'with user ID:', userId);
+    presenceTimeline = await loadPresenceTimeline(db, consultationSessionId);
+    presenceTimelineMetadata = buildPresenceTimelineMetadata(presenceTimeline);
+    serializedPresenceTimeline = serializePresenceTimelineForSummary(presenceTimeline);
+    presenceTimelineNarrativeSuffix = presenceTimeline?.narrative
+      ? ` ${presenceTimeline.narrative}`
+      : '';
 
     const entitlement = await resolveAiEntitlement(db, userId, 'consultation_summary');
     if (!entitlement.enabled) {
@@ -203,18 +462,23 @@ export async function generateAndStoreConsultationSummary({
         roomName,
         consultationSessionId,
         summary:
-          'Consultation completed. AI summary is currently unavailable for this account configuration.',
-        keyPoints: ['Consultation completed', 'AI summary not available for current configuration'],
+          `Consultation completed. AI summary is currently unavailable for this account configuration.${presenceTimelineNarrativeSuffix}`,
+        keyPoints: augmentKeyPointsWithPresenceTimeline(
+          ['Consultation completed', 'AI summary not available for current configuration'],
+          presenceTimeline
+        ),
         recommendations: ['Review consultation manually', 'Enable AI when needed'],
         followUpActions: ['Document outcomes in notes'],
         riskLevel: 'Unknown',
         category: 'General Consultation',
         participants: [patientName],
         duration: durationMinutes,
+        presenceTimeline: serializedPresenceTimeline,
         createdAt: new Date(),
         createdBy: userId,
         metadata: {
           ...defaultMetadata(userId, transcriptionData, consultationSessionId),
+          ...presenceTimelineMetadata,
           aiSummaryEnabled: false,
           aiSummaryDisabledReason: entitlement.reason,
         },
@@ -231,18 +495,23 @@ export async function generateAndStoreConsultationSummary({
       const summaryData: Record<string, any> = {
         roomName,
         consultationSessionId,
-        summary: `Consultation completed with ${patientName}. Duration: ${durationMinutes} minutes. No AI analysis available - OpenAI not configured.`,
-        keyPoints: ['Consultation completed', 'Duration recorded', 'No AI analysis available'],
+        summary: `Consultation completed with ${patientName}. Duration: ${durationMinutes} minutes. No AI analysis available - OpenAI not configured.${presenceTimelineNarrativeSuffix}`,
+        keyPoints: augmentKeyPointsWithPresenceTimeline(
+          ['Consultation completed', 'Duration recorded', 'No AI analysis available'],
+          presenceTimeline
+        ),
         recommendations: ['Please configure OpenAI API for enhanced summaries'],
         followUpActions: ['Manual review required'],
         riskLevel: 'Unknown',
         category: 'General Consultation',
         participants: [patientName],
         duration: durationMinutes,
+        presenceTimeline: serializedPresenceTimeline,
         createdAt: new Date(),
         createdBy: userId,
         metadata: {
           ...defaultMetadata(userId, transcriptionData, consultationSessionId),
+          ...presenceTimelineMetadata,
           aiSummaryEnabled: false,
           aiSummaryDisabledReason: 'OPENAI_API_KEY not configured',
         },
@@ -269,7 +538,8 @@ export async function generateAndStoreConsultationSummary({
       patientName,
       durationMinutes,
       transcriptionData,
-      attachmentContext
+      attachmentContext,
+      presenceTimeline?.promptContext || null
     );
 
     console.log('Calling OpenAI API for consultation summary...');
@@ -308,6 +578,10 @@ export async function generateAndStoreConsultationSummary({
 
     try {
       const parsedSummary = normalizeSummary(JSON.parse(stripMarkdownCodeFence(content)));
+      parsedSummary.keyPoints = augmentKeyPointsWithPresenceTimeline(
+        parsedSummary.keyPoints,
+        presenceTimeline
+      );
       console.log('Successfully parsed AI response');
 
       const summaryData: Record<string, any> = {
@@ -321,10 +595,12 @@ export async function generateAndStoreConsultationSummary({
         category: parsedSummary.category,
         participants: [patientName],
         duration: durationMinutes,
+        presenceTimeline: serializedPresenceTimeline,
         createdAt: new Date(),
         createdBy: userId,
         metadata: {
           ...defaultMetadata(userId, transcriptionData, consultationSessionId),
+          ...presenceTimelineMetadata,
           hasAttachmentContext: Boolean(attachmentContext),
         },
       };
@@ -340,17 +616,24 @@ export async function generateAndStoreConsultationSummary({
       const summaryData = {
         roomName,
         consultationSessionId,
-        summary: content || 'Summary generation failed',
-        keyPoints: ['Unable to parse structured data'],
+        summary: `${content || 'Summary generation failed'}${presenceTimelineNarrativeSuffix}`,
+        keyPoints: augmentKeyPointsWithPresenceTimeline(
+          ['Unable to parse structured data'],
+          presenceTimeline
+        ),
         recommendations: ['Manual review recommended'],
         followUpActions: ['Contact support if needed'],
         riskLevel: 'Unknown',
         category: 'General Consultation',
         participants: [patientName],
         duration: durationMinutes,
+        presenceTimeline: serializedPresenceTimeline,
         createdAt: new Date(),
         createdBy: userId,
-        metadata: defaultMetadata(userId, transcriptionData, consultationSessionId),
+        metadata: {
+          ...defaultMetadata(userId, transcriptionData, consultationSessionId),
+          ...presenceTimelineMetadata,
+        },
       };
 
       await writeSummary(db, consultationSessionId || roomName, summaryData);
@@ -364,18 +647,20 @@ export async function generateAndStoreConsultationSummary({
       const summaryData = {
         roomName,
         consultationSessionId,
-        summary: 'Error generating AI summary',
-        keyPoints: ['Summary generation failed'],
+        summary: `Error generating AI summary.${presenceTimelineNarrativeSuffix}`,
+        keyPoints: augmentKeyPointsWithPresenceTimeline(['Summary generation failed'], presenceTimeline),
         recommendations: ['Manual review required'],
         followUpActions: ['Contact technical support'],
         riskLevel: 'Unknown',
         category: 'General Consultation',
         participants: [patientName],
         duration: durationMinutes,
+        presenceTimeline: serializedPresenceTimeline,
         createdAt: new Date(),
         createdBy: userId,
         metadata: {
           ...defaultMetadata(userId, transcriptionData, consultationSessionId),
+          ...presenceTimelineMetadata,
           error: error instanceof Error ? error.message : 'Unknown error',
         },
       };

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { copyTextToClipboard, fetchInvitationLink } from '@/lib/invitations/invitation-link-client';
+import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 interface DoctorControlsPanelProps {
   doctorName: string;
@@ -16,9 +17,11 @@ interface InvitationLinkResponse {
 }
 
 export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: DoctorControlsPanelProps) {
+  const { showToast } = useToast();
   const [invitationLink, setInvitationLink] = useState<string | null>(null);
   const [loadingLink, setLoadingLink] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const fallbackLink = `https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`;
 
   const loadInvitationLink = useCallback(
@@ -53,6 +56,18 @@ export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: D
   useEffect(() => {
     void loadInvitationLink();
   }, [loadInvitationLink]);
+
+  useEffect(() => {
+    if (!copied) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setCopied(false);
+    }, 1500);
+
+    return () => window.clearTimeout(timer);
+  }, [copied]);
 
   const patientLink = invitationLink || fallbackLink;
 
@@ -122,13 +137,27 @@ export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: D
         </p>
 
         <button
-          onClick={() => {
-            void copyTextToClipboard(patientLink);
-            alert(invitationLink ? 'Invitation link copied to clipboard.' : 'Patient link copied to clipboard.');
+          onClick={async () => {
+            try {
+              await copyTextToClipboard(patientLink);
+              setCopied(true);
+              showToast({
+                kind: 'success',
+                title: 'Link copied',
+                message: invitationLink ? 'Invitation link copied to clipboard.' : 'Patient link copied to clipboard.',
+              });
+            } catch (copyError) {
+              console.error('Failed to copy patient link:', copyError);
+              showToast({
+                kind: 'error',
+                title: 'Copy failed',
+                message: 'Unable to copy link. Please try again.',
+              });
+            }
           }}
           disabled={loadingLink}
           style={{
-            backgroundColor: loadingLink ? '#9ca3af' : '#22c55e',
+            backgroundColor: loadingLink ? '#9ca3af' : copied ? '#16a34a' : '#22c55e',
             color: 'white',
             border: 'none',
             borderRadius: '0.5rem',
@@ -138,9 +167,11 @@ export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: D
             cursor: loadingLink ? 'not-allowed' : 'pointer',
             width: '100%',
             marginBottom: '0.5rem',
+            transform: copied ? 'translateY(1px) scale(0.99)' : 'none',
+            transition: 'all 140ms ease',
           }}
         >
-          {loadingLink ? 'Loading...' : 'Copy Link'}
+          {loadingLink ? 'Loading...' : copied ? 'Copied' : 'Copy Link'}
         </button>
 
         <button

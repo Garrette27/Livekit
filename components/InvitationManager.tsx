@@ -6,6 +6,7 @@ import { Timestamp } from 'firebase/firestore';
 import { CreateInvitationRequest, CreateInvitationResponse, Invitation } from '@/lib/types';
 import InvitationForm from './InvitationForm';
 import InvitationResult from './InvitationResult';
+import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 interface InvitationManagerProps {
   user: User;
@@ -19,6 +20,7 @@ interface CreatedInvitationResult {
 }
 
 export default function InvitationManager({ user, roomName, onInvitationCreated }: InvitationManagerProps) {
+  const { showToast } = useToast();
   const [createdInvitation, setCreatedInvitation] = useState<CreatedInvitationResult | null>(null);
 
   const handleInvitationCreated = async (formData: CreateInvitationRequest) => {
@@ -81,16 +83,28 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
         });
         onInvitationCreated?.(result.invitationId);
       } else {
-        alert(result.error || 'Failed to create invitation');
+        showToast({
+          kind: 'error',
+          title: 'Create failed',
+          message: result.error || 'Failed to create invitation.',
+        });
       }
     } catch (err) {
       console.error('Error creating invitation:', err);
-      alert('Network error. Please try again.');
+      showToast({
+        kind: 'error',
+        title: 'Network error',
+        message: 'Network error. Please try again.',
+      });
     }
   };
 
   const handleCopySuccess = () => {
-    alert('Invitation link copied to clipboard!');
+    showToast({
+      kind: 'success',
+      title: 'Link copied',
+      message: 'Invitation link copied to clipboard.',
+    });
   };
 
   const resetForm = () => {

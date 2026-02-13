@@ -90,10 +90,12 @@ service cloud.firestore {
         request.resource.data.keys().hasAll(['email', 'role']) &&
         request.resource.data.email is string &&
         request.resource.data.role in ['patient', 'doctor'];
-      // Allow users to update their own document (including merge operations)
-      allow update: if request.auth != null && request.auth.uid == userId;
-      // Allow users to write/delete their own document (covers all write operations)
-      allow write: if request.auth != null && request.auth.uid == userId;
+      // Allow users to update their own profile while keeping email and role immutable.
+      allow update: if request.auth != null &&
+        request.auth.uid == userId &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.email == resource.data.email;
+      allow delete: if false;
     }
     
     // Audit logs - read-only for users, write-only for server
@@ -101,6 +103,12 @@ service cloud.firestore {
       allow read: if request.auth != null && 
         (resource.data.userId == request.auth.uid || 
          request.auth.token.admin == true);
+      allow write: if false; // Only server-side writes
+    }
+
+    // Admin activity feed - operational timeline for support and compliance workflows.
+    match /admin-activity-feed/{eventId} {
+      allow read: if request.auth != null && request.auth.token.admin == true;
       allow write: if false; // Only server-side writes
     }
     
