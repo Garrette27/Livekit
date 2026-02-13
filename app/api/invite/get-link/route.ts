@@ -6,6 +6,27 @@ import { InvitationToken } from '../../../../lib/types';
 
 let hasLoggedMissingInvitationIndexWarning = false;
 
+function isExpiredInvitation(invitation: any): boolean {
+  const expiresAtDate = invitation?.expiresAt
+    ? toDate(invitation.expiresAt, new Date(0))
+    : new Date('2099-12-31');
+
+  return expiresAtDate.getTime() > 0 && new Date() > expiresAtDate;
+}
+
+function pickLatestUsableInvitation(docs: any[]) {
+  const usableInvitations = docs
+    .map((doc) => ({ doc, data: doc.data?.() }))
+    .filter(({ data }) => (data?.status || 'active') === 'active' && !isExpiredInvitation(data))
+    .sort((a, b) => {
+      const aDate = toDate(a.data?.createdAt, new Date(0)).getTime();
+      const bDate = toDate(b.data?.createdAt, new Date(0)).getTime();
+      return bDate - aDate;
+    });
+
+  return usableInvitations[0]?.doc || null;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -38,7 +59,7 @@ export async function GET(req: NextRequest) {
           .where('roomName', '==', roomName)
           .where('status', '==', 'active')
           .orderBy('createdAt', 'desc')
-          .limit(1)
+          .limit(20)
           .get();
         
         if (invitationsQuery.empty) {
@@ -47,8 +68,14 @@ export async function GET(req: NextRequest) {
             { status: 404 }
           );
         }
-        
-        invitationDoc = invitationsQuery.docs[0];
+
+        invitationDoc = pickLatestUsableInvitation(invitationsQuery.docs);
+        if (!invitationDoc) {
+          return NextResponse.json(
+            { success: false, error: 'No active non-expired invitation found for this room' },
+            { status: 404 }
+          );
+        }
       } catch (queryError: any) {
         const isMissingIndexError =
           queryError?.code === 9 ||
@@ -76,22 +103,13 @@ export async function GET(req: NextRequest) {
           );
         }
 
-        const activeInvitations = fallbackQuery.docs
-          .filter((doc) => (doc.data()?.status || 'active') === 'active')
-          .sort((a, b) => {
-            const aDate = toDate(a.data()?.createdAt, new Date(0)).getTime();
-            const bDate = toDate(b.data()?.createdAt, new Date(0)).getTime();
-            return bDate - aDate;
-          });
-
-        if (activeInvitations.length === 0) {
+        invitationDoc = pickLatestUsableInvitation(fallbackQuery.docs);
+        if (!invitationDoc) {
           return NextResponse.json(
             { success: false, error: 'No active invitation found for this room' },
             { status: 404 }
           );
         }
-
-        invitationDoc = activeInvitations[0];
       }
     }
 

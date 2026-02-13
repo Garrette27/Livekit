@@ -221,31 +221,37 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
     return '/patient/login';
   }, [isAuthenticated, user?.uid]);
 
-  const trackPatientLeave = useCallback(async () => {
-    try {
-      await fetch('/api/track-consultation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomName,
-          action: 'leave',
-          patientName,
-          userId: user?.uid || 'anonymous',
-          patientEmail: user?.email || null,
-        }),
-      });
-    } catch (trackError) {
-      console.error('Error tracking patient leave:', trackError);
+  const trackPatientLeave = useCallback(() => {
+    const payload = JSON.stringify({
+      roomName,
+      action: 'leave',
+      patientName,
+      userId: user?.uid || 'anonymous',
+      patientEmail: user?.email || null,
+    });
+
+    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+      navigator.sendBeacon('/api/track-consultation', payload);
+      return;
     }
+
+    void fetch('/api/track-consultation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true,
+    }).catch((trackError) => {
+      console.error('Error tracking patient leave:', trackError);
+    });
   }, [patientName, roomName, user?.email, user?.uid]);
 
-  const leaveConsultation = useCallback(async () => {
+  const leaveConsultation = useCallback(() => {
     if (isLeavingRef.current) {
       return;
     }
 
     isLeavingRef.current = true;
-    await trackPatientLeave();
+    trackPatientLeave();
 
     localStorage.removeItem(`patientToken_${roomName}`);
     localStorage.removeItem(`patientInCall_${roomName}`);

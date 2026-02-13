@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../lib/firebase-admin';
 import { buildVisibleUserIds, choosePatientUserId, isKnownUserId } from '../../../lib/consultations/identity-utils';
 import { generateAndStoreConsultationSummary } from '../../../lib/consultations/summary-service';
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
 
     const db = getFirebaseAdmin();
     if (!db) {
-      console.error('❌ Firebase Admin not initialized');
+      console.error('âŒ Firebase Admin not initialized');
       return NextResponse.json({ 
         error: 'Firebase Admin not initialized',
         message: 'Please check your Firebase environment variables'
@@ -154,7 +154,7 @@ export async function POST(req: Request) {
           }
         });
         
-        console.log(`✅ Updated consultation ${roomName} with patient user ID: ${actualPatientUserId}`);
+        console.log(`âœ… Updated consultation ${roomName} with patient user ID: ${actualPatientUserId}`);
       } else {
         // Get patient email if available
         let patientEmailToStore = null;
@@ -183,35 +183,33 @@ export async function POST(req: Request) {
         const finalPatientEmail = (!patientEmailToStore && existingPatientEmail)
           ? existingPatientEmail  // Preserve existing patient email
           : patientEmailToStore;  // Use new email (or null if anonymous)
-        
-        // Determine if we should preserve existing joinedAt timestamp
-        // Only preserve if consultation is active and joinedAt is recent (within 3 hours)
-        // If consultation is completed or joinedAt is too old, reset it
+        // Preserve start time only for short reconnects of the same known patient.
         let finalJoinedAt: Date;
+        let finalSessionStartedAt: Date;
         if (existingData?.joinedAt) {
           const existingStatus = existingData?.status;
           const existingJoinedAt = existingData.joinedAt.toDate ? existingData.joinedAt.toDate() : new Date(existingData.joinedAt);
           const now = new Date();
-          const hoursSinceJoined = (now.getTime() - existingJoinedAt.getTime()) / (1000 * 60 * 60); // Convert to hours
-          
-          // Only preserve joinedAt if:
-          // 1. Consultation is active (not completed)
-          // 2. JoinedAt is recent (within 3 hours) - handles brief disconnections
-          if (existingStatus === 'active' && hoursSinceJoined < 3) {
+          const hoursSinceJoined = (now.getTime() - existingJoinedAt.getTime()) / (1000 * 60 * 60);
+          const isSameKnownPatient =
+            isKnownUserId(existingPatientUserId) &&
+            isKnownUserId(finalPatientUserId) &&
+            existingPatientUserId === finalPatientUserId;
+
+          if (existingStatus === 'active' && hoursSinceJoined < 3 && isSameKnownPatient) {
             finalJoinedAt = existingJoinedAt;
-            console.log(`ℹ️ Preserving existing joinedAt (${hoursSinceJoined.toFixed(2)} hours ago) for active consultation`);
+            finalSessionStartedAt = existingData.sessionStartedAt?.toDate
+              ? existingData.sessionStartedAt.toDate()
+              : finalJoinedAt;
+            console.log(`Preserving joinedAt for same-patient reconnect (${hoursSinceJoined.toFixed(2)}h)`);
           } else {
-            // Consultation is completed or joinedAt is too old - reset it
             finalJoinedAt = new Date();
-            if (existingStatus === 'completed') {
-              console.log(`ℹ️ Resetting joinedAt - consultation was already completed`);
-            } else {
-              console.log(`ℹ️ Resetting joinedAt - too old (${hoursSinceJoined.toFixed(2)} hours ago)`);
-            }
+            finalSessionStartedAt = finalJoinedAt;
+            console.log('Resetting joinedAt/sessionStartedAt for new or stale session');
           }
         } else {
-          // No existing joinedAt - use current time
           finalJoinedAt = new Date();
+          finalSessionStartedAt = finalJoinedAt;
         }
         
         // Track when patient joins (new consultation or update existing)
@@ -219,6 +217,7 @@ export async function POST(req: Request) {
           roomName,
           patientName: patientName || existingData?.patientName || 'Unknown Patient',
           joinedAt: finalJoinedAt,
+          sessionStartedAt: finalSessionStartedAt,
           status: 'active',
           isRealConsultation: true, // Mark as real consultation, not test
           createdBy: doctorUserId, // Store doctor's user ID for doctor's view
@@ -242,9 +241,9 @@ export async function POST(req: Request) {
         
         await consultationRef.set(consultationData, { merge: true });
         
-        console.log(`✅ Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}, patient: ${finalPatientUserId}, email: ${finalPatientEmail || 'not available'}`);
+        console.log(`âœ… Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}, patient: ${finalPatientUserId}, email: ${finalPatientEmail || 'not available'}`);
         if (actualPatientUserId === 'anonymous' && existingPatientEmail) {
-          console.log(`ℹ️ Preserved existing patient email (${existingPatientEmail}) when patient joined anonymously`);
+          console.log(`â„¹ï¸ Preserved existing patient email (${existingPatientEmail}) when patient joined anonymously`);
         }
         console.log('Consultation data stored:', consultationData);
       }
@@ -254,9 +253,12 @@ export async function POST(req: Request) {
       const consultationDoc = await consultationRef.get();
       if (consultationDoc.exists) {
         const data = consultationDoc.data();
-        const joinedAt = data?.joinedAt?.toDate() || new Date();
+        const joinedAt = data?.sessionStartedAt?.toDate?.() || data?.joinedAt?.toDate?.() || (data?.joinedAt ? new Date(data.joinedAt) : new Date());
         const leftAt = new Date();
-        const durationMinutes = Math.round((leftAt.getTime() - joinedAt.getTime()) / (1000 * 60));
+        let durationMinutes = Math.round((leftAt.getTime() - joinedAt.getTime()) / (1000 * 60));
+        if (!Number.isFinite(durationMinutes) || durationMinutes < 0) {
+          durationMinutes = 0;
+        }
         
         // Preserve existing patient email/userId if leaving anonymously
         // Get existing patient data from consultation
@@ -293,15 +295,15 @@ export async function POST(req: Request) {
         if (patientEmailToStore) {
           updateData.patientEmail = patientEmailToStore;
           updateData.metadata.patientEmail = patientEmailToStore;
-          console.log('✅ Storing patient email in consultation:', patientEmailToStore);
+          console.log('âœ… Storing patient email in consultation:', patientEmailToStore);
           if (actualPatientUserId === 'anonymous' && existingPatientEmail) {
-            console.log(`ℹ️ Preserved existing patient email (${existingPatientEmail}) when patient left anonymously`);
+            console.log(`â„¹ï¸ Preserved existing patient email (${existingPatientEmail}) when patient left anonymously`);
           }
         }
         
         await consultationRef.update(updateData);
         
-        console.log(`✅ Patient left consultation: ${roomName}, duration: ${durationMinutes} minutes, linked to doctor: ${doctorUserId}`);
+        console.log(`âœ… Patient left consultation: ${roomName}, duration: ${durationMinutes} minutes, linked to doctor: ${doctorUserId}`);
         
         // Generate AI summary for completed consultation
         try {
@@ -334,7 +336,7 @@ export async function POST(req: Request) {
             patientEmail: patientEmailFromConsultation // Use preserved patient email
           });
         } catch (error) {
-          console.error('❌ Error generating consultation summary:', error);
+          console.error('âŒ Error generating consultation summary:', error);
         }
       }
     }
@@ -347,12 +349,13 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    console.error('❌ Track consultation error:', error);
+    console.error('âŒ Track consultation error:', error);
     return NextResponse.json({ 
       error: 'Failed to track consultation',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }
+
 
 

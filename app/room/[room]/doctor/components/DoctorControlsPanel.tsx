@@ -201,28 +201,6 @@ export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: D
         </button>
 
         <button
-          onClick={() => window.open(`/room/${roomName}/patient`, '_blank')}
-          style={{
-            backgroundColor: '#059669',
-            color: 'white',
-            border: 'none',
-            borderRadius: '0.5rem',
-            padding: '0.75rem 1rem',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            cursor: 'pointer',
-            textDecoration: 'none',
-            display: 'inline-block',
-            textAlign: 'center',
-            width: '100%',
-            transition: 'all 0.2s ease',
-            boxShadow: '0 2px 4px rgba(5, 150, 105, 0.2)',
-          }}
-        >
-          Join as Patient
-        </button>
-
-        <button
           onClick={onLeave}
           style={{
             backgroundColor: '#dc2626',
@@ -239,7 +217,7 @@ export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: D
             width: '100%',
             transition: 'all 0.2s ease',
             boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-            marginTop: '0.5rem',
+            marginTop: '0.25rem',
           }}
         >
           Leave Call

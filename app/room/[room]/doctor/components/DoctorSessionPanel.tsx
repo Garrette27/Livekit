@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import { User } from 'firebase/auth';
@@ -7,7 +7,6 @@ import { FirebaseStorage } from 'firebase/storage';
 import NotesPanel from './NotesPanel';
 import DoctorControlsPanel from './DoctorControlsPanel';
 import WaitingRoomPanel from './WaitingRoomPanel';
-import InvitationManagementPanel from './InvitationManagementPanel';
 import SidebarPortal from './shared/SidebarPortal';
 
 interface DoctorSessionPanelProps {
@@ -30,32 +29,21 @@ export default function DoctorSessionPanel({
   return (
     <>
       <SidebarPortal
-        title="Waiting Room"
-        icon="🚪"
+        title="Waiting Queue"
+        icon="Queue"
         position="left"
-        defaultCollapsed={true}
-        width={350}
+        defaultCollapsed={false}
+        width={360}
         collapsedWidth={60}
       >
         <WaitingRoomPanel roomName={roomName} />
       </SidebarPortal>
 
       <SidebarPortal
-        title="Invitation Management"
-        icon="📧"
+        title="Manual Notes"
+        icon="Notes"
         position="left"
         defaultCollapsed={true}
-        width={400}
-        collapsedWidth={60}
-      >
-        <InvitationManagementPanel user={user} roomName={roomName} />
-      </SidebarPortal>
-
-      <SidebarPortal
-        title="Manual Notes"
-        icon="📝"
-        position="left"
-        defaultCollapsed={false}
         width={350}
         collapsedWidth={60}
       >
@@ -64,7 +52,7 @@ export default function DoctorSessionPanel({
 
       <SidebarPortal
         title="Doctor Session Panel"
-        icon="🛠️"
+        icon="Doctor"
         position="right"
         defaultCollapsed={false}
         width={300}
