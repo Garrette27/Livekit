@@ -1,11 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, onSnapshot, orderBy, query, Timestamp, where, limit } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { isDoctor } from '@/lib/auth-utils';
+import { useAuthSession } from '@/hooks/useAuthSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,11 +39,12 @@ interface CallSummary {
 }
 
 export default function DoctorDashboard() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isAuthenticated, isAuthorized, isLoading: authLoading } = useAuthSession({
+    requiredRole: 'doctor',
+  });
   const [summaries, setSummaries] = useState<CallSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [isAuthorized, setIsAuthorized] = useState(false);
   const [editingSummary, setEditingSummary] = useState<CallSummary | null>(null);
   const [editForm, setEditForm] = useState({
     summary: '',
@@ -60,22 +60,17 @@ export default function DoctorDashboard() {
 
   // Handle authentication and role check - redirect directly to invitations
   useEffect(() => {
-    if (auth) {
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          const doctor = await isDoctor(user);
-          if (doctor) {
-            // Doctor is logged in - redirect directly to invitations page
-            router.replace('/doctor/invitations');
-            return;
-          }
-        }
-        // Not a doctor or not logged in, redirect to login
-        router.replace('/doctor/login');
-      });
-      return unsubscribe;
+    if (authLoading) {
+      return;
     }
-  }, [router]);
+
+    if (!isAuthenticated || !isAuthorized) {
+      router.replace('/doctor/login');
+      return;
+    }
+
+    router.replace('/doctor/invitations');
+  }, [authLoading, isAuthenticated, isAuthorized, router]);
 
   useEffect(() => {
     if (!user || !db || !isAuthorized) return;

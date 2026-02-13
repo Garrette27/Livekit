@@ -11,6 +11,12 @@ export interface RoomChatPolicy {
   defaultOpen: boolean;
 }
 
+export interface RoomGridPolicy {
+  enabled: boolean;
+  maxParticipants: number;
+  mobileMaxColumns: number;
+}
+
 export interface SidebarPolicy {
   enabled: boolean;
   title: string;
@@ -30,6 +36,7 @@ export interface WaitingQueuePanelPolicy extends SidebarPolicy {
 export interface RoomSessionPolicy {
   controls: RoomControlsPolicy;
   chat: RoomChatPolicy;
+  grid: RoomGridPolicy;
   panels: {
     waitingQueue: WaitingQueuePanelPolicy;
     doctorSession: SidebarPolicy;
@@ -55,6 +62,12 @@ const DISABLED_WAITING_QUEUE_PANEL: WaitingQueuePanelPolicy = {
   showRefreshButton: false,
 };
 
+const DEFAULT_GRID_POLICY: RoomGridPolicy = {
+  enabled: true,
+  maxParticipants: 40,
+  mobileMaxColumns: 2,
+};
+
 const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
   doctor: {
     controls: {
@@ -66,6 +79,7 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
       enabled: true,
       defaultOpen: false,
     },
+    grid: DEFAULT_GRID_POLICY,
     panels: {
       waitingQueue: {
         enabled: true,
@@ -102,6 +116,7 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
       enabled: true,
       defaultOpen: false,
     },
+    grid: DEFAULT_GRID_POLICY,
     panels: {
       waitingQueue: DISABLED_WAITING_QUEUE_PANEL,
       doctorSession: DISABLED_PANEL,

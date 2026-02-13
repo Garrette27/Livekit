@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { trackConsultationEvent } from '@/lib/consultations/consultation-event-client';
 
 interface RoomLifecycleArgs {
   token: string | null;
@@ -56,25 +57,13 @@ export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLife
           { merge: true }
         );
 
-        try {
-          const response = await fetch('/api/track-consultation', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              roomName,
-              action: 'join',
-              patientName: 'Doctor',
-              duration: 0,
-              userId: user.uid
-            })
-          });
-
-          if (!response.ok) {
-            console.error('Failed to track consultation:', await response.text());
-          }
-        } catch (error) {
-          console.error('Error tracking consultation:', error);
-        }
+        await trackConsultationEvent({
+          roomName,
+          action: 'join',
+          patientName: 'Doctor',
+          duration: 0,
+          userId: user.uid,
+        });
       } catch (error) {
         console.error('Error creating room/call records:', error);
       }

@@ -2,11 +2,15 @@
 
 import React from 'react';
 import { RoomControlsPolicy } from './room-controls-policy';
+import { resolveGridColumns, resolveMobileGridColumns } from './participant-grid-policy';
+import { RoomGridPolicy } from './room-grid-policy';
 
 interface LiveKitStylesProps {
   controlBarColor?: 'blue' | 'default';
   controlsPolicy?: RoomControlsPolicy;
   chatEnabled?: boolean;
+  gridPolicy?: RoomGridPolicy;
+  participantCount?: number;
 }
 
 const DEFAULT_CONTROLS_POLICY: RoomControlsPolicy = {
@@ -15,11 +19,22 @@ const DEFAULT_CONTROLS_POLICY: RoomControlsPolicy = {
   hideSettingsControl: true,
 };
 
+const DEFAULT_GRID_POLICY: RoomGridPolicy = {
+  enabled: true,
+  maxParticipants: 40,
+  mobileMaxColumns: 2,
+};
+
 export default function LiveKitStyles({
   controlBarColor = 'blue',
   controlsPolicy = DEFAULT_CONTROLS_POLICY,
   chatEnabled = true,
+  gridPolicy = DEFAULT_GRID_POLICY,
+  participantCount = 1,
 }: LiveKitStylesProps) {
+  const gridColumns = resolveGridColumns(participantCount, gridPolicy);
+  const mobileGridColumns = resolveMobileGridColumns(gridColumns || 1, gridPolicy);
+
   const controlButtonStyles =
     controlBarColor === 'blue'
       ? `
@@ -65,11 +80,12 @@ export default function LiveKitStyles({
 
   const hideStartVideoControlStyles = controlsPolicy.hideStartVideoControl
     ? `
-      .lk-control-bar .lk-button[data-lk-source='camera'],
-      .lk-control-bar [data-lk-source='camera'],
+      .lk-control-bar .lk-start-video-button,
+      .lk-control-bar [data-lk-kind='start-video'],
       .lk-control-bar button[aria-label*='start video' i],
       .lk-control-bar button[title*='start video' i],
-      .lk-control-bar button[aria-label*='camera' i][aria-pressed='false'] {
+      .lk-control-bar button[aria-label='Start Video' i],
+      .lk-control-bar button[title='Start Video' i] {
         display: none !important;
       }
     `
@@ -101,6 +117,21 @@ export default function LiveKitStyles({
     `
     : '';
 
+  const participantGridStyles = gridPolicy.enabled
+    ? `
+      .lk-grid-layout {
+        display: grid !important;
+        grid-template-columns: repeat(${gridColumns}, minmax(0, 1fr)) !important;
+        grid-auto-rows: minmax(0, 1fr) !important;
+      }
+
+      .lk-grid-layout > * {
+        min-width: 0 !important;
+        min-height: 0 !important;
+      }
+    `
+    : '';
+
   return (
     <style jsx global>{`
       ${controlButtonStyles}
@@ -108,6 +139,7 @@ export default function LiveKitStyles({
       ${hideStartVideoControlStyles}
       ${hideSettingsControlStyles}
       ${hideChatControlStyles}
+      ${participantGridStyles}
 
       .lk-video-conference,
       .lk-stage,
@@ -212,6 +244,10 @@ export default function LiveKitStyles({
         .lk-grid-layout,
         .lk-focus-layout {
           padding-bottom: 84px !important;
+        }
+
+        .lk-grid-layout {
+          grid-template-columns: repeat(${mobileGridColumns}, minmax(0, 1fr)) !important;
         }
 
         .lk-control-bar {

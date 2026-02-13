@@ -1,12 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { User } from 'firebase/auth';
 import { collection, onSnapshot, query, Timestamp, where, limit, doc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { isPatient } from '@/lib/auth-utils';
 import { calculateDurationMinutes } from '@/lib/consultations/session-timing';
+import { useAuthSession } from '@/hooks/useAuthSession';
 
 // Component for joining with invitation link
 function JoinWithInvitationLink() {
@@ -139,50 +139,49 @@ interface Consultation {
 }
 
 export default function PatientDashboard() {
-  const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
+
+  const handleAuthenticated = useCallback(async (authenticatedUser: User) => {
+    try {
+      await fetch('/api/link-patient-consultations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: authenticatedUser.uid,
+          userEmail: authenticatedUser.email,
+        }),
+      });
+      console.log('Linked patient consultations');
+    } catch (error) {
+      console.error('Error linking consultations:', error);
+    }
+  }, []);
+
+  const {
+    user,
+    isAuthenticated,
+    isAuthorized,
+    isLoading: authLoading,
+  } = useAuthSession({
+    requiredRole: 'patient',
+    onAuthenticated: handleAuthenticated,
+  });
+
   const [summaries, setSummaries] = useState<CallSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [isAuthorized, setIsAuthorized] = useState(false);
   const [deletingSummary, setDeletingSummary] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const router = useRouter();
 
-  // Handle authentication and role check
   useEffect(() => {
-    if (auth) {
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        setUser(user);
-        if (user) {
-          const patient = await isPatient(user);
-          setIsAuthorized(patient);
-          if (!patient) {
-            // Not a patient, redirect
-            router.push('/');
-          } else {
-            // Patient is authenticated - link any consultations that match their email
-            try {
-              await fetch('/api/link-patient-consultations', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId: user.uid,
-                  userEmail: user.email
-                }),
-              });
-              console.log('Linked patient consultations');
-            } catch (error) {
-              console.error('Error linking consultations:', error);
-            }
-          }
-        } else {
-          // Not logged in, show message (patients can still use invitation links)
-          setIsAuthorized(false);
-        }
-      });
-      return unsubscribe;
+    if (authLoading) {
+      return;
     }
-  }, [router]);
+
+    if (isAuthenticated && !isAuthorized) {
+      router.push('/');
+    }
+  }, [authLoading, isAuthenticated, isAuthorized, router]);
 
   // Helper function to fetch user email
   const fetchUserEmail = async (userId: string | undefined): Promise<string | null> => {
@@ -378,6 +377,30 @@ export default function PatientDashboard() {
       unsubscribe4();
     };
   }, [user, sortOrder, isAuthorized]);
+
+  if (authLoading) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center' 
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '4rem',
+            height: '4rem',
+            border: '2px solid #dcfce7',
+            borderTop: '2px solid #059669',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 1.5rem'
+          }}></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (

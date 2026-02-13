@@ -1,16 +1,16 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import Link from 'next/link';
+import { useAuthSession } from '@/hooks/useAuthSession';
 
 interface CreateRoomClientProps {
   room: string;
 }
 
 export default function CreateRoomClient({ room }: CreateRoomClientProps) {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isLoading: authLoading } = useAuthSession();
   const [shareUrl, setShareUrl] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,10 +20,6 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
     // Check if Firebase is initialized
     if (auth && db) {
       setIsFirebaseReady(true);
-      return onAuthStateChanged(auth, (user) => {
-        console.log('Auth state changed:', user ? 'User logged in' : 'No user');
-        setUser(user);
-      });
     } else {
       console.warn('Firebase not initialized');
     }
@@ -88,7 +84,7 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
   };
 
   // Loading state while Firebase initializes
-  if (!isFirebaseReady) {
+  if (!isFirebaseReady || authLoading) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
         <div style={{ textAlign: 'center', maxWidth: '28rem' }}>

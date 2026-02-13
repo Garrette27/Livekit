@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useWaitingQueue } from '../hooks/useWaitingQueue';
+import { useWaitingQueue } from '@/hooks/useWaitingQueue';
 
 interface WaitingRoomPanelProps {
   roomName: string;

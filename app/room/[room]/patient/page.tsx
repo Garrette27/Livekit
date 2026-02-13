@@ -4,70 +4,60 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { auth, provider } from '@/lib/firebase';
-import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
+import { signInWithPopup, signOut } from 'firebase/auth';
 import RoomShell from '../components/shared/RoomShell';
 import PatientSessionPanels from './components/PatientSessionPanels';
 import { PATIENT_ROOM_CONTROLS } from '../components/shared/room-controls-policy';
 import { PATIENT_ROOM_CHAT } from '../components/shared/room-chat-policy';
+import { PATIENT_ROOM_GRID } from '../components/shared/room-grid-policy';
+import { useAuthSession } from '@/hooks/useAuthSession';
+import {
+  trackConsultationEvent,
+  trackConsultationEventWithBeacon,
+} from '@/lib/consultations/consultation-event-client';
 
 function PatientRoomClient({ roomName }: { roomName: string }) {
   const router = useRouter();
+  const { user, isAuthenticated } = useAuthSession();
   const [token, setToken] = useState<string | null>(null);
   const [patientName, setPatientName] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const isLeavingRef = useRef(false);
 
   useEffect(() => {
-    if (!auth) {
+    if (!user || !roomName) {
       return;
     }
 
-    return onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      setIsAuthenticated(Boolean(currentUser));
+    if (user.email) {
+      void fetch('/api/link-patient-consultations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          userEmail: user.email,
+        }),
+      }).catch((linkError) => {
+        console.error('Error linking consultations after sign-in:', linkError);
+      });
+    }
 
-      if (!currentUser || !roomName) {
-        return;
-      }
+    const wasInCall = localStorage.getItem(`patientInCall_${roomName}`);
+    if (wasInCall !== 'true') {
+      return;
+    }
 
-      if (currentUser.email) {
-        try {
-          await fetch('/api/link-patient-consultations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: currentUser.uid,
-              userEmail: currentUser.email,
-            }),
-          });
-        } catch (linkError) {
-          console.error('Error linking consultations after sign-in:', linkError);
-        }
-      }
-
-      const wasInCall = localStorage.getItem(`patientInCall_${roomName}`);
-      if (wasInCall === 'true') {
-        try {
-          await fetch('/api/track-consultation', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              roomName,
-              action: 'join',
-              patientName: patientName || localStorage.getItem(`patientName_${roomName}`) || 'Patient',
-              userId: currentUser.uid,
-              patientEmail: currentUser.email || null,
-            }),
-          });
-        } catch (updateError) {
-          console.error('Error updating consultation after sign-in:', updateError);
-        }
-      }
+    void trackConsultationEvent({
+      roomName,
+      action: 'join',
+      patientName: patientName || localStorage.getItem(`patientName_${roomName}`) || 'Patient',
+      userId: user.uid,
+      patientEmail: user.email || null,
+    }).catch((updateError) => {
+      console.error('Error updating consultation after sign-in:', updateError);
     });
-  }, [patientName, roomName]);
+  }, [patientName, roomName, user]);
 
   useEffect(() => {
     const savedName = localStorage.getItem(`patientName_${roomName}`);
@@ -89,26 +79,28 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
       if (!token) {
         return;
       }
-
-      const payload = JSON.stringify({
+      const trackedWithBeacon = trackConsultationEventWithBeacon({
         roomName,
         action: 'leave',
         patientName,
-        userId: user?.uid || 'anonymous',
+        userId: user?.uid,
         patientEmail: user?.email || null,
       });
 
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/track-consultation', payload);
+      if (trackedWithBeacon) {
         return;
       }
 
-      fetch('/api/track-consultation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-        keepalive: true,
-      }).catch((trackError) => {
+      void trackConsultationEvent(
+        {
+          roomName,
+          action: 'leave',
+          patientName,
+          userId: user?.uid,
+          patientEmail: user?.email || null,
+        },
+        { keepalive: true }
+      ).catch((trackError) => {
         console.error('Error tracking consultation leave on unload:', trackError);
       });
     };
@@ -123,15 +115,12 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         return;
       }
 
-      fetch('/api/track-consultation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomName,
-          action: 'leave',
-          patientName,
-          userId: user?.uid || 'anonymous',
-        }),
+      void trackConsultationEvent({
+        roomName,
+        action: 'leave',
+        patientName,
+        userId: user?.uid,
+        patientEmail: user?.email || null,
       }).catch((trackError) => {
         console.error('Error tracking consultation leave (visibility change):', trackError);
       });
@@ -139,7 +128,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [patientName, roomName, token, user?.uid]);
+  }, [patientName, roomName, token, user?.email, user?.uid]);
 
   const handleGoogleSignIn = async () => {
     if (!auth || !provider) {
@@ -185,16 +174,12 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
       localStorage.setItem(`patientToken_${roomName}`, data.token);
       setToken(data.token);
 
-      await fetch('/api/track-consultation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomName,
-          action: 'join',
-          patientName,
-          userId: user?.uid || 'anonymous',
-          patientEmail: user?.email || null,
-        }),
+      await trackConsultationEvent({
+        roomName,
+        action: 'join',
+        patientName,
+        userId: user?.uid,
+        patientEmail: user?.email || null,
       });
     } catch (joinError) {
       const message = joinError instanceof Error ? joinError.message : 'Failed to join room';
@@ -219,25 +204,28 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
   }, [isAuthenticated, user?.uid]);
 
   const trackPatientLeave = useCallback(() => {
-    const payload = JSON.stringify({
+    const trackedWithBeacon = trackConsultationEventWithBeacon({
       roomName,
       action: 'leave',
       patientName,
-      userId: user?.uid || 'anonymous',
+      userId: user?.uid,
       patientEmail: user?.email || null,
     });
 
-    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-      navigator.sendBeacon('/api/track-consultation', payload);
+    if (trackedWithBeacon) {
       return;
     }
 
-    void fetch('/api/track-consultation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload,
-      keepalive: true,
-    }).catch((trackError) => {
+    void trackConsultationEvent(
+      {
+        roomName,
+        action: 'leave',
+        patientName,
+        userId: user?.uid,
+        patientEmail: user?.email || null,
+      },
+      { keepalive: true }
+    ).catch((trackError) => {
       console.error('Error tracking patient leave:', trackError);
     });
   }, [patientName, roomName, user?.email, user?.uid]);
@@ -435,6 +423,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         controlBarColor="blue"
         controlsPolicy={PATIENT_ROOM_CONTROLS}
         chatPolicy={PATIENT_ROOM_CHAT}
+        gridPolicy={PATIENT_ROOM_GRID}
       />
     </div>
   );

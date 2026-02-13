@@ -2,10 +2,13 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
 import PatientLiveKitRoom from './components/PatientLiveKitRoom';
 import PatientRegistration from '@/components/PatientRegistration';
+import { useAuthSession } from '@/hooks/useAuthSession';
+import {
+  trackConsultationEvent,
+  trackConsultationEventWithBeacon,
+} from '@/lib/consultations/consultation-event-client';
 import { 
   ValidateInvitationRequest, 
   ValidateInvitationResponse, 
@@ -98,6 +101,7 @@ function InvitePageContent() {
   const params = useParams();
   const router = useRouter();
   const token = params.token as string;
+  const { user, isAuthenticated } = useAuthSession();
   
   const [isValidating, setIsValidating] = useState(true);
   const [validationResult, setValidationResult] = useState<ValidateInvitationResponse | null>(null);
@@ -105,18 +109,6 @@ function InvitePageContent() {
   const [deviceFingerprint, setDeviceFingerprint] = useState<DeviceFingerprint | null>(null);
   const [requiresRegistration, setRequiresRegistration] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-
-  // Handle authentication state
-  useEffect(() => {
-    if (auth) {
-      return onAuthStateChanged(auth, (user) => {
-        setUser(user);
-        setIsAuthenticated(!!user);
-      });
-    }
-  }, []);
 
   // Generate device fingerprint
   useEffect(() => {
@@ -238,6 +230,48 @@ function InvitePageContent() {
 
     validateInvitation();
   }, [token, deviceFingerprint]);
+
+  const getPostCallRedirectPath = () => {
+    if (user?.uid || isAuthenticated) {
+      return '/patient/dashboard';
+    }
+
+    const registeredEmail = localStorage.getItem('patientRegisteredEmail');
+    if (registeredEmail) {
+      return `/patient/login?registered=true&email=${encodeURIComponent(registeredEmail)}`;
+    }
+
+    return '/patient/login';
+  };
+
+  const handleConsultationExit = () => {
+    if (validationResult?.roomName && !validationResult.waitingRoomEnabled) {
+      const trackedWithBeacon = trackConsultationEventWithBeacon({
+        roomName: validationResult.roomName,
+        action: 'leave',
+        patientName: 'Patient',
+        userId: user?.uid,
+        patientEmail: user?.email || validationResult.registeredEmail || invitationEmail || null,
+      });
+
+      if (!trackedWithBeacon) {
+        void trackConsultationEvent(
+          {
+            roomName: validationResult.roomName,
+            action: 'leave',
+            patientName: 'Patient',
+            userId: user?.uid,
+            patientEmail: user?.email || validationResult.registeredEmail || invitationEmail || null,
+          },
+          { keepalive: true }
+        ).catch((trackingError) => {
+          console.error('Error tracking patient leave:', trackingError);
+        });
+      }
+    }
+
+    router.push(getPostCallRedirectPath());
+  };
 
   // Handle registration requirement
   if (requiresRegistration) {
@@ -436,7 +470,7 @@ function InvitePageContent() {
               color: '#1e40af',
               marginBottom: '1rem'
             }}>
-              You're in the Waiting Room
+              You&apos;re in the Waiting Room
             </h1>
 
             <p style={{
@@ -445,7 +479,7 @@ function InvitePageContent() {
               marginBottom: '2rem',
               lineHeight: '1.6'
             }}>
-              Please wait while the doctor admits you to the consultation. This page will automatically update when you're admitted.
+              Please wait while the doctor admits you to the consultation. This page will automatically update when you&apos;re admitted.
             </p>
 
             <div style={{
@@ -460,7 +494,7 @@ function InvitePageContent() {
                 color: '#1e40af',
                 margin: 0
               }}>
-                💡 <strong>Tip:</strong> Keep this page open. You'll automatically join the consultation when the doctor admits you.
+                💡 <strong>Tip:</strong> Keep this page open. You&apos;ll automatically join the consultation when the doctor admits you.
               </p>
             </div>
 
@@ -526,42 +560,7 @@ function InvitePageContent() {
           token={validationResult.liveKitToken}
           onDisconnected={() => {
             console.log('Patient disconnected from consultation');
-            
-            // Track patient leaving consultation (only if in main consultation room, not waiting room)
-            if (validationResult?.roomName && !validationResult.waitingRoomEnabled) {
-              try {
-                void fetch('/api/track-consultation', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    roomName: validationResult.roomName,
-                    action: 'leave',
-                    patientName: 'Patient', // Default name, can be improved if patient name is stored
-                    userId: user?.uid || 'anonymous',
-                    patientEmail: user?.email || validationResult.registeredEmail || invitationEmail || null
-                  })
-                });
-                console.log('✅ Patient leave tracked for room:', validationResult.roomName);
-              } catch (error) {
-                console.error('Error tracking patient leave:', error);
-              }
-            }
-            
-            // Redirect to patient dashboard or login page
-            // Check if user is authenticated first - if yes, go to patient dashboard
-            if (user?.uid || isAuthenticated) {
-              router.push('/patient/dashboard');
-            } else {
-              // Not authenticated - check if patient just registered
-              const registeredEmail = localStorage.getItem('patientRegisteredEmail');
-              if (registeredEmail) {
-                // Patient just registered, guide them to sign in
-                router.push('/patient/login?registered=true&email=' + encodeURIComponent(registeredEmail));
-              } else {
-                // Not registered or no email stored, go to patient login
-                router.push('/patient/login');
-              }
-            }
+            handleConsultationExit();
           }}
           onError={(error) => {
             console.error('LiveKit error:', error);
@@ -585,43 +584,7 @@ function InvitePageContent() {
               }
             }
           }}
-          onLeaveClick={() => {
-            // Track patient leaving consultation (only if in main consultation room, not waiting room)
-            if (validationResult?.roomName && !validationResult.waitingRoomEnabled) {
-              try {
-                void fetch('/api/track-consultation', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    roomName: validationResult.roomName,
-                    action: 'leave',
-                    patientName: 'Patient', // Default name, can be improved if patient name is stored
-                    userId: user?.uid || 'anonymous',
-                    patientEmail: user?.email || validationResult.registeredEmail || invitationEmail || null
-                  })
-                });
-                console.log('✅ Patient leave tracked for room:', validationResult.roomName);
-              } catch (error) {
-                console.error('Error tracking patient leave:', error);
-              }
-            }
-            
-            // Route patient to patient-specific dashboard or login
-            // Check if user is authenticated first - if yes, go to patient dashboard
-            if (user?.uid || isAuthenticated) {
-              router.push('/patient/dashboard');
-            } else {
-              // Not authenticated - check if patient just registered
-              const registeredEmail = localStorage.getItem('patientRegisteredEmail');
-              if (registeredEmail) {
-                // Patient just registered, guide them to sign in
-                router.push('/patient/login?registered=true&email=' + encodeURIComponent(registeredEmail));
-              } else {
-                // Not registered or no email stored, go to patient login
-                router.push('/patient/login');
-              }
-            }
-          }}
+          onLeaveClick={handleConsultationExit}
         />
 
         <style jsx>{`
@@ -721,3 +684,5 @@ export default function InvitePage() {
     </Suspense>
   );
 }
+
+

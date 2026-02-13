@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
+import { signInWithPopup, signOut, User } from 'firebase/auth';
 import { auth, provider } from '@/lib/firebase';
+import { useAuthSession } from '@/hooks/useAuthSession';
 
 interface DoctorAuthState {
   user: User | null;
@@ -16,8 +17,7 @@ interface DoctorAuthState {
 }
 
 export function useDoctorAuth(roomName: string): DoctorAuthState {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { user, isAuthenticated } = useAuthSession();
   const [doctorName, setDoctorName] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -31,20 +31,22 @@ export function useDoctorAuth(roomName: string): DoctorAuthState {
     }
   }, [roomName]);
 
-  // Subscribe to auth changes
+  // Hydrate doctor name from auth profile when no local name is present.
   useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setIsAuthenticated(!!currentUser);
+    if (!user) {
+      return;
+    }
 
-      if (currentUser && !doctorName) {
-        const displayName = currentUser.displayName || currentUser.email || 'Dr. Anonymous';
-        setDoctorName(displayName);
-        localStorage.setItem(`doctorName_${roomName}`, displayName);
+    setDoctorName((currentName) => {
+      if (currentName) {
+        return currentName;
       }
+
+      const displayName = user.displayName || user.email || 'Dr. Anonymous';
+      localStorage.setItem(`doctorName_${roomName}`, displayName);
+      return displayName;
     });
-  }, [roomName, doctorName]);
+  }, [roomName, user]);
 
   const signIn = useCallback(async () => {
     if (!auth || !provider) {
@@ -55,8 +57,6 @@ export function useDoctorAuth(roomName: string): DoctorAuthState {
     try {
       const result = await signInWithPopup(auth, provider);
       const signedInUser = result.user;
-      setUser(signedInUser);
-      setIsAuthenticated(true);
       const name = signedInUser.displayName || signedInUser.email || 'Dr. Anonymous';
       setDoctorName(name);
       localStorage.setItem(`doctorName_${roomName}`, name);
@@ -71,8 +71,6 @@ export function useDoctorAuth(roomName: string): DoctorAuthState {
     try {
       if (auth) {
         await signOut(auth);
-        setUser(null);
-        setIsAuthenticated(false);
         setDoctorName('');
         localStorage.removeItem(`doctorName_${roomName}`);
         localStorage.removeItem(`doctorToken_${roomName}`);

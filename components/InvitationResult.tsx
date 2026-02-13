@@ -4,16 +4,14 @@ import { Invitation } from '@/lib/types';
 
 interface InvitationResultProps {
   invitation: Invitation;
-  user: {
-    uid: string;
-  };
+  inviteUrl: string;
   onCopyLink: () => void;
 }
 
-export default function InvitationResult({ invitation, user, onCopyLink }: InvitationResultProps) {
+export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: InvitationResultProps) {
   const copyInvitationLink = async () => {
     try {
-      await navigator.clipboard.writeText('Invitation link copied to clipboard!');
+      await navigator.clipboard.writeText(inviteUrl);
       onCopyLink();
     } catch (error) {
       console.error('Error copying link:', error);
@@ -91,9 +89,6 @@ export default function InvitationResult({ invitation, user, onCopyLink }: Invit
       <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>
         Email: {invitation.emailAllowed || 'Open Invitation (No email required)'}
       </p>
-      <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>
-        Role: {invitation.emailAllowed || 'Participant'}
-      </p>
       
       <div style={{ 
         margin: '0.75rem 0', 
@@ -122,7 +117,7 @@ export default function InvitationResult({ invitation, user, onCopyLink }: Invit
             wordBreak: 'break-all',
             flex: 1
           }}>
-            Invitation link would be displayed here
+            {inviteUrl}
           </p>
           <button
             onClick={copyInvitationLink}

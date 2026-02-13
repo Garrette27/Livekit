@@ -1,29 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import InvitationManager from '@/components/InvitationManager';
-import { Invitation, WaitingPatient, AdmitPatientResponse } from '@/lib/types';
-import { isDoctor } from '@/lib/auth-utils';
+import { Invitation } from '@/lib/types';
 import WaitingPatientsList from './components/WaitingPatientsList';
+import { useAuthSession } from '@/hooks/useAuthSession';
+import { copyTextToClipboard, fetchInvitationLink as getInvitationLink } from '@/lib/invitations/invitation-link-client';
 
 export default function DoctorInvitationsPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isAuthenticated, isAuthorized, isLoading: authLoading } = useAuthSession({
+    requiredRole: 'doctor',
+  });
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<string>('');
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [admittingId, setAdmittingId] = useState<string | null>(null);
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [selectedInvitationId, setSelectedInvitationId] = useState<string | null>(null);
   const [invitationLinks, setInvitationLinks] = useState<Record<string, string>>({});
   const [loadingLinks, setLoadingLinks] = useState<Record<string, boolean>>({});
   const [linkErrors, setLinkErrors] = useState<Record<string, string>>({});
   const [waitingPatientsCounts, setWaitingPatientsCounts] = useState<Record<string, number>>({});
+  const requestedInvitationLinksRef = useRef<Set<string>>(new Set());
   const router = useRouter();
 
   // Persist room name in localStorage
@@ -44,21 +44,19 @@ export default function DoctorInvitationsPage() {
   }, [selectedRoom]);
 
   useEffect(() => {
-    if (auth) {
-      return onAuthStateChanged(auth, async (user) => {
-        setUser(user);
-        if (user) {
-          const doctor = await isDoctor(user);
-          setIsAuthorized(doctor);
-          if (!doctor) {
-            router.push('/');
-          }
-        } else {
-          router.push('/doctor/login');
-        }
-      });
+    if (authLoading) {
+      return;
     }
-  }, [router]);
+
+    if (!isAuthenticated) {
+      router.push('/doctor/login');
+      return;
+    }
+
+    if (!isAuthorized) {
+      router.push('/');
+    }
+  }, [authLoading, isAuthenticated, isAuthorized, router]);
 
   useEffect(() => {
     if (!user || !db || !isAuthorized) {
@@ -80,28 +78,45 @@ export default function DoctorInvitationsPage() {
       setInvitations(invitationData);
       setLoading(false);
       
-      // Fetch links for all active invitations
-      invitationData.forEach((invitation) => {
-        if (invitation.status === 'active' && !invitationLinks[invitation.id]) {
-          fetchInvitationLink(invitation.id);
+      // Fetch each active invitation link once per snapshot lifecycle.
+      const activeInvitationIds = new Set(
+        invitationData.filter((invitation) => invitation.status === 'active').map((invitation) => invitation.id)
+      );
+
+      requestedInvitationLinksRef.current.forEach((invitationId) => {
+        if (!activeInvitationIds.has(invitationId)) {
+          requestedInvitationLinksRef.current.delete(invitationId);
         }
+      });
+
+      invitationData.forEach((invitation) => {
+        if (invitation.status !== 'active') {
+          return;
+        }
+
+        if (requestedInvitationLinksRef.current.has(invitation.id)) {
+          return;
+        }
+
+        requestedInvitationLinksRef.current.add(invitation.id);
+        void fetchInvitationLink(invitation.id);
       });
     });
 
     return () => unsubscribe();
   }, [user, isAuthorized]);
 
-  const fetchInvitationLink = async (invitationId: string) => {
+  async function fetchInvitationLink(invitationId: string) {
     setLoadingLinks(prev => ({ ...prev, [invitationId]: true }));
     setLinkErrors(prev => ({ ...prev, [invitationId]: '' })); // Clear previous error
     try {
-      const response = await fetch(`/api/invite/get-link?invitationId=${encodeURIComponent(invitationId)}`);
-      const result = await response.json();
-      if (result.success && result.inviteUrl) {
-        setInvitationLinks(prev => ({ ...prev, [invitationId]: result.inviteUrl }));
+      const result = await getInvitationLink({ invitationId });
+      const inviteUrl = result.inviteUrl;
+      if (result.success && inviteUrl) {
+        setInvitationLinks(prev => ({ ...prev, [invitationId]: inviteUrl }));
         setLinkErrors(prev => ({ ...prev, [invitationId]: '' })); // Clear error on success
       } else {
-        console.error(`Failed to fetch link for invitation ${invitationId}:`, result.error, result.details);
+        console.error(`Failed to fetch link for invitation ${invitationId}:`, result.error);
         
         // Provide user-friendly error messages
         let errorMessage = 'Unable to load invitation link.';
@@ -124,11 +139,11 @@ export default function DoctorInvitationsPage() {
     } finally {
       setLoadingLinks(prev => ({ ...prev, [invitationId]: false }));
     }
-  };
+  }
 
-  const copyInvitationLink = async (link: string, invitationId: string) => {
+  const copyInvitationLink = async (link: string) => {
     try {
-      await navigator.clipboard.writeText(link);
+      await copyTextToClipboard(link);
       alert('Invitation link copied to clipboard!');
     } catch (error) {
       console.error('Error copying link:', error);
@@ -137,68 +152,6 @@ export default function DoctorInvitationsPage() {
   };
 
   // Note: Waiting patients are now handled by WaitingPatientsList component
-
-  const admitPatient = async (waitingPatient: WaitingPatient) => {
-    try {
-      setAdmittingId(waitingPatient.id);
-      const response = await fetch('/api/waiting-room/admit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          waitingPatientId: waitingPatient.id,
-          roomName: waitingPatient.roomName,
-        }),
-      });
-
-      const result: AdmitPatientResponse = await response.json();
-
-      if (result.success) {
-        alert(`Patient ${waitingPatient.patientName || waitingPatient.patientEmail || 'Unknown'} admitted to consultation room.`);
-        // The real-time listener will update the list automatically
-      } else {
-        alert(result.error || 'Failed to admit patient');
-      }
-    } catch (err) {
-      alert('Network error. Please try again.');
-      console.error('Error admitting patient:', err);
-    } finally {
-      setAdmittingId(null);
-    }
-  };
-
-  const rejectPatient = async (waitingPatientId: string) => {
-    if (!confirm('Are you sure you want to remove this patient from the waiting room?')) {
-      return;
-    }
-
-    try {
-      setRejectingId(waitingPatientId);
-      const response = await fetch('/api/waiting-room/reject', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          waitingPatientId,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        // The real-time listener will update the list automatically
-      } else {
-        alert(result.error || 'Failed to remove patient');
-      }
-    } catch (err) {
-      alert('Network error. Please try again.');
-      console.error('Error rejecting patient:', err);
-    } finally {
-      setRejectingId(null);
-    }
-  };
 
   const revokeInvitation = async (invitationId: string) => {
     if (!db) return;
@@ -270,7 +223,7 @@ export default function DoctorInvitationsPage() {
     return invitation.status;
   };
 
-  if (!isAuthorized) {
+  if (authLoading || !isAuthenticated || !isAuthorized) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -358,8 +311,8 @@ export default function DoctorInvitationsPage() {
             </h3>
             <ul style={{ fontSize: '0.875rem', color: '#1e40af', margin: 0, paddingLeft: '1.25rem', lineHeight: '1.75' }}>
               <li><strong>Patient:</strong> Uses the invitation link to join and register (if first time)</li>
-              <li><strong>Doctor:</strong> Uses the 'Join as Doctor' button (no invitation needed)</li>
-              <li><strong>Security:</strong> System automatically verifies patient's device, location, and browser after registration with consent</li>
+              <li><strong>Doctor:</strong> Uses the &apos;Join as Doctor&apos; button (no invitation needed)</li>
+              <li><strong>Security:</strong> System automatically verifies patient&apos;s device, location, and browser after registration with consent</li>
             </ul>
           </div>
           
@@ -568,7 +521,7 @@ export default function DoctorInvitationsPage() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  copyInvitationLink(invitationLinks[invitation.id], invitation.id);
+                                  copyInvitationLink(invitationLinks[invitation.id]);
                                 }}
                                 style={{
                                   backgroundColor: '#2563eb',
@@ -741,16 +694,11 @@ export default function DoctorInvitationsPage() {
               </>
             )}
 
-          {db && user ? (
+          {user ? (
             <WaitingPatientsList
-              db={db}
               user={user}
               invitations={invitations}
               selectedInvitationId={selectedInvitationId}
-              onAdmit={admitPatient}
-              onReject={rejectPatient}
-              admittingId={admittingId}
-              rejectingId={rejectingId}
               onCountUpdate={(invitationId, count) => {
                 setWaitingPatientsCounts(prev => ({ ...prev, [invitationId]: count }));
               }}

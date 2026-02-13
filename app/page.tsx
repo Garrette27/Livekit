@@ -1,75 +1,46 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
-import { LiveKitRoom, VideoConference } from '@livekit/components-react';
+import { useCallback, useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
-import { collection, doc, serverTimestamp, setDoc, updateDoc, getFirestore } from 'firebase/firestore';
+import { signOut, User } from 'firebase/auth';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { isDoctor } from '@/lib/auth-utils';
+import { useAuthSession } from '@/hooks/useAuthSession';
 
 // Force dynamic rendering to prevent build-time Firebase errors
 export const dynamic = 'force-dynamic';
 
 export default function Page() {
-  const [user, setUser] = useState<User | null>(null);
-  const [roomName, setRoomName] = useState<string>('');
-  const [token, setToken] = useState<string | null>(null);
-  const [shareUrl, setShareUrl] = useState<string>('');
-  const [isCreating, setIsCreating] = useState<boolean>(false);
-  const [isJoining, setIsJoining] = useState<boolean>(false);
+  const [roomName, setRoomName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isFirebaseReady, setIsFirebaseReady] = useState<boolean>(false);
   const router = useRouter();
+
+  const handleAuthenticated = useCallback(async (authenticatedUser: User) => {
+    console.log('Auth state changed: User logged in');
+    console.log('User details:', authenticatedUser);
+    const doctor = await isDoctor(authenticatedUser);
+    if (doctor) {
+      router.replace('/doctor/invitations');
+    }
+  }, [router]);
+
+  const { user, isLoading: authLoading } = useAuthSession({
+    onAuthenticated: handleAuthenticated,
+  });
 
   useEffect(() => {
     // Check if Firebase is initialized
     if (auth && db) {
       setIsFirebaseReady(true);
-      return onAuthStateChanged(auth, async (user) => {
-        console.log('Auth state changed:', user ? 'User logged in' : 'No user');
-        console.log('User details:', user);
-        setUser(user);
-        
-        // If doctor is logged in, redirect to invitations page
-        if (user) {
-          const doctor = await isDoctor(user);
-          if (doctor) {
-            router.replace('/doctor/invitations');
-            return;
-          }
-        }
-      });
     } else {
       console.warn('Firebase not initialized');
     }
-  }, [router]);
+  }, []);
 
   // Debug logging
   console.log('Current user state:', user);
-  console.log('Current token state:', token);
   console.log('Firebase ready:', isFirebaseReady);
-
-  const provider = useMemo(() => new GoogleAuthProvider(), []);
-
-  async function login() {
-    if (!auth || !provider) {
-      setError('Firebase not initialized. Please refresh the page.');
-      return;
-    }
-
-    try {
-      setError(null);
-      await signInWithPopup(auth, provider);
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        console.error('Login error:', err.message);
-      } else {
-        console.error('Login error:', err);
-      }
-      setError('Failed to sign in. Please try again.');
-    }
-  }
 
   async function logout() {
     if (!auth) {
@@ -79,8 +50,6 @@ export default function Page() {
 
     try {
       await signOut(auth);
-      setToken(null);
-      setShareUrl('');
       setError(null);
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -91,98 +60,19 @@ export default function Page() {
     }
   }
 
-  const handleCreateRoom = async () => {
-    if (!roomName.trim()) {
-      alert('Please enter a room name');
+  function joinRoom() {
+    const nextRoomName = roomName.trim();
+    if (!nextRoomName) {
+      setError('Please enter a room name to join.');
       return;
     }
 
-    if (!db) {
-      alert('Firebase not initialized. Please refresh the page.');
-      return;
-    }
-
-    if (!user) {
-      alert('Please sign in to create a room.');
-      return;
-    }
-
-    try {
-      setIsCreating(true);
-      setError(null);
-      
-      console.log('Creating room with user:', user.uid);
-      
-      // Store room creation with user ID
-      const roomRef = doc(db, 'rooms', roomName);
-      await setDoc(roomRef, {
-        roomName,
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-        status: 'active',
-        metadata: {
-          createdBy: user.uid,
-          userId: user.uid,
-          userEmail: user.email,
-          userName: user.displayName
-        }
-      });
-
-      console.log('Room created successfully in Firestore');
-
-      // Generate share URL
-      const shareUrl = `${window.location.origin}/room/${roomName}/patient`;
-      setShareUrl(shareUrl);
-      
-      console.log('Generated share URL:', shareUrl);
-      
-      // Copy to clipboard
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        alert('Room created! Share URL copied to clipboard.');
-      } catch (err) {
-        alert('Room created! Share URL: ' + shareUrl);
-      }
-      
-    } catch (error) {
-      console.error('Error creating room:', error);
-      setError(`Error creating room: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      alert('Error creating room. Please try again.');
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  async function joinRoom() {
-    if (!roomName) {
-      setError('Please create a room first');
-      return;
-    }
-
-    // Route to the dedicated doctor room interface which handles token generation
-    window.location.href = `/room/${roomName}`;
-  }
-
-  async function onDisconnected() {
-    setToken(null);
-    if (roomName && db) {
-      try {
-        await updateDoc(doc(db, 'calls', roomName), { 
-          status: 'ended', 
-          endedAt: serverTimestamp() 
-        });
-      } catch (err: unknown) {
-        if (err instanceof Error) {
-          console.error('Error updating call status:', err.message);
-        } else {
-          console.error('Error updating call status:', err);
-        }
-      }
-    }
+    setError(null);
+    router.push(`/room/${nextRoomName}/patient`);
   }
 
   // Loading state while Firebase initializes
-  if (!isFirebaseReady) {
+  if (!isFirebaseReady || authLoading) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
         <div style={{ textAlign: 'center', maxWidth: '28rem' }}>
@@ -327,99 +217,81 @@ export default function Page() {
     );
   }
 
-  // Pre-join view
-  if (!token) {
-    return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#F9FAFB' }}>
-        {/* Header */}
-        <div style={{ backgroundColor: 'white', borderBottom: '1px solid #E5E7EB', padding: '1rem 2rem' }}>
-          <div style={{ maxWidth: '80rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>Telehealth Console</h1>
-              <p style={{ color: '#4B5563' }}>Welcome, Dr. {user.displayName?.split(' ')[0] || user.email?.split('@')[0]}</p>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-              <Link href="/dashboard" style={{ color: '#2563EB', fontSize: '1.125rem', fontWeight: '500', textDecoration: 'none' }}>
-                View History
-              </Link>
-              <button 
-                onClick={logout} 
-                style={{ color: '#DC2626', fontSize: '1.125rem', fontWeight: '500', padding: '0.5rem 1rem', borderRadius: '0.5rem', border: 'none', cursor: 'pointer', backgroundColor: 'transparent' }}
-              >
-                Sign out
-              </button>
-            </div>
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#F9FAFB' }}>
+      {/* Header */}
+      <div style={{ backgroundColor: 'white', borderBottom: '1px solid #E5E7EB', padding: '1rem 2rem' }}>
+        <div style={{ maxWidth: '80rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>Telehealth Console</h1>
+            <p style={{ color: '#4B5563' }}>Welcome, Dr. {user.displayName?.split(' ')[0] || user.email?.split('@')[0]}</p>
           </div>
-        </div>
-
-        {/* Main content - Join Room Section Only (Create Room removed for doctors) */}
-        <div style={{ maxWidth: '80rem', margin: '0 auto', padding: '2rem' }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: '2rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>Join Existing Room</h2>
-            <p style={{ fontSize: '1.125rem', color: '#4B5563', marginBottom: '2rem' }}>
-              Have a room link? Enter the room name to join as a patient.
-            </p>
-            
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <input
-                placeholder="Enter room name to join"
-                style={{ 
-                  flex: '1', 
-                  border: '1px solid #D1D5DB', 
-                  borderRadius: '0.5rem', 
-                  padding: '1rem 1.25rem', 
-                  fontSize: '1.125rem',
-                  backgroundColor: 'white',
-                  color: '#111827'
-                }}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    const target = e.target as HTMLInputElement;
-                    if (target.value.trim()) {
-                      window.location.href = `/room/${target.value.trim()}/patient`;
-                    }
-                  }
-                }}
-              />
-              <button 
-                onClick={() => {
-                  const joinRoomName = (document.querySelector('input[placeholder="Enter room name to join"]') as HTMLInputElement)?.value;
-                  if (joinRoomName && joinRoomName.trim()) {
-                    window.location.href = `/room/${joinRoomName.trim()}/patient`;
-                  }
-                }}
-                style={{ 
-                  backgroundColor: '#059669', 
-                  color: 'white', 
-                  padding: '1rem 2rem', 
-                  borderRadius: '0.5rem', 
-                  fontWeight: '600', 
-                  fontSize: '1.125rem', 
-                  border: 'none', 
-                  cursor: 'pointer'
-                }}
-              >
-                Join Room
-              </button>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <Link href="/dashboard" style={{ color: '#2563EB', fontSize: '1.125rem', fontWeight: '500', textDecoration: 'none' }}>
+              View History
+            </Link>
+            <button
+              onClick={logout}
+              style={{ color: '#DC2626', fontSize: '1.125rem', fontWeight: '500', padding: '0.5rem 1rem', borderRadius: '0.5rem', border: 'none', cursor: 'pointer', backgroundColor: 'transparent' }}
+            >
+              Sign out
+            </button>
           </div>
         </div>
       </div>
-    );
-  }
 
-  // In-call view
-  return (
-    <LiveKitRoom
-      token={token}
-      serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
-      connect
-      audio
-      video
-      onDisconnected={onDisconnected}
-      className="min-h-screen"
-    >
-      <VideoConference />
-    </LiveKitRoom>
+      {/* Main content - Join Room Section Only (Create Room removed for doctors) */}
+      <div style={{ maxWidth: '80rem', margin: '0 auto', padding: '2rem' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: '2rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>Join Existing Room</h2>
+          <p style={{ fontSize: '1.125rem', color: '#4B5563', marginBottom: '2rem' }}>
+            Have a room link? Enter the room name to join as a patient.
+          </p>
+
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <input
+              value={roomName}
+              onChange={(event) => {
+                setRoomName(event.target.value);
+                setError(null);
+              }}
+              placeholder="Enter room name to join"
+              style={{
+                flex: '1',
+                border: '1px solid #D1D5DB',
+                borderRadius: '0.5rem',
+                padding: '1rem 1.25rem',
+                fontSize: '1.125rem',
+                backgroundColor: 'white',
+                color: '#111827'
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  joinRoom();
+                }
+              }}
+            />
+            <button
+              onClick={joinRoom}
+              style={{
+                backgroundColor: '#059669',
+                color: 'white',
+                padding: '1rem 2rem',
+                borderRadius: '0.5rem',
+                fontWeight: '600',
+                fontSize: '1.125rem',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              Join Room
+            </button>
+          </div>
+          {error && (
+            <p style={{ color: '#DC2626', marginTop: '0.75rem', marginBottom: 0 }}>{error}</p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

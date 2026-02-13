@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { copyTextToClipboard, fetchInvitationLink } from '@/lib/invitations/invitation-link-client';
 
 interface DoctorControlsPanelProps {
   doctorName: string;
@@ -14,63 +15,24 @@ interface InvitationLinkResponse {
   error?: string;
 }
 
-interface CachedInvitation {
-  inviteUrl: string;
-  fetchedAtMs: number;
-}
-
-const INVITATION_LINK_CACHE_TTL_MS = 60_000;
-const invitationLinkCache = new Map<string, CachedInvitation>();
-
-async function parseJsonResponse<T>(response: Response): Promise<T> {
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    throw new Error(`Expected JSON response but received status ${response.status}`);
-  }
-
-  return (await response.json()) as T;
-}
-
-function getCachedInvitationLink(roomName: string): string | null {
-  const cached = invitationLinkCache.get(roomName);
-  if (!cached) {
-    return null;
-  }
-
-  if (Date.now() - cached.fetchedAtMs > INVITATION_LINK_CACHE_TTL_MS) {
-    invitationLinkCache.delete(roomName);
-    return null;
-  }
-
-  return cached.inviteUrl;
-}
-
 export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: DoctorControlsPanelProps) {
-  const [invitationLink, setInvitationLink] = useState<string | null>(() => getCachedInvitationLink(roomName));
+  const [invitationLink, setInvitationLink] = useState<string | null>(null);
   const [loadingLink, setLoadingLink] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const fallbackLink = `https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`;
 
-  const fetchInvitationLink = useCallback(
+  const loadInvitationLink = useCallback(
     async (forceRefresh = false) => {
-      if (!forceRefresh) {
-        const cachedLink = getCachedInvitationLink(roomName);
-        if (cachedLink) {
-          setInvitationLink(cachedLink);
-          setLinkError(null);
-          return;
-        }
-      }
-
       setLoadingLink(true);
       setLinkError(null);
 
       try {
-        const response = await fetch(`/api/invite/get-link?roomName=${encodeURIComponent(roomName)}`);
-        const result = await parseJsonResponse<InvitationLinkResponse>(response);
+        const result: InvitationLinkResponse = await fetchInvitationLink({
+          roomName,
+          forceRefresh,
+        });
 
         if (result.success && result.inviteUrl) {
-          invitationLinkCache.set(roomName, { inviteUrl: result.inviteUrl, fetchedAtMs: Date.now() });
           setInvitationLink(result.inviteUrl);
           return;
         }
@@ -89,8 +51,8 @@ export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: D
   );
 
   useEffect(() => {
-    void fetchInvitationLink();
-  }, [fetchInvitationLink]);
+    void loadInvitationLink();
+  }, [loadInvitationLink]);
 
   const patientLink = invitationLink || fallbackLink;
 
@@ -161,7 +123,7 @@ export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: D
 
         <button
           onClick={() => {
-            navigator.clipboard.writeText(patientLink);
+            void copyTextToClipboard(patientLink);
             alert(invitationLink ? 'Invitation link copied to clipboard.' : 'Patient link copied to clipboard.');
           }}
           disabled={loadingLink}
@@ -182,7 +144,7 @@ export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: D
         </button>
 
         <button
-          onClick={() => void fetchInvitationLink(true)}
+          onClick={() => void loadInvitationLink(true)}
           disabled={loadingLink}
           style={{
             backgroundColor: '#f3f4f6',

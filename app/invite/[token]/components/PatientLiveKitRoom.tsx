@@ -3,6 +3,7 @@
 import RoomShell from '../../../room/[room]/components/shared/RoomShell';
 import { PATIENT_ROOM_CONTROLS } from '../../../room/[room]/components/shared/room-controls-policy';
 import { PATIENT_ROOM_CHAT } from '../../../room/[room]/components/shared/room-chat-policy';
+import { PATIENT_ROOM_GRID } from '../../../room/[room]/components/shared/room-grid-policy';
 
 interface PatientLiveKitRoomProps {
   token: string;
@@ -46,6 +47,7 @@ export default function PatientLiveKitRoom({
         controlBarColor="blue"
         controlsPolicy={PATIENT_ROOM_CONTROLS}
         chatPolicy={PATIENT_ROOM_CHAT}
+        gridPolicy={PATIENT_ROOM_GRID}
       />
 
       {onLeaveClick && (

@@ -1,18 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { User } from 'firebase/auth';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { CreateInvitationRequest, CreateInvitationResponse } from '@/lib/types';
+import { useEffect, useState } from 'react';
+import { CreateInvitationRequest } from '@/lib/types';
 
 interface InvitationFormProps {
-  user: User;
   roomName: string;
-  onInvitationCreated?: (formData: any) => void;
+  onInvitationCreated?: (formData: CreateInvitationRequest) => Promise<void> | void;
 }
 
-export default function InvitationForm({ user, roomName, onInvitationCreated }: InvitationFormProps) {
+export default function InvitationForm({ roomName, onInvitationCreated }: InvitationFormProps) {
   const [formData, setFormData] = useState<CreateInvitationRequest>({
     roomName,
     expiresInHours: 24,
@@ -22,6 +18,13 @@ export default function InvitationForm({ user, roomName, onInvitationCreated }: 
   });
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFormData((previous) => ({
+      ...previous,
+      roomName,
+    }));
+  }, [roomName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,8 +38,8 @@ export default function InvitationForm({ user, roomName, onInvitationCreated }: 
     setError(null);
 
     try {
-      // Let the parent handle the API call
-      onInvitationCreated?.(formData);
+      // Parent owns API side effects and result state.
+      await onInvitationCreated?.(formData);
     } catch (err) {
       console.error('Error creating invitation:', err);
       setError('Network error. Please try again.');
@@ -88,21 +91,19 @@ export default function InvitationForm({ user, roomName, onInvitationCreated }: 
           }}>
             Room Name
           </label>
-          <input
-            type="text"
-            name="roomName"
-            value={formData.roomName}
-            onChange={handleInputChange}
-            placeholder="Enter room name"
-            required
+          <div
             style={{
               width: '100%',
               padding: '0.75rem',
               border: '1px solid #d1d5db',
               borderRadius: '0.375rem',
               fontSize: '1rem',
+              backgroundColor: '#f9fafb',
+              color: '#111827',
             }}
-          />
+          >
+            {formData.roomName}
+          </div>
         </div>
 
         <div style={{ marginBottom: '1rem' }}>

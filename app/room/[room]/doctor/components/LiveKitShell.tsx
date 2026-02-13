@@ -4,6 +4,7 @@ import React from 'react';
 import RoomShell from '../../components/shared/RoomShell';
 import { DOCTOR_ROOM_CONTROLS } from '../../components/shared/room-controls-policy';
 import { DOCTOR_ROOM_CHAT } from '../../components/shared/room-chat-policy';
+import { DOCTOR_ROOM_GRID } from '../../components/shared/room-grid-policy';
 
 interface LiveKitShellProps {
   token: string;
@@ -39,6 +40,7 @@ export default function LiveKitShell({ token, onDisconnected, onError }: LiveKit
       controlBarColor="blue"
       controlsPolicy={DOCTOR_ROOM_CONTROLS}
       chatPolicy={DOCTOR_ROOM_CHAT}
+      gridPolicy={DOCTOR_ROOM_GRID}
     />
   );
 }

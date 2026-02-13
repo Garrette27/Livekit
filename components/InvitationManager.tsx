@@ -2,9 +2,8 @@
 
 import { useState } from 'react';
 import { User } from 'firebase/auth';
-import { doc, updateDoc, serverTimestamp, collection, query, where, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { Invitation } from '@/lib/types';
+import { Timestamp } from 'firebase/firestore';
+import { CreateInvitationRequest, CreateInvitationResponse, Invitation } from '@/lib/types';
 import InvitationForm from './InvitationForm';
 import InvitationResult from './InvitationResult';
 
@@ -14,13 +13,15 @@ interface InvitationManagerProps {
   onInvitationCreated?: (invitationId: string) => void;
 }
 
-export default function InvitationManager({ user, roomName, onInvitationCreated }: InvitationManagerProps) {
-  const [createdInvitation, setCreatedInvitation] = useState<Invitation | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
+interface CreatedInvitationResult {
+  invitation: Invitation;
+  inviteUrl: string;
+}
 
-  const handleInvitationCreated = async (formData: any) => {
-    setIsCreating(true);
-    
+export default function InvitationManager({ user, roomName, onInvitationCreated }: InvitationManagerProps) {
+  const [createdInvitation, setCreatedInvitation] = useState<CreatedInvitationResult | null>(null);
+
+  const handleInvitationCreated = async (formData: CreateInvitationRequest) => {
     try {
       const response = await fetch('/api/invite/create', {
         method: 'POST',
@@ -35,21 +36,22 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
         }),
       });
 
-      const result = await response.json();
+      const result: CreateInvitationResponse = await response.json();
 
-      if (result.success) {
+      if (response.ok && result.success) {
+        const now = Timestamp.now();
         const invitation: Invitation = {
           id: result.invitationId,
           roomName: formData.roomName,
           emailAllowed: formData.emailAllowed,
           phoneAllowed: formData.phoneAllowed,
           expiresAt: Timestamp.fromDate(new Date(result.expiresAt)),
-          maxUses: formData.maxUses,
+          maxUses: formData.maxUses ?? 999999,
           currentUses: 0,
-          maxPatients: formData.maxPatients,
-          waitingRoomEnabled: formData.waitingRoomEnabled,
+          maxPatients: formData.maxPatients ?? 10,
+          waitingRoomEnabled: formData.waitingRoomEnabled ?? true,
           createdBy: user.uid,
-          createdAt: serverTimestamp() as any,
+          createdAt: now,
           status: 'active',
           metadata: {
             createdBy: user.uid,
@@ -62,18 +64,21 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
             },
             security: {
               singleUse: formData.maxUses === 1,
-              timeLimited: formData.expiresInHours > 0,
+              timeLimited: (formData.expiresInHours ?? 24) > 0,
             },
           },
           audit: {
-            created: serverTimestamp() as any,
+            created: now,
             lastAccessed: undefined,
             accessAttempts: [],
             violations: [],
           },
         };
 
-        setCreatedInvitation(invitation);
+        setCreatedInvitation({
+          invitation,
+          inviteUrl: result.inviteUrl,
+        });
         onInvitationCreated?.(result.invitationId);
       } else {
         alert(result.error || 'Failed to create invitation');
@@ -81,8 +86,6 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
     } catch (err) {
       console.error('Error creating invitation:', err);
       alert('Network error. Please try again.');
-    } finally {
-      setIsCreating(false);
     }
   };
 
@@ -104,8 +107,8 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
       {createdInvitation ? (
         <div style={{ marginBottom: '1rem' }}>
           <InvitationResult 
-            invitation={createdInvitation}
-            user={user}
+            invitation={createdInvitation.invitation}
+            inviteUrl={createdInvitation.inviteUrl}
             onCopyLink={handleCopySuccess}
           />
           <button
@@ -128,7 +131,6 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
         </div>
       ) : (
         <InvitationForm
-          user={user}
           roomName={roomName}
           onInvitationCreated={handleInvitationCreated}
         />

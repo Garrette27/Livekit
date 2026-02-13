@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, onSnapshot, orderBy, query, Timestamp, where, limit, doc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
+import { useAuthSession } from '@/hooks/useAuthSession';
 import {
   isInCurrentMonth,
   isTestConsultationSummary,
@@ -66,7 +66,7 @@ interface Consultation {
 }
 
 export default function Dashboard() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, isLoading: authLoading } = useAuthSession();
   const [summaries, setSummaries] = useState<CallSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
@@ -83,17 +83,6 @@ export default function Dashboard() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deletingSummary, setDeletingSummary] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  // Handle authentication
-  useEffect(() => {
-    if (auth) {
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        console.log('Dashboard: Auth state changed:', user ? 'User logged in' : 'No user');
-        setUser(user);
-      });
-      return unsubscribe;
-    }
-  }, []);
 
   // Fetch summaries from Firestore (reacts to sortOrder)
   useEffect(() => {
@@ -437,6 +426,33 @@ export default function Dashboard() {
     }
     window.location.href = '/';
   };
+
+  if (authLoading) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        backgroundColor: '#eff6ff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '4rem',
+            height: '4rem',
+            border: '2px solid #dbeafe',
+            borderTop: '2px solid #2563eb',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 1.5rem'
+          }}></div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1e40af' }}>
+            Loading Dashboard...
+          </h2>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
