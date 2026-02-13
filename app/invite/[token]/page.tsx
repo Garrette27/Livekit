@@ -524,13 +524,13 @@ function InvitePageContent() {
       <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}>
         <PatientLiveKitRoom
           token={validationResult.liveKitToken}
-          onDisconnected={async () => {
+          onDisconnected={() => {
             console.log('Patient disconnected from consultation');
             
             // Track patient leaving consultation (only if in main consultation room, not waiting room)
             if (validationResult?.roomName && !validationResult.waitingRoomEnabled) {
               try {
-                await fetch('/api/track-consultation', {
+                void fetch('/api/track-consultation', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -585,11 +585,11 @@ function InvitePageContent() {
               }
             }
           }}
-          onLeaveClick={async () => {
+          onLeaveClick={() => {
             // Track patient leaving consultation (only if in main consultation room, not waiting room)
             if (validationResult?.roomName && !validationResult.waitingRoomEnabled) {
               try {
-                await fetch('/api/track-consultation', {
+                void fetch('/api/track-consultation', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({

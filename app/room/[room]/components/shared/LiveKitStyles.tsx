@@ -54,6 +54,7 @@ export default function LiveKitStyles({
 
   const hideLeaveControlStyles = controlsPolicy.hideLeaveControl
     ? `
+      .lk-control-bar .lk-disconnect-button,
       .lk-control-bar button[aria-label*='leave' i],
       .lk-control-bar button[title*='leave' i],
       .lk-control-bar [data-lk-kind='leave'] {
@@ -64,8 +65,11 @@ export default function LiveKitStyles({
 
   const hideStartVideoControlStyles = controlsPolicy.hideStartVideoControl
     ? `
+      .lk-control-bar .lk-button[data-lk-source='camera'],
+      .lk-control-bar [data-lk-source='camera'],
       .lk-control-bar button[aria-label*='start video' i],
-      .lk-control-bar button[title*='start video' i] {
+      .lk-control-bar button[title*='start video' i],
+      .lk-control-bar button[aria-label*='camera' i][aria-pressed='false'] {
         display: none !important;
       }
     `
@@ -154,6 +158,56 @@ export default function LiveKitStyles({
         z-index: 10050 !important;
       }
 
+      .lk-chat {
+        position: fixed !important;
+        right: 16px !important;
+        bottom: 86px !important;
+        top: auto !important;
+        width: min(360px, calc(100vw - 24px)) !important;
+        max-height: min(60vh, 520px) !important;
+        background-color: #ffffff !important;
+        color: #111827 !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 12px !important;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25) !important;
+      }
+
+      .lk-chat-header {
+        color: #111827 !important;
+        border-bottom: 1px solid #e5e7eb !important;
+      }
+
+      .lk-chat-messages {
+        background-color: #ffffff !important;
+      }
+
+      .lk-chat-entry .lk-message-body {
+        color: #111827 !important;
+      }
+
+      .lk-chat-entry[data-lk-message-origin='local'] .lk-message-body {
+        background-color: #e5e7eb !important;
+      }
+
+      .lk-chat-entry[data-lk-message-origin='remote'] .lk-message-body {
+        background-color: #dbeafe !important;
+      }
+
+      .lk-chat-form {
+        border-top: 1px solid #e5e7eb !important;
+        background-color: #ffffff !important;
+      }
+
+      .lk-chat-form-input {
+        background-color: #ffffff !important;
+        color: #111827 !important;
+        border: 1px solid #d1d5db !important;
+      }
+
+      .lk-chat-form-input::placeholder {
+        color: #6b7280 !important;
+      }
+
       @media (max-width: 768px) {
         .lk-grid-layout,
         .lk-focus-layout {
@@ -175,6 +229,13 @@ export default function LiveKitStyles({
           min-width: 44px !important;
           min-height: 44px !important;
           padding: 0.5rem !important;
+        }
+
+        .lk-chat {
+          right: 8px !important;
+          bottom: 76px !important;
+          width: min(360px, calc(100vw - 16px)) !important;
+          max-height: min(58vh, 420px) !important;
         }
       }
     `}</style>

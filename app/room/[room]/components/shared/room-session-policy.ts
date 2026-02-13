@@ -21,11 +21,17 @@ export interface SidebarPolicy {
   defaultCollapsed: boolean;
 }
 
+export interface WaitingQueuePanelPolicy extends SidebarPolicy {
+  autoRefresh: boolean;
+  pollIntervalMs: number;
+  showRefreshButton: boolean;
+}
+
 export interface RoomSessionPolicy {
   controls: RoomControlsPolicy;
   chat: RoomChatPolicy;
   panels: {
-    waitingQueue: SidebarPolicy;
+    waitingQueue: WaitingQueuePanelPolicy;
     doctorSession: SidebarPolicy;
     patientSession: SidebarPolicy;
     notes: SidebarPolicy;
@@ -42,11 +48,18 @@ const DISABLED_PANEL: SidebarPolicy = {
   defaultCollapsed: false,
 };
 
+const DISABLED_WAITING_QUEUE_PANEL: WaitingQueuePanelPolicy = {
+  ...DISABLED_PANEL,
+  autoRefresh: false,
+  pollIntervalMs: 15_000,
+  showRefreshButton: false,
+};
+
 const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
   doctor: {
     controls: {
       hideLeaveControl: true,
-      hideStartVideoControl: false,
+      hideStartVideoControl: true,
       hideSettingsControl: true,
     },
     chat: {
@@ -57,16 +70,19 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
       waitingQueue: {
         enabled: true,
         title: 'Waiting Queue',
-        icon: '🚪',
+        icon: 'WQ',
         position: 'left',
         width: 360,
         collapsedWidth: 60,
         defaultCollapsed: false,
+        autoRefresh: true,
+        pollIntervalMs: 15_000,
+        showRefreshButton: false,
       },
       doctorSession: {
         enabled: true,
         title: 'Doctor Session Panel',
-        icon: '🩺',
+        icon: 'DR',
         position: 'right',
         width: 300,
         collapsedWidth: 60,
@@ -87,7 +103,7 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
       defaultOpen: false,
     },
     panels: {
-      waitingQueue: DISABLED_PANEL,
+      waitingQueue: DISABLED_WAITING_QUEUE_PANEL,
       doctorSession: DISABLED_PANEL,
       patientSession: DISABLED_PANEL,
       notes: DISABLED_PANEL,

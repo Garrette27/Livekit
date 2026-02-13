@@ -33,7 +33,13 @@ export default function DoctorSessionPanel({
           width={policy.panels.waitingQueue.width}
           collapsedWidth={policy.panels.waitingQueue.collapsedWidth}
         >
-          <WaitingRoomPanel roomName={roomName} />
+          <WaitingRoomPanel
+            roomName={roomName}
+            doctorUserId={user.uid}
+            autoRefresh={policy.panels.waitingQueue.autoRefresh}
+            pollIntervalMs={policy.panels.waitingQueue.pollIntervalMs}
+            showRefreshButton={policy.panels.waitingQueue.showRefreshButton}
+          />
         </SidebarPortal>
       )}
 

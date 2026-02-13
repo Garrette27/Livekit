@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
     }
 
     let waitingPatientsQuery;
+    let shouldFilterByRoomName = false;
     
     // If doctorUserId is provided, use it (most efficient for security)
     if (doctorUserId) {
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
         .where('doctorUserId', '==', doctorUserId)
         .where('status', '==', 'waiting')
         .get();
+      shouldFilterByRoomName = Boolean(roomName);
     } else if (invitationId) {
       // If invitationId is provided, use it (more efficient, no index needed)
       waitingPatientsQuery = await db.collection('waitingPatients')
@@ -87,10 +89,20 @@ export async function GET(req: NextRequest) {
 
     // Process query results for doctorUserId or invitationId paths
     if (waitingPatientsQuery) {
-      const waitingPatients = waitingPatientsQuery.docs.map(doc => ({
+      let waitingPatients = waitingPatientsQuery.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as WaitingPatient));
+
+      if (shouldFilterByRoomName && roomName) {
+        waitingPatients = waitingPatients.filter((patient) => patient.roomName === roomName);
+      }
+
+      waitingPatients.sort((a, b) => {
+        const aTime = a.joinedAt?.toMillis?.() || (a.joinedAt instanceof Date ? a.joinedAt.getTime() : 0);
+        const bTime = b.joinedAt?.toMillis?.() || (b.joinedAt instanceof Date ? b.joinedAt.getTime() : 0);
+        return aTime - bTime;
+      });
 
       return NextResponse.json({
         success: true,

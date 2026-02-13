@@ -1,151 +1,38 @@
-﻿'use client';
+'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AdmitPatientResponse, WaitingPatient } from '@/lib/types';
+import { useMemo } from 'react';
+import { useWaitingQueue } from '../hooks/useWaitingQueue';
 
 interface WaitingRoomPanelProps {
   roomName: string;
+  doctorUserId?: string;
+  autoRefresh?: boolean;
+  pollIntervalMs?: number;
+  showRefreshButton?: boolean;
 }
 
-interface WaitingRoomListResponse {
-  success: boolean;
-  waitingPatients?: WaitingPatient[];
-  error?: string;
-}
+export default function WaitingRoomPanel({
+  roomName,
+  doctorUserId,
+  autoRefresh = true,
+  pollIntervalMs = 15_000,
+  showRefreshButton = false,
+}: WaitingRoomPanelProps) {
+  const {
+    waitingPatients,
+    loading,
+    error,
+    admittingId,
+    refresh,
+    admitPatient,
+  } = useWaitingQueue({
+    roomName,
+    doctorUserId,
+    autoRefresh,
+    pollIntervalMs,
+  });
 
-interface InvitationLookupResponse {
-  success: boolean;
-  invitationId?: string;
-  error?: string;
-}
-
-async function parseJsonResponse<T>(response: Response): Promise<T> {
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    throw new Error(`Expected JSON response but received status ${response.status}`);
-  }
-
-  return (await response.json()) as T;
-}
-
-export default function WaitingRoomPanel({ roomName }: WaitingRoomPanelProps) {
-  const [waitingPatients, setWaitingPatients] = useState<WaitingPatient[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [admittingId, setAdmittingId] = useState<string | null>(null);
-  const [invitationId, setInvitationId] = useState<string | null>(null);
-  const isFetchingRef = useRef(false);
-
-  const resolveInvitationId = useCallback(
-    async (forceRefresh = false): Promise<string | null> => {
-      if (invitationId && !forceRefresh) {
-        return invitationId;
-      }
-
-      try {
-        const response = await fetch(`/api/invite/get-link?roomName=${encodeURIComponent(roomName)}`);
-        const result = await parseJsonResponse<InvitationLookupResponse>(response);
-
-        if (result.success && result.invitationId) {
-          setInvitationId(result.invitationId);
-          return result.invitationId;
-        }
-
-        setInvitationId(null);
-        return null;
-      } catch (lookupError) {
-        console.warn('Unable to refresh invitation id for waiting room list:', lookupError);
-        setInvitationId(null);
-        return null;
-      }
-    },
-    [invitationId, roomName]
-  );
-
-  const fetchWaitingPatients = useCallback(
-    async ({ forceInvitationRefresh = false, showLoading = false }: { forceInvitationRefresh?: boolean; showLoading?: boolean } = {}) => {
-      if (isFetchingRef.current) {
-        return;
-      }
-
-      isFetchingRef.current = true;
-      if (showLoading) {
-        setLoading(true);
-      }
-      setError(null);
-
-      try {
-        const activeInvitationId = await resolveInvitationId(forceInvitationRefresh);
-        const query = activeInvitationId
-          ? `invitationId=${encodeURIComponent(activeInvitationId)}`
-          : `roomName=${encodeURIComponent(roomName)}`;
-
-        const response = await fetch(`/api/waiting-room/list?${query}`);
-        const result = await parseJsonResponse<WaitingRoomListResponse>(response);
-
-        if (result.success) {
-          setWaitingPatients(result.waitingPatients || []);
-          return;
-        }
-
-        setError(result.error || 'Failed to fetch waiting patients');
-        setWaitingPatients([]);
-      } catch (fetchError) {
-        console.error('Error fetching waiting patients:', fetchError);
-        setError('Network error. Please try again.');
-      } finally {
-        isFetchingRef.current = false;
-        if (showLoading) {
-          setLoading(false);
-        }
-      }
-    },
-    [resolveInvitationId, roomName]
-  );
-
-  const admitPatient = async (waitingPatientId: string) => {
-    try {
-      setAdmittingId(waitingPatientId);
-      setError(null);
-
-      const response = await fetch('/api/waiting-room/admit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          waitingPatientId,
-          roomName,
-        }),
-      });
-
-      const result: AdmitPatientResponse = await parseJsonResponse<AdmitPatientResponse>(response);
-
-      if (result.success) {
-        setWaitingPatients((previous) => previous.filter((patient) => patient.id !== waitingPatientId));
-        alert('Patient admitted to consultation room. They can now join the main room.');
-      } else {
-        setError(result.error || 'Failed to admit patient');
-      }
-    } catch (admitError) {
-      setError('Network error. Please try again.');
-      console.error('Error admitting patient:', admitError);
-    } finally {
-      setAdmittingId(null);
-    }
-  };
-
-  useEffect(() => {
-    void fetchWaitingPatients({ forceInvitationRefresh: true, showLoading: true });
-
-    const interval = window.setInterval(() => {
-      void fetchWaitingPatients();
-    }, 15000);
-
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [fetchWaitingPatients]);
+  const pollSeconds = useMemo(() => Math.max(1, Math.round(pollIntervalMs / 1000)), [pollIntervalMs]);
 
   return (
     <div
@@ -173,21 +60,24 @@ export default function WaitingRoomPanel({ roomName }: WaitingRoomPanelProps) {
         >
           Waiting Room ({waitingPatients.length})
         </h3>
-        <button
-          onClick={() => void fetchWaitingPatients({ forceInvitationRefresh: true, showLoading: true })}
-          disabled={loading}
-          style={{
-            backgroundColor: '#f3f4f6',
-            border: '1px solid #d1d5db',
-            borderRadius: '0.375rem',
-            padding: '0.25rem 0.5rem',
-            fontSize: '0.75rem',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.6 : 1,
-          }}
-        >
-          {loading ? 'Loading...' : 'Refresh'}
-        </button>
+
+        {showRefreshButton && (
+          <button
+            onClick={() => void refresh(true)}
+            disabled={loading}
+            style={{
+              backgroundColor: '#f3f4f6',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.375rem',
+              padding: '0.25rem 0.5rem',
+              fontSize: '0.75rem',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            {loading ? 'Loading...' : 'Refresh'}
+          </button>
+        )}
       </div>
 
       {error && (
@@ -277,7 +167,12 @@ export default function WaitingRoomPanel({ roomName }: WaitingRoomPanelProps) {
                     </p>
                   </div>
                   <button
-                    onClick={() => void admitPatient(patient.id)}
+                    onClick={async () => {
+                      const admitted = await admitPatient(patient.id);
+                      if (admitted) {
+                        alert('Patient admitted to consultation room. They can now join the main room.');
+                      }
+                    }}
                     disabled={admittingId === patient.id}
                     style={{
                       backgroundColor: admittingId === patient.id ? '#9ca3af' : '#059669',
@@ -315,7 +210,11 @@ export default function WaitingRoomPanel({ roomName }: WaitingRoomPanelProps) {
         <ul style={{ margin: '0.25rem 0 0 0', paddingLeft: '1.25rem' }}>
           <li>Patients join the waiting room automatically.</li>
           <li>Click Admit to allow a patient into the consultation.</li>
-          <li>The list refreshes automatically every 15 seconds.</li>
+          <li>
+            {autoRefresh
+              ? `The list refreshes automatically every ${pollSeconds} second${pollSeconds === 1 ? '' : 's'}.`
+              : 'Automatic refresh is disabled for this panel.'}
+          </li>
         </ul>
       </div>
     </div>
