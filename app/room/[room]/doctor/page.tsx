@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
-import DoctorSessionPanels from './components/DoctorSessionPanels';
+import DoctorSessionPanel from './components/DoctorSessionPanel';
 import LiveKitShell from './components/LiveKitShell';
 import AuthCard from './components/shared/AuthCard';
 import LoadingSpinner from './components/shared/LoadingSpinner';
@@ -177,7 +177,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
   if (token) {
     return (
       <>
-        <DoctorSessionPanels
+        <DoctorSessionPanel
           roomName={roomName}
           user={user!}
           doctorName={doctorName}

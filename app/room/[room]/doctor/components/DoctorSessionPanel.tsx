@@ -10,7 +10,7 @@ import WaitingRoomPanel from './WaitingRoomPanel';
 import InvitationManagementPanel from './InvitationManagementPanel';
 import SidebarPortal from './shared/SidebarPortal';
 
-interface DoctorSessionPanelsProps {
+interface DoctorSessionPanelProps {
   roomName: string;
   user: User;
   doctorName: string;
@@ -19,14 +19,14 @@ interface DoctorSessionPanelsProps {
   onLeave: () => void;
 }
 
-export default function DoctorSessionPanels({
+export default function DoctorSessionPanel({
   roomName,
   user,
   doctorName,
   db,
   storage,
   onLeave,
-}: DoctorSessionPanelsProps) {
+}: DoctorSessionPanelProps) {
   return (
     <>
       <SidebarPortal
@@ -63,7 +63,7 @@ export default function DoctorSessionPanels({
       </SidebarPortal>
 
       <SidebarPortal
-        title="Doctor Session Control"
+        title="Doctor Session Panel"
         icon="🛠️"
         position="right"
         defaultCollapsed={false}

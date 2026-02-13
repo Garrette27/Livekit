@@ -10,8 +10,8 @@ interface PatientSessionPanelsProps {
   patientName: string;
   isInfoPanelCollapsed: boolean;
   onToggleInfoPanel: () => void;
-  showFixControlPanel: boolean;
-  onHideFixPanel: () => void;
+  showRoomControlPanel: boolean;
+  onHideRoomControlPanel: () => void;
   onLeave: () => void;
   notesPanel: React.ReactNode;
 }
@@ -21,8 +21,8 @@ export default function PatientSessionPanels({
   patientName,
   isInfoPanelCollapsed,
   onToggleInfoPanel,
-  showFixControlPanel,
-  onHideFixPanel,
+  showRoomControlPanel,
+  onHideRoomControlPanel,
   onLeave,
   notesPanel,
 }: PatientSessionPanelsProps) {
@@ -30,7 +30,7 @@ export default function PatientSessionPanels({
 
   return (
     <>
-      {showFixControlPanel && (
+      {showRoomControlPanel && (
         <div
           style={{
             position: 'fixed',
@@ -116,7 +116,7 @@ export default function PatientSessionPanels({
               </button>
 
               <button
-                onClick={onHideFixPanel}
+                onClick={onHideRoomControlPanel}
                 style={{
                   backgroundColor: '#dc2626',
                   color: 'white',

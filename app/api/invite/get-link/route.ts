@@ -4,6 +4,8 @@ import { signInvitationToken } from '../../../../lib/invitations/token-utils';
 import { buildInviteUrl, toDate } from '../../../../lib/invitations/utils';
 import { InvitationToken } from '../../../../lib/types';
 
+let hasLoggedMissingInvitationIndexWarning = false;
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -57,7 +59,10 @@ export async function GET(req: NextRequest) {
           throw queryError;
         }
 
-        console.warn('Primary invitation query requires index. Falling back to roomName-only query.');
+        if (!hasLoggedMissingInvitationIndexWarning) {
+          console.warn('Primary invitation query requires index. Falling back to roomName-only query.');
+          hasLoggedMissingInvitationIndexWarning = true;
+        }
 
         const fallbackQuery = await db.collection('invitations')
           .where('roomName', '==', roomName)

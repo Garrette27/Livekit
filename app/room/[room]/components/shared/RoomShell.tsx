@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { LiveKitRoom, VideoConference } from '@livekit/components-react';
-import { useLiveKitChatUiFix } from '@/hooks/useLiveKitChatUiFix';
 import LiveKitStyles from './LiveKitStyles';
+import { useRoomChatController } from './room-chat-controller';
 
 interface RoomShellProps {
   token: string;
@@ -18,10 +18,11 @@ export default function RoomShell({
   onError,
   controlBarColor = 'blue',
 }: RoomShellProps) {
-  useLiveKitChatUiFix({ enabled: Boolean(token) });
+  const roomScopeRef = useRef<HTMLDivElement | null>(null);
+  useRoomChatController({ enabled: Boolean(token), scopeRef: roomScopeRef });
 
   return (
-    <>
+    <div ref={roomScopeRef} style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       <LiveKitRoom
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
@@ -36,6 +37,6 @@ export default function RoomShell({
       </LiveKitRoom>
 
       <LiveKitStyles controlBarColor={controlBarColor} />
-    </>
+    </div>
   );
 }

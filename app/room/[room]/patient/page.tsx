@@ -16,7 +16,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isInfoPanelCollapsed, setIsInfoPanelCollapsed] = useState(false);
-  const [showFixControlPanel, setShowFixControlPanel] = useState(false);
+  const [showRoomControlPanel, setShowRoomControlPanel] = useState(false);
   const isLeavingRef = useRef(false);
 
   useEffect(() => {
@@ -84,7 +84,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
   }, [patientName, roomName]);
 
   useEffect(() => {
-    setShowFixControlPanel(localStorage.getItem(`doctorGeneratedLink_${roomName}`) === 'true');
+    setShowRoomControlPanel(localStorage.getItem(`doctorGeneratedLink_${roomName}`) === 'true');
   }, [roomName]);
 
   useEffect(() => {
@@ -399,10 +399,10 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         patientName={patientName}
         isInfoPanelCollapsed={isInfoPanelCollapsed}
         onToggleInfoPanel={() => setIsInfoPanelCollapsed((value) => !value)}
-        showFixControlPanel={showFixControlPanel}
-        onHideFixPanel={() => {
+        showRoomControlPanel={showRoomControlPanel}
+        onHideRoomControlPanel={() => {
           localStorage.removeItem(`doctorGeneratedLink_${roomName}`);
-          setShowFixControlPanel(false);
+          setShowRoomControlPanel(false);
         }}
         onLeave={() => {
           void leaveConsultation();
