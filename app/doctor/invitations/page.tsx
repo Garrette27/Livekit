@@ -80,7 +80,21 @@ export default function DoctorInvitationsPage() {
       
       // Fetch each active invitation link once per snapshot lifecycle.
       const activeInvitationIds = new Set(
-        invitationData.filter((invitation) => invitation.status === 'active').map((invitation) => invitation.id)
+        invitationData
+          .filter((invitation) => {
+            if (invitation.status !== 'active') {
+              return false;
+            }
+
+            const expiresAt = invitation.expiresAt?.toDate
+              ? invitation.expiresAt.toDate()
+              : invitation.expiresAt instanceof Date
+              ? invitation.expiresAt
+              : null;
+
+            return !expiresAt || expiresAt.getTime() > Date.now();
+          })
+          .map((invitation) => invitation.id)
       );
 
       requestedInvitationLinksRef.current.forEach((invitationId) => {
@@ -90,7 +104,7 @@ export default function DoctorInvitationsPage() {
       });
 
       invitationData.forEach((invitation) => {
-        if (invitation.status !== 'active') {
+        if (!activeInvitationIds.has(invitation.id)) {
           return;
         }
 
@@ -268,7 +282,7 @@ export default function DoctorInvitationsPage() {
             <p style={{ color: '#4B5563' }}>Create and manage secure patient invitations</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            <Link href="/dashboard" style={{ color: '#2563EB', fontSize: '1.125rem', fontWeight: '500', textDecoration: 'none' }}>
+            <Link href="/doctor/dashboard" style={{ color: '#2563EB', fontSize: '1.125rem', fontWeight: '500', textDecoration: 'none' }}>
               Dashboard
             </Link>
             <button

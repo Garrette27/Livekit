@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { trackConsultationEvent } from '@/lib/consultations/consultation-event-client';
 
 interface RoomLifecycleArgs {
   token: string | null;
@@ -56,14 +55,6 @@ export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLife
           },
           { merge: true }
         );
-
-        await trackConsultationEvent({
-          roomName,
-          action: 'join',
-          patientName: 'Doctor',
-          duration: 0,
-          userId: user.uid,
-        });
       } catch (error) {
         console.error('Error creating room/call records:', error);
       }

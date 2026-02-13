@@ -1,349 +1,552 @@
-﻿import { NextResponse } from 'next/server';
-import { getFirebaseAdmin } from '../../../lib/firebase-admin';
-import { buildVisibleUserIds, choosePatientUserId, isKnownUserId } from '../../../lib/consultations/identity-utils';
-import { calculateDurationMinutes, resolveJoinTiming } from '../../../lib/consultations/session-timing';
-import { generateAndStoreConsultationSummary } from '../../../lib/consultations/summary-service';
+import { NextResponse } from 'next/server';
+import type {
+  DocumentReference,
+  Firestore,
+  QueryDocumentSnapshot,
+} from 'firebase-admin/firestore';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import {
+  buildVisibleUserIds,
+  choosePatientUserId,
+  isKnownUserId,
+} from '@/lib/consultations/identity-utils';
+import { calculateDurationMinutes } from '@/lib/consultations/session-timing';
+import {
+  appendPresenceEvent,
+  resolveJoinSession,
+  resolveLeaveSessionId,
+  upsertSessionSnapshot,
+} from '@/lib/consultations/consultation-session-store';
+import { generateAndStoreConsultationSummary } from '@/lib/consultations/summary-service';
+
+type ConsultationAction = 'join' | 'leave';
+
+interface TrackConsultationRequest {
+  roomName?: string;
+  action?: ConsultationAction;
+  patientName?: string;
+  userId?: string;
+  patientEmail?: string;
+}
+
+interface DateLike {
+  toDate?: () => Date;
+  toMillis?: () => number;
+}
+
+interface ResolvedPatientIdentity {
+  patientUserId: string;
+  patientEmail: string | null;
+}
+
+function toDate(value: unknown): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value;
+  }
+
+  const maybeDateLike = value as DateLike;
+  if (typeof maybeDateLike.toDate === 'function') {
+    return maybeDateLike.toDate();
+  }
+
+  if (typeof maybeDateLike.toMillis === 'function') {
+    return new Date(maybeDateLike.toMillis());
+  }
+
+  const parsed = new Date(value as string | number | Date);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function getLatestByCreatedAt(docs: QueryDocumentSnapshot[]): QueryDocumentSnapshot | null {
+  if (docs.length === 0) {
+    return null;
+  }
+
+  return [...docs].sort((left, right) => {
+    const leftMillis = toDate(left.data().createdAt)?.getTime() || 0;
+    const rightMillis = toDate(right.data().createdAt)?.getTime() || 0;
+    return rightMillis - leftMillis;
+  })[0];
+}
+
+async function lookupDoctorUserId(
+  db: Firestore,
+  roomName: string
+): Promise<string> {
+  try {
+    const roomDoc = await db.collection('rooms').doc(roomName).get();
+    if (!roomDoc.exists) {
+      return 'unknown';
+    }
+
+    const roomData = roomDoc.data();
+    return roomData?.createdBy || roomData?.metadata?.createdBy || 'unknown';
+  } catch (error) {
+    console.error('Error looking up room creator:', error);
+    return 'unknown';
+  }
+}
+
+async function lookupUserIdByEmail(
+  db: Firestore,
+  email: string
+): Promise<string | null> {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  try {
+    const querySnapshot = await db
+      .collection('users')
+      .where('email', '==', normalizedEmail)
+      .limit(1)
+      .get();
+
+    if (querySnapshot.empty) {
+      return null;
+    }
+
+    return querySnapshot.docs[0].id;
+  } catch (error) {
+    console.error('Error looking up user by email:', error);
+    return null;
+  }
+}
+
+async function lookupLatestInvitationEmail(
+  db: Firestore,
+  roomName: string
+): Promise<string | null> {
+  try {
+    const invitationsSnapshot = await db
+      .collection('invitations')
+      .where('roomName', '==', roomName)
+      .limit(20)
+      .get();
+
+    if (invitationsSnapshot.empty) {
+      return null;
+    }
+
+    const latestInvitationDoc = getLatestByCreatedAt(invitationsSnapshot.docs);
+    if (!latestInvitationDoc) {
+      return null;
+    }
+
+    const invitationData = latestInvitationDoc.data();
+    const invitationEmail =
+      invitationData?.emailAllowed ||
+      invitationData?.metadata?.constraints?.email ||
+      null;
+
+    return invitationEmail ? String(invitationEmail).trim().toLowerCase() : null;
+  } catch (error) {
+    console.error('Error resolving invitation email:', error);
+    return null;
+  }
+}
+
+async function resolvePatientIdentity(
+  db: Firestore,
+  params: {
+    roomName: string;
+    userId?: string;
+    patientEmail?: string;
+    doctorUserId: string;
+    existingPatientUserId?: string | null;
+    existingPatientEmail?: string | null;
+  }
+): Promise<ResolvedPatientIdentity> {
+  const {
+    roomName,
+    userId,
+    patientEmail,
+    doctorUserId,
+    existingPatientUserId,
+    existingPatientEmail,
+  } = params;
+
+  let resolvedPatientUserId = userId || 'anonymous';
+  let resolvedPatientEmail: string | null = patientEmail?.trim().toLowerCase() || null;
+
+  if (resolvedPatientUserId === doctorUserId) {
+    resolvedPatientUserId = 'anonymous';
+  }
+
+  if (!isKnownUserId(resolvedPatientUserId) && resolvedPatientEmail) {
+    const matchedUserId = await lookupUserIdByEmail(db, resolvedPatientEmail);
+    if (matchedUserId && matchedUserId !== doctorUserId) {
+      resolvedPatientUserId = matchedUserId;
+    }
+  }
+
+  if (!isKnownUserId(resolvedPatientUserId) && !resolvedPatientEmail) {
+    const invitationEmail = await lookupLatestInvitationEmail(db, roomName);
+    if (invitationEmail) {
+      resolvedPatientEmail = invitationEmail;
+      const matchedUserId = await lookupUserIdByEmail(db, invitationEmail);
+      if (matchedUserId && matchedUserId !== doctorUserId) {
+        resolvedPatientUserId = matchedUserId;
+      }
+    }
+  }
+
+  return {
+    patientUserId: choosePatientUserId(resolvedPatientUserId, existingPatientUserId || null),
+    patientEmail: resolvedPatientEmail || existingPatientEmail || null,
+  };
+}
+
+async function loadTranscriptionData(
+  db: Firestore,
+  roomName: string
+): Promise<any[] | null> {
+  try {
+    const callDoc = await db.collection('calls').doc(roomName).get();
+    if (!callDoc.exists) {
+      return null;
+    }
+
+    const callData = callDoc.data();
+    const transcription = callData?.transcription;
+    return Array.isArray(transcription) ? transcription : null;
+  } catch (error) {
+    console.error('Could not fetch transcription data:', error);
+    return null;
+  }
+}
+
+async function handleJoinEvent(
+  db: Firestore,
+  params: {
+    roomName: string;
+    patientName: string;
+    patientUserId: string;
+    patientEmail: string | null;
+    doctorUserId: string;
+    consultationRef: DocumentReference;
+    existingData: Record<string, any> | null;
+  }
+) {
+  const {
+    roomName,
+    patientName,
+    patientUserId,
+    patientEmail,
+    doctorUserId,
+    consultationRef,
+    existingData,
+  } = params;
+
+  const now = new Date();
+  const existingPatientUserId = existingData?.patientUserId || existingData?.metadata?.patientUserId || null;
+  const existingVisibleToUsers = existingData?.metadata?.visibleToUsers || [];
+  const existingJoinedAt = toDate(existingData?.joinedAt);
+
+  const sessionResolution = resolveJoinSession({
+    roomName,
+    existingData,
+    existingPatientUserId,
+    nextPatientUserId: patientUserId,
+    now,
+  });
+
+  const joinedAt = sessionResolution.reusedExistingSession && existingJoinedAt ? existingJoinedAt : now;
+
+  await consultationRef.set(
+    {
+      roomName,
+      patientName: patientName || existingData?.patientName || 'Unknown Patient',
+      patientUserId,
+      patientEmail,
+      joinedAt,
+      sessionStartedAt: sessionResolution.sessionStartedAt,
+      consultationSessionId: sessionResolution.consultationSessionId,
+      status: 'active',
+      isRealConsultation: true,
+      createdBy: doctorUserId,
+      metadata: {
+        ...(existingData?.metadata || {}),
+        source: 'patient_join',
+        trackedAt: now,
+        createdBy: doctorUserId,
+        patientUserId,
+        patientEmail,
+        doctorUserId,
+        consultationSessionId: sessionResolution.consultationSessionId,
+        visibleToUsers: buildVisibleUserIds(doctorUserId, patientUserId, existingVisibleToUsers),
+      },
+    },
+    { merge: true }
+  );
+
+  await upsertSessionSnapshot(db, {
+    consultationSessionId: sessionResolution.consultationSessionId,
+    roomName,
+    doctorUserId,
+    patientUserId,
+    status: 'active',
+    sessionStartedAt: sessionResolution.sessionStartedAt,
+    metadata: {
+      source: 'track-consultation-join',
+      patientName,
+    },
+  });
+
+  await appendPresenceEvent(db, {
+    consultationSessionId: sessionResolution.consultationSessionId,
+    roomName,
+    doctorUserId,
+    patientUserId,
+    actorType: 'patient',
+    eventType: sessionResolution.eventType,
+    eventAt: now,
+    metadata: {
+      patientName,
+    },
+  });
+
+  return {
+    consultationSessionId: sessionResolution.consultationSessionId,
+  };
+}
+
+async function handleLeaveEvent(
+  db: Firestore,
+  params: {
+    roomName: string;
+    patientName: string;
+    patientUserId: string;
+    patientEmail: string | null;
+    doctorUserId: string;
+    consultationRef: DocumentReference;
+    existingData: Record<string, any> | null;
+  }
+) {
+  const {
+    roomName,
+    patientName,
+    patientUserId,
+    patientEmail,
+    doctorUserId,
+    consultationRef,
+    existingData,
+  } = params;
+
+  if (!existingData) {
+    return {
+      consultationSessionId: null,
+      durationMinutes: 0,
+    };
+  }
+
+  const now = new Date();
+  const sessionStartedAt = toDate(existingData.sessionStartedAt || existingData.joinedAt) || now;
+  const consultationSessionId = resolveLeaveSessionId({
+    roomName,
+    existingData,
+    now,
+  });
+  const durationMinutes = calculateDurationMinutes({
+    startedAt: sessionStartedAt,
+    endedAt: now,
+  });
+
+  const existingVisibleToUsers = existingData.metadata?.visibleToUsers || [];
+
+  await consultationRef.set(
+    {
+      roomName,
+      patientName: patientName || existingData.patientName || 'Unknown Patient',
+      patientUserId,
+      patientEmail,
+      consultationSessionId,
+      sessionStartedAt,
+      leftAt: now,
+      duration: durationMinutes,
+      status: 'completed',
+      isRealConsultation: true,
+      createdBy: doctorUserId,
+      metadata: {
+        ...(existingData.metadata || {}),
+        source: 'patient_leave',
+        trackedAt: now,
+        durationMinutes,
+        createdBy: doctorUserId,
+        patientUserId,
+        patientEmail,
+        doctorUserId,
+        consultationSessionId,
+        visibleToUsers: buildVisibleUserIds(doctorUserId, patientUserId, existingVisibleToUsers),
+      },
+    },
+    { merge: true }
+  );
+
+  await upsertSessionSnapshot(db, {
+    consultationSessionId,
+    roomName,
+    doctorUserId,
+    patientUserId,
+    status: 'completed',
+    sessionStartedAt,
+    sessionEndedAt: now,
+    metadata: {
+      source: 'track-consultation-leave',
+      patientName,
+      durationMinutes,
+    },
+  });
+
+  await appendPresenceEvent(db, {
+    consultationSessionId,
+    roomName,
+    doctorUserId,
+    patientUserId,
+    actorType: 'patient',
+    eventType: 'left',
+    eventAt: now,
+    metadata: {
+      patientName,
+      durationMinutes,
+    },
+  });
+
+  const transcriptionData = await loadTranscriptionData(db, roomName);
+  await generateAndStoreConsultationSummary({
+    roomName,
+    patientName: patientName || existingData.patientName || 'Unknown Patient',
+    durationMinutes,
+    userId: doctorUserId,
+    consultationSessionId,
+    transcriptionData,
+    patientUserId,
+    patientEmail,
+  });
+
+  return {
+    consultationSessionId,
+    durationMinutes,
+  };
+}
 
 export async function POST(req: Request) {
   try {
-    const { roomName, action, patientName, userId, patientEmail } = await req.json();
-    console.log(`Track consultation: ${action} for room: ${roomName}, user: ${userId}, patientEmail: ${patientEmail}`);
+    const body = (await req.json()) as TrackConsultationRequest;
+    const roomName = body.roomName?.trim();
+    const action = body.action;
+    const patientName = body.patientName?.trim() || 'Unknown Patient';
+    const userId = body.userId?.trim() || 'anonymous';
+    const patientEmail = body.patientEmail?.trim().toLowerCase() || undefined;
 
     if (!roomName || !action) {
-      return NextResponse.json({ error: 'Room name and action are required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'roomName and action are required' },
+        { status: 400 }
+      );
+    }
+
+    if (action !== 'join' && action !== 'leave') {
+      return NextResponse.json(
+        { success: false, error: `Unsupported action: ${action}` },
+        { status: 400 }
+      );
     }
 
     const db = getFirebaseAdmin();
     if (!db) {
-      console.error('âŒ Firebase Admin not initialized');
-      return NextResponse.json({ 
-        error: 'Firebase Admin not initialized',
-        message: 'Please check your Firebase environment variables'
-      }, { status: 500 });
+      return NextResponse.json(
+        { success: false, error: 'Firebase Admin not initialized' },
+        { status: 500 }
+      );
     }
 
-    // Look up the room creator (doctor) to link the consultation to them
-    let doctorUserId = 'unknown';
-    try {
-      const roomRef = db.collection('rooms').doc(roomName);
-      const roomDoc = await roomRef.get();
-      if (roomDoc.exists) {
-        const roomData = roomDoc.data();
-        doctorUserId = roomData?.createdBy || roomData?.metadata?.createdBy || 'unknown';
-        console.log(`Found room creator: ${doctorUserId} for room: ${roomName}`);
-      } else {
-        console.log(`Room ${roomName} not found in rooms collection`);
-      }
-    } catch (error) {
-      console.error('Error looking up room creator:', error);
-    }
+    const doctorUserId = await lookupDoctorUserId(db, roomName);
 
-    // If userId is 'anonymous' or missing, try to look up patient by email
-    // Also check if this is a doctor joining (should not set patientUserId to doctor's ID)
-    let actualPatientUserId = userId || 'anonymous';
-    let invitationEmailForPatient: string | null = null;
-    
-    // Don't set patientUserId to doctor's ID - only set if it's actually a patient
-    if (userId && userId === doctorUserId && action === 'join') {
-      // This is likely the doctor joining, not the patient
-      // Don't set patientUserId to doctor's ID - keep it as 'anonymous' until patient joins
-      actualPatientUserId = 'anonymous';
-      console.log(`Doctor joining detected (userId matches doctorUserId), keeping patientUserId as anonymous`);
-    } else {
-      // Try multiple methods to find patient user ID
-      
-      // Method 1: If we have a userId and it's not the doctor, use it
-      if (userId && userId !== doctorUserId && userId !== 'anonymous') {
-        actualPatientUserId = userId;
-        console.log(`Using provided user ID as patient: ${actualPatientUserId}`);
-      }
-      // Method 2: If we have patientEmail, look up by email
-      else if (patientEmail) {
-        try {
-          const usersRef = db.collection('users');
-          const userQuery = await usersRef.where('email', '==', patientEmail.toLowerCase().trim()).limit(1).get();
-          if (!userQuery.empty) {
-            const foundUserId = userQuery.docs[0].id;
-            // Make sure we're not setting patientUserId to doctor's ID
-            if (foundUserId !== doctorUserId) {
-              actualPatientUserId = foundUserId;
-              console.log(`Found patient user ID by email: ${actualPatientUserId} for email: ${patientEmail}`);
-            } else {
-              console.log(`Found user ID matches doctor ID, keeping patientUserId as anonymous`);
-            }
-          } else {
-            console.log(`No user found with email: ${patientEmail}`);
-          }
-        } catch (error) {
-          console.error('Error looking up patient by email:', error);
-        }
-      }
-      
-      // Method 3: If still anonymous, try to get email from invitation and look up user
-      if (actualPatientUserId === 'anonymous' || !actualPatientUserId) {
-        try {
-          const invitationsRef = db.collection('invitations');
-          // Find invitation for this room (try both active and used status)
-          let invitationQuery = await invitationsRef
-            .where('roomName', '==', roomName)
-            .orderBy('createdAt', 'desc')
-            .limit(5)
-            .get();
-          
-          // If no results with orderBy, try without (in case index not ready)
-          if (invitationQuery.empty) {
-            invitationQuery = await invitationsRef
-              .where('roomName', '==', roomName)
-              .limit(5)
-              .get();
-          }
-          
-          if (!invitationQuery.empty) {
-            // Get the most recent invitation
-            const invitation = invitationQuery.docs[0].data();
-            invitationEmailForPatient = invitation?.emailAllowed || invitation?.metadata?.constraints?.email || null;
-            if (invitationEmailForPatient) {
-              console.log(`Found invitation email for room ${roomName}: ${invitationEmailForPatient}`);
-              // Look up user by invitation email
-              const usersRef = db.collection('users');
-              const userQuery = await usersRef.where('email', '==', invitationEmailForPatient.toLowerCase().trim()).limit(1).get();
-              if (!userQuery.empty) {
-                const foundUserId = userQuery.docs[0].id;
-                if (foundUserId !== doctorUserId) {
-                  actualPatientUserId = foundUserId;
-                  console.log(`Found patient user ID from invitation email: ${actualPatientUserId} for email: ${invitationEmailForPatient}`);
-                } else {
-                  console.log(`Found user ID from invitation matches doctor ID, keeping patientUserId as anonymous`);
-                }
-              } else {
-                console.log(`No user found with invitation email: ${invitationEmailForPatient} - patient may not be registered yet, but will store email`);
-              }
-            }
-          } else {
-            console.log(`No invitation found for room: ${roomName}`);
-          }
-        } catch (error) {
-          console.error('Error looking up patient from invitation:', error);
-        }
-      }
+    // Doctor lifecycle events are tracked separately and should not overwrite patient consultation state.
+    const isDoctorLifecycleEvent =
+      Boolean(userId) && doctorUserId !== 'unknown' && userId === doctorUserId;
+    if (isDoctorLifecycleEvent) {
+      return NextResponse.json({
+        success: true,
+        message: 'Doctor lifecycle event ignored',
+        roomName,
+        action,
+      });
     }
 
     const consultationRef = db.collection('consultations').doc(roomName);
-    
-    if (action === 'join') {
-      // Check if consultation already exists
-      const consultationDoc = await consultationRef.get();
-      const existingData = consultationDoc.exists ? consultationDoc.data() : null;
-      
-      // Preserve existing patient email/userId if we're getting anonymous values
-      // Only update if we have a better (non-anonymous, non-null) value
-      const existingPatientUserId = existingData?.patientUserId || existingData?.metadata?.patientUserId;
-      const existingPatientEmail = existingData?.patientEmail || existingData?.metadata?.patientEmail;
-      
-      // If consultation exists and patientUserId is 'anonymous' but we now have a real user ID, update it
-      if (existingData && existingPatientUserId === 'anonymous' && isKnownUserId(actualPatientUserId) && actualPatientUserId !== doctorUserId) {
-        console.log(`Updating existing consultation with patient user ID: ${actualPatientUserId}`);
-        const existingVisibleToUsers = existingData.metadata?.visibleToUsers || [];
-        const updatedVisibleToUsers = buildVisibleUserIds(doctorUserId, actualPatientUserId, existingVisibleToUsers);
-        
-        await consultationRef.update({
-          patientUserId: actualPatientUserId,
-          metadata: {
-            ...existingData.metadata,
-            patientUserId: actualPatientUserId,
-            visibleToUsers: updatedVisibleToUsers
-          }
-        });
-        
-        console.log(`âœ… Updated consultation ${roomName} with patient user ID: ${actualPatientUserId}`);
-      } else {
-        // Get patient email if available
-        let patientEmailToStore = null;
-        if (patientEmail) {
-          patientEmailToStore = patientEmail;
-        } else if (isKnownUserId(actualPatientUserId)) {
-          // Try to get email from user document
-          try {
-            const userDoc = await db.collection('users').doc(actualPatientUserId).get();
-            if (userDoc.exists) {
-              patientEmailToStore = userDoc.data()?.email || null;
-            }
-          } catch (error) {
-            console.error('Error fetching patient email from user document:', error);
-          }
-        } else if (invitationEmailForPatient) {
-          // If patient is anonymous but invitation has email, use invitation email
-          patientEmailToStore = invitationEmailForPatient;
-          console.log(`Storing invitation email as patient email: ${invitationEmailForPatient}`);
-        }
-        
-        // Preserve existing patient email/userId if joining anonymously
-        // Only use new values if they're better (non-anonymous, non-null)
-        const finalPatientUserId = choosePatientUserId(actualPatientUserId, existingPatientUserId);
-        
-        const finalPatientEmail = (!patientEmailToStore && existingPatientEmail)
-          ? existingPatientEmail  // Preserve existing patient email
-          : patientEmailToStore;  // Use new email (or null if anonymous)
-        const now = new Date();
-        const timing = resolveJoinTiming({
-          existingData,
-          existingPatientUserId,
-          nextPatientUserId: finalPatientUserId,
-          now,
-        });
-        const finalJoinedAt = timing.joinedAt;
-        const finalSessionStartedAt = timing.sessionStartedAt;
+    const consultationDoc = await consultationRef.get();
+    const existingData = consultationDoc.exists ? (consultationDoc.data() as Record<string, any>) : null;
 
-        console.log(
-          timing.reusedExistingStart
-            ? 'Preserving joinedAt/sessionStartedAt for short same-patient reconnect'
-            : 'Resetting joinedAt/sessionStartedAt for new session'
-        );
-        
-        // Track when patient joins (new consultation or update existing)
-        const consultationData: any = {
-          roomName,
-          patientName: patientName || existingData?.patientName || 'Unknown Patient',
-          joinedAt: finalJoinedAt,
-          sessionStartedAt: finalSessionStartedAt,
-          status: 'active',
-          isRealConsultation: true, // Mark as real consultation, not test
-          createdBy: doctorUserId, // Store doctor's user ID for doctor's view
-          patientUserId: finalPatientUserId, // Use preserved or new patient user ID
-          metadata: {
-            source: 'patient_join',
-            trackedAt: new Date(),
-            createdBy: doctorUserId,
-            patientUserId: finalPatientUserId, // Use preserved or new patient user ID
-            doctorUserId: doctorUserId, // Explicitly store doctor's user ID
-            // Add both user IDs so both can see the consultation (remove duplicates)
-            visibleToUsers: buildVisibleUserIds(doctorUserId, finalPatientUserId)
-          }
-        };
-        
-        // Only set patient email if we have a value (preserve existing or use new)
-        if (finalPatientEmail) {
-          consultationData.patientEmail = finalPatientEmail;
-          consultationData.metadata.patientEmail = finalPatientEmail;
-        }
-        
-        await consultationRef.set(consultationData, { merge: true });
-        
-        console.log(`âœ… Patient joined consultation: ${roomName}, linked to doctor: ${doctorUserId}, patient: ${finalPatientUserId}, email: ${finalPatientEmail || 'not available'}`);
-        if (actualPatientUserId === 'anonymous' && existingPatientEmail) {
-          console.log(`â„¹ï¸ Preserved existing patient email (${existingPatientEmail}) when patient joined anonymously`);
-        }
-        console.log('Consultation data stored:', consultationData);
-      }
-      
-    } else if (action === 'leave') {
-      // Track when patient leaves and calculate duration
-      const consultationDoc = await consultationRef.get();
-      if (consultationDoc.exists) {
-        const data = consultationDoc.data();
-        const joinedAt = data?.sessionStartedAt || data?.joinedAt;
-        const leftAt = new Date();
-        const durationMinutes = calculateDurationMinutes({
-          startedAt: joinedAt,
-          endedAt: leftAt,
-        });
-        
-        // Preserve existing patient email/userId if leaving anonymously
-        // Get existing patient data from consultation
-        const existingPatientUserId = data?.patientUserId || data?.metadata?.patientUserId;
-        const existingPatientEmail = data?.patientEmail || data?.metadata?.patientEmail;
-        
-        // Preserve existing patientUserId if leaving anonymously and existing is better
-        const finalPatientUserId = choosePatientUserId(actualPatientUserId, existingPatientUserId);
-        
-        // Get patient email from consultation data or request (preserve existing if available)
-        const patientEmailToStore = existingPatientEmail || patientEmail || null;
-        
-        const updateData: any = {
-          leftAt,
-          duration: durationMinutes,
-          status: 'completed',
-          isRealConsultation: true,
-          createdBy: doctorUserId, // Ensure doctor's user ID is preserved
-          patientUserId: finalPatientUserId, // Use preserved or current patient user ID
-          metadata: {
-            ...data?.metadata,
-            source: 'patient_leave',
-            durationMinutes,
-            trackedAt: new Date(),
-            createdBy: doctorUserId,
-            patientUserId: finalPatientUserId, // Use preserved or current patient user ID
-            doctorUserId: doctorUserId,
-            // Add both user IDs so both can see the consultation (remove duplicates)
-            visibleToUsers: buildVisibleUserIds(doctorUserId, finalPatientUserId)
-          }
-        };
-        
-        // Add patient email if available (preserve existing)
-        if (patientEmailToStore) {
-          updateData.patientEmail = patientEmailToStore;
-          updateData.metadata.patientEmail = patientEmailToStore;
-          console.log('âœ… Storing patient email in consultation:', patientEmailToStore);
-          if (actualPatientUserId === 'anonymous' && existingPatientEmail) {
-            console.log(`â„¹ï¸ Preserved existing patient email (${existingPatientEmail}) when patient left anonymously`);
-          }
-        }
-        
-        await consultationRef.update(updateData);
-        
-        console.log(`âœ… Patient left consultation: ${roomName}, duration: ${durationMinutes} minutes, linked to doctor: ${doctorUserId}`);
-        
-        // Generate AI summary for completed consultation
-        try {
-          console.log(`Generating AI summary for room: ${roomName}, patient: ${data?.patientName || 'Unknown Patient'}, duration: ${durationMinutes}, doctor: ${doctorUserId}`);
-          
-          // Get patient email from consultation data (use preserved email)
-          const patientEmailFromConsultation = patientEmailToStore || patientEmail || null;
-          
-          // Try to get transcription data from the calls collection
-          let transcriptionData = null;
-          try {
-            const callRef = db.collection('calls').doc(roomName);
-            const callDoc = await callRef.get();
-            if (callDoc.exists) {
-              const callData = callDoc.data();
-              transcriptionData = callData?.transcription || [];
-              console.log('Found transcription data for summary:', transcriptionData.length, 'entries');
-            }
-          } catch (transcriptionError) {
-            console.log('Could not fetch transcription data:', transcriptionError);
-          }
-          
-          await generateAndStoreConsultationSummary({
-            roomName,
-            patientName: data?.patientName || 'Unknown Patient',
-            durationMinutes,
-            userId: doctorUserId,
-            transcriptionData,
-            patientUserId: finalPatientUserId, // Use preserved patient user ID
-            patientEmail: patientEmailFromConsultation // Use preserved patient email
-          });
-        } catch (error) {
-          console.error('âŒ Error generating consultation summary:', error);
-        }
-      }
-    }
+    const existingPatientUserId = existingData?.patientUserId || existingData?.metadata?.patientUserId || null;
+    const existingPatientEmail = existingData?.patientEmail || existingData?.metadata?.patientEmail || null;
 
-    return NextResponse.json({ 
-      success: true, 
-      message: `Consultation ${action} tracked successfully`,
+    const resolvedPatient = await resolvePatientIdentity(db, {
       roomName,
-      action
+      userId,
+      patientEmail,
+      doctorUserId,
+      existingPatientUserId,
+      existingPatientEmail,
     });
 
+    if (action === 'join') {
+      const joinResult = await handleJoinEvent(db, {
+        roomName,
+        patientName,
+        patientUserId: resolvedPatient.patientUserId,
+        patientEmail: resolvedPatient.patientEmail,
+        doctorUserId,
+        consultationRef,
+        existingData,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Consultation join tracked successfully',
+        roomName,
+        action,
+        consultationSessionId: joinResult.consultationSessionId,
+      });
+    }
+
+    const leaveResult = await handleLeaveEvent(db, {
+      roomName,
+      patientName,
+      patientUserId: resolvedPatient.patientUserId,
+      patientEmail: resolvedPatient.patientEmail,
+      doctorUserId,
+      consultationRef,
+      existingData,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Consultation leave tracked successfully',
+      roomName,
+      action,
+      consultationSessionId: leaveResult.consultationSessionId,
+      durationMinutes: leaveResult.durationMinutes,
+    });
   } catch (error) {
-    console.error('âŒ Track consultation error:', error);
-    return NextResponse.json({ 
-      error: 'Failed to track consultation',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error('Track consultation error:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to track consultation',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
   }
 }
-
-
-

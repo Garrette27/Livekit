@@ -258,14 +258,14 @@ export default function Dashboard() {
       return;
     }
 
-    setDeletingSummary(summary.roomName);
+    setDeletingSummary(summary.id);
     setDeleteError(null);
 
     try {
       // Get Firebase ID token for authentication
       const token = await user.getIdToken();
 
-      const response = await fetch(`/api/summary/delete?id=${encodeURIComponent(summary.roomName)}`, {
+      const response = await fetch(`/api/summary/delete?id=${encodeURIComponent(summary.id)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -816,25 +816,25 @@ export default function Dashboard() {
                         </button>
                         <button
                           onClick={() => handleDelete(summary)}
-                          disabled={deletingSummary === summary.roomName}
+                          disabled={deletingSummary === summary.id}
                           style={{
                             padding: '0.5rem 1rem',
-                            backgroundColor: deletingSummary === summary.roomName ? '#9ca3af' : '#dc2626',
+                            backgroundColor: deletingSummary === summary.id ? '#9ca3af' : '#dc2626',
                             color: 'white',
                             border: 'none',
                             borderRadius: '0.5rem',
-                            cursor: deletingSummary === summary.roomName ? 'not-allowed' : 'pointer',
+                            cursor: deletingSummary === summary.id ? 'not-allowed' : 'pointer',
                             fontSize: '0.875rem',
                             fontWeight: '500',
                             whiteSpace: 'nowrap',
-                            opacity: deletingSummary === summary.roomName ? 0.6 : 1
+                            opacity: deletingSummary === summary.id ? 0.6 : 1
                           }}
                         >
-                          {deletingSummary === summary.roomName ? 'Deleting...' : 'Delete'}
+                          {deletingSummary === summary.id ? 'Deleting...' : 'Delete'}
                         </button>
                       </div>
                     </div>
-                    {deleteError && summary.roomName === deletingSummary && (
+                    {deleteError && summary.id === deletingSummary && (
                       <div style={{
                         marginTop: '0.5rem',
                         padding: '0.75rem',

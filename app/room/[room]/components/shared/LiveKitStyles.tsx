@@ -80,12 +80,8 @@ export default function LiveKitStyles({
 
   const hideStartVideoControlStyles = controlsPolicy.hideStartVideoControl
     ? `
-      .lk-control-bar .lk-start-video-button,
-      .lk-control-bar [data-lk-kind='start-video'],
-      .lk-control-bar button[aria-label*='start video' i],
-      .lk-control-bar button[title*='start video' i],
-      .lk-control-bar button[aria-label='Start Video' i],
-      .lk-control-bar button[title='Start Video' i] {
+      .lk-control-bar .lk-start-audio-button,
+      .lk-control-bar .lk-start-video-button {
         display: none !important;
       }
     `

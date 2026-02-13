@@ -7,6 +7,8 @@ import {
   listWaitingPatients,
   rejectWaitingPatient,
 } from '@/lib/waiting-room/waiting-queue-client';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { setWaitingQueueSnapshot } from '@/store/slices/waiting-queue-slice';
 
 interface UseWaitingQueueOptions {
   roomName?: string;
@@ -33,6 +35,9 @@ interface UseWaitingQueueResult {
   admitPatient: (waitingPatientId: string, roomNameOverride?: string) => Promise<boolean>;
   rejectPatient: (waitingPatientId: string) => Promise<boolean>;
 }
+
+const EMPTY_WAITING_PATIENTS: WaitingPatient[] = [];
+const EMPTY_WAITING_COUNTS: WaitingQueueCounts = {};
 
 function shouldIncludeInvitation(invitationIds: Set<string> | null, invitationId?: string): boolean {
   if (!invitationIds) {
@@ -65,21 +70,34 @@ export function useWaitingQueue({
   autoRefresh = true,
   pollIntervalMs = 15_000,
 }: UseWaitingQueueOptions): UseWaitingQueueResult {
-  const [waitingPatients, setWaitingPatients] = useState<WaitingPatient[]>([]);
-  const [waitingPatientCounts, setWaitingPatientCounts] = useState<WaitingQueueCounts>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [admittingId, setAdmittingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [lastUpdatedAtMs, setLastUpdatedAtMs] = useState<number | null>(null);
+  const dispatch = useAppDispatch();
   const isFetchingRef = useRef(false);
 
   const invitationIdsSet = useMemo(() => {
-    if (!invitationIds || invitationIds.length === 0) {
+    if (typeof invitationIds === 'undefined') {
       return null;
     }
+
     return new Set(invitationIds);
   }, [invitationIds]);
+
+  const invitationScope = useMemo(
+    () => (invitationIds ? [...invitationIds].sort().join('|') : 'all'),
+    [invitationIds]
+  );
+  const scopeKey = useMemo(
+    () => `${roomName || 'all-rooms'}::${doctorUserId || 'all-doctors'}::${selectedInvitationId || 'all'}::${invitationScope}`,
+    [doctorUserId, invitationScope, roomName, selectedInvitationId]
+  );
+
+  const snapshot = useAppSelector((state) => state.waitingQueue.byScopeKey[scopeKey]);
+  const waitingPatients = snapshot?.waitingPatients ?? EMPTY_WAITING_PATIENTS;
+  const waitingPatientCounts = snapshot?.waitingPatientCounts ?? EMPTY_WAITING_COUNTS;
+  const lastUpdatedAtMs = snapshot?.lastUpdatedAtMs || null;
 
   const refresh = useCallback(
     async (showLoading = false) => {
@@ -94,10 +112,28 @@ export function useWaitingQueue({
       setError(null);
 
       try {
+        if (invitationIdsSet && invitationIdsSet.size === 0) {
+          dispatch(
+            setWaitingQueueSnapshot({
+              scopeKey,
+              waitingPatients: [],
+              waitingPatientCounts: {},
+              lastUpdatedAtMs: Date.now(),
+            })
+          );
+          return;
+        }
+
         const result = await listWaitingPatients({ roomName, doctorUserId });
         if (!result.success) {
-          setWaitingPatients([]);
-          setWaitingPatientCounts({});
+          dispatch(
+            setWaitingQueueSnapshot({
+              scopeKey,
+              waitingPatients: [],
+              waitingPatientCounts: {},
+              lastUpdatedAtMs: Date.now(),
+            })
+          );
           setError(result.error || 'Failed to load waiting queue');
           return;
         }
@@ -111,9 +147,14 @@ export function useWaitingQueue({
           ? scopedPatients.filter((waitingPatient) => waitingPatient.invitationId === selectedInvitationId)
           : scopedPatients;
 
-        setWaitingPatientCounts(counts);
-        setWaitingPatients(visiblePatients);
-        setLastUpdatedAtMs(Date.now());
+        dispatch(
+          setWaitingQueueSnapshot({
+            scopeKey,
+            waitingPatients: visiblePatients,
+            waitingPatientCounts: counts,
+            lastUpdatedAtMs: Date.now(),
+          })
+        );
       } catch (fetchError) {
         console.error('Failed to fetch waiting queue:', fetchError);
         setError('Failed to load waiting queue');
@@ -124,7 +165,7 @@ export function useWaitingQueue({
         }
       }
     },
-    [doctorUserId, invitationIdsSet, roomName, selectedInvitationId]
+    [dispatch, doctorUserId, invitationIdsSet, roomName, scopeKey, selectedInvitationId]
   );
 
   const admitPatient = useCallback(

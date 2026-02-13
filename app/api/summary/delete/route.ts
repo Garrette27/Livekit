@@ -73,21 +73,23 @@ export async function DELETE(req: NextRequest) {
 
     // Delete from call-summaries collection
     await db.collection('call-summaries').doc(summaryId).delete();
-    
-    // Delete from consultations collection (same roomName as summaryId)
+
+    const roomNameForCleanup = existingSummary?.roomName || summaryId;
+
+    // Delete from consultations collection for the matching room.
     try {
-      await db.collection('consultations').doc(summaryId).delete();
-    } catch (error) {
+      await db.collection('consultations').doc(roomNameForCleanup).delete();
+    } catch {
       // Consultation might not exist, that's okay
-      console.log(`Consultation ${summaryId} not found or already deleted`);
+      console.log(`Consultation ${roomNameForCleanup} not found or already deleted`);
     }
     
-    // Delete from scheduled-deletions collection
+    // Delete from scheduled-deletions collection for the same room.
     try {
-      await db.collection('scheduled-deletions').doc(summaryId).delete();
-    } catch (error) {
+      await db.collection('scheduled-deletions').doc(roomNameForCleanup).delete();
+    } catch {
       // Scheduled deletion might not exist, that's okay
-      console.log(`Scheduled deletion ${summaryId} not found or already deleted`);
+      console.log(`Scheduled deletion ${roomNameForCleanup} not found or already deleted`);
     }
 
     console.log(`Manually deleted summary: ${summaryId} by user: ${userId} (${isCreator ? 'creator' : 'patient'})`);

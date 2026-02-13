@@ -58,7 +58,7 @@ export default function DoctorDashboard() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const router = useRouter();
 
-  // Handle authentication and role check - redirect directly to invitations
+  // Handle authentication and role check
   useEffect(() => {
     if (authLoading) {
       return;
@@ -66,10 +66,7 @@ export default function DoctorDashboard() {
 
     if (!isAuthenticated || !isAuthorized) {
       router.replace('/doctor/login');
-      return;
     }
-
-    router.replace('/doctor/invitations');
   }, [authLoading, isAuthenticated, isAuthorized, router]);
 
   useEffect(() => {
