@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../lib/firebase-admin';
+import { buildVisibleUserIds, choosePatientUserId, isKnownUserId } from '../../../lib/consultations/identity-utils';
+import { generateAndStoreConsultationSummary } from '../../../lib/consultations/summary-service';
 
 export async function POST(req: Request) {
   try {
-    const { roomName, action, patientName, duration, userId, patientEmail } = await req.json();
+    const { roomName, action, patientName, userId, patientEmail } = await req.json();
     console.log(`Track consultation: ${action} for room: ${roomName}, user: ${userId}, patientEmail: ${patientEmail}`);
 
     if (!roomName || !action) {
@@ -138,12 +140,10 @@ export async function POST(req: Request) {
       const existingPatientEmail = existingData?.patientEmail || existingData?.metadata?.patientEmail;
       
       // If consultation exists and patientUserId is 'anonymous' but we now have a real user ID, update it
-      if (existingData && existingPatientUserId === 'anonymous' && actualPatientUserId !== 'anonymous' && actualPatientUserId !== doctorUserId) {
+      if (existingData && existingPatientUserId === 'anonymous' && isKnownUserId(actualPatientUserId) && actualPatientUserId !== doctorUserId) {
         console.log(`Updating existing consultation with patient user ID: ${actualPatientUserId}`);
         const existingVisibleToUsers = existingData.metadata?.visibleToUsers || [];
-        const updatedVisibleToUsers = [...new Set([...existingVisibleToUsers, doctorUserId, actualPatientUserId])].filter(
-          (id) => id !== 'unknown' && id !== 'anonymous'
-        );
+        const updatedVisibleToUsers = buildVisibleUserIds(doctorUserId, actualPatientUserId, existingVisibleToUsers);
         
         await consultationRef.update({
           patientUserId: actualPatientUserId,
@@ -160,7 +160,7 @@ export async function POST(req: Request) {
         let patientEmailToStore = null;
         if (patientEmail) {
           patientEmailToStore = patientEmail;
-        } else if (actualPatientUserId && actualPatientUserId !== 'anonymous' && actualPatientUserId !== 'unknown') {
+        } else if (isKnownUserId(actualPatientUserId)) {
           // Try to get email from user document
           try {
             const userDoc = await db.collection('users').doc(actualPatientUserId).get();
@@ -178,12 +178,7 @@ export async function POST(req: Request) {
         
         // Preserve existing patient email/userId if joining anonymously
         // Only use new values if they're better (non-anonymous, non-null)
-        const finalPatientUserId = (actualPatientUserId === 'anonymous' || actualPatientUserId === 'unknown') && 
-                                   existingPatientUserId && 
-                                   existingPatientUserId !== 'anonymous' && 
-                                   existingPatientUserId !== 'unknown'
-          ? existingPatientUserId  // Preserve existing valid patientUserId
-          : actualPatientUserId;    // Use new patientUserId (or anonymous if no existing)
+        const finalPatientUserId = choosePatientUserId(actualPatientUserId, existingPatientUserId);
         
         const finalPatientEmail = (!patientEmailToStore && existingPatientEmail)
           ? existingPatientEmail  // Preserve existing patient email
@@ -235,9 +230,7 @@ export async function POST(req: Request) {
             patientUserId: finalPatientUserId, // Use preserved or new patient user ID
             doctorUserId: doctorUserId, // Explicitly store doctor's user ID
             // Add both user IDs so both can see the consultation (remove duplicates)
-            visibleToUsers: [doctorUserId, finalPatientUserId].filter((id, index, self) => 
-              id !== 'unknown' && id !== 'anonymous' && self.indexOf(id) === index
-            )
+            visibleToUsers: buildVisibleUserIds(doctorUserId, finalPatientUserId)
           }
         };
         
@@ -271,12 +264,7 @@ export async function POST(req: Request) {
         const existingPatientEmail = data?.patientEmail || data?.metadata?.patientEmail;
         
         // Preserve existing patientUserId if leaving anonymously and existing is better
-        const finalPatientUserId = (actualPatientUserId === 'anonymous' || actualPatientUserId === 'unknown') && 
-                                   existingPatientUserId && 
-                                   existingPatientUserId !== 'anonymous' && 
-                                   existingPatientUserId !== 'unknown'
-          ? existingPatientUserId  // Preserve existing valid patientUserId
-          : actualPatientUserId;    // Use current patientUserId (or anonymous if no existing)
+        const finalPatientUserId = choosePatientUserId(actualPatientUserId, existingPatientUserId);
         
         // Get patient email from consultation data or request (preserve existing if available)
         const patientEmailToStore = existingPatientEmail || patientEmail || null;
@@ -297,9 +285,7 @@ export async function POST(req: Request) {
             patientUserId: finalPatientUserId, // Use preserved or current patient user ID
             doctorUserId: doctorUserId,
             // Add both user IDs so both can see the consultation (remove duplicates)
-            visibleToUsers: [doctorUserId, finalPatientUserId].filter((id, index, self) => 
-              id !== 'unknown' && id !== 'anonymous' && self.indexOf(id) === index
-            )
+            visibleToUsers: buildVisibleUserIds(doctorUserId, finalPatientUserId)
           }
         };
         
@@ -338,15 +324,15 @@ export async function POST(req: Request) {
             console.log('Could not fetch transcription data:', transcriptionError);
           }
           
-          await generateConsultationSummary(
-            roomName, 
-            data?.patientName || 'Unknown Patient', 
-            durationMinutes, 
-            doctorUserId, 
+          await generateAndStoreConsultationSummary({
+            roomName,
+            patientName: data?.patientName || 'Unknown Patient',
+            durationMinutes,
+            userId: doctorUserId,
             transcriptionData,
-            finalPatientUserId, // Use preserved patient user ID
-            patientEmailFromConsultation // Use preserved patient email
-          );
+            patientUserId: finalPatientUserId, // Use preserved patient user ID
+            patientEmail: patientEmailFromConsultation // Use preserved patient email
+          });
         } catch (error) {
           console.error('❌ Error generating consultation summary:', error);
         }
@@ -369,261 +355,4 @@ export async function POST(req: Request) {
   }
 }
 
-async function generateConsultationSummary(
-  roomName: string, 
-  patientName: string, 
-  durationMinutes: number, 
-  userId: string, 
-  transcriptionData: any[] | null = null,
-  patientUserId: string | null = null,
-  patientEmail: string | null = null
-) {
-  try {
-    console.log('Generating AI summary for consultation:', roomName, 'with user ID:', userId);
-    
-    const db = getFirebaseAdmin();
-    if (!db) {
-      console.error('❌ Firebase Admin not initialized for summary generation');
-      return;
-    }
 
-    // Check if OpenAI API key is configured
-    if (!process.env.OPENAI_API_KEY) {
-      console.log('⚠️ OpenAI API key not configured, using fallback summary');
-      
-      // Store fallback summary
-      const summaryData: any = {
-        roomName,
-        summary: `Consultation completed with ${patientName}. Duration: ${durationMinutes} minutes. No AI analysis available - OpenAI not configured.`,
-        keyPoints: ['Consultation completed', 'Duration recorded', 'No AI analysis available'],
-        recommendations: ['Please configure OpenAI API for enhanced summaries'],
-        followUpActions: ['Manual review required'],
-        riskLevel: 'Unknown',
-        category: 'General Consultation',
-        participants: [patientName],
-        duration: durationMinutes,
-        createdAt: new Date(),
-        createdBy: userId,
-        metadata: {
-          totalParticipants: 1,
-          createdBy: userId,
-          source: 'consultation_tracking',
-          hasTranscriptionData: transcriptionData && transcriptionData.length > 0,
-          transcriptionEntries: transcriptionData ? transcriptionData.length : 0,
-          summaryGeneratedAt: new Date()
-        }
-      };
-      
-      // Add patient information if available
-      if (patientUserId && patientUserId !== 'anonymous' && patientUserId !== 'unknown') {
-        summaryData.patientUserId = patientUserId;
-        summaryData.metadata.patientUserId = patientUserId;
-      }
-      
-      if (patientEmail) {
-        summaryData.patientEmail = patientEmail;
-        summaryData.metadata.patientEmail = patientEmail;
-        console.log('✅ Storing patient email in fallback summary:', patientEmail);
-      }
-
-      const summaryRef = db.collection('call-summaries').doc(roomName);
-      await summaryRef.set(summaryData);
-      console.log('✅ Fallback summary stored successfully with user ID:', userId);
-      console.log('Fallback summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
-      return;
-    }
-
-    console.log('✅ OpenAI API key found, generating AI summary...');
-
-    // Prepare conversation context for AI
-    let conversationContext = '';
-    if (transcriptionData && transcriptionData.length > 0) {
-      conversationContext = `\n\nActual conversation transcript:\n${transcriptionData.join('\n')}`;
-    } else {
-      conversationContext = '\n\nNo conversation transcript available. This may be a video-only consultation or transcription was not enabled.';
-    }
-
-    // Create a comprehensive prompt for medical consultation summarization
-    const prompt = `You are a medical AI assistant specializing in summarizing telehealth consultations. 
-    
-    Generate a comprehensive, structured summary for a medical consultation that took place in room: ${roomName}.
-    
-    Consultation details:
-    - Duration: ${durationMinutes} minutes
-    - Patient: ${patientName}
-    ${conversationContext}
-    
-    Please provide the following structured response in JSON format:
-    
-    {
-      "summary": "A concise 2-3 sentence overview of the consultation based on the actual conversation content",
-      "keyPoints": ["List of 3-5 main topics discussed", "Important symptoms mentioned", "Key findings from the conversation"],
-      "recommendations": ["List of 2-4 recommendations made by the doctor", "Prescriptions if any", "Lifestyle advice"],
-      "followUpActions": ["List of 2-3 follow-up actions needed", "Appointment scheduling", "Tests required"],
-      "riskLevel": "Low/Medium/High based on the consultation content",
-      "category": "Primary Care/Specialist/Emergency/Follow-up/General Consultation"
-    }
-    
-    IMPORTANT: Base your summary on the actual conversation content provided. If no conversation transcript is available, indicate this clearly in the summary.
-    
-    Focus on medical accuracy, patient privacy, and actionable insights.`;
-
-    console.log('Calling OpenAI API for consultation summary...');
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a medical AI assistant that provides structured, professional summaries of telehealth consultations. Always respond with valid JSON format.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_tokens: 800,
-        temperature: 0.3,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ OpenAI API error:', response.status, errorText);
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content || '{}';
-    console.log('OpenAI response received:', content);
-    
-    try {
-      // Clean the content - remove markdown code blocks if present
-      let cleanContent = content.trim();
-      if (cleanContent.startsWith('```json')) {
-        cleanContent = cleanContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      } else if (cleanContent.startsWith('```')) {
-        cleanContent = cleanContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
-      }
-      
-      // Parse the JSON response
-      const parsedSummary = JSON.parse(cleanContent);
-      console.log('✅ Successfully parsed AI response');
-      
-      // Store the summary in Firestore
-      const summaryData: any = {
-        roomName,
-        summary: parsedSummary.summary || 'Summary generation failed',
-        keyPoints: parsedSummary.keyPoints || ['No key points available'],
-        recommendations: parsedSummary.recommendations || ['No recommendations available'],
-        followUpActions: parsedSummary.followUpActions || ['No follow-up actions specified'],
-        riskLevel: parsedSummary.riskLevel || 'Unknown',
-        category: parsedSummary.category || 'General Consultation',
-        participants: [patientName],
-        duration: durationMinutes,
-        createdAt: new Date(),
-        createdBy: userId,
-        metadata: {
-          totalParticipants: 1,
-          createdBy: userId,
-          source: 'consultation_tracking',
-          hasTranscriptionData: transcriptionData && transcriptionData.length > 0,
-          transcriptionEntries: transcriptionData ? transcriptionData.length : 0,
-          summaryGeneratedAt: new Date()
-        }
-      };
-      
-      // Add patient information if available
-      if (patientUserId && patientUserId !== 'anonymous' && patientUserId !== 'unknown') {
-        summaryData.patientUserId = patientUserId;
-        summaryData.metadata.patientUserId = patientUserId;
-      }
-      
-      if (patientEmail) {
-        summaryData.patientEmail = patientEmail;
-        summaryData.metadata.patientEmail = patientEmail;
-        console.log('✅ Storing patient email in AI summary:', patientEmail);
-      }
-
-      const summaryRef = db.collection('call-summaries').doc(roomName);
-      await summaryRef.set(summaryData);
-      console.log('✅ AI summary stored successfully in Firestore with user ID:', userId);
-      console.log('Summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
-      
-    } catch (parseError) {
-      console.error('❌ Error parsing AI response:', parseError);
-      
-      // Store fallback summary
-      const summaryData = {
-        roomName,
-        summary: content || 'Summary generation failed',
-        keyPoints: ['Unable to parse structured data'],
-        recommendations: ['Manual review recommended'],
-        followUpActions: ['Contact support if needed'],
-        riskLevel: 'Unknown',
-        category: 'General Consultation',
-        participants: [patientName],
-        duration: durationMinutes,
-        createdAt: new Date(),
-        createdBy: userId,
-        metadata: {
-          totalParticipants: 1,
-          createdBy: userId,
-          source: 'consultation_tracking',
-          hasTranscriptionData: transcriptionData && transcriptionData.length > 0,
-          transcriptionEntries: transcriptionData ? transcriptionData.length : 0,
-          summaryGeneratedAt: new Date()
-        }
-      };
-
-      const summaryRef = db.collection('call-summaries').doc(roomName);
-      await summaryRef.set(summaryData);
-      console.log('✅ Parse error fallback summary stored successfully with user ID:', userId);
-      console.log('Parse error fallback summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
-    }
-    
-  } catch (error) {
-    console.error('❌ Error generating consultation summary:', error);
-    
-    // Store error summary
-    try {
-      const db = getFirebaseAdmin();
-      if (db) {
-        const summaryData = {
-          roomName,
-          summary: 'Error generating AI summary',
-          keyPoints: ['Summary generation failed'],
-          recommendations: ['Manual review required'],
-          followUpActions: ['Contact technical support'],
-          riskLevel: 'Unknown',
-          category: 'General Consultation',
-          participants: [patientName],
-          duration: durationMinutes,
-          createdAt: new Date(),
-          createdBy: userId,
-          metadata: {
-            totalParticipants: 1,
-            createdBy: userId,
-            source: 'consultation_tracking',
-            hasTranscriptionData: transcriptionData && transcriptionData.length > 0,
-            transcriptionEntries: transcriptionData ? transcriptionData.length : 0,
-            summaryGeneratedAt: new Date(),
-            error: error instanceof Error ? error.message : 'Unknown error'
-          }
-        };
-
-        const summaryRef = db.collection('call-summaries').doc(roomName);
-        await summaryRef.set(summaryData);
-        console.log('✅ Error summary stored successfully with user ID:', userId);
-        console.log('Error summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
-      }
-    } catch (storeError) {
-      console.error('❌ Error storing error summary:', storeError);
-    }
-  }
-}
