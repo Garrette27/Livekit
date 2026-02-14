@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { auth, db, provider } from "@/lib/firebase";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithPopup } from "firebase/auth";
 import { useSearchParams } from "next/navigation";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { checkRoleConflictByEmail } from "@/lib/auth/role-conflict";
 
 export const dynamic = 'force-dynamic';
@@ -201,10 +201,34 @@ function PatientLoginContent() {
     } catch (err: any) {
       console.error('Auth error:', err);
       if (err.code === 'auth/user-not-found') {
-        setError('No account found with this email. Please sign up.');
+        setError('No patient account found with this email. Please sign up first, then use your invitation link again.');
         setIsSignUp(true);
       } else if (err.code === 'auth/wrong-password') {
         setError('Incorrect password. Please try again or reset your password.');
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
+        let hasPatientProfile = false;
+
+        if (db && normalizedEmail) {
+          try {
+            const existingPatientQuery = query(
+              collection(db, 'users'),
+              where('email', '==', normalizedEmail),
+              where('role', '==', 'patient'),
+              limit(1)
+            );
+            const existingPatientSnapshot = await getDocs(existingPatientQuery);
+            hasPatientProfile = !existingPatientSnapshot.empty;
+          } catch (lookupError) {
+            console.error('Error checking patient profile existence:', lookupError);
+          }
+        }
+
+        if (hasPatientProfile) {
+          setError('Incorrect email or password. Please try again, or use Forgot password.');
+        } else {
+          setError('No patient account found with this email. Click "Don\'t have an account? Sign up" to register first.');
+          setIsSignUp(true);
+        }
       } else if (err.code === 'auth/email-already-in-use') {
         setError('This email is already registered. Please sign in.');
         setIsSignUp(false);

@@ -8,6 +8,7 @@ interface DoctorControlsPanelProps {
   doctorName: string;
   roomName: string;
   onLeave: () => void;
+  showRefreshInvitationLinkControl?: boolean;
 }
 
 interface InvitationLinkResponse {
@@ -16,7 +17,12 @@ interface InvitationLinkResponse {
   error?: string;
 }
 
-export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: DoctorControlsPanelProps) {
+export default function DoctorControlsPanel({
+  doctorName,
+  roomName,
+  onLeave,
+  showRefreshInvitationLinkControl = false,
+}: DoctorControlsPanelProps) {
   const { showToast } = useToast();
   const [invitationLink, setInvitationLink] = useState<string | null>(null);
   const [loadingLink, setLoadingLink] = useState(false);
@@ -174,24 +180,26 @@ export default function DoctorControlsPanel({ doctorName, roomName, onLeave }: D
           {loadingLink ? 'Loading...' : copied ? 'Copied' : 'Copy Link'}
         </button>
 
-        <button
-          onClick={() => void loadInvitationLink(true)}
-          disabled={loadingLink}
-          style={{
-            backgroundColor: '#f3f4f6',
-            color: '#374151',
-            border: '1px solid #d1d5db',
-            borderRadius: '0.5rem',
-            padding: '0.5rem 1rem',
-            fontSize: '0.75rem',
-            fontWeight: '500',
-            cursor: loadingLink ? 'not-allowed' : 'pointer',
-            width: '100%',
-            marginBottom: '0.5rem',
-          }}
-        >
-          Refresh Invitation Link
-        </button>
+        {showRefreshInvitationLinkControl && (
+          <button
+            onClick={() => void loadInvitationLink(true)}
+            disabled={loadingLink}
+            style={{
+              backgroundColor: '#f3f4f6',
+              color: '#374151',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.5rem',
+              padding: '0.5rem 1rem',
+              fontSize: '0.75rem',
+              fontWeight: '500',
+              cursor: loadingLink ? 'not-allowed' : 'pointer',
+              width: '100%',
+              marginBottom: '0.5rem',
+            }}
+          >
+            Refresh Invitation Link
+          </button>
+        )}
 
         <button
           onClick={onLeave}

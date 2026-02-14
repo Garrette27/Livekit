@@ -15,7 +15,7 @@ interface LiveKitStylesProps {
 
 const DEFAULT_CONTROLS_POLICY: RoomControlsPolicy = {
   hideLeaveControl: true,
-  hideStartVideoControl: false,
+  hideStartVideoControl: true,
   hideSettingsControl: true,
 };
 
@@ -159,9 +159,9 @@ export default function LiveKitStyles({
         object-fit: cover !important;
       }
 
-      .lk-participant-name,
-      .lk-participant-metadata,
-      .lk-participant-placeholder {
+      .lk-participant-tile .lk-participant-name,
+      .lk-participant-tile .lk-participant-metadata,
+      .lk-participant-tile .lk-participant-placeholder {
         display: none !important;
       }
 
@@ -211,6 +211,15 @@ export default function LiveKitStyles({
 
       .lk-chat-entry .lk-message-body {
         color: #111827 !important;
+      }
+
+      .lk-chat-entry .lk-participant-name,
+      .lk-chat-entry .lk-message-sender,
+      .lk-chat-entry .lk-message-header {
+        display: block !important;
+        font-size: 0.7rem !important;
+        font-weight: 600 !important;
+        color: #475569 !important;
       }
 
       .lk-chat-entry[data-lk-message-origin='local'] .lk-message-body {

@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import InvitationManager from '@/components/InvitationManager';
 import { Invitation } from '@/lib/types';
@@ -29,6 +28,15 @@ export default function DoctorInvitationsPage() {
   const [pendingRevokeId, setPendingRevokeId] = useState<string | null>(null);
   const requestedInvitationLinksRef = useRef<Set<string>>(new Set());
   const router = useRouter();
+
+  const navigateToConsultationHistory = useCallback(() => {
+    router.push('/doctor/dashboard');
+    window.setTimeout(() => {
+      if (window.location.pathname !== '/doctor/dashboard') {
+        window.location.assign('/doctor/dashboard');
+      }
+    }, 250);
+  }, [router]);
 
   useEffect(() => {
     if (!pendingRevokeId) {
@@ -325,8 +333,9 @@ export default function DoctorInvitationsPage() {
             <p style={{ color: '#4B5563' }}>Create and manage secure patient invitations</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            <Link
-              href="/doctor/history"
+            <button
+              type="button"
+              onClick={navigateToConsultationHistory}
               style={{
                 backgroundColor: 'transparent',
                 border: 0,
@@ -339,7 +348,7 @@ export default function DoctorInvitationsPage() {
               }}
             >
               Consultation History
-            </Link>
+            </button>
             <button
               onClick={() => auth && auth.signOut()}
               style={{

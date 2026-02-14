@@ -28,6 +28,10 @@ export interface SidebarPolicy {
   defaultCollapsed: boolean;
 }
 
+export interface DoctorSessionPanelPolicy extends SidebarPolicy {
+  showRefreshInvitationLinkControl: boolean;
+}
+
 export interface WaitingQueuePanelPolicy extends SidebarPolicy {
   autoRefresh: boolean;
   pollIntervalMs: number;
@@ -40,7 +44,7 @@ export interface RoomSessionPolicy {
   grid: RoomGridPolicy;
   panels: {
     waitingQueue: WaitingQueuePanelPolicy;
-    doctorSession: SidebarPolicy;
+    doctorSession: DoctorSessionPanelPolicy;
     patientSession: SidebarPolicy;
     notes: SidebarPolicy;
   };
@@ -63,6 +67,11 @@ const DISABLED_WAITING_QUEUE_PANEL: WaitingQueuePanelPolicy = {
   showRefreshButton: false,
 };
 
+const DISABLED_DOCTOR_SESSION_PANEL: DoctorSessionPanelPolicy = {
+  ...DISABLED_PANEL,
+  showRefreshInvitationLinkControl: false,
+};
+
 const DEFAULT_GRID_POLICY: RoomGridPolicy = {
   enabled: true,
   maxParticipants: 40,
@@ -73,7 +82,7 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
   doctor: {
     controls: {
       hideLeaveControl: true,
-      hideStartVideoControl: false,
+      hideStartVideoControl: true,
       hideSettingsControl: true,
     },
     chat: {
@@ -103,6 +112,7 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
         width: 300,
         collapsedWidth: 60,
         defaultCollapsed: false,
+        showRefreshInvitationLinkControl: false,
       },
       patientSession: DISABLED_PANEL,
       notes: DISABLED_PANEL,
@@ -111,7 +121,7 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
   patient: {
     controls: {
       hideLeaveControl: true,
-      hideStartVideoControl: false,
+      hideStartVideoControl: true,
       hideSettingsControl: true,
     },
     chat: {
@@ -122,7 +132,7 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
     grid: DEFAULT_GRID_POLICY,
     panels: {
       waitingQueue: DISABLED_WAITING_QUEUE_PANEL,
-      doctorSession: DISABLED_PANEL,
+      doctorSession: DISABLED_DOCTOR_SESSION_PANEL,
       patientSession: DISABLED_PANEL,
       notes: DISABLED_PANEL,
     },

@@ -56,6 +56,7 @@ export default function DoctorSessionPanel({
             doctorName={doctorName || user.displayName || user.email || 'Doctor'}
             roomName={roomName}
             onLeave={onLeave}
+            showRefreshInvitationLinkControl={policy.panels.doctorSession.showRefreshInvitationLinkControl}
           />
         </SidebarPortal>
       )}
