@@ -40,6 +40,8 @@ export default function DoctorSessionPanel({
             pollIntervalMs={policy.panels.waitingQueue.pollIntervalMs}
             showRefreshButton={policy.panels.waitingQueue.showRefreshButton}
             showAdmitControl={policy.panels.waitingQueue.showAdmitControl}
+            showRejectControl={policy.panels.waitingQueue.showRejectControl}
+            showRemoveControl={policy.panels.waitingQueue.showRemoveControl}
           />
         </SidebarPortal>
       )}

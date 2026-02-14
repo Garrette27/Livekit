@@ -53,11 +53,11 @@ export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: 
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'active': return '✅';
-      case 'used': return '🔵';
-      case 'expired': return '❌';
-      case 'revoked': return '🚫';
-      default: return '❓';
+      case 'active': return 'A';
+      case 'used': return 'U';
+      case 'expired': return 'E';
+      case 'revoked': return 'R';
+      default: return '?';
     }
   };
 
@@ -89,6 +89,20 @@ export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: 
   };
 
   const effectiveStatus = getEffectiveStatus(invitation);
+  const invitationEmails = Array.from(
+    new Set(
+      [
+        ...(invitation.emailAllowed ? [invitation.emailAllowed] : []),
+        ...(
+          Array.isArray((invitation as any)?.metadata?.constraints?.emails)
+            ? (invitation as any).metadata.constraints.emails
+            : []
+        ),
+      ]
+        .map((email) => (typeof email === 'string' ? email.toLowerCase().trim() : ''))
+        .filter((email) => email.length > 0)
+    )
+  );
 
   return (
     <div style={{
@@ -109,7 +123,7 @@ export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: 
         Room: {invitation.roomName}
       </p>
       <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>
-        Email: {invitation.emailAllowed || 'Open Invitation (No email required)'}
+        Email: {invitationEmails.length > 0 ? invitationEmails.join(', ') : 'Open Invitation (No email required)'}
       </p>
       
       <div style={{ 
@@ -192,9 +206,9 @@ export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: 
           <strong>Uses:</strong> {invitation.usedAt ? 1 : 0} / {invitation.maxUses || 1}
         </p>
       )}
-      {invitation.emailAllowed ? (
+      {invitationEmails.length > 0 ? (
         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-          <strong>Email:</strong> {invitation.emailAllowed}
+          <strong>Emails:</strong> {invitationEmails.join(', ')}
         </p>
       ) : (
         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>

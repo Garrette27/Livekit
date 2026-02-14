@@ -14,6 +14,7 @@ interface WaitingRoomMutationResponse {
 interface ListWaitingPatientsArgs {
   roomName?: string;
   doctorUserId?: string;
+  statuses?: Array<'waiting' | 'admitted' | 'left' | 'rejected'>;
 }
 
 function toTimestampMillis(value: unknown): number {
@@ -51,6 +52,7 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
 export async function listWaitingPatients({
   roomName,
   doctorUserId,
+  statuses,
 }: ListWaitingPatientsArgs): Promise<WaitingRoomListResponse> {
   const params = new URLSearchParams();
   if (roomName) {
@@ -58,6 +60,9 @@ export async function listWaitingPatients({
   }
   if (doctorUserId) {
     params.set('doctorUserId', doctorUserId);
+  }
+  if (Array.isArray(statuses) && statuses.length > 0) {
+    params.set('statuses', statuses.join(','));
   }
 
   const query = params.toString();
@@ -75,23 +80,29 @@ export async function listWaitingPatients({
   };
 }
 
-export async function admitWaitingPatient(waitingPatientId: string, roomName: string): Promise<AdmitPatientResponse> {
+export async function admitWaitingPatient(
+  waitingPatientId: string,
+  roomName: string,
+  doctorUserId?: string
+): Promise<AdmitPatientResponse> {
   const response = await fetch('/api/waiting-room/admit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ waitingPatientId, roomName }),
+    body: JSON.stringify({ waitingPatientId, roomName, doctorUserId }),
   });
 
   return parseJsonResponse<AdmitPatientResponse>(response);
 }
 
-export async function rejectWaitingPatient(waitingPatientId: string): Promise<WaitingRoomMutationResponse> {
+export async function rejectWaitingPatient(
+  waitingPatientId: string,
+  doctorUserId?: string
+): Promise<WaitingRoomMutationResponse> {
   const response = await fetch('/api/waiting-room/reject', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ waitingPatientId }),
+    body: JSON.stringify({ waitingPatientId, doctorUserId }),
   });
 
   return parseJsonResponse<WaitingRoomMutationResponse>(response);
 }
-

@@ -39,6 +39,8 @@ export interface WaitingQueuePanelPolicy extends SidebarPolicy {
   pollIntervalMs: number;
   showRefreshButton: boolean;
   showAdmitControl: boolean;
+  showRejectControl: boolean;
+  showRemoveControl: boolean;
 }
 
 export interface RoomSessionPolicy {
@@ -69,6 +71,8 @@ const DISABLED_WAITING_QUEUE_PANEL: WaitingQueuePanelPolicy = {
   pollIntervalMs: 15_000,
   showRefreshButton: false,
   showAdmitControl: false,
+  showRejectControl: false,
+  showRemoveControl: false,
 };
 
 const DISABLED_DOCTOR_SESSION_PANEL: DoctorSessionPanelPolicy = {
@@ -110,6 +114,8 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
         pollIntervalMs: 15_000,
         showRefreshButton: false,
         showAdmitControl: true,
+        showRejectControl: true,
+        showRemoveControl: true,
       },
       doctorSession: {
         enabled: true,

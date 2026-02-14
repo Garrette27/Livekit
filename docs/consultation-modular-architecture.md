@@ -9,6 +9,32 @@ This document defines a deep-module split so room UI, invitation flow, and histo
 - Make admin and moderation features additive, not invasive.
 - Preserve strategic design: simple interfaces, complexity inside modules.
 
+## Implementation Snapshot (2026-02-14)
+
+This architecture is now implemented as three backend service modules plus UI adapter wiring:
+
+- `video-chat` service: `lib/services/video-chat/*`
+  - `consultation-session-core` via `FirestoreConsultationSessionCore`
+  - `rtc-transport-adapter` via `LiveKitRtcTransportAdapter`
+  - `chat-transport-adapter` via `FirestoreChatMessageStore`
+- `invitation-access` service: `lib/services/invitation-access/*`
+  - `InvitationAccessService` via `FirestoreInvitationAccessCore`
+  - Handles validation, waiting entries, admit/reject/left idempotency
+- `history-summary` service: `lib/services/history-summary/*`
+  - `SummaryProjectionService` via `FirestoreSummaryProjectionService`
+  - Builds doctor and patient history read models from sessions + summaries
+
+API routes are now wired to these service boundaries instead of direct UI-side state mutation:
+
+- Invitation/Waiting APIs: `app/api/invite/validate/route.ts`, `app/api/waiting-room/*`
+- Video chat APIs: `app/api/track-consultation/route.ts`, `app/api/session-chat/messages/route.ts`
+- History APIs: `app/api/patient/consultations/route.ts`, `app/api/doctor/history/route.ts`
+
+Doctor history UI reads through projection API (`/api/doctor/history`) instead of direct Firestore reads.
+Patient history UI reads through projection API (`/api/patient/consultations`).
+
+This snapshot intentionally excludes RBAC and payment policy hooks.
+
 ## Bounded Modules
 
 1. `consultation-session-core`

@@ -25,6 +25,15 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
 
   const handleInvitationCreated = async (formData: CreateInvitationRequest) => {
     try {
+      const normalizedAllowlist = Array.from(
+        new Set(
+          [ ...(formData.emailAllowlist || []), ...(formData.emailAllowed ? [formData.emailAllowed] : []) ]
+            .map((email) => (typeof email === 'string' ? email.toLowerCase().trim() : ''))
+            .filter((email) => email.length > 0)
+        )
+      );
+      const primaryEmail = normalizedAllowlist[0];
+
       const response = await fetch('/api/invite/create', {
         method: 'POST',
         headers: {
@@ -32,6 +41,8 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
         },
         body: JSON.stringify({
           ...formData,
+          emailAllowed: primaryEmail,
+          emailAllowlist: normalizedAllowlist,
           doctorUserId: user.uid,
           doctorEmail: user.email,
           doctorName: user.displayName || user.email || 'Doctor',
@@ -45,7 +56,7 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
         const invitation: Invitation = {
           id: result.invitationId,
           roomName: formData.roomName,
-          emailAllowed: formData.emailAllowed,
+          emailAllowed: primaryEmail,
           phoneAllowed: formData.phoneAllowed,
           expiresAt: Timestamp.fromDate(new Date(result.expiresAt)),
           maxUses: formData.maxUses ?? 999999,
@@ -61,8 +72,8 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
             doctorEmail: user.email || '',
             roomName: formData.roomName,
             constraints: {
-              email: formData.emailAllowed,
-              ...(formData.emailAllowed ? { emails: [formData.emailAllowed.toLowerCase().trim()] } : {}),
+              email: primaryEmail,
+              ...(normalizedAllowlist.length > 0 ? { emails: normalizedAllowlist } : {}),
               phone: formData.phoneAllowed,
             },
             security: {

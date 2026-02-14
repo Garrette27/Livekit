@@ -16,6 +16,7 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
     maxPatients: 10, // Default to 10 patients
     maxUses: 999999, // Unlimited uses for waiting room
   });
+  const [emailAllowlistInput, setEmailAllowlistInput] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,8 +39,22 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
     setError(null);
 
     try {
+      const parsedAllowlist = Array.from(
+        new Set(
+          emailAllowlistInput
+            .split(/[\n,]/)
+            .map((email) => email.trim().toLowerCase())
+            .filter((email) => email.length > 0)
+        )
+      );
+      const requestPayload: CreateInvitationRequest = {
+        ...formData,
+        emailAllowlist: parsedAllowlist,
+        emailAllowed: parsedAllowlist[0],
+      };
+
       // Parent owns API side effects and result state.
-      await onInvitationCreated?.(formData);
+      await onInvitationCreated?.(requestPayload);
     } catch (err) {
       console.error('Error creating invitation:', err);
       setError('Network error. Please try again.');
@@ -114,22 +129,24 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
             color: '#374151', 
             marginBottom: '0.5rem' 
           }}>
-            Email Address
+            Auto-admit Email Allowlist
           </label>
-          <input
-            type="email"
-            name="emailAllowed"
-            value={formData.emailAllowed || ''}
-            onChange={handleInputChange}
-            placeholder="Enter email address (optional)"
+          <textarea
+            value={emailAllowlistInput}
+            onChange={(event) => setEmailAllowlistInput(event.target.value)}
+            placeholder="erika@gmail.com, garrette@gmail.com"
             style={{
               width: '100%',
               padding: '0.75rem',
               border: '1px solid #d1d5db',
               borderRadius: '0.375rem',
               fontSize: '1rem',
+              minHeight: '5.5rem',
             }}
           />
+          <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.72rem', color: '#6b7280' }}>
+            Add one or more emails (comma or new line). These accounts are auto-admitted.
+          </p>
         </div>
 
         <div style={{ marginBottom: '1rem' }}>
@@ -172,7 +189,7 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
             color: '#374151', 
             marginBottom: '0.5rem' 
           }}>
-            🚪 Waiting Room: Maximum patients
+            Waiting Room: Maximum patients
           </label>
           <input
             type="number"

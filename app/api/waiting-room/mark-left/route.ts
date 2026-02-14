@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
+import { FirestoreInvitationAccessCore, toInvitationAccessError } from '@/lib/services/invitation-access';
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,26 +22,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const waitingRef = db.collection('waitingPatients').doc(waitingPatientId);
-    const waitingDoc = await waitingRef.get();
-    if (!waitingDoc.exists) {
-      return NextResponse.json({
-        success: true,
-        message: 'Waiting entry already removed',
-      });
-    }
-
-    await waitingRef.update({
-      status: 'left',
-      leftAt: new Date(),
-      'metadata.lastAccessed': new Date(),
-    });
+    const invitationAccess = new FirestoreInvitationAccessCore(db);
+    const result = await invitationAccess.markWaitingEntryLeft({ waitingPatientId });
 
     return NextResponse.json({
       success: true,
-      waitingPatientId,
+      waitingPatientId: result.waitingPatientId,
+      status: result.status,
     });
   } catch (error) {
+    const mappedError = toInvitationAccessError(error);
+    if (mappedError.status !== 500) {
+      return NextResponse.json(
+        { success: false, error: mappedError.message },
+        { status: mappedError.status }
+      );
+    }
+
     console.error('Error marking waiting patient left:', error);
     return NextResponse.json(
       { success: false, error: 'Internal server error' },

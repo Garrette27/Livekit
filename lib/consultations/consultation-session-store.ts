@@ -2,7 +2,12 @@ import { FieldValue, Firestore, Timestamp } from 'firebase-admin/firestore';
 import { isKnownUserId } from './identity-utils';
 import { EVENT_DOMAINS, EVENT_SCHEMA_VERSION } from '../events/event-schema';
 
-export type ConsultationPresenceEventType = 'joined' | 'left' | 'rejoined';
+export type ConsultationPresenceEventType =
+  | 'joined'
+  | 'left'
+  | 'rejoined'
+  | 'admitted_to_consultation'
+  | 'patient_removed_by_doctor';
 export type SessionChatVisibilityPolicy = 'join-time-only' | 'full-history';
 
 interface DateLike {
@@ -57,8 +62,10 @@ interface ResolveJoinSessionInput {
   existingData?: Record<string, any> | null;
   existingPatientUserId?: string | null;
   nextPatientUserId?: string | null;
+  allowCompletedReuse?: boolean;
   now?: Date;
   reconnectWindowMinutes?: number;
+  completedReuseWindowMinutes?: number;
 }
 
 interface ResolveJoinSessionResult {
@@ -77,8 +84,10 @@ export function resolveJoinSession({
   existingData,
   existingPatientUserId,
   nextPatientUserId,
+  allowCompletedReuse = false,
   now = new Date(),
   reconnectWindowMinutes = 5,
+  completedReuseWindowMinutes = 60,
 }: ResolveJoinSessionInput): ResolveJoinSessionResult {
   const existingSessionId =
     typeof existingData?.consultationSessionId === 'string' && existingData.consultationSessionId
@@ -97,6 +106,9 @@ export function resolveJoinSession({
   const minutesSinceJoined = existingJoinedAt
     ? (now.getTime() - existingJoinedAt.getTime()) / (1000 * 60)
     : Number.POSITIVE_INFINITY;
+  const minutesSinceLeft = existingLeftAt
+    ? (now.getTime() - existingLeftAt.getTime()) / (1000 * 60)
+    : Number.POSITIVE_INFINITY;
 
   const canReuseExistingSession =
     Boolean(existingSessionId) &&
@@ -107,7 +119,17 @@ export function resolveJoinSession({
     minutesSinceJoined <= reconnectWindowMinutes &&
     Boolean(existingSessionStartedAt);
 
-  if (canReuseExistingSession) {
+  const canReuseCompletedSession =
+    Boolean(existingSessionId) &&
+    allowCompletedReuse &&
+    existingStatus === 'completed' &&
+    isSameKnownPatient &&
+    Boolean(existingLeftAt) &&
+    Number.isFinite(minutesSinceLeft) &&
+    minutesSinceLeft <= completedReuseWindowMinutes &&
+    Boolean(existingSessionStartedAt);
+
+  if (canReuseExistingSession || canReuseCompletedSession) {
     return {
       consultationSessionId: existingSessionId as string,
       sessionStartedAt: existingSessionStartedAt as Date,
@@ -209,6 +231,7 @@ interface AppendPresenceEventInput {
   doctorUserId?: string | null;
   patientUserId?: string | null;
   actorType: 'patient' | 'doctor' | 'system';
+  actorId?: string | null;
   eventType: ConsultationPresenceEventType;
   eventAt?: Date;
   metadata?: Record<string, unknown>;
@@ -225,6 +248,7 @@ export async function appendPresenceEvent(
     doctorUserId,
     patientUserId,
     actorType,
+    actorId = null,
     eventType,
     eventAt = new Date(),
     metadata = {},
@@ -243,6 +267,7 @@ export async function appendPresenceEvent(
     doctorUserId: doctorUserId || null,
     patientUserId: patientUserId || null,
     actorType,
+    actorId,
     eventType,
     occurredAt: Timestamp.fromDate(eventAt),
     eventAt: Timestamp.fromDate(eventAt),

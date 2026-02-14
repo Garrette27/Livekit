@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import { getClientIP } from '../../../../lib/invitations/utils';
 import { ValidateInvitationRequest } from '../../../../lib/types';
-import { validateInvitationAndIssueToken } from '../../../../lib/invitations/validate-service';
+import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
+import { FirestoreInvitationAccessCore } from '@/lib/services/invitation-access';
 
 export async function POST(req: NextRequest) {
   const rateLimitResponse = withRateLimit(RateLimitConfigs.TOKEN_GENERATION)(req);
@@ -20,7 +21,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const result = await validateInvitationAndIssueToken({
+  const db = getFirebaseAdmin();
+  if (!db) {
+    return NextResponse.json(
+      { success: false, error: 'Database not available' },
+      { status: 500 }
+    );
+  }
+
+  const invitationAccess = new FirestoreInvitationAccessCore(db);
+  const result = await invitationAccess.validateInvite({
     token: body.token,
     deviceFingerprint: body.deviceFingerprint,
     userEmail: body.userEmail,

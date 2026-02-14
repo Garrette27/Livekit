@@ -88,8 +88,12 @@ export interface Invitation {
 
 export interface AccessAttempt {
   eventDomain?: string;
+  eventType?: string;
   eventVersion?: number;
   occurredAt?: Timestamp;
+  actorType?: 'patient' | 'doctor' | 'system' | 'anonymous';
+  actorId?: string | null;
+  metadata?: Record<string, unknown>;
   timestamp: Timestamp;
   ip: string;
   userAgent: string;
@@ -101,8 +105,12 @@ export interface AccessAttempt {
 
 export interface SecurityViolation {
   eventDomain?: string;
+  eventType?: string;
   eventVersion?: number;
   occurredAt?: Timestamp;
+  actorType?: 'patient' | 'doctor' | 'system' | 'anonymous';
+  actorId?: string | null;
+  metadata?: Record<string, unknown>;
   timestamp: Timestamp;
   type: 'wrong_email' | 'wrong_country' | 'wrong_browser' | 'wrong_device' | 'wrong_ip' | 'expired' | 'already_used' | 'not_registered' | 'consent_not_given';
   details: string;
@@ -144,6 +152,7 @@ export interface GeolocationData {
 export interface CreateInvitationRequest {
   roomName: string;
   emailAllowed?: string; // Optional email - invitation can be created without email
+  emailAllowlist?: string[]; // Optional multi-email auto-admit allowlist
   phoneAllowed?: string; // Optional phone number
   expiresInHours?: number; // Optional expiration (defaults to 24 hours)
   waitingRoomEnabled?: boolean; // Enable waiting room feature
@@ -208,8 +217,9 @@ export interface WaitingPatient {
   roomName: string;
   invitationId: string;
   joinedAt: Timestamp | Date | any;
-  status: 'waiting' | 'admitted' | 'left';
+  status: 'waiting' | 'admitted' | 'left' | 'rejected';
   admittedAt?: Timestamp | Date | any;
+  rejectedAt?: Timestamp | Date | any;
   metadata?: {
     deviceFingerprint?: string;
     ip?: string;

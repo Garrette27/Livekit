@@ -23,7 +23,7 @@ interface ParsedSummary {
   category: string;
 }
 
-type PresenceEventType = 'joined' | 'left' | 'rejoined';
+type PresenceEventType = 'joined' | 'left' | 'rejoined' | 'admitted_to_consultation' | 'patient_removed_by_doctor';
 
 interface PresenceTimelineEvent {
   eventType: PresenceEventType;
@@ -37,6 +37,8 @@ interface PresenceTimeline {
   joinedCount: number;
   leftCount: number;
   rejoinCount: number;
+  admittedCount: number;
+  removedByDoctorCount: number;
   hadDisconnect: boolean;
   hadRejoin: boolean;
   promptContext: string;
@@ -80,6 +82,14 @@ function getPresenceEventLabel(eventType: PresenceEventType): string {
     return 'Patient rejoined consultation';
   }
 
+  if (eventType === 'admitted_to_consultation') {
+    return 'Patient admitted to consultation';
+  }
+
+  if (eventType === 'patient_removed_by_doctor') {
+    return 'Patient removed by doctor';
+  }
+
   return 'Patient left consultation';
 }
 
@@ -96,6 +106,8 @@ function buildPresenceTimelineNarrative(timeline: PresenceTimeline | null): stri
     `joined=${timeline.joinedCount}`,
     `left=${timeline.leftCount}`,
     `rejoined=${timeline.rejoinCount}`,
+    `admitted=${timeline.admittedCount}`,
+    `removed=${timeline.removedByDoctorCount}`,
   ].join(', ');
 
   return `Patient presence timeline (${eventSummary}): ${sequence}.`;
@@ -119,6 +131,8 @@ function buildPresenceTimelineMetadata(timeline: PresenceTimeline | null): Recor
       patientJoinedCount: 0,
       patientLeftCount: 0,
       patientRejoinCount: 0,
+      patientAdmittedCount: 0,
+      patientRemovedByDoctorCount: 0,
       patientHadDisconnect: false,
       patientHadRejoin: false,
     };
@@ -130,6 +144,8 @@ function buildPresenceTimelineMetadata(timeline: PresenceTimeline | null): Recor
     patientJoinedCount: timeline.joinedCount,
     patientLeftCount: timeline.leftCount,
     patientRejoinCount: timeline.rejoinCount,
+    patientAdmittedCount: timeline.admittedCount,
+    patientRemovedByDoctorCount: timeline.removedByDoctorCount,
     patientHadDisconnect: timeline.hadDisconnect,
     patientHadRejoin: timeline.hadRejoin,
   };
@@ -148,7 +164,9 @@ function augmentKeyPointsWithPresenceTimeline(
     .join(' -> ')}`;
 
   const hasSimilarPoint = keyPoints.some((point) =>
-    point.toLowerCase().includes('connection timeline') || point.toLowerCase().includes('rejoined')
+    point.toLowerCase().includes('connection timeline')
+    || point.toLowerCase().includes('rejoined')
+    || point.toLowerCase().includes('removed by doctor')
   );
 
   if (hasSimilarPoint) {
@@ -209,7 +227,13 @@ async function loadPresenceTimeline(
         };
 
         const eventType = data.eventType;
-        if (eventType !== 'joined' && eventType !== 'left' && eventType !== 'rejoined') {
+        const isSupportedEventType =
+          eventType === 'joined'
+          || eventType === 'left'
+          || eventType === 'rejoined'
+          || eventType === 'admitted_to_consultation'
+          || eventType === 'patient_removed_by_doctor';
+        if (!isSupportedEventType) {
           return null;
         }
 
@@ -219,7 +243,14 @@ async function loadPresenceTimeline(
             : 'unknown';
 
         // Keep timeline focused on patient presence transitions.
-        if (actorType !== 'patient' && actorType !== 'unknown') {
+        const isDoctorModerationEvent = eventType === 'patient_removed_by_doctor';
+        const isDoctorAdmissionEvent = eventType === 'admitted_to_consultation';
+        if (
+          actorType !== 'patient'
+          && actorType !== 'unknown'
+          && !isDoctorModerationEvent
+          && !isDoctorAdmissionEvent
+        ) {
           return null;
         }
 
@@ -248,12 +279,16 @@ async function loadPresenceTimeline(
     const joinedCount = events.filter((event) => event.eventType === 'joined').length;
     const leftCount = events.filter((event) => event.eventType === 'left').length;
     const rejoinCount = events.filter((event) => event.eventType === 'rejoined').length;
+    const admittedCount = events.filter((event) => event.eventType === 'admitted_to_consultation').length;
+    const removedByDoctorCount = events.filter((event) => event.eventType === 'patient_removed_by_doctor').length;
 
     const timeline: PresenceTimeline = {
       events,
       joinedCount,
       leftCount,
       rejoinCount,
+      admittedCount,
+      removedByDoctorCount,
       hadDisconnect: leftCount > 0,
       hadRejoin: rejoinCount > 0,
       promptContext: buildPresenceTimelinePromptContext(events),

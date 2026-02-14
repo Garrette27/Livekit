@@ -15,6 +15,7 @@ interface UseWaitingQueueOptions {
   doctorUserId?: string;
   invitationIds?: string[];
   selectedInvitationId?: string | null;
+  statuses?: Array<'waiting' | 'admitted' | 'left' | 'rejected'>;
   autoRefresh?: boolean;
   pollIntervalMs?: number;
 }
@@ -67,6 +68,7 @@ export function useWaitingQueue({
   doctorUserId,
   invitationIds,
   selectedInvitationId = null,
+  statuses = ['waiting'],
   autoRefresh = true,
   pollIntervalMs = 15_000,
 }: UseWaitingQueueOptions): UseWaitingQueueResult {
@@ -90,9 +92,11 @@ export function useWaitingQueue({
     () => (invitationIds ? [...invitationIds].sort().join('|') : 'all'),
     [invitationIds]
   );
+  const statusScope = useMemo(() => [...statuses].sort().join('|'), [statuses]);
   const scopeKey = useMemo(
-    () => `${roomName || 'all-rooms'}::${doctorUserId || 'all-doctors'}::${selectedInvitationId || 'all'}::${invitationScope}`,
-    [doctorUserId, invitationScope, roomName, selectedInvitationId]
+    () =>
+      `${roomName || 'all-rooms'}::${doctorUserId || 'all-doctors'}::${selectedInvitationId || 'all'}::${invitationScope}::${statusScope}`,
+    [doctorUserId, invitationScope, roomName, selectedInvitationId, statusScope]
   );
 
   const snapshot = useAppSelector((state) => state.waitingQueue.byScopeKey[scopeKey]);
@@ -140,7 +144,7 @@ export function useWaitingQueue({
           return;
         }
 
-        const result = await listWaitingPatients({ roomName, doctorUserId });
+        const result = await listWaitingPatients({ roomName, doctorUserId, statuses });
         if (!result.success) {
           dispatch(
             setWaitingQueueSnapshot({
@@ -182,7 +186,7 @@ export function useWaitingQueue({
         }
       }
     },
-    [dispatch, doctorUserId, invitationIdsSet, roomName, scopeKey, selectedInvitationId]
+    [dispatch, doctorUserId, invitationIdsSet, roomName, scopeKey, selectedInvitationId, statuses]
   );
 
   const admitPatient = useCallback(
@@ -197,7 +201,7 @@ export function useWaitingQueue({
       setError(null);
 
       try {
-        const result = await admitWaitingPatient(waitingPatientId, targetRoomName);
+        const result = await admitWaitingPatient(waitingPatientId, targetRoomName, doctorUserId);
         if (!result.success) {
           setError(result.error || 'Failed to admit patient');
           return false;
@@ -213,7 +217,7 @@ export function useWaitingQueue({
         setAdmittingId(null);
       }
     },
-    [refresh, roomName]
+    [doctorUserId, refresh, roomName]
   );
 
   const rejectPatient = useCallback(
@@ -222,7 +226,7 @@ export function useWaitingQueue({
       setError(null);
 
       try {
-        const result = await rejectWaitingPatient(waitingPatientId);
+        const result = await rejectWaitingPatient(waitingPatientId, doctorUserId);
         if (!result.success) {
           setError(result.error || 'Failed to remove patient');
           return false;
@@ -238,7 +242,7 @@ export function useWaitingQueue({
         setRejectingId(null);
       }
     },
-    [refresh]
+    [doctorUserId, refresh]
   );
 
   useEffect(() => {

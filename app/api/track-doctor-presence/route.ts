@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { appendPresenceEvent } from '@/lib/consultations/consultation-session-store';
+import { finalizeConsultationForRoom } from '@/lib/consultations/session-finalization';
 
 type DoctorPresenceAction = 'join' | 'leave';
 
@@ -98,38 +99,6 @@ async function applyDoctorDurationToSession(
   );
 
   return nextDurationMinutes;
-}
-
-async function applyDoctorDurationToSummary(
-  db: any,
-  consultationSessionId: string,
-  doctorDurationMinutes: number
-): Promise<void> {
-  const summaryRef = db.collection('call-summaries').doc(consultationSessionId);
-  const summaryDoc = await summaryRef.get();
-  if (!summaryDoc.exists) {
-    return;
-  }
-
-  const summaryData = summaryDoc.data() as Record<string, unknown>;
-  const existingDuration = Number(summaryData.duration || 0);
-  const safeExistingDuration = Number.isFinite(existingDuration) && existingDuration > 0
-    ? Math.round(existingDuration)
-    : 0;
-
-  await summaryRef.set(
-    {
-      duration: Math.max(safeExistingDuration, doctorDurationMinutes),
-      metadata: {
-        ...((summaryData.metadata as Record<string, unknown> | undefined) || {}),
-        doctorDurationMinutes,
-        durationSource: 'doctor_presence',
-        updatedAt: new Date().toISOString(),
-      },
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
 }
 
 export async function POST(req: Request) {
@@ -287,13 +256,20 @@ export async function POST(req: Request) {
       },
     });
 
-    await applyDoctorDurationToSummary(db, consultationSessionId, doctorDurationMinutes);
+    const finalizationResult = await finalizeConsultationForRoom(db, {
+      roomName,
+      finalizedAt: now,
+      reason: 'doctor_left',
+      regenerateSummary: true,
+    });
+    const finalDurationMinutes = finalizationResult?.finalDurationMinutes || doctorDurationMinutes;
 
     return NextResponse.json({
       success: true,
       message: 'Doctor leave tracked',
       consultationSessionId,
       doctorDurationMinutes,
+      finalDurationMinutes,
     });
   } catch (error) {
     console.error('Track doctor presence error:', error);

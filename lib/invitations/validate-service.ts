@@ -14,6 +14,7 @@ import { detectBrowser, generateDeviceFingerprintHash, toDate } from './utils';
 import { buildWaitingPatientIdentity } from './waiting-patient-identity';
 import { EVENT_DOMAINS, EVENT_SCHEMA_VERSION } from '../events/event-schema';
 import { getInvitationEmailAllowlist, isEmailAllowedByInvitation } from './email-allowlist';
+import { finalizeConsultationForRoom } from '../consultations/session-finalization';
 
 export interface ValidateInvitationContext {
   token: string;
@@ -58,8 +59,14 @@ function buildAccessAttempt(
   const occurredAt = new Date() as any;
   return {
     eventDomain: EVENT_DOMAINS.INVITATION_AUDIT,
+    eventType: 'access_attempt',
     eventVersion: EVENT_SCHEMA_VERSION,
     occurredAt,
+    actorType: 'anonymous',
+    actorId: null,
+    metadata: {
+      source: 'invitation-access-core.validateInvite',
+    },
     timestamp: occurredAt,
     ip: clientIP,
     userAgent,
@@ -73,8 +80,12 @@ function buildAccessAttempt(
 function toAccessAttemptData(accessAttempt: AccessAttempt): Record<string, any> {
   return {
     eventDomain: accessAttempt.eventDomain || EVENT_DOMAINS.INVITATION_AUDIT,
+    eventType: accessAttempt.eventType || 'access_attempt',
     eventVersion: accessAttempt.eventVersion || EVENT_SCHEMA_VERSION,
     occurredAt: accessAttempt.occurredAt || accessAttempt.timestamp,
+    actorType: accessAttempt.actorType || 'anonymous',
+    actorId: typeof accessAttempt.actorId === 'string' ? accessAttempt.actorId : null,
+    metadata: accessAttempt.metadata || {},
     timestamp: accessAttempt.timestamp,
     ip: accessAttempt.ip,
     userAgent: accessAttempt.userAgent,
@@ -82,6 +93,33 @@ function toAccessAttemptData(accessAttempt: AccessAttempt): Record<string, any> 
     reason: accessAttempt.reason,
     ...(accessAttempt.country && { country: accessAttempt.country }),
     ...(accessAttempt.deviceFingerprint && { deviceFingerprint: accessAttempt.deviceFingerprint }),
+  };
+}
+
+function buildSecurityViolation(input: {
+  type: SecurityViolation['type'];
+  details: string;
+  clientIP: string;
+  userAgent: string;
+  actorType?: SecurityViolation['actorType'];
+  actorId?: string | null;
+}): SecurityViolation {
+  const timestamp = new Date() as any;
+  return {
+    eventDomain: EVENT_DOMAINS.INVITATION_AUDIT,
+    eventType: 'security_violation',
+    eventVersion: EVENT_SCHEMA_VERSION,
+    occurredAt: timestamp,
+    actorType: input.actorType || 'anonymous',
+    actorId: input.actorId || null,
+    metadata: {
+      source: 'invitation-access-core.validateInvite',
+    },
+    timestamp,
+    type: input.type,
+    details: input.details,
+    ip: input.clientIP,
+    userAgent: input.userAgent,
   };
 }
 
@@ -136,7 +174,7 @@ async function lookupRegisteredAdmissionHistory(
   existingPatientsQuery.docs.forEach((doc: any) => {
     const data = { id: doc.id, ...doc.data() } as WaitingPatient;
 
-    if (data.status === 'left') {
+    if (data.status === 'left' || data.status === 'rejected') {
       hasLeft = true;
       return;
     }
@@ -264,17 +302,16 @@ async function resolveUserContext(
   }
 
   if (emailAllowlist.length > 0 && !isEmailAllowedByInvitation(invitation, lookup.userEmailToCheck)) {
-    const violationTimestamp = new Date() as any;
-    violations.push({
-      eventDomain: EVENT_DOMAINS.INVITATION_AUDIT,
-      eventVersion: EVENT_SCHEMA_VERSION,
-      occurredAt: violationTimestamp,
-      timestamp: violationTimestamp,
-      type: 'wrong_email',
-      details: `Expected one of: ${emailAllowlist.join(', ')}, Got: ${lookup.userEmailToCheck}`,
-      ip: clientIP,
-      userAgent,
-    });
+    violations.push(
+      buildSecurityViolation({
+        type: 'wrong_email',
+        details: `Expected one of: ${emailAllowlist.join(', ')}, Got: ${lookup.userEmailToCheck}`,
+        clientIP,
+        userAgent,
+        actorType: 'patient',
+        actorId: lookup.userDocId || null,
+      })
+    );
   }
 
   return { lookup };
@@ -298,17 +335,16 @@ async function collectSecurityViolations(
   if (deviceFingerprint && lookup.userProfile.deviceInfo && !isWaitingRoomEnabled) {
     const currentDeviceHash = generateDeviceFingerprintHash(deviceFingerprint);
     if (lookup.userProfile.deviceInfo.deviceFingerprintHash !== currentDeviceHash) {
-      const violationTimestamp = new Date() as any;
-      violations.push({
-        eventDomain: EVENT_DOMAINS.INVITATION_AUDIT,
-        eventVersion: EVENT_SCHEMA_VERSION,
-        occurredAt: violationTimestamp,
-        timestamp: violationTimestamp,
-        type: 'wrong_device',
-        details: 'Device fingerprint does not match registered device',
-        ip: clientIP,
-        userAgent,
-      });
+      violations.push(
+        buildSecurityViolation({
+          type: 'wrong_device',
+          details: 'Device fingerprint does not match registered device',
+          clientIP,
+          userAgent,
+          actorType: 'patient',
+          actorId: lookup.userDocId || null,
+        })
+      );
     }
   } else if (deviceFingerprint && !lookup.userProfile.deviceInfo && lookup.userDocId) {
     const deviceHash = generateDeviceFingerprintHash(deviceFingerprint);
@@ -327,34 +363,32 @@ async function collectSecurityViolations(
       lookup.userProfile.locationInfo.country !== geolocation.country &&
       lookup.userProfile.locationInfo.countryCode !== geolocation.countryCode
     ) {
-      const violationTimestamp = new Date() as any;
-      violations.push({
-        eventDomain: EVENT_DOMAINS.INVITATION_AUDIT,
-        eventVersion: EVENT_SCHEMA_VERSION,
-        occurredAt: violationTimestamp,
-        timestamp: violationTimestamp,
-        type: 'wrong_country',
-        details:
-          `Expected: ${lookup.userProfile.locationInfo.country} ` +
-          `(${lookup.userProfile.locationInfo.countryCode}), Got: ${geolocation.country} (${geolocation.countryCode})`,
-        ip: clientIP,
-        userAgent,
-      });
+      violations.push(
+        buildSecurityViolation({
+          type: 'wrong_country',
+          details:
+            `Expected: ${lookup.userProfile.locationInfo.country} ` +
+            `(${lookup.userProfile.locationInfo.countryCode}), Got: ${geolocation.country} (${geolocation.countryCode})`,
+          clientIP,
+          userAgent,
+          actorType: 'patient',
+          actorId: lookup.userDocId || null,
+        })
+      );
     }
   }
 
   if (lookup.userProfile.browserInfo && lookup.userProfile.browserInfo.name !== detectedBrowser) {
-    const violationTimestamp = new Date() as any;
-    violations.push({
-      eventDomain: EVENT_DOMAINS.INVITATION_AUDIT,
-      eventVersion: EVENT_SCHEMA_VERSION,
-      occurredAt: violationTimestamp,
-      timestamp: violationTimestamp,
-      type: 'wrong_browser',
-      details: `Expected: ${lookup.userProfile.browserInfo.name}, Got: ${detectedBrowser}`,
-      ip: clientIP,
-      userAgent,
-    });
+    violations.push(
+      buildSecurityViolation({
+        type: 'wrong_browser',
+        details: `Expected: ${lookup.userProfile.browserInfo.name}, Got: ${detectedBrowser}`,
+        clientIP,
+        userAgent,
+        actorType: 'patient',
+        actorId: lookup.userDocId || null,
+      })
+    );
   }
 }
 
@@ -682,7 +716,28 @@ export async function validateInvitationAndIssueToken(
 
     const invitation = invitationDoc.data() as Invitation;
     const expiresAtDate = toDate(invitation.expiresAt, new Date());
-    if (invitation.status === 'expired' || new Date() > expiresAtDate) {
+    const expiredByTime = new Date() > expiresAtDate;
+    if ((invitation.status === 'active' || !invitation.status) && expiredByTime) {
+      try {
+        await db.collection('invitations').doc(tokenPayload.invitationId).set(
+          {
+            status: 'expired',
+            expiredAt: expiresAtDate,
+          },
+          { merge: true }
+        );
+        await finalizeConsultationForRoom(db, {
+          roomName: invitation.roomName || tokenPayload.roomName,
+          finalizedAt: expiresAtDate,
+          reason: 'invitation_expired',
+          regenerateSummary: true,
+        });
+      } catch (expirationFinalizeError) {
+        console.error('Failed to finalize consultation during invite expiration:', expirationFinalizeError);
+      }
+    }
+
+    if (invitation.status === 'expired' || expiredByTime) {
       return result(403, { success: false, error: 'Invitation has expired' });
     }
     if (invitation.status === 'cancelled' || invitation.status === 'revoked') {
@@ -711,6 +766,15 @@ export async function validateInvitationAndIssueToken(
     if (userResolution.earlyResult) {
       return userResolution.earlyResult;
     }
+
+    accessAttempt.actorType = userResolution.lookup.userDocId ? 'patient' : 'anonymous';
+    accessAttempt.actorId = userResolution.lookup.userDocId || null;
+    accessAttempt.metadata = {
+      ...(accessAttempt.metadata || {}),
+      invitationId: tokenPayload.invitationId,
+      roomName: tokenPayload.roomName,
+      waitingRoomEnabled: invitation.waitingRoomEnabled === true,
+    };
 
     const isWaitingRoomEnabled = invitation.waitingRoomEnabled === true;
     const waitingRoomName = isWaitingRoomEnabled

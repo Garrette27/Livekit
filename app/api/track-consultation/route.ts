@@ -10,13 +10,9 @@ import {
   isKnownUserId,
 } from '@/lib/consultations/identity-utils';
 import { calculateDurationMinutes } from '@/lib/consultations/session-timing';
-import {
-  appendPresenceEvent,
-  resolveJoinSession,
-  resolveLeaveSessionId,
-  upsertSessionSnapshot,
-} from '@/lib/consultations/consultation-session-store';
+import { resolveLeaveSessionId } from '@/lib/consultations/consultation-session-store';
 import { generateAndStoreConsultationSummary } from '@/lib/consultations/summary-service';
+import { FirestoreConsultationSessionCore } from '@/lib/services/video-chat';
 
 type ConsultationAction = 'join' | 'leave';
 
@@ -83,6 +79,31 @@ async function lookupDoctorUserId(
   }
 }
 
+async function isDoctorActiveInRoom(
+  db: Firestore,
+  roomName: string,
+  doctorUserId: string
+): Promise<boolean> {
+  try {
+    const presenceDoc = await db.collection('roomDoctorPresence').doc(roomName).get();
+    if (!presenceDoc.exists) {
+      return false;
+    }
+
+    const presenceData = presenceDoc.data() as Record<string, unknown>;
+    const activeDoctors =
+      (presenceData.activeDoctors as Record<string, { joinedAt?: unknown } | undefined> | undefined) || {};
+    if (doctorUserId && activeDoctors[doctorUserId]) {
+      return true;
+    }
+
+    return Object.values(activeDoctors).some((entry) => Boolean(entry?.joinedAt));
+  } catch (error) {
+    console.error('Error checking active doctor presence:', error);
+    return false;
+  }
+}
+
 function resolvePatientIdentity(params: {
     roomName: string;
     userId?: string;
@@ -142,6 +163,7 @@ async function loadTranscriptionData(
 
 async function handleJoinEvent(
   db: Firestore,
+  sessionCore: FirestoreConsultationSessionCore,
   params: {
     roomName: string;
     patientName: string;
@@ -165,17 +187,32 @@ async function handleJoinEvent(
   const now = new Date();
   const existingPatientUserId = existingData?.patientUserId || existingData?.metadata?.patientUserId || null;
   const existingVisibleToUsers = existingData?.metadata?.visibleToUsers || [];
-  const existingJoinedAt = toDate(existingData?.joinedAt);
+  const existingPatientEmail =
+    (typeof existingData?.patientEmail === 'string' ? existingData.patientEmail : null)
+    || (typeof existingData?.metadata?.patientEmail === 'string' ? existingData.metadata.patientEmail : null);
+  const hasActiveDoctor = await isDoctorActiveInRoom(db, roomName, doctorUserId);
+  const allowCompletedReuse = Boolean(
+    hasActiveDoctor &&
+    existingData?.status === 'completed' &&
+    existingData?.consultationSessionId &&
+    isKnownUserId(existingPatientUserId) &&
+    isKnownUserId(patientUserId) &&
+    existingPatientUserId === patientUserId &&
+    patientEmail &&
+    existingPatientEmail &&
+    patientEmail.toLowerCase() === existingPatientEmail.toLowerCase()
+  );
 
-  const sessionResolution = resolveJoinSession({
+  const session = await sessionCore.startSession({
     roomName,
+    doctorUserId,
+    patientUserId,
+    patientEmail,
+    patientName,
     existingData,
-    existingPatientUserId,
-    nextPatientUserId: patientUserId,
     now,
+    allowCompletedReuse,
   });
-
-  const joinedAt = sessionResolution.reusedExistingSession && existingJoinedAt ? existingJoinedAt : now;
 
   await consultationRef.set(
     {
@@ -183,9 +220,9 @@ async function handleJoinEvent(
       patientName: patientName || existingData?.patientName || 'Unknown Patient',
       patientUserId,
       patientEmail,
-      joinedAt,
-      sessionStartedAt: sessionResolution.sessionStartedAt,
-      consultationSessionId: sessionResolution.consultationSessionId,
+      joinedAt: now,
+      sessionStartedAt: session.sessionStartedAt,
+      consultationSessionId: session.sessionId,
       status: 'active',
       isRealConsultation: true,
       createdBy: doctorUserId,
@@ -197,47 +234,21 @@ async function handleJoinEvent(
         patientUserId,
         patientEmail,
         doctorUserId,
-        consultationSessionId: sessionResolution.consultationSessionId,
+        consultationSessionId: session.sessionId,
         visibleToUsers: buildVisibleUserIds(doctorUserId, patientUserId, existingVisibleToUsers),
       },
     },
     { merge: true }
   );
 
-  await upsertSessionSnapshot(db, {
-    consultationSessionId: sessionResolution.consultationSessionId,
-    roomName,
-    doctorUserId,
-    patientUserId,
-    status: 'active',
-    sessionStartedAt: sessionResolution.sessionStartedAt,
-    metadata: {
-      source: 'track-consultation-join',
-      patientName,
-      patientEmail,
-    },
-  });
-
-  await appendPresenceEvent(db, {
-    consultationSessionId: sessionResolution.consultationSessionId,
-    roomName,
-    doctorUserId,
-    patientUserId,
-    actorType: 'patient',
-    eventType: sessionResolution.eventType,
-    eventAt: now,
-    metadata: {
-      patientName,
-    },
-  });
-
   return {
-    consultationSessionId: sessionResolution.consultationSessionId,
+    consultationSessionId: session.sessionId,
   };
 }
 
 async function handleLeaveEvent(
   db: Firestore,
+  sessionCore: FirestoreConsultationSessionCore,
   params: {
     roomName: string;
     patientName: string;
@@ -333,32 +344,20 @@ async function handleLeaveEvent(
     { merge: true }
   );
 
-  await upsertSessionSnapshot(db, {
-    consultationSessionId,
+  await sessionCore.closeSession({
+    sessionId: consultationSessionId,
     roomName,
     doctorUserId,
     patientUserId,
-    status: 'completed',
     sessionStartedAt,
     sessionEndedAt: now,
+    eventType: 'left',
+    actorType: 'patient',
+    actorId: patientUserId,
     metadata: {
       source: 'track-consultation-leave',
       patientName,
       patientEmail,
-      durationMinutes: finalDurationMinutes,
-    },
-  });
-
-  await appendPresenceEvent(db, {
-    consultationSessionId,
-    roomName,
-    doctorUserId,
-    patientUserId,
-    actorType: 'patient',
-    eventType: 'left',
-    eventAt: now,
-    metadata: {
-      patientName,
       durationMinutes: finalDurationMinutes,
     },
   });
@@ -412,6 +411,7 @@ export async function POST(req: Request) {
         { status: 500 }
       );
     }
+    const sessionCore = new FirestoreConsultationSessionCore(db);
 
     const doctorUserId = await lookupDoctorUserId(db, roomName);
 
@@ -445,7 +445,7 @@ export async function POST(req: Request) {
     });
 
     if (action === 'join') {
-      const joinResult = await handleJoinEvent(db, {
+      const joinResult = await handleJoinEvent(db, sessionCore, {
         roomName,
         patientName,
         patientUserId: resolvedPatient.patientUserId,
@@ -464,7 +464,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const leaveResult = await handleLeaveEvent(db, {
+    const leaveResult = await handleLeaveEvent(db, sessionCore, {
       roomName,
       patientName,
       patientUserId: resolvedPatient.patientUserId,

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import InvitationManager from '@/components/InvitationManager';
 import { Invitation } from '@/lib/types';
@@ -206,8 +206,6 @@ export default function DoctorInvitationsPage() {
   // Note: Waiting patients are now handled by WaitingPatientsList component
 
   const revokeInvitation = async (invitationId: string) => {
-    if (!db) return;
-
     if (pendingRevokeId !== invitationId) {
       setPendingRevokeId(invitationId);
       showToast({
@@ -219,16 +217,22 @@ export default function DoctorInvitationsPage() {
     }
 
     try {
-      const invitationRef = doc(db, 'invitations', invitationId);
-      await updateDoc(invitationRef, {
-        status: 'revoked',
-        revokedAt: new Date()
+      const response = await fetch('/api/invite/revoke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invitationId }),
       });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to revoke invitation');
+      }
       setPendingRevokeId(null);
       showToast({
         kind: 'success',
         title: 'Invitation revoked',
-        message: 'Patients using this link will now be denied access.',
+        message: result.finalization?.finalDurationMinutes
+          ? `Patients are denied. Final duration: ${result.finalization.finalDurationMinutes} minute(s).`
+          : 'Patients using this link will now be denied access.',
       });
     } catch (error) {
       console.error('Error revoking invitation:', error);
@@ -252,12 +256,23 @@ export default function DoctorInvitationsPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'active': return '✅';
-      case 'used': return '🔵';
-      case 'expired': return '❌';
-      case 'revoked': return '🚫';
-      default: return '❓';
+      case 'active': return 'A';
+      case 'used': return 'U';
+      case 'expired': return 'E';
+      case 'revoked': return 'R';
+      default: return '?';
     }
+  };
+
+  const getInvitationEmails = (invitation: Invitation): string[] => {
+    const metadataEmails = Array.isArray((invitation as any)?.metadata?.constraints?.emails)
+      ? (invitation as any).metadata.constraints.emails
+      : [];
+    const emails = [invitation.emailAllowed, ...metadataEmails]
+      .map((email) => (typeof email === 'string' ? email.toLowerCase().trim() : ''))
+      .filter((email) => email.length > 0);
+
+    return Array.from(new Set(emails));
   };
 
   // Helper function to check if invitation is expired
@@ -497,11 +512,14 @@ export default function DoctorInvitationsPage() {
                           Room: {invitation.roomName}
                         </h3>
                         <p style={{ fontSize: '0.875rem', color: '#6B7280' }}>
-                          Patient: {invitation.emailAllowed || 'Open Invitation (No email required)'}
+                          Patient: {(() => {
+                            const emails = getInvitationEmails(invitation);
+                            return emails.length > 0 ? emails.join(', ') : 'Open Invitation (No email required)';
+                          })()}
                         </p>
                         {invitation.waitingRoomEnabled && (
                           <p style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '500', marginTop: '0.25rem' }}>
-                            🚪 Waiting Room: {waitingPatientsCounts[invitation.id] ?? 0} / {invitation.maxPatients || 10} patients
+                            Waiting Room: {waitingPatientsCounts[invitation.id] ?? 0} / {invitation.maxPatients || 10} patients
                           </p>
                         )}
                       </div>
@@ -535,8 +553,8 @@ export default function DoctorInvitationsPage() {
                       ) : (
                         <p><strong>Uses:</strong> {invitation.usedAt ? 1 : 0} / {invitation.maxUses || 1}</p>
                       )}
-                      {invitation.emailAllowed ? (
-                        <p><strong>Email:</strong> {invitation.emailAllowed}</p>
+                      {getInvitationEmails(invitation).length > 0 ? (
+                        <p><strong>Emails:</strong> {getInvitationEmails(invitation).join(', ')}</p>
                       ) : (
                         <p><strong>Type:</strong> <span style={{ color: '#059669', fontWeight: '600' }}>Open Invitation</span> (No email required)</p>
                       )}
@@ -668,7 +686,7 @@ export default function DoctorInvitationsPage() {
                                   cursor: 'pointer'
                                 }}
                               >
-                                🩺 Join as Doctor
+                                Join as Doctor
                               </button>
                               <button
                                 onClick={(e) => {
@@ -716,7 +734,10 @@ export default function DoctorInvitationsPage() {
                             {selectedInv.roomName}
                           </h2>
                           <p style={{ color: '#6B7280', fontSize: '0.875rem' }}>
-                            {selectedInv.emailAllowed || 'Open Invitation'}
+                            {(() => {
+                              const emails = getInvitationEmails(selectedInv);
+                              return emails.length > 0 ? emails.join(', ') : 'Open Invitation';
+                            })()}
                           </p>
                         </div>
                         <button
@@ -731,7 +752,7 @@ export default function DoctorInvitationsPage() {
                             color: '#6b7280'
                           }}
                         >
-                          ✕ Close
+                          Close
                         </button>
                       </div>
                       
@@ -753,7 +774,7 @@ export default function DoctorInvitationsPage() {
                         <p style={{ margin: '0 0 0.5rem 0' }}><strong>Expires:</strong> {selectedInv.expiresAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
                         {selectedInv.waitingRoomEnabled && (
                           <p style={{ margin: '0', color: '#059669', fontWeight: '500' }}>
-                            🚪 Waiting Room: {waitingPatientsCounts[selectedInv.id] ?? 0} / {selectedInv.maxPatients || 10} patients
+                            Waiting Room: {waitingPatientsCounts[selectedInv.id] ?? 0} / {selectedInv.maxPatients || 10} patients
                           </p>
                         )}
                       </div>

@@ -19,8 +19,7 @@ export async function GET(req: NextRequest) {
     }
 
     const decodedToken = await adminAuth.verifyIdToken(idToken);
-    const patientUserId = decodedToken.uid;
-    const patientEmail = (decodedToken.email || '').trim().toLowerCase();
+    const doctorUserId = decodedToken.uid;
 
     const db = getFirebaseAdmin();
     if (!db) {
@@ -28,10 +27,7 @@ export async function GET(req: NextRequest) {
     }
 
     const historyProjection = new FirestoreSummaryProjectionService(db);
-    const summaries = await historyProjection.buildPatientHistory({
-      patientUserId,
-      patientEmail: patientEmail || null,
-    });
+    const summaries = await historyProjection.buildDoctorHistory(doctorUserId);
 
     return NextResponse.json({
       success: true,
@@ -39,11 +35,11 @@ export async function GET(req: NextRequest) {
       count: summaries.length,
     });
   } catch (error) {
-    console.error('Error fetching patient consultations:', error);
+    console.error('Error fetching doctor consultation history:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to fetch patient consultations',
+        error: 'Failed to fetch doctor consultation history',
       },
       { status: 500 }
     );

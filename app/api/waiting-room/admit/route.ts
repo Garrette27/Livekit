@@ -1,12 +1,13 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
-import { signLiveKitRoomToken } from '../../../../lib/invitations/token-utils';
-import { AdmitPatientRequest, AdmitPatientResponse, WaitingPatient } from '../../../../lib/types';
+import { FirestoreInvitationAccessCore, toInvitationAccessError } from '@/lib/services/invitation-access';
+import { AdmitPatientRequest, AdmitPatientResponse } from '../../../../lib/types';
 
 export async function POST(req: NextRequest) {
   try {
     const body: AdmitPatientRequest = await req.json();
     const { waitingPatientId, roomName } = body;
+    const doctorUserId = (body as { doctorUserId?: string }).doctorUserId;
 
     if (!waitingPatientId || !roomName) {
       return NextResponse.json(
@@ -23,65 +24,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get waiting patient
-    const waitingPatientDoc = await db.collection('waitingPatients').doc(waitingPatientId).get();
-    if (!waitingPatientDoc.exists) {
-      return NextResponse.json(
-        { success: false, error: 'Waiting patient not found' },
-        { status: 404 }
-      );
-    }
-
-    const waitingPatient = { id: waitingPatientDoc.id, ...waitingPatientDoc.data() } as WaitingPatient;
-
-    // Verify patient is still waiting
-    if (waitingPatient.status !== 'waiting') {
-      return NextResponse.json(
-        { success: false, error: `Patient is no longer waiting. Current status: ${waitingPatient.status}` },
-        { status: 400 }
-      );
-    }
-
-    // Verify room name matches
-    if (waitingPatient.roomName !== roomName) {
-      return NextResponse.json(
-        { success: false, error: 'Room name mismatch' },
-        { status: 400 }
-      );
-    }
-
-    // Generate LiveKit token for main consultation room.
-    const liveKitToken = signLiveKitRoomToken({
-      subject: `patient_${waitingPatient.invitationId}_${waitingPatient.id}`,
+    const invitationAccess = new FirestoreInvitationAccessCore(db);
+    const admissionResult = await invitationAccess.admitWaitingEntry({
+      waitingPatientId,
       roomName,
-      participantName: waitingPatient.patientName || waitingPatient.patientEmail || 'Anonymous Patient',
-      expiresIn: '2h',
-    });
-
-    // Update waiting patient status to admitted
-    await db.collection('waitingPatients').doc(waitingPatientId).update({
-      status: 'admitted',
-      admittedAt: new Date(),
-      'metadata.lastAccessed': new Date(),
-      'metadata.admissionMode': 'doctor-manual',
+      doctorUserId,
     });
 
     const response: AdmitPatientResponse = {
       success: true,
-      liveKitToken,
-      roomName,
+      liveKitToken: admissionResult.liveKitToken,
+      roomName: admissionResult.roomName,
     };
 
     console.log('Patient admitted to consultation room:', {
       waitingPatientId,
-      patientId: waitingPatient.patientId,
-      patientName: waitingPatient.patientName,
-      roomName,
+      roomName: admissionResult.roomName,
     });
 
     return NextResponse.json(response);
 
   } catch (error) {
+    const mappedError = toInvitationAccessError(error);
+    if (mappedError.status !== 500) {
+      return NextResponse.json(
+        { success: false, error: mappedError.message },
+        { status: mappedError.status }
+      );
+    }
+
     console.error('Error admitting patient:', error);
     return NextResponse.json(
       { success: false, error: 'Internal server error' },

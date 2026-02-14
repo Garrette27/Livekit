@@ -1,7 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { collection, onSnapshot, orderBy, query, Timestamp, where, limit } from 'firebase/firestore';
+import { useCallback, useEffect, useState } from 'react';
+import { auth } from '@/lib/firebase';
+import { Timestamp } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthSession } from '@/hooks/useAuthSession';
@@ -38,6 +38,53 @@ interface CallSummary {
   _logged?: boolean;
 }
 
+interface DoctorHistoryResponseItem {
+  id: string;
+  roomName?: string;
+  createdAt?: string | null;
+  duration?: number;
+  doctorEmail?: string;
+  patientEmail?: string;
+  summary?: string;
+  riskLevel?: string;
+  category?: string;
+  keyPoints?: string[];
+  recommendations?: string[];
+  followUpActions?: string[];
+}
+
+function toTimestamp(value?: string | null): Timestamp {
+  if (!value) {
+    return Timestamp.fromDate(new Date(0));
+  }
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return Timestamp.fromDate(new Date(0));
+  }
+
+  return Timestamp.fromDate(parsedDate);
+}
+
+function mapHistoryRecordToSummary(record: DoctorHistoryResponseItem): CallSummary {
+  return {
+    id: record.id,
+    roomName: record.roomName || 'Unknown Room',
+    summary: record.summary || 'No AI summary available yet.',
+    keyPoints: Array.isArray(record.keyPoints) ? record.keyPoints : [],
+    recommendations: Array.isArray(record.recommendations) ? record.recommendations : [],
+    followUpActions: Array.isArray(record.followUpActions) ? record.followUpActions : [],
+    riskLevel: record.riskLevel || 'Low',
+    category: record.category || 'General',
+    createdAt: toTimestamp(record.createdAt),
+    participants: [],
+    duration: Math.max(0, Math.round(Number(record.duration || 0))),
+    metadata: {
+      totalParticipants: 1,
+    },
+  };
+}
+
 export default function DoctorDashboard() {
   const { user, isAuthenticated, isAuthorized, isLoading: authLoading } = useAuthSession({
     requiredRole: 'doctor',
@@ -69,31 +116,45 @@ export default function DoctorDashboard() {
     }
   }, [authLoading, isAuthenticated, isAuthorized, router]);
 
-  useEffect(() => {
-    if (!user || !db || !isAuthorized) return;
-
-    const summariesRef = collection(db, 'call-summaries');
-    const q = query(
-      summariesRef,
-      where('createdBy', '==', user.uid),
-      orderBy('createdAt', sortOrder),
-      limit(100)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const summaryData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as CallSummary[];
-      setSummaries(summaryData);
+  const loadSummaries = useCallback(async () => {
+    if (!user || !isAuthorized) {
       setLoading(false);
-    }, (error) => {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/doctor/history', {
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to fetch doctor consultation history');
+      }
+
+      const records = Array.isArray(data.summaries) ? (data.summaries as DoctorHistoryResponseItem[]) : [];
+      const mappedSummaries = records.map(mapHistoryRecordToSummary);
+      mappedSummaries.sort((left, right) => {
+        const leftMs = left.createdAt?.toDate?.().getTime() || 0;
+        const rightMs = right.createdAt?.toDate?.().getTime() || 0;
+        return sortOrder === 'desc' ? rightMs - leftMs : leftMs - rightMs;
+      });
+      setSummaries(mappedSummaries);
+    } catch (error) {
       console.error('Error fetching summaries:', error);
+      setSummaries([]);
+    } finally {
       setLoading(false);
-    });
+    }
+  }, [isAuthorized, sortOrder, user]);
 
-    return () => unsubscribe();
-  }, [user, sortOrder, isAuthorized]);
+  useEffect(() => {
+    void loadSummaries();
+  }, [loadSummaries]);
 
   const handleEdit = (summary: CallSummary) => {
     setEditingSummary(summary);
@@ -154,7 +215,8 @@ export default function DoctorDashboard() {
         throw new Error(data.error || 'Failed to update summary');
       }
 
-      // Close edit modal - the real-time listener will update the UI
+      await loadSummaries();
+      // Close edit modal after refreshing history.
       handleCancelEdit();
     } catch (error) {
       console.error('Error saving summary:', error);
@@ -322,7 +384,7 @@ export default function DoctorDashboard() {
                         {summary.createdAt?.toDate?.()?.toLocaleString() || 'Unknown date'}
                         {summary.metadata?.lastEditedAt && (
                           <span style={{ marginLeft: '0.5rem', fontStyle: 'italic' }}>
-                            • Last edited: {summary.metadata.lastEditedAt?.toDate?.()?.toLocaleString() || 'Unknown'}
+                            | Last edited: {summary.metadata.lastEditedAt?.toDate?.()?.toLocaleString() || 'Unknown'}
                           </span>
                         )}
                       </p>
@@ -422,7 +484,7 @@ export default function DoctorDashboard() {
                   padding: '0.25rem'
                 }}
               >
-                ×
+                X
               </button>
             </div>
 

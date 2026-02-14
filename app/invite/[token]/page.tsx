@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, Suspense, Dispatch, SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, Suspense, Dispatch, SetStateAction } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import PatientLiveKitRoom from './components/PatientLiveKitRoom';
 import PatientRegistration from '@/components/PatientRegistration';
@@ -60,7 +60,7 @@ function WaitingRoomView({
 
         if (result.success && result.admitted && result.liveKitToken) {
           waitingPatientIdRef.current = result.waitingPatientId || waitingPatientIdRef.current;
-          console.log('✅ Patient admitted! Updating to main consultation room...');
+          console.log('Patient admitted. Updating to main consultation room...');
           // Clear any previous errors
           setError(null);
           // Patient has been admitted - update to show consultation room
@@ -75,18 +75,30 @@ function WaitingRoomView({
           };
           setValidationResult(admittedState);
           
+        } else if (result.success && !result.admitted) {
+          if (typeof result.waitingPatientId === 'string' && result.waitingPatientId.trim()) {
+            waitingPatientIdRef.current = result.waitingPatientId.trim();
+          }
+
+          if (result.status === 'rejected') {
+            setError(result.error || 'You were rejected by the doctor.');
+            return;
+          }
+
+          if (result.status === 'left' && result.error) {
+            setError(result.error);
+            return;
+          }
+
+          if (result.error && result.error.includes('No active waiting entry')) {
+            setError(result.error);
+          }
         } else if (!result.success && result.error) {
           console.error('Error checking admission:', result.error);
           // Don't set error for waiting status - that's expected
           if (result.error !== 'Waiting patient not found' && !result.error.includes('waiting')) {
             setError(result.error);
           }
-        } else if (result.success && !result.admitted && result.error) {
-          if (result.error.includes('No active waiting entry')) {
-            setError(result.error);
-          }
-        } else if (result.success && !result.admitted && result.waitingPatientId) {
-          waitingPatientIdRef.current = result.waitingPatientId;
         }
       } catch (err: any) {
         console.error('Error checking admission:', err);
@@ -130,6 +142,8 @@ function InvitePageContent() {
   const [invitationEmail, setInvitationEmail] = useState<string>('');
   const trackedJoinKeyRef = useRef<string | null>(null);
   const activeConsultationSessionIdRef = useRef<string | null>(null);
+  const hasProcessedExitRef = useRef(false);
+  const validationResultRef = useRef<ValidateInvitationResponse | null>(null);
 
   // Generate device fingerprint
   useEffect(() => {
@@ -241,7 +255,15 @@ function InvitePageContent() {
     validationResult?.waitingRoomEnabled,
   ]);
 
-  const getPostCallRedirectPath = () => {
+  useEffect(() => {
+    validationResultRef.current = validationResult;
+  }, [validationResult]);
+
+  useEffect(() => {
+    hasProcessedExitRef.current = false;
+  }, [validationResult?.liveKitToken, validationResult?.roomName, validationResult?.waitingPatientId]);
+
+  const getPostCallRedirectPath = useCallback(() => {
     if (user?.uid || isAuthenticated) {
       return '/patient/dashboard';
     }
@@ -252,60 +274,95 @@ function InvitePageContent() {
     }
 
     return '/patient/login';
-  };
+  }, [isAuthenticated, user?.uid]);
 
-  const handleConsultationExit = () => {
-    const waitingPatientId = validationResult?.waitingPatientId;
-    if (waitingPatientId) {
-      void fetch('/api/waiting-room/mark-left', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ waitingPatientId }),
-        keepalive: true,
-      }).catch((markLeftError) => {
-        console.error('Error marking waiting entry as left:', markLeftError);
-      });
-    }
-
-    if (validationResult?.roomName && !validationResult.waitingRoomEnabled) {
-      const trackedWithBeacon = trackConsultationEventWithBeacon({
-        roomName: validationResult.roomName,
-        action: 'leave',
-        patientName: 'Patient',
-        userId: user?.uid,
-        patientEmail: user?.email || validationResult.registeredEmail || invitationEmail || null,
-        consultationSessionId: activeConsultationSessionIdRef.current,
-      });
-
-      if (!trackedWithBeacon) {
-        void trackConsultationEvent(
-          {
-            roomName: validationResult.roomName,
-            action: 'leave',
-            patientName: 'Patient',
-            userId: user?.uid,
-            patientEmail: user?.email || validationResult.registeredEmail || invitationEmail || null,
-            consultationSessionId: activeConsultationSessionIdRef.current,
-          },
-          { keepalive: true }
-        )
-          .then((result) => {
-            activeConsultationSessionIdRef.current = result.consultationSessionId || null;
-            addPendingConsultationSessionId(result.consultationSessionId);
-          })
-          .catch((trackingError) => {
-            console.error('Error tracking patient leave:', trackingError);
-          });
-      } else if (activeConsultationSessionIdRef.current) {
-        addPendingConsultationSessionId(activeConsultationSessionIdRef.current);
+  const finalizeConsultationExit = useCallback(
+    (redirectAfterExit: boolean) => {
+      if (hasProcessedExitRef.current) {
+        if (redirectAfterExit) {
+          router.push(getPostCallRedirectPath());
+        }
+        return;
       }
-    }
 
-    activeConsultationSessionIdRef.current = null;
-    trackedJoinKeyRef.current = null;
+      hasProcessedExitRef.current = true;
+      const currentValidation = validationResultRef.current;
+      const waitingPatientId = currentValidation?.waitingPatientId;
+      if (waitingPatientId) {
+        void fetch('/api/waiting-room/mark-left', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ waitingPatientId }),
+          keepalive: true,
+        }).catch((markLeftError) => {
+          console.error('Error marking waiting entry as left:', markLeftError);
+        });
+      }
 
-    router.push(getPostCallRedirectPath());
-  };
+      if (currentValidation?.roomName && !currentValidation.waitingRoomEnabled) {
+        const trackedWithBeacon = trackConsultationEventWithBeacon({
+          roomName: currentValidation.roomName,
+          action: 'leave',
+          patientName: 'Patient',
+          userId: user?.uid,
+          patientEmail: user?.email || currentValidation.registeredEmail || invitationEmail || null,
+          consultationSessionId: activeConsultationSessionIdRef.current,
+        });
+
+        if (!trackedWithBeacon) {
+          void trackConsultationEvent(
+            {
+              roomName: currentValidation.roomName,
+              action: 'leave',
+              patientName: 'Patient',
+              userId: user?.uid,
+              patientEmail: user?.email || currentValidation.registeredEmail || invitationEmail || null,
+              consultationSessionId: activeConsultationSessionIdRef.current,
+            },
+            { keepalive: true }
+          )
+            .then((result) => {
+              activeConsultationSessionIdRef.current = result.consultationSessionId || null;
+              addPendingConsultationSessionId(result.consultationSessionId);
+            })
+            .catch((trackingError) => {
+              console.error('Error tracking patient leave:', trackingError);
+            });
+        } else if (activeConsultationSessionIdRef.current) {
+          addPendingConsultationSessionId(activeConsultationSessionIdRef.current);
+        }
+      }
+
+      activeConsultationSessionIdRef.current = null;
+      trackedJoinKeyRef.current = null;
+      validationResultRef.current = null;
+
+      if (redirectAfterExit) {
+        router.push(getPostCallRedirectPath());
+      }
+    },
+    [getPostCallRedirectPath, invitationEmail, router, user?.email, user?.uid]
+  );
+
+  const handleConsultationExit = useCallback(() => {
+    finalizeConsultationExit(true);
+  }, [finalizeConsultationExit]);
+
+  useEffect(() => {
+    const handleBrowserExit = () => {
+      finalizeConsultationExit(false);
+    };
+
+    window.addEventListener('beforeunload', handleBrowserExit);
+    window.addEventListener('pagehide', handleBrowserExit);
+    window.addEventListener('popstate', handleBrowserExit);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBrowserExit);
+      window.removeEventListener('pagehide', handleBrowserExit);
+      window.removeEventListener('popstate', handleBrowserExit);
+    };
+  }, [finalizeConsultationExit]);
 
   // Handle registration requirement
   if (requiresRegistration) {
@@ -383,7 +440,7 @@ function InvitePageContent() {
             justifyContent: 'center',
             margin: '0 auto 2rem'
           }}>
-            <span style={{ fontSize: '2.5rem', color: '#dc2626' }}>🚫</span>
+              <span style={{ fontSize: '2.5rem', color: '#dc2626' }}>X</span>
           </div>
 
           <h1 style={{
@@ -488,7 +545,7 @@ function InvitePageContent() {
               margin: '0 auto 2rem',
               animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
             }}>
-              <span style={{ fontSize: '2.5rem' }}>🚪</span>
+              <span style={{ fontSize: '2.5rem' }}>WAIT</span>
             </div>
 
             <h1 style={{
@@ -521,7 +578,7 @@ function InvitePageContent() {
                 color: '#1e40af',
                 margin: 0
               }}>
-                💡 <strong>Tip:</strong> Keep this page open. You&apos;ll automatically join the consultation when the doctor admits you.
+                <strong>Tip:</strong> Keep this page open. You&apos;ll automatically join the consultation when the doctor admits you.
               </p>
             </div>
 

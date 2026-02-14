@@ -1,32 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
-import {
-  isMessageVisibleForParticipant,
-  SessionChatMessageInput,
-  SessionChatVisibilityPolicy,
-} from '@/lib/chat/session-chat-model';
+import type { SessionChatVisibilityPolicy } from '@/lib/chat/session-chat-model';
+import { FirestoreChatMessageStore } from '@/lib/services/video-chat';
 
-interface DateLike {
-  toDate?: () => Date;
-}
-
-function toDate(value: unknown): Date {
-  if (value instanceof Date) {
-    return value;
-  }
-
-  const maybeDateLike = value as DateLike;
-  if (typeof maybeDateLike?.toDate === 'function') {
-    return maybeDateLike.toDate();
+function toDate(value: unknown): Date | null {
+  if (!value) {
+    return null;
   }
 
   const parsed = new Date(value as string | number | Date);
-  if (Number.isNaN(parsed.getTime())) {
-    return new Date(0);
-  }
-
-  return parsed;
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function parseVisibilityPolicy(raw: string | null): SessionChatVisibilityPolicy {
@@ -38,8 +21,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const consultationSessionId = searchParams.get('consultationSessionId');
     const visibilityPolicy = parseVisibilityPolicy(searchParams.get('visibilityPolicy'));
-    const participantJoinedAtRaw = searchParams.get('participantJoinedAt');
-    const participantJoinedAt = participantJoinedAtRaw ? toDate(participantJoinedAtRaw) : null;
+    const participantJoinedAt = toDate(searchParams.get('participantJoinedAt'));
+    const participantId = searchParams.get('participantId') || 'anonymous';
 
     if (!consultationSessionId) {
       return NextResponse.json(
@@ -56,27 +39,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const messagesSnapshot = await db
-      .collection('consultationSessions')
-      .doc(consultationSessionId)
-      .collection('messages')
-      .orderBy('createdAt', 'asc')
-      .limit(500)
-      .get();
-
-    const messages = messagesSnapshot.docs
-      .map((doc) => {
-        const data = doc.data();
-        const createdAt = toDate(data.createdAt);
-        return {
-          id: doc.id,
-          ...data,
-          createdAt,
-        };
-      })
-      .filter((message) =>
-        isMessageVisibleForParticipant(message.createdAt, participantJoinedAt, visibilityPolicy)
-      );
+    const chatStore = new FirestoreChatMessageStore(db);
+    const messages = await chatStore.listVisibleMessages({
+      sessionId: consultationSessionId,
+      participantId,
+      participantJoinedAt,
+      visibilityPolicy,
+    });
 
     return NextResponse.json({
       success: true,
@@ -94,15 +63,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as SessionChatMessageInput;
-    const {
-      consultationSessionId,
-      senderId,
-      senderName,
-      senderType,
-      text,
-      attachments = [],
-    } = body;
+    const body = await req.json();
+    const consultationSessionId =
+      typeof body.consultationSessionId === 'string' ? body.consultationSessionId.trim() : '';
+    const senderId = typeof body.senderId === 'string' ? body.senderId.trim() : '';
+    const senderName = typeof body.senderName === 'string' ? body.senderName.trim() : '';
+    const senderType = body.senderType as 'doctor' | 'patient' | 'system';
+    const text = typeof body.text === 'string' ? body.text : '';
+    const attachments = Array.isArray(body.attachments) ? body.attachments : [];
+    const messageId = typeof body.messageId === 'string' ? body.messageId.trim() : undefined;
 
     if (!consultationSessionId || !senderId || !senderName || !senderType) {
       return NextResponse.json(
@@ -110,10 +79,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-
-    if (!text?.trim() && attachments.length === 0) {
+    if (senderType !== 'doctor' && senderType !== 'patient' && senderType !== 'system') {
       return NextResponse.json(
-        { success: false, error: 'Message must include text or attachment' },
+        { success: false, error: 'senderType must be doctor, patient, or system' },
         { status: 400 }
       );
     }
@@ -126,40 +94,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const messagePayload = {
-      consultationSessionId,
+    const chatStore = new FirestoreChatMessageStore(db);
+    const result = await chatStore.appendMessage({
+      sessionId: consultationSessionId,
+      messageId,
       senderId,
       senderName,
       senderType,
-      text: text?.trim() || '',
+      message: text,
       attachments,
-      createdAt: FieldValue.serverTimestamp(),
-      createdAtIso: new Date().toISOString(),
-    };
-
-    const messageRef = await db
-      .collection('consultationSessions')
-      .doc(consultationSessionId)
-      .collection('messages')
-      .add(messagePayload);
-
-    await db.collection('consultationSessions').doc(consultationSessionId).set(
-      {
-        lastMessageAt: Timestamp.now(),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
+    });
 
     return NextResponse.json({
       success: true,
-      messageId: messageRef.id,
+      messageId: result.messageId,
+      duplicated: result.duplicated,
     });
   } catch (error) {
-    console.error('Error storing session chat message:', error);
+    const message = error instanceof Error ? error.message : 'Failed to store message';
+    const status = message.includes('Message must include text or attachment') ? 400 : 500;
     return NextResponse.json(
-      { success: false, error: 'Failed to store message' },
-      { status: 500 }
+      { success: false, error: message },
+      { status }
     );
   }
 }

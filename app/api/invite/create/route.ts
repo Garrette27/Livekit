@@ -20,7 +20,19 @@ export async function POST(req: NextRequest) {
     }
 
     const body: CreateInvitationRequest = await req.json();
-    const { roomName, emailAllowed, phoneAllowed, expiresInHours, waitingRoomEnabled, maxPatients, maxUses, doctorUserId, doctorEmail, doctorName } = body;
+    const {
+      roomName,
+      emailAllowed,
+      emailAllowlist,
+      phoneAllowed,
+      expiresInHours,
+      waitingRoomEnabled,
+      maxPatients,
+      maxUses,
+      doctorUserId,
+      doctorEmail,
+      doctorName,
+    } = body;
 
     // Input validation - only roomName is required
     if (!roomName) {
@@ -38,17 +50,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate email only if provided
-    if (emailAllowed && !validateEmail(emailAllowed)) {
+    const normalizedEmailCandidates = [
+      ...(Array.isArray(emailAllowlist) ? emailAllowlist : []),
+      ...(emailAllowed ? [emailAllowed] : []),
+    ]
+      .map((email) => (typeof email === 'string' ? email.toLowerCase().trim() : ''))
+      .filter((email) => email.length > 0);
+
+    const invalidEmail = normalizedEmailCandidates.find((email) => !validateEmail(email));
+    if (invalidEmail) {
       return NextResponse.json(
-        { success: false, error: 'Invalid email address' },
+        { success: false, error: `Invalid email address: ${invalidEmail}` },
         { status: 400 }
       );
     }
 
     // Sanitize inputs
     const sanitizedRoomName = sanitizeInput(roomName);
-    const sanitizedEmail = emailAllowed ? sanitizeInput(emailAllowed.toLowerCase().trim()) : undefined;
+    const sanitizedEmailAllowlist = Array.from(
+      new Set(normalizedEmailCandidates.map((email) => sanitizeInput(email)))
+    );
+    const sanitizedEmail = sanitizedEmailAllowlist[0];
     const sanitizedPhone = phoneAllowed ? sanitizeInput(phoneAllowed.trim()) : undefined;
 
     // Validate expiration time (1-168 hours = 1 hour to 1 week)
@@ -94,7 +116,7 @@ export async function POST(req: NextRequest) {
 
     // Validate doctorUserId
     if (!doctorUserId) {
-      console.error('⚠️ ERROR: doctorUserId is required but not provided in request');
+      console.error('ERROR: doctorUserId is required but not provided in request');
       return NextResponse.json(
         { success: false, error: 'Doctor user ID is required' },
         { status: 400 }
@@ -125,7 +147,7 @@ export async function POST(req: NextRequest) {
         roomName: sanitizedRoomName,
         constraints: {
           ...(sanitizedEmail && { email: sanitizedEmail }),
-          ...(sanitizedEmail && { emails: [sanitizedEmail] }),
+          ...(sanitizedEmailAllowlist.length > 0 && { emails: sanitizedEmailAllowlist }),
           ...(sanitizedPhone && { phone: sanitizedPhone }),
         },
         security: {
@@ -170,7 +192,7 @@ export async function POST(req: NextRequest) {
       ...(sanitizedEmail && { email: sanitizedEmail }), // Only include email if provided
       exp: Math.floor(expiresAt.getTime() / 1000),
       iat: Math.floor(Date.now() / 1000),
-      oneUse: true,
+      oneUse: !isWaitingRoomEnabled,
     };
 
     const inviteToken = signInvitationToken(tokenPayload);
@@ -202,6 +224,7 @@ export async function POST(req: NextRequest) {
       invitationId,
       roomName: sanitizedRoomName,
       email: sanitizedEmail || 'none',
+      allowlistCount: sanitizedEmailAllowlist.length,
       expiresAt: expiresAt.toISOString(),
     });
 

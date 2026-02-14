@@ -3,6 +3,7 @@ import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { signInvitationToken } from '../../../../lib/invitations/token-utils';
 import { buildInviteUrl, toDate } from '../../../../lib/invitations/utils';
 import { InvitationToken } from '../../../../lib/types';
+import { finalizeConsultationForRoom } from '../../../../lib/consultations/session-finalization';
 
 let hasLoggedMissingInvitationIndexWarning = false;
 
@@ -156,6 +157,26 @@ export async function GET(req: NextRequest) {
     const isExpired = expiresAtDate.getTime() > 0 && now > expiresAtDate;
 
     if (isExpired) {
+      if (invitation.status === 'active') {
+        try {
+          await db.collection('invitations').doc(invitationDoc.id).set(
+            {
+              status: 'expired',
+              expiredAt: expiresAtDate,
+            },
+            { merge: true }
+          );
+          await finalizeConsultationForRoom(db, {
+            roomName: invitation.roomName,
+            finalizedAt: expiresAtDate,
+            reason: 'invitation_expired',
+            regenerateSummary: true,
+          });
+        } catch (expirationFinalizeError) {
+          console.error('Failed to finalize consultation for expired invitation:', expirationFinalizeError);
+        }
+      }
+
       console.error('Invitation expired:', {
         invitationId: invitationDoc.id,
         roomName: invitation.roomName,
