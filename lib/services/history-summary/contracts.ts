@@ -20,6 +20,23 @@ export interface WaitingRoomHistoryRecord {
   participants: WaitingRoomParticipantHistoryRecord[];
 }
 
+export interface HistoryChatMessageRecord {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderType: 'doctor' | 'patient' | 'system';
+  text: string;
+  createdAt: string | null;
+}
+
+export interface HistoryChatRecord {
+  totalMessages: number;
+  firstMessageAt: string | null;
+  lastMessageAt: string | null;
+  participants: string[];
+  messages: HistoryChatMessageRecord[];
+}
+
 export interface HistoryRecord {
   id: string;
   roomName: string;
@@ -38,6 +55,7 @@ export interface HistoryRecord {
   recommendations?: string[];
   followUpActions?: string[];
   waitingRoomHistory?: WaitingRoomHistoryRecord;
+  chatHistory?: HistoryChatRecord;
 }
 
 export interface SummaryProjectionService {
@@ -45,7 +63,10 @@ export interface SummaryProjectionService {
     consultationSessionId: string;
     regenerate?: boolean;
   }): Promise<{ summaryId: string; summary: Record<string, unknown> | null }>;
-  buildDoctorHistory(doctorUserId: string): Promise<HistoryRecord[]>;
+  buildDoctorHistory(input: {
+    doctorUserId: string;
+    includeChatHistory?: boolean;
+  }): Promise<HistoryRecord[]>;
   buildPatientHistory(input: {
     patientUserId: string;
     patientEmail?: string | null;

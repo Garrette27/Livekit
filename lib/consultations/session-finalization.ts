@@ -1,6 +1,7 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { calculateDurationMinutes } from './session-timing';
 import { generateAndStoreConsultationSummary } from './summary-service';
+import { isKnownUserId } from './identity-utils';
 import {
   buildWaitingRoomHistorySnapshot,
   type WaitingRoomHistorySnapshot,
@@ -53,6 +54,38 @@ function parseDuration(value: unknown): number {
     return 0;
   }
   return Math.round(parsed);
+}
+
+function normalizeKnownPatientUserId(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return isKnownUserId(normalized) ? normalized : null;
+}
+
+function resolveWaitingHistoryPatientEmail(waitingRoomHistory: WaitingRoomHistorySnapshot): string | null {
+  const admittedRegisteredParticipant = waitingRoomHistory.participants.find((participant) =>
+    participant.status === 'admitted'
+    && !participant.isAnonymous
+    && typeof participant.patientEmail === 'string'
+    && participant.patientEmail.trim().length > 0
+  );
+  if (admittedRegisteredParticipant?.patientEmail) {
+    return admittedRegisteredParticipant.patientEmail;
+  }
+
+  return waitingRoomHistory.participantEmails[0] || null;
+}
+
+function resolveConsultationSessionIdFromDoc(consultationData: Record<string, unknown>): string | null {
+  const consultationSessionId = consultationData.consultationSessionId;
+  if (typeof consultationSessionId !== 'string' || !consultationSessionId.trim()) {
+    return null;
+  }
+
+  return consultationSessionId.trim();
 }
 
 function pickSessionDocument(
@@ -245,14 +278,18 @@ export async function finalizeConsultationForRoom(
   const waitingRoomHistory = await buildWaitingRoomHistorySnapshot(db, {
     roomName,
     doctorUserId,
+    consultationSessionId,
     sessionStartedAt,
     sessionEndedAt: effectiveSessionEndedAt,
   });
-  const fallbackPatientEmail = waitingRoomHistory.participantEmails[0] || null;
+  const sessionPatientUserId =
+    normalizeKnownPatientUserId(sessionData.patientUserId)
+    || normalizeKnownPatientUserId(sessionMetadata.patientUserId);
+  const waitingHistoryPatientEmail = resolveWaitingHistoryPatientEmail(waitingRoomHistory);
   const sessionPatientEmail =
     (sessionData.patientEmail as string | undefined)
     || (typeof sessionMetadata.patientEmail === 'string' ? sessionMetadata.patientEmail : null)
-    || fallbackPatientEmail;
+    || waitingHistoryPatientEmail;
 
   await sessionRef.set(
     {
@@ -263,6 +300,7 @@ export async function finalizeConsultationForRoom(
       sessionStartedAt,
       sessionEndedAt: effectiveSessionEndedAt,
       duration: finalDurationMinutes,
+      patientUserId: sessionPatientUserId,
       ...(sessionPatientEmail ? { patientEmail: sessionPatientEmail } : {}),
       metadata: {
         ...sessionMetadata,
@@ -272,6 +310,7 @@ export async function finalizeConsultationForRoom(
         finalizedAt: finalizedAt.toISOString(),
         finalizationReason: reason,
         waitingRoomHistory,
+        patientUserId: sessionPatientUserId,
         updatedAt: new Date().toISOString(),
       },
       updatedAt: new Date(),
@@ -283,10 +322,15 @@ export async function finalizeConsultationForRoom(
   const consultationDoc = await consultationRef.get();
   const consultationData = (consultationDoc.exists ? consultationDoc.data() : {}) as Record<string, unknown>;
   const consultationMetadata = (consultationData.metadata as Record<string, unknown> | undefined) || {};
+  const consultationDocSessionId = resolveConsultationSessionIdFromDoc(consultationData);
+  const consultationDocMatchesCurrentSession =
+    consultationDocSessionId === consultationSessionId;
   const consultationPatientEmail =
-    (consultationData.patientEmail as string | undefined)
-    || (typeof consultationMetadata.patientEmail === 'string' ? consultationMetadata.patientEmail : null)
-    || sessionPatientEmail;
+    sessionPatientEmail
+    || (consultationDocMatchesCurrentSession
+      ? (consultationData.patientEmail as string | undefined)
+        || (typeof consultationMetadata.patientEmail === 'string' ? consultationMetadata.patientEmail : null)
+      : null);
   await consultationRef.set(
     {
       roomName,
@@ -295,6 +339,7 @@ export async function finalizeConsultationForRoom(
       leftAt: effectiveSessionEndedAt,
       duration: finalDurationMinutes,
       status: 'completed',
+      patientUserId: sessionPatientUserId,
       ...(consultationPatientEmail ? { patientEmail: consultationPatientEmail } : {}),
       metadata: {
         ...consultationMetadata,
@@ -304,6 +349,7 @@ export async function finalizeConsultationForRoom(
         finalizedAt: finalizedAt.toISOString(),
         finalizationReason: reason,
         waitingRoomHistory,
+        patientUserId: sessionPatientUserId,
       },
     },
     { merge: true }
@@ -319,10 +365,11 @@ export async function finalizeConsultationForRoom(
         (consultationData.patientName as string | undefined) ||
         ((sessionMetadata.patientName as string | undefined) || 'Patient');
       const patientUserId =
-        (sessionData.patientUserId as string | undefined) ||
-        (consultationData.patientUserId as string | undefined) ||
-        (consultationMetadata.patientUserId as string | undefined) ||
-        null;
+        sessionPatientUserId
+        || (consultationDocMatchesCurrentSession
+          ? normalizeKnownPatientUserId(consultationData.patientUserId)
+            || normalizeKnownPatientUserId(consultationMetadata.patientUserId)
+          : null);
 
       await generateAndStoreConsultationSummary({
         roomName,

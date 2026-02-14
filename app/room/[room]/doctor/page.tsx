@@ -37,7 +37,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
   } = useDoctorToken({ roomName, doctorName, user });
 
   const { captureError } = useSpeechCapture({ roomName, token });
-  useRoomLifecycle({ token, user, roomName, doctorName });
+  const { consultationSessionId } = useRoomLifecycle({ token, user, roomName, doctorName });
 
   const { pageError, setPageError } = useErrorHandler(authError, tokenError, captureError);
 
@@ -64,6 +64,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
           doctorUserId: user.uid,
           doctorName: doctorName || user.displayName || user.email,
           doctorEmail: user.email || null,
+          consultationSessionId,
         },
         { keepalive: true }
       ).catch((presenceError) => {
@@ -200,6 +201,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
 
         <LiveKitShell
           token={token}
+          consultationSessionId={consultationSessionId}
           onDisconnected={handleLeave}
           onError={(error) => {
             console.error('LiveKit error:', error);

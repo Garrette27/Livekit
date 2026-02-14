@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { User } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -13,11 +13,37 @@ interface RoomLifecycleArgs {
   doctorName: string;
 }
 
-export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLifecycleArgs) {
+interface RoomLifecycleState {
+  consultationSessionId: string | null;
+}
+
+function normalizeConsultationSessionId(value?: string | null): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+/**
+ * Tracks doctor presence and exposes the active consultation session id for room-level features.
+ */
+export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLifecycleArgs): RoomLifecycleState {
+  const [consultationSessionId, setConsultationSessionId] = useState<string | null>(null);
+  const consultationSessionIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!token || !user || !roomName || !db) return;
+    if (!token || !user || !roomName || !db) {
+      if (consultationSessionIdRef.current !== null) {
+        consultationSessionIdRef.current = null;
+        setConsultationSessionId(null);
+      }
+      return;
+    }
 
     const firestoreDb = db; // Store in const so TypeScript knows it's defined
+    let cancelled = false;
 
     const createRecords = async () => {
       try {
@@ -57,13 +83,21 @@ export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLife
           { merge: true }
         );
 
-        await trackDoctorPresenceEvent({
+        const presenceResult = await trackDoctorPresenceEvent({
           roomName,
           action: 'join',
           doctorUserId: user.uid,
           doctorName: doctorName || user.displayName || user.email,
           doctorEmail: user.email || null,
         });
+
+        const normalizedConsultationSessionId = normalizeConsultationSessionId(
+          presenceResult.consultationSessionId
+        );
+        if (!cancelled) {
+          consultationSessionIdRef.current = normalizedConsultationSessionId;
+          setConsultationSessionId(normalizedConsultationSessionId);
+        }
       } catch (error) {
         console.error('Error creating room/call records:', error);
       }
@@ -72,6 +106,8 @@ export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLife
     createRecords();
 
     return () => {
+      cancelled = true;
+
       void trackDoctorPresenceEvent(
         {
           roomName,
@@ -79,6 +115,7 @@ export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLife
           doctorUserId: user.uid,
           doctorName: doctorName || user.displayName || user.email,
           doctorEmail: user.email || null,
+          consultationSessionId: consultationSessionIdRef.current,
         },
         { keepalive: true }
       ).catch((presenceError) => {
@@ -86,6 +123,10 @@ export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLife
       });
     };
   }, [token, user, roomName, doctorName]);
+
+  return {
+    consultationSessionId,
+  };
 }
 
 

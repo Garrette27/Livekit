@@ -41,6 +41,20 @@ interface CallSummary {
       waitingDurationMinutes: number | null;
     }>;
   };
+  chatHistory?: {
+    totalMessages: number;
+    firstMessageAt: string | null;
+    lastMessageAt: string | null;
+    participants: string[];
+    messages: Array<{
+      id: string;
+      senderId: string;
+      senderName: string;
+      senderType: 'doctor' | 'patient' | 'system';
+      text: string;
+      createdAt: string | null;
+    }>;
+  };
   metadata?: {
     totalParticipants: number;
     createdBy?: string;
@@ -93,6 +107,20 @@ interface DoctorHistoryResponseItem {
       waitingDurationMinutes: number | null;
     }>;
   };
+  chatHistory?: {
+    totalMessages: number;
+    firstMessageAt: string | null;
+    lastMessageAt: string | null;
+    participants: string[];
+    messages: Array<{
+      id: string;
+      senderId: string;
+      senderName: string;
+      senderType: 'doctor' | 'patient' | 'system';
+      text: string;
+      createdAt: string | null;
+    }>;
+  };
 }
 
 function toTimestamp(value?: string | null): Timestamp {
@@ -124,6 +152,7 @@ function mapHistoryRecordToSummary(record: DoctorHistoryResponseItem): CallSumma
     participants: [],
     duration: Math.max(0, Math.round(Number(record.duration || 0))),
     waitingRoomHistory: record.waitingRoomHistory,
+    chatHistory: record.chatHistory,
     metadata: {
       totalParticipants: 1,
     },
@@ -196,7 +225,7 @@ export default function DoctorDashboard() {
     setLoading(true);
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch('/api/doctor/history', {
+      const response = await fetch('/api/doctor/history?includeChatHistory=true', {
         headers: {
           Authorization: `Bearer ${idToken}`,
         },
@@ -552,6 +581,84 @@ export default function DoctorDashboard() {
                         ))}
                       </div>
                     </div>
+                  )}
+                  {summary.chatHistory && summary.chatHistory.totalMessages > 0 && (
+                    <details
+                      style={{
+                        marginBottom: '1rem',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #dbeafe',
+                        backgroundColor: '#eff6ff',
+                      }}
+                    >
+                      <summary
+                        style={{
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          color: '#1e3a8a',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Chat Transcript ({summary.chatHistory.totalMessages} message
+                        {summary.chatHistory.totalMessages === 1 ? '' : 's'})
+                      </summary>
+
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <p style={{ fontSize: '0.75rem', color: '#1e40af', marginBottom: '0.5rem' }}>
+                          First message: {formatIsoTimestamp(summary.chatHistory.firstMessageAt)}
+                          {' | '}
+                          Last message: {formatIsoTimestamp(summary.chatHistory.lastMessageAt)}
+                        </p>
+                        {summary.chatHistory.participants.length > 0 && (
+                          <p style={{ fontSize: '0.75rem', color: '#1d4ed8', marginBottom: '0.5rem' }}>
+                            Participants: {summary.chatHistory.participants.join(', ')}
+                          </p>
+                        )}
+                        <div
+                          style={{
+                            maxHeight: '16rem',
+                            overflowY: 'auto',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '0.375rem',
+                            backgroundColor: '#ffffff',
+                            padding: '0.5rem',
+                          }}
+                        >
+                          {summary.chatHistory.messages.map((message) => (
+                            <div
+                              key={message.id}
+                              style={{
+                                borderBottom: '1px solid #e5e7eb',
+                                padding: '0.375rem 0',
+                              }}
+                            >
+                              <p
+                                style={{
+                                  margin: 0,
+                                  fontSize: '0.7rem',
+                                  fontWeight: 600,
+                                  color: '#1f2937',
+                                }}
+                              >
+                                {message.senderName} ({message.senderType}) - {formatIsoTimestamp(message.createdAt)}
+                              </p>
+                              <p
+                                style={{
+                                  margin: '0.125rem 0 0 0',
+                                  fontSize: '0.75rem',
+                                  color: '#374151',
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {message.text || '(empty message)'}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </details>
                   )}
                   {summary.keyPoints && summary.keyPoints.length > 0 && (
                     <div style={{ marginTop: '1rem' }}>

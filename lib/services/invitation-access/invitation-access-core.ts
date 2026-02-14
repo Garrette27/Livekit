@@ -92,6 +92,10 @@ function normalizePatientEmail(email?: string): string | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
+function isWaitingRoomName(roomName: string): boolean {
+  return roomName.trim().toLowerCase().endsWith('-waiting');
+}
+
 function buildParticipantIdentity(waitingPatient: WaitingPatient): string {
   return `patient_${waitingPatient.invitationId}_${waitingPatient.id}`;
 }
@@ -981,6 +985,74 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
     return {
       waitingPatientId: waitingPatient.id,
       status: 'rejected',
+    };
+  }
+
+  /**
+   * Applies a participant-left webhook signal to a waiting entry with room-aware semantics.
+   * Waiting-room departures after admission are treated as transition noise, not a true leave.
+   */
+  async handleParticipantLeftWebhook(input: {
+    waitingPatientId: string;
+    roomName: string;
+  }): Promise<{
+    handled: boolean;
+    reason:
+      | 'waiting_entry_not_found'
+      | 'waiting_entry_marked_left'
+      | 'waiting_entry_marked_rejected'
+      | 'waiting_entry_already_left'
+      | 'waiting_entry_already_rejected'
+      | 'waiting_room_departure_after_admission_ignored';
+    status: 'left' | 'rejected' | null;
+  }> {
+    const waitingPatientId = input.waitingPatientId?.trim();
+    if (!waitingPatientId) {
+      throw new InvitationAccessError(400, 'invalid_argument', 'waitingPatientId is required');
+    }
+
+    const waitingRef = this.db.collection('waitingPatients').doc(waitingPatientId);
+    const waitingDoc = await waitingRef.get();
+    if (!waitingDoc.exists) {
+      return {
+        handled: false,
+        reason: 'waiting_entry_not_found',
+        status: null,
+      };
+    }
+
+    const waitingPatient = mapWaitingDocToModel({
+      id: waitingDoc.id,
+      data: waitingDoc.data() as Record<string, unknown>,
+    });
+    if (waitingPatient.status === 'rejected') {
+      return {
+        handled: false,
+        reason: 'waiting_entry_already_rejected',
+        status: 'rejected',
+      };
+    }
+    if (waitingPatient.status === 'left') {
+      return {
+        handled: false,
+        reason: 'waiting_entry_already_left',
+        status: 'left',
+      };
+    }
+
+    if (isWaitingRoomName(input.roomName) && waitingPatient.status === 'admitted') {
+      return {
+        handled: false,
+        reason: 'waiting_room_departure_after_admission_ignored',
+        status: null,
+      };
+    }
+
+    const result = await this.markWaitingEntryLeft({ waitingPatientId: waitingPatient.id });
+    return {
+      handled: true,
+      reason: result.status === 'rejected' ? 'waiting_entry_marked_rejected' : 'waiting_entry_marked_left',
+      status: result.status,
     };
   }
 

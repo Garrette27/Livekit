@@ -28,16 +28,37 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
   const [patientName, setPatientName] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [consultationSessionId, setConsultationSessionId] = useState<string | null>(null);
   const isLeavingRef = useRef(false);
   const consultationSessionIdRef = useRef<string | null>(null);
   const consultationSessionStorageKey = `patientConsultationSessionId_${roomName}`;
 
+  const updateConsultationSessionId = useCallback(
+    (nextSessionId?: string | null): string | null => {
+      const normalizedSessionId =
+        typeof nextSessionId === 'string' && nextSessionId.trim()
+          ? nextSessionId.trim()
+          : null;
+      consultationSessionIdRef.current = normalizedSessionId;
+      setConsultationSessionId(normalizedSessionId);
+
+      if (normalizedSessionId) {
+        localStorage.setItem(consultationSessionStorageKey, normalizedSessionId);
+      } else {
+        localStorage.removeItem(consultationSessionStorageKey);
+      }
+
+      return normalizedSessionId;
+    },
+    [consultationSessionStorageKey]
+  );
+
   useEffect(() => {
     const storedConsultationSessionId = localStorage.getItem(consultationSessionStorageKey);
     if (storedConsultationSessionId) {
-      consultationSessionIdRef.current = storedConsultationSessionId;
+      updateConsultationSessionId(storedConsultationSessionId);
     }
-  }, [consultationSessionStorageKey]);
+  }, [consultationSessionStorageKey, updateConsultationSessionId]);
 
   useEffect(() => {
     if (!user || !roomName) {
@@ -84,16 +105,15 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
       consultationSessionId: consultationSessionIdRef.current,
     })
       .then((result) => {
-        consultationSessionIdRef.current = result.consultationSessionId || consultationSessionIdRef.current;
-        if (consultationSessionIdRef.current) {
-          localStorage.setItem(consultationSessionStorageKey, consultationSessionIdRef.current);
-        }
-        addPendingConsultationSessionId(result.consultationSessionId);
+        const resolvedSessionId = updateConsultationSessionId(
+          result.consultationSessionId || consultationSessionIdRef.current
+        );
+        addPendingConsultationSessionId(resolvedSessionId);
       })
       .catch((updateError) => {
         console.error('Error updating consultation after sign-in:', updateError);
       });
-  }, [consultationSessionStorageKey, patientName, roomName, token, user]);
+  }, [patientName, roomName, token, updateConsultationSessionId, user]);
 
   useEffect(() => {
     const savedName = localStorage.getItem(`patientName_${roomName}`);
@@ -201,11 +221,10 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
         userId: user?.uid,
         patientEmail: user?.email || null,
       });
-      consultationSessionIdRef.current = result.consultationSessionId || consultationSessionIdRef.current;
-      if (consultationSessionIdRef.current) {
-        localStorage.setItem(consultationSessionStorageKey, consultationSessionIdRef.current);
-      }
-      addPendingConsultationSessionId(result.consultationSessionId);
+      const resolvedSessionId = updateConsultationSessionId(
+        result.consultationSessionId || consultationSessionIdRef.current
+      );
+      addPendingConsultationSessionId(resolvedSessionId);
     } catch (joinError) {
       const message = joinError instanceof Error ? joinError.message : 'Failed to join room';
       setError(message);
@@ -257,16 +276,15 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
       { keepalive: true }
     )
       .then((result) => {
-        consultationSessionIdRef.current = result.consultationSessionId || consultationSessionIdRef.current;
-        if (consultationSessionIdRef.current) {
-          localStorage.setItem(consultationSessionStorageKey, consultationSessionIdRef.current);
-        }
-        addPendingConsultationSessionId(result.consultationSessionId);
+        const resolvedSessionId = updateConsultationSessionId(
+          result.consultationSessionId || consultationSessionIdRef.current
+        );
+        addPendingConsultationSessionId(resolvedSessionId);
       })
       .catch((trackError) => {
         console.error('Error tracking patient leave:', trackError);
       });
-  }, [consultationSessionStorageKey, patientName, roomName, user?.email, user?.uid]);
+  }, [patientName, roomName, updateConsultationSessionId, user?.email, user?.uid]);
 
   const leaveConsultation = useCallback(() => {
     if (isLeavingRef.current) {
@@ -278,11 +296,10 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
 
     localStorage.removeItem(`patientToken_${roomName}`);
     localStorage.removeItem(`patientInCall_${roomName}`);
-    localStorage.removeItem(consultationSessionStorageKey);
-    consultationSessionIdRef.current = null;
+    updateConsultationSessionId(null);
     setToken(null);
     router.replace(getPostCallRedirectPath());
-  }, [consultationSessionStorageKey, getPostCallRedirectPath, roomName, router, trackPatientLeave]);
+  }, [getPostCallRedirectPath, roomName, router, trackPatientLeave, updateConsultationSessionId]);
 
   if (!token) {
     return (
@@ -435,6 +452,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
 
       <RoomShell
         token={token}
+        consultationSessionId={consultationSessionId}
         onDisconnected={(reason) => {
           console.log('Patient disconnected from room:', roomName, 'reason:', reason);
           void leaveConsultation();

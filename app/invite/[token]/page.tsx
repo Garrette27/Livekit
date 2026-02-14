@@ -142,11 +142,22 @@ function InvitePageContent() {
   const [requiresRegistration, setRequiresRegistration] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
   const [allowLiveKitMount, setAllowLiveKitMount] = useState(false);
+  const [activeConsultationSessionId, setActiveConsultationSessionId] = useState<string | null>(null);
   const trackedJoinKeyRef = useRef<string | null>(null);
   const activeConsultationSessionIdRef = useRef<string | null>(null);
   const hasProcessedExitRef = useRef(false);
   const validationResultRef = useRef<ValidateInvitationResponse | null>(null);
   const finalizeConsultationExitRef = useRef<(redirectAfterExit: boolean) => void>(() => undefined);
+
+  const updateActiveConsultationSessionId = useCallback((nextSessionId?: string | null): string | null => {
+    const normalizedSessionId =
+      typeof nextSessionId === 'string' && nextSessionId.trim()
+        ? nextSessionId.trim()
+        : null;
+    activeConsultationSessionIdRef.current = normalizedSessionId;
+    setActiveConsultationSessionId(normalizedSessionId);
+    return normalizedSessionId;
+  }, []);
 
   // Generate device fingerprint
   useEffect(() => {
@@ -219,7 +230,7 @@ function InvitePageContent() {
   useEffect(() => {
     if (!validationResult?.roomName || validationResult.waitingRoomEnabled) {
       trackedJoinKeyRef.current = null;
-      activeConsultationSessionIdRef.current = null;
+      updateActiveConsultationSessionId(null);
       return;
     }
 
@@ -228,7 +239,7 @@ function InvitePageContent() {
       return;
     }
     trackedJoinKeyRef.current = joinTrackingKey;
-    activeConsultationSessionIdRef.current = null;
+    updateActiveConsultationSessionId(null);
 
     void trackConsultationEvent({
       roomName: validationResult.roomName,
@@ -238,7 +249,7 @@ function InvitePageContent() {
       patientEmail: user?.email || validationResult.registeredEmail || invitationEmail || null,
     })
       .then((result) => {
-        activeConsultationSessionIdRef.current = result.consultationSessionId || null;
+        updateActiveConsultationSessionId(result.consultationSessionId || null);
         addPendingConsultationSessionId(result.consultationSessionId);
       })
       .catch((trackingError) => {
@@ -256,6 +267,7 @@ function InvitePageContent() {
     validationResult?.registeredEmail,
     validationResult?.roomName,
     validationResult?.waitingRoomEnabled,
+    updateActiveConsultationSessionId,
   ]);
 
   useEffect(() => {
@@ -343,7 +355,7 @@ function InvitePageContent() {
             { keepalive: true }
           )
             .then((result) => {
-              activeConsultationSessionIdRef.current = result.consultationSessionId || null;
+              updateActiveConsultationSessionId(result.consultationSessionId || null);
               addPendingConsultationSessionId(result.consultationSessionId);
             })
             .catch((trackingError) => {
@@ -354,7 +366,7 @@ function InvitePageContent() {
         }
       }
 
-      activeConsultationSessionIdRef.current = null;
+      updateActiveConsultationSessionId(null);
       trackedJoinKeyRef.current = null;
       validationResultRef.current = null;
 
@@ -362,7 +374,15 @@ function InvitePageContent() {
         router.push(getPostCallRedirectPath());
       }
     },
-    [getPostCallRedirectPath, invitationEmail, markWaitingEntryLeftWithBeacon, router, user?.email, user?.uid]
+    [
+      getPostCallRedirectPath,
+      invitationEmail,
+      markWaitingEntryLeftWithBeacon,
+      router,
+      updateActiveConsultationSessionId,
+      user?.email,
+      user?.uid,
+    ]
   );
 
   const handleConsultationExit = useCallback(() => {
@@ -644,6 +664,7 @@ function InvitePageContent() {
               <div style={{ display: 'none' }}>
                 <PatientLiveKitRoom
                   token={validationResult.liveKitToken}
+                  consultationSessionId={null}
                   onDisconnected={() => {
                     console.log('Patient disconnected from waiting room');
                     router.push('/');
@@ -739,6 +760,7 @@ function InvitePageContent() {
       <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}>
         <PatientLiveKitRoom
           token={validationResult.liveKitToken}
+          consultationSessionId={activeConsultationSessionId}
           onDisconnected={() => {
             console.log('Patient disconnected from consultation');
             handleConsultationExit();

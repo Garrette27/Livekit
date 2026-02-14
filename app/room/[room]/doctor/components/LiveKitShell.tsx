@@ -8,14 +8,21 @@ import { DOCTOR_ROOM_GRID } from '../../components/shared/room-grid-policy';
 
 interface LiveKitShellProps {
   token: string;
+  consultationSessionId?: string | null;
   onDisconnected: () => void;
   onError: (error: Error) => void;
 }
 
-export default function LiveKitShell({ token, onDisconnected, onError }: LiveKitShellProps) {
+export default function LiveKitShell({
+  token,
+  consultationSessionId = null,
+  onDisconnected,
+  onError,
+}: LiveKitShellProps) {
   return (
     <RoomShell
       token={token}
+      consultationSessionId={consultationSessionId}
       onDisconnected={() => onDisconnected()}
       onError={(error) => {
         const isCameraPermissionError =

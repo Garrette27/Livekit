@@ -2,6 +2,8 @@ import type { Firestore } from 'firebase-admin/firestore';
 import { isKnownUserId } from '@/lib/consultations/identity-utils';
 import { generateAndStoreConsultationSummary } from '@/lib/consultations/summary-service';
 import type {
+  HistoryChatMessageRecord,
+  HistoryChatRecord,
   HistoryRecord,
   SummaryProjectionService,
   WaitingRoomHistoryRecord,
@@ -74,6 +76,7 @@ function mergeHistoryRecords(existing: HistoryRecord, incoming: HistoryRecord): 
     (incoming.waitingRoomHistory && incoming.waitingRoomHistory.totalParticipants > 0)
       ? incoming.waitingRoomHistory
       : existing.waitingRoomHistory;
+  const mergedChatHistory = mergeChatHistory(existing.chatHistory, incoming.chatHistory);
 
   return {
     ...existing,
@@ -103,6 +106,7 @@ function mergeHistoryRecords(existing: HistoryRecord, incoming: HistoryRecord): 
         ? incoming.followUpActions
         : existing.followUpActions,
     waitingRoomHistory: mergedWaitingRoomHistory,
+    chatHistory: mergedChatHistory,
   };
 }
 
@@ -199,6 +203,101 @@ function normalizeWaitingRoomHistory(value: unknown): WaitingRoomHistoryRecord |
     participantEmails,
     participants,
   };
+}
+
+function normalizeChatMessage(value: unknown): HistoryChatMessageRecord | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const raw = value as Record<string, unknown>;
+  const id = typeof raw.id === 'string' ? raw.id : '';
+  const senderId = typeof raw.senderId === 'string' ? raw.senderId : '';
+  const senderName = typeof raw.senderName === 'string' ? raw.senderName : '';
+  const senderTypeRaw = raw.senderType;
+  const senderType: HistoryChatMessageRecord['senderType'] =
+    senderTypeRaw === 'doctor' || senderTypeRaw === 'patient' || senderTypeRaw === 'system'
+      ? senderTypeRaw
+      : 'system';
+  const text = typeof raw.text === 'string' ? raw.text : '';
+  const createdAt = toIsoString(raw.createdAt);
+
+  if (!id || !senderId || !senderName) {
+    return null;
+  }
+
+  return {
+    id,
+    senderId,
+    senderName,
+    senderType,
+    text,
+    createdAt,
+  };
+}
+
+function normalizeChatHistory(value: unknown): HistoryChatRecord | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const raw = value as Record<string, unknown>;
+  const messages = Array.isArray(raw.messages)
+    ? raw.messages
+        .map((message) => normalizeChatMessage(message))
+        .filter((message): message is HistoryChatMessageRecord => Boolean(message))
+    : [];
+
+  const participants = Array.from(
+    new Set(
+      messages
+        .map((message) => message.senderName)
+        .filter((senderName) => senderName.trim().length > 0)
+    )
+  );
+
+  const firstMessageAt =
+    messages.length > 0
+      ? messages[0].createdAt
+      : toIsoString(raw.firstMessageAt);
+  const lastMessageAt =
+    messages.length > 0
+      ? messages[messages.length - 1].createdAt
+      : toIsoString(raw.lastMessageAt);
+  const totalMessagesRaw = Number(raw.totalMessages);
+  const totalMessages = Number.isFinite(totalMessagesRaw) && totalMessagesRaw >= 0
+    ? Math.round(totalMessagesRaw)
+    : messages.length;
+
+  if (messages.length === 0 && totalMessages === 0) {
+    return undefined;
+  }
+
+  return {
+    totalMessages: Math.max(totalMessages, messages.length),
+    firstMessageAt,
+    lastMessageAt,
+    participants,
+    messages,
+  };
+}
+
+function mergeChatHistory(
+  existing?: HistoryChatRecord,
+  incoming?: HistoryChatRecord
+): HistoryChatRecord | undefined {
+  if (!incoming) {
+    return existing;
+  }
+  if (!existing) {
+    return incoming;
+  }
+
+  if (incoming.totalMessages > 0) {
+    return incoming;
+  }
+
+  return existing;
 }
 
 async function resolveUserEmail(
@@ -304,6 +403,66 @@ function sortHistoryDescending(history: HistoryRecord[]): HistoryRecord[] {
   });
 }
 
+function toChatSenderType(value: unknown): HistoryChatMessageRecord['senderType'] {
+  if (value === 'doctor' || value === 'patient' || value === 'system') {
+    return value;
+  }
+  return 'system';
+}
+
+async function loadSessionChatHistory(
+  db: Firestore,
+  consultationSessionId: string
+): Promise<HistoryChatRecord | undefined> {
+  try {
+    const snapshot = await db
+      .collection('consultationSessions')
+      .doc(consultationSessionId)
+      .collection('messages')
+      .orderBy('createdAt', 'asc')
+      .limit(500)
+      .get();
+
+    if (snapshot.empty) {
+      return undefined;
+    }
+
+    const messages: HistoryChatMessageRecord[] = snapshot.docs.map((messageDoc) => {
+      const messageData = messageDoc.data() as Record<string, unknown>;
+      return {
+        id: messageDoc.id,
+        senderId: typeof messageData.senderId === 'string' ? messageData.senderId : 'unknown',
+        senderName: typeof messageData.senderName === 'string' ? messageData.senderName : 'Unknown',
+        senderType: toChatSenderType(messageData.senderType),
+        text: typeof messageData.text === 'string' ? messageData.text : '',
+        createdAt: toIsoString(messageData.createdAt || messageData.createdAtIso),
+      };
+    });
+
+    const participants = Array.from(
+      new Set(
+        messages
+          .map((message) => message.senderName)
+          .filter((senderName) => senderName.trim().length > 0)
+      )
+    );
+
+    return {
+      totalMessages: messages.length,
+      firstMessageAt: messages[0]?.createdAt || null,
+      lastMessageAt: messages[messages.length - 1]?.createdAt || null,
+      participants,
+      messages,
+    };
+  } catch (chatHistoryError) {
+    console.warn('Failed to load chat history for session:', {
+      consultationSessionId,
+      error: chatHistoryError instanceof Error ? chatHistoryError.message : chatHistoryError,
+    });
+    return undefined;
+  }
+}
+
 export class FirestoreSummaryProjectionService implements SummaryProjectionService {
   constructor(private readonly db: Firestore) {}
 
@@ -370,8 +529,12 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
     };
   }
 
-  async buildDoctorHistory(doctorUserId: string): Promise<HistoryRecord[]> {
-    const normalizedDoctorUserId = doctorUserId.trim();
+  async buildDoctorHistory(input: {
+    doctorUserId: string;
+    includeChatHistory?: boolean;
+  }): Promise<HistoryRecord[]> {
+    const normalizedDoctorUserId = input.doctorUserId.trim();
+    const includeChatHistory = input.includeChatHistory === true;
     if (!normalizedDoctorUserId) {
       throw new Error('doctorUserId is required');
     }
@@ -398,6 +561,9 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
       const waitingRoomHistory = normalizeWaitingRoomHistory(
         summaryData.waitingRoomHistory || summaryMetadata.waitingRoomHistory
       );
+      const chatHistory = normalizeChatHistory(
+        summaryData.chatHistory || summaryMetadata.chatHistory
+      );
       const record: HistoryRecord = {
         id: summaryDoc.id,
         roomName: (summaryData.roomName as string) || 'Unknown Room',
@@ -422,6 +588,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
           ? (summaryData.followUpActions as string[])
           : undefined,
         waitingRoomHistory,
+        chatHistory,
       };
 
       const existing = historyById.get(record.id);
@@ -446,6 +613,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
         || (await resolveUserEmail(this.db, userEmailCache, patientUserId));
       const sessionMetadata = (sessionData.metadata as Record<string, unknown> | undefined) || {};
       const waitingRoomHistory = normalizeWaitingRoomHistory(sessionMetadata.waitingRoomHistory);
+      const chatHistory = normalizeChatHistory(sessionMetadata.chatHistory);
       const startedAt = toIsoString(sessionData.sessionStartedAt || sessionData.createdAt || sessionData.updatedAt);
       const endedAt = toIsoString(
         sessionData.sessionEndedAt
@@ -463,13 +631,37 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
         createdBy: normalizedDoctorUserId,
         patientUserId: patientUserId || undefined,
         waitingRoomHistory,
+        chatHistory,
       };
 
       const existing = historyById.get(record.id);
       historyById.set(record.id, existing ? mergeHistoryRecords(existing, record) : record);
     }
 
-    return sortHistoryDescending(Array.from(historyById.values()));
+    const history = Array.from(historyById.values());
+    if (!includeChatHistory) {
+      return sortHistoryDescending(history);
+    }
+
+    const chatHistoryPairs = await Promise.all(
+      history.map(async (record) => {
+        const chatHistory = await loadSessionChatHistory(this.db, record.id);
+        return {
+          id: record.id,
+          chatHistory: mergeChatHistory(record.chatHistory, chatHistory),
+        };
+      })
+    );
+    const chatHistoryById = new Map(
+      chatHistoryPairs.map((pair) => [pair.id, pair.chatHistory])
+    );
+
+    return sortHistoryDescending(
+      history.map((record) => ({
+        ...record,
+        chatHistory: chatHistoryById.get(record.id) || record.chatHistory,
+      }))
+    );
   }
 
   async buildPatientHistory(input: {

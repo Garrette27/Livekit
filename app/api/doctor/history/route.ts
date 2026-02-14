@@ -4,6 +4,7 @@ import { FirestoreSummaryProjectionService } from '@/lib/services/history-summar
 
 export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
     const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ success: false, error: 'Authorization token required' }, { status: 401 });
@@ -27,7 +28,11 @@ export async function GET(req: NextRequest) {
     }
 
     const historyProjection = new FirestoreSummaryProjectionService(db);
-    const summaries = await historyProjection.buildDoctorHistory(doctorUserId);
+    const includeChatHistory = searchParams.get('includeChatHistory') === 'true';
+    const summaries = await historyProjection.buildDoctorHistory({
+      doctorUserId,
+      includeChatHistory,
+    });
 
     return NextResponse.json({
       success: true,

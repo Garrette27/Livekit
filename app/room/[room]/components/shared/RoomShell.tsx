@@ -21,6 +21,7 @@ interface RoomShellProps {
   controlsPolicy?: RoomControlsPolicy;
   chatPolicy?: RoomChatPolicy;
   gridPolicy?: RoomGridPolicy;
+  consultationSessionId?: string | null;
 }
 
 const DEFAULT_CHAT_POLICY: RoomChatPolicy = {
@@ -127,6 +128,121 @@ function openChatPanel(attempt = 0): void {
   window.setTimeout(() => openChatPanel(attempt + 1), 120);
 }
 
+function toChatTimestampKey(value: unknown): number {
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  return 0;
+}
+
+function inferSenderType(senderId: string): 'doctor' | 'patient' | 'system' {
+  if (senderId.startsWith('doctor_')) {
+    return 'doctor';
+  }
+  if (senderId.startsWith('patient_')) {
+    return 'patient';
+  }
+
+  return 'system';
+}
+
+/**
+ * Persists LiveKit chat messages into consultation session storage.
+ * Idempotent message ids keep re-renders from creating duplicate records.
+ */
+function ChatPersistenceBridge({
+  enabled,
+  consultationSessionId,
+}: {
+  enabled: boolean;
+  consultationSessionId?: string | null;
+}) {
+  const { chatMessages } = useChat();
+  const persistedMessageIdsRef = React.useRef<Set<string>>(new Set());
+  const activeSessionIdRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    const normalizedSessionId =
+      typeof consultationSessionId === 'string' && consultationSessionId.trim()
+        ? consultationSessionId.trim()
+        : null;
+    if (activeSessionIdRef.current === normalizedSessionId) {
+      return;
+    }
+
+    activeSessionIdRef.current = normalizedSessionId;
+    persistedMessageIdsRef.current = new Set<string>();
+  }, [consultationSessionId]);
+
+  React.useEffect(() => {
+    const normalizedSessionId =
+      typeof consultationSessionId === 'string' && consultationSessionId.trim()
+        ? consultationSessionId.trim()
+        : null;
+    if (!enabled || !normalizedSessionId) {
+      return;
+    }
+
+    const persistMessages = async () => {
+      for (const message of chatMessages) {
+        const messageText = typeof message.message === 'string' ? message.message.trim() : '';
+        if (!messageText) {
+          continue;
+        }
+
+        const senderId = message.from?.identity || 'unknown';
+        const senderName = message.from?.name || message.from?.identity || 'Unknown';
+        const messageTimestamp = toChatTimestampKey(message.timestamp);
+        const persistedMessageId =
+          typeof message.id === 'string' && message.id.trim()
+            ? message.id.trim()
+            : `${senderId}:${messageTimestamp}:${messageText}`;
+
+        if (persistedMessageIdsRef.current.has(persistedMessageId)) {
+          continue;
+        }
+
+        persistedMessageIdsRef.current.add(persistedMessageId);
+        try {
+          const response = await fetch('/api/session-chat/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              consultationSessionId: normalizedSessionId,
+              senderId,
+              senderName,
+              senderType: inferSenderType(senderId),
+              text: messageText,
+              messageId: persistedMessageId,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to persist chat message (${response.status})`);
+          }
+        } catch (persistError) {
+          persistedMessageIdsRef.current.delete(persistedMessageId);
+          console.error('Failed to persist consultation chat message:', persistError);
+        }
+      }
+    };
+
+    void persistMessages();
+  }, [chatMessages, consultationSessionId, enabled]);
+
+  return null;
+}
+
 function ChatBehaviorBridge({
   enabled,
   defaultOpen,
@@ -230,6 +346,7 @@ export default function RoomShell({
   controlsPolicy,
   chatPolicy = DEFAULT_CHAT_POLICY,
   gridPolicy = DEFAULT_GRID_POLICY,
+  consultationSessionId = null,
 }: RoomShellProps) {
   const roomScopeRef = useRef<HTMLDivElement | null>(null);
   const [participantCount, setParticipantCount] = useState(1);
@@ -257,6 +374,10 @@ export default function RoomShell({
           enabled={chatEnabled}
           defaultOpen={chatDefaultOpen}
           autoOpenOnIncomingMessage={chatAutoOpenOnIncomingMessage}
+        />
+        <ChatPersistenceBridge
+          enabled={chatEnabled}
+          consultationSessionId={consultationSessionId}
         />
         <VideoConference />
       </LiveKitRoom>

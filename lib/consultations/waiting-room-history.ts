@@ -49,6 +49,7 @@ export interface WaitingRoomHistorySnapshot {
 interface BuildWaitingRoomHistoryInput {
   roomName: string;
   doctorUserId?: string | null;
+  consultationSessionId?: string | null;
   sessionStartedAt: Date;
   sessionEndedAt: Date;
 }
@@ -170,6 +171,128 @@ function toParticipantHistory(
   };
 }
 
+interface SessionWindowCandidate {
+  consultationSessionId: string;
+  sessionEndedAt: Date | null;
+}
+
+function normalizeConsultationSessionId(
+  sessionDocId: string,
+  sessionData: Record<string, unknown>
+): string {
+  const sessionIdFromData = sessionData.consultationSessionId;
+  if (typeof sessionIdFromData === 'string' && sessionIdFromData.trim()) {
+    return sessionIdFromData.trim();
+  }
+
+  return sessionDocId;
+}
+
+function resolveSessionEndedAt(sessionData: Record<string, unknown>): Date | null {
+  const metadata = (sessionData.metadata as Record<string, unknown> | undefined) || {};
+  return toDate(sessionData.sessionEndedAt || metadata.sessionEndedAt || sessionData.updatedAt);
+}
+
+function extractWaitingPatientIdFromEvent(eventData: Record<string, unknown>): string | null {
+  const metadata = (eventData.metadata as Record<string, unknown> | undefined) || {};
+  const waitingPatientId = metadata.waitingPatientId;
+  if (typeof waitingPatientId !== 'string') {
+    return null;
+  }
+
+  const normalized = waitingPatientId.trim();
+  return normalized.startsWith('waiting_') ? normalized : null;
+}
+
+/**
+ * Session events carry waitingPatientId for moderation and close actions.
+ * Reusing room names is safe once history reads are anchored to those ids.
+ */
+async function resolveSessionScopedWaitingPatientIds(
+  db: Firestore,
+  consultationSessionId?: string | null
+): Promise<Set<string>> {
+  if (!consultationSessionId) {
+    return new Set<string>();
+  }
+
+  try {
+    const eventsSnapshot = await db
+      .collection('consultationSessions')
+      .doc(consultationSessionId)
+      .collection('events')
+      .limit(500)
+      .get();
+
+    const waitingPatientIds = new Set<string>();
+    eventsSnapshot.docs.forEach((eventDoc) => {
+      const waitingPatientId = extractWaitingPatientIdFromEvent(eventDoc.data() as Record<string, unknown>);
+      if (waitingPatientId) {
+        waitingPatientIds.add(waitingPatientId);
+      }
+    });
+
+    return waitingPatientIds;
+  } catch (error) {
+    console.warn('Failed to resolve session-scoped waiting patient ids:', error);
+    return new Set<string>();
+  }
+}
+
+/**
+ * Reused room names can contain waiting entries from older encounters.
+ * The previous session end acts as a hard floor so one summary cannot absorb prior sessions.
+ */
+async function resolveWindowStart(
+  db: Firestore,
+  input: {
+    roomName: string;
+    consultationSessionId?: string | null;
+    sessionStartedAt: Date;
+  }
+): Promise<Date> {
+  const defaultWindowStart = new Date(input.sessionStartedAt.getTime() - (6 * 60 * 60 * 1000));
+  if (!input.consultationSessionId) {
+    return defaultWindowStart;
+  }
+
+  try {
+    const sessionSnapshot = await db
+      .collection('consultationSessions')
+      .where('roomName', '==', input.roomName)
+      .limit(300)
+      .get();
+
+    const previousSession = sessionSnapshot.docs
+      .map((sessionDoc) => {
+        const sessionData = sessionDoc.data() as Record<string, unknown>;
+        return {
+          consultationSessionId: normalizeConsultationSessionId(sessionDoc.id, sessionData),
+          sessionEndedAt: resolveSessionEndedAt(sessionData),
+        } as SessionWindowCandidate;
+      })
+      .filter((candidate) =>
+        candidate.consultationSessionId !== input.consultationSessionId
+        && Boolean(candidate.sessionEndedAt)
+        && (candidate.sessionEndedAt as Date).getTime() <= input.sessionStartedAt.getTime()
+      )
+      .sort((left, right) =>
+        (right.sessionEndedAt as Date).getTime() - (left.sessionEndedAt as Date).getTime()
+      )[0];
+
+    if (!previousSession?.sessionEndedAt) {
+      return defaultWindowStart;
+    }
+
+    return new Date(
+      Math.max(defaultWindowStart.getTime(), previousSession.sessionEndedAt.getTime() + 1)
+    );
+  } catch (error) {
+    console.warn('Failed to resolve waiting-room history window start:', error);
+    return defaultWindowStart;
+  }
+}
+
 /**
  * Build waiting-room participant history scoped to a single finalized consultation session.
  * The window intentionally includes pre-join waiting time so waiting metrics stay accurate.
@@ -178,8 +301,16 @@ export async function buildWaitingRoomHistorySnapshot(
   db: Firestore,
   input: BuildWaitingRoomHistoryInput
 ): Promise<WaitingRoomHistorySnapshot> {
-  const windowStart = new Date(input.sessionStartedAt.getTime() - (6 * 60 * 60 * 1000));
+  const windowStart = await resolveWindowStart(db, {
+    roomName: input.roomName,
+    consultationSessionId: input.consultationSessionId || null,
+    sessionStartedAt: input.sessionStartedAt,
+  });
   const windowEnd = new Date(input.sessionEndedAt.getTime() + (30 * 60 * 1000));
+  const sessionScopedWaitingPatientIds = await resolveSessionScopedWaitingPatientIds(
+    db,
+    input.consultationSessionId || null
+  );
 
   const snapshot = await db
     .collection('waitingPatients')
@@ -198,6 +329,10 @@ export async function buildWaitingRoomHistorySnapshot(
     .filter((waitingPatient) => {
       if (input.doctorUserId && waitingPatient.doctorUserId && waitingPatient.doctorUserId !== input.doctorUserId) {
         return false;
+      }
+
+      if (sessionScopedWaitingPatientIds.size > 0) {
+        return sessionScopedWaitingPatientIds.has(waitingPatient.id);
       }
 
       const joinedAt = toDate(waitingPatient.joinedAt);

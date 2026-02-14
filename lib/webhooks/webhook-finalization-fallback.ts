@@ -104,13 +104,20 @@ function resolveEventTimestamp(event: LiveKitWebhookEvent): Date {
   return new Date();
 }
 
-async function markWaitingEntryLeftFromWebhook(
-  db: Firestore,
-  waitingPatientId: string
-): Promise<'left' | 'rejected'> {
-  const invitationAccess = new FirestoreInvitationAccessCore(db);
-  const result = await invitationAccess.markWaitingEntryLeft({ waitingPatientId });
-  return result.status;
+async function handleParticipantLeftWithWaitingEntry(input: {
+  db: Firestore;
+  waitingPatientId: string;
+  roomName: string;
+}): Promise<{
+  handled: boolean;
+  reason: string;
+  status: 'left' | 'rejected' | null;
+}> {
+  const invitationAccess = new FirestoreInvitationAccessCore(input.db);
+  return invitationAccess.handleParticipantLeftWebhook({
+    waitingPatientId: input.waitingPatientId,
+    roomName: input.roomName,
+  });
 }
 
 async function finalizeSessionFromWebhook(input: {
@@ -198,10 +205,14 @@ export async function processWebhookFinalizationFallback(
 
   const waitingPatientId = extractWaitingPatientId(participantIdentity);
   if (waitingPatientId) {
-    const waitingStatus = await markWaitingEntryLeftFromWebhook(db, waitingPatientId);
+    const waitingEntryResult = await handleParticipantLeftWithWaitingEntry({
+      db,
+      waitingPatientId,
+      roomName,
+    });
     return {
-      handled: true,
-      reason: `waiting_entry_marked_${waitingStatus}`,
+      handled: waitingEntryResult.handled,
+      reason: waitingEntryResult.reason,
       roomName,
       waitingPatientId,
     };

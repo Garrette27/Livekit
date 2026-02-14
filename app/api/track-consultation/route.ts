@@ -6,7 +6,6 @@ import type {
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import {
   buildVisibleUserIds,
-  choosePatientUserId,
   isKnownUserId,
 } from '@/lib/consultations/identity-utils';
 import { calculateDurationMinutes } from '@/lib/consultations/session-timing';
@@ -129,13 +128,19 @@ function resolvePatientIdentity(params: {
     resolvedPatientUserId = 'anonymous';
   }
 
-  if (preferExistingKnownPatient && !resolvedPatientEmail) {
+  const shouldCarryExistingKnownIdentity =
+    preferExistingKnownPatient
+    && isKnownUserId(resolvedPatientUserId)
+    && isKnownUserId(existingPatientUserId)
+    && resolvedPatientUserId === existingPatientUserId;
+
+  if (shouldCarryExistingKnownIdentity && !resolvedPatientEmail) {
     resolvedPatientEmail = existingPatientEmail || null;
   }
 
   return {
-    patientUserId: preferExistingKnownPatient
-      ? choosePatientUserId(resolvedPatientUserId, existingPatientUserId || null)
+    patientUserId: shouldCarryExistingKnownIdentity
+      ? existingPatientUserId as string
       : resolvedPatientUserId || 'anonymous',
     patientEmail: resolvedPatientEmail || null,
   };

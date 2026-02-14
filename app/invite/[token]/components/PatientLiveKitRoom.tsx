@@ -10,6 +10,7 @@ interface PatientLiveKitRoomProps {
   onDisconnected: () => void;
   onError: (error: Error) => void;
   onLeaveClick?: () => void;
+  consultationSessionId?: string | null;
 }
 
 export default function PatientLiveKitRoom({
@@ -17,6 +18,7 @@ export default function PatientLiveKitRoom({
   onDisconnected,
   onError,
   onLeaveClick,
+  consultationSessionId = null,
 }: PatientLiveKitRoomProps) {
   return (
     <>
@@ -48,6 +50,7 @@ export default function PatientLiveKitRoom({
         controlsPolicy={PATIENT_ROOM_CONTROLS}
         chatPolicy={PATIENT_ROOM_CHAT}
         gridPolicy={PATIENT_ROOM_GRID}
+        consultationSessionId={consultationSessionId}
       />
 
       {onLeaveClick && (
