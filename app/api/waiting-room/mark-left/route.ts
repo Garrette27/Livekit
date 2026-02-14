@@ -2,9 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { FirestoreInvitationAccessCore, toInvitationAccessError } from '@/lib/services/invitation-access';
 
+async function parseRequestBody(req: NextRequest): Promise<Record<string, unknown>> {
+  const rawBody = await req.text();
+  if (!rawBody) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(rawBody) as Record<string, unknown>;
+  } catch {
+    const params = new URLSearchParams(rawBody);
+    return {
+      waitingPatientId: params.get('waitingPatientId') || undefined,
+    };
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await parseRequestBody(req);
     const waitingPatientId = typeof body.waitingPatientId === 'string' ? body.waitingPatientId.trim() : '';
 
     if (!waitingPatientId) {

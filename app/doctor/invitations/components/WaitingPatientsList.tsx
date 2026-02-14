@@ -67,9 +67,19 @@ export default function WaitingPatientsList({
     doctorUserId: user.uid,
     invitationIds: activeInvitationIds,
     selectedInvitationId,
+    statuses: ['waiting', 'admitted'],
     autoRefresh: true,
     pollIntervalMs: 5000,
   });
+
+  const waitingOnly = useMemo(
+    () => waitingPatients.filter((patient) => patient.status === 'waiting'),
+    [waitingPatients]
+  );
+  const admittedOnly = useMemo(
+    () => waitingPatients.filter((patient) => patient.status === 'admitted'),
+    [waitingPatients]
+  );
 
   useEffect(() => {
     if (!onCountUpdate) {
@@ -123,10 +133,10 @@ export default function WaitingPatientsList({
     );
   }
 
-  if (waitingPatients.length === 0) {
+  if (waitingOnly.length === 0 && admittedOnly.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>
-        <p>{selectedInvitationId ? 'No patients waiting for this invitation.' : 'No patients waiting.'}</p>
+        <p>{selectedInvitationId ? 'No patients in queue for this invitation.' : 'No patients in queue.'}</p>
         <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
           {selectedInvitationId
             ? 'Patients will appear here when they join using this invitation link.'
@@ -138,124 +148,233 @@ export default function WaitingPatientsList({
 
   return (
     <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-      {waitingPatients.map((patient) => {
-        const joinedAt = toDate(patient.joinedAt);
-        const waitTime = Math.floor((Date.now() - joinedAt.getTime()) / 1000 / 60);
-        const displayName =
-          patient.patientName && patient.patientName !== 'Anonymous Patient'
-            ? patient.patientName
-            : patient.patientEmail || 'Anonymous Patient';
+      <div style={{ marginBottom: '1rem' }}>
+        <p
+          style={{
+            margin: '0 0 0.5rem 0',
+            fontSize: '0.75rem',
+            color: '#6b7280',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+          }}
+        >
+          Waiting Queue ({waitingOnly.length})
+        </p>
+        {waitingOnly.length === 0 ? (
+          <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>No one waiting right now.</p>
+        ) : (
+          waitingOnly.map((patient) => {
+            const joinedAt = toDate(patient.joinedAt);
+            const waitTime = Math.floor((Date.now() - joinedAt.getTime()) / 1000 / 60);
+            const displayName =
+              patient.patientName && patient.patientName !== 'Anonymous Patient'
+                ? patient.patientName
+                : patient.patientEmail || 'Anonymous Patient';
 
-        return (
-          <div
-            key={patient.id}
-            style={{
-              border: '1px solid #E5E7EB',
-              borderRadius: '0.5rem',
-              padding: '1rem',
-              marginBottom: '1rem',
-              backgroundColor: '#F9FAFB',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                marginBottom: '0.75rem',
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                  Room: {patient.roomName}
-                </h3>
-                <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '0.25rem' }}>
-                  <strong>Email:</strong> {patient.patientEmail || 'Unknown'}
-                </p>
-                <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '0.25rem' }}>
-                  <strong>Name:</strong> {displayName}
-                </p>
-                <p style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '0.25rem' }}>
-                  <strong>Joined:</strong> {joinedAt.toLocaleString()}
-                </p>
-                <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.5rem' }}>
-                  Waiting for {waitTime} minute{waitTime !== 1 ? 's' : ''}
-                </p>
+            return (
+              <div
+                key={patient.id}
+                style={{
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '0.5rem',
+                  padding: '1rem',
+                  marginBottom: '1rem',
+                  backgroundColor: '#F9FAFB',
+                }}
+              >
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                    Room: {patient.roomName}
+                  </h3>
+                  <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '0.25rem' }}>
+                    <strong>Email:</strong> {patient.patientEmail || 'Unknown'}
+                  </p>
+                  <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '0.25rem' }}>
+                    <strong>Name:</strong> {displayName}
+                  </p>
+                  <p style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '0.25rem' }}>
+                    <strong>Joined:</strong> {joinedAt.toLocaleString()}
+                  </p>
+                  <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.5rem' }}>
+                    Waiting for {waitTime} minute{waitTime !== 1 ? 's' : ''}
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={async () => {
+                      const admitted = await admitPatient(patient.id, patient.roomName);
+                      if (admitted) {
+                        showToast({
+                          kind: 'success',
+                          title: 'Patient admitted',
+                          message: `${displayName} can now join the consultation room.`,
+                        });
+                      }
+                    }}
+                    disabled={admittingId === patient.id}
+                    style={{
+                      backgroundColor: admittingId === patient.id ? '#9ca3af' : '#059669',
+                      color: 'white',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '0.375rem',
+                      border: 'none',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      cursor: admittingId === patient.id ? 'not-allowed' : 'pointer',
+                      flex: 1,
+                    }}
+                  >
+                    {admittingId === patient.id ? 'Admitting...' : 'Admit'}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (pendingRejectId !== patient.id) {
+                        setPendingRejectId(patient.id);
+                        showToast({
+                          kind: 'info',
+                          title: 'Confirm removal',
+                          message: 'Click Reject again within 5 seconds to remove this patient.',
+                        });
+                        return;
+                      }
+
+                      const rejected = await rejectPatient(patient.id);
+                      setPendingRejectId(null);
+                      if (rejected) {
+                        showToast({
+                          kind: 'success',
+                          title: 'Patient removed',
+                          message: `${displayName} was removed from the waiting room.`,
+                        });
+                      }
+                    }}
+                    disabled={rejectingId === patient.id}
+                    style={{
+                      backgroundColor: rejectingId === patient.id ? '#9ca3af' : '#dc2626',
+                      color: 'white',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '0.375rem',
+                      border: 'none',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      cursor: rejectingId === patient.id ? 'not-allowed' : 'pointer',
+                      flex: 1,
+                    }}
+                  >
+                    {rejectingId === patient.id
+                      ? 'Removing...'
+                      : pendingRejectId === patient.id
+                        ? 'Confirm Reject'
+                        : 'Reject'}
+                  </button>
+                </div>
               </div>
-            </div>
+            );
+          })
+        )}
+      </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <button
-                onClick={async () => {
-                  const admitted = await admitPatient(patient.id, patient.roomName);
-                  if (admitted) {
-                    showToast({
-                      kind: 'success',
-                      title: 'Patient admitted',
-                      message: `${displayName} can now join the consultation room.`,
-                    });
-                  }
-                }}
-                disabled={admittingId === patient.id}
+      <div>
+        <p
+          style={{
+            margin: '0 0 0.5rem 0',
+            fontSize: '0.75rem',
+            color: '#6b7280',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+          }}
+        >
+          In Consultation Room ({admittedOnly.length})
+        </p>
+        {admittedOnly.length === 0 ? (
+          <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>No admitted patient currently in room.</p>
+        ) : (
+          admittedOnly.map((patient) => {
+            const admittedAt = toDate(patient.admittedAt || patient.joinedAt);
+            const admittedMinutes = Math.max(0, Math.floor((Date.now() - admittedAt.getTime()) / 1000 / 60));
+            const displayName =
+              patient.patientName && patient.patientName !== 'Anonymous Patient'
+                ? patient.patientName
+                : patient.patientEmail || 'Anonymous Patient';
+
+            return (
+              <div
+                key={patient.id}
                 style={{
-                  backgroundColor: admittingId === patient.id ? '#9ca3af' : '#059669',
-                  color: 'white',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.375rem',
-                  border: 'none',
-                  fontSize: '0.75rem',
-                  fontWeight: '500',
-                  cursor: admittingId === patient.id ? 'not-allowed' : 'pointer',
-                  flex: 1,
+                  border: '1px solid #d1fae5',
+                  borderRadius: '0.5rem',
+                  padding: '1rem',
+                  marginBottom: '1rem',
+                  backgroundColor: '#ecfdf5',
                 }}
               >
-                {admittingId === patient.id ? 'Admitting...' : 'Admit'}
-              </button>
-              <button
-                onClick={async () => {
-                  if (pendingRejectId !== patient.id) {
-                    setPendingRejectId(patient.id);
-                    showToast({
-                      kind: 'info',
-                      title: 'Confirm removal',
-                      message: 'Click Reject again within 5 seconds to remove this patient.',
-                    });
-                    return;
-                  }
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#065f46', marginBottom: '0.25rem' }}>
+                    Room: {patient.roomName}
+                  </h3>
+                  <p style={{ fontSize: '0.875rem', color: '#047857', marginBottom: '0.25rem' }}>
+                    <strong>Email:</strong> {patient.patientEmail || 'Unknown'}
+                  </p>
+                  <p style={{ fontSize: '0.875rem', color: '#047857', marginBottom: '0.25rem' }}>
+                    <strong>Name:</strong> {displayName}
+                  </p>
+                  <p style={{ fontSize: '0.75rem', color: '#047857', marginBottom: '0.25rem' }}>
+                    <strong>Admitted:</strong> {admittedAt.toLocaleString()}
+                  </p>
+                  <p style={{ fontSize: '0.75rem', color: '#059669', marginTop: '0.5rem' }}>
+                    In room for {admittedMinutes} minute{admittedMinutes !== 1 ? 's' : ''}
+                  </p>
+                </div>
 
-                  const rejected = await rejectPatient(patient.id);
-                  setPendingRejectId(null);
-                  if (rejected) {
-                    showToast({
-                      kind: 'success',
-                      title: 'Patient removed',
-                      message: `${displayName} was removed from the waiting room.`,
-                    });
-                  }
-                }}
-                disabled={rejectingId === patient.id}
-                style={{
-                  backgroundColor: rejectingId === patient.id ? '#9ca3af' : '#dc2626',
-                  color: 'white',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.375rem',
-                  border: 'none',
-                  fontSize: '0.75rem',
-                  fontWeight: '500',
-                  cursor: rejectingId === patient.id ? 'not-allowed' : 'pointer',
-                  flex: 1,
-                }}
-              >
-                {rejectingId === patient.id
-                  ? 'Removing...'
-                  : pendingRejectId === patient.id
-                  ? 'Confirm Reject'
-                  : 'Reject'}
-              </button>
-            </div>
-          </div>
-        );
-      })}
+                <button
+                  onClick={async () => {
+                    if (pendingRejectId !== patient.id) {
+                      setPendingRejectId(patient.id);
+                      showToast({
+                        kind: 'info',
+                        title: 'Confirm removal',
+                        message: 'Click Remove again within 5 seconds to remove this patient.',
+                      });
+                      return;
+                    }
+
+                    const removed = await rejectPatient(patient.id);
+                    setPendingRejectId(null);
+                    if (removed) {
+                      showToast({
+                        kind: 'success',
+                        title: 'Patient removed',
+                        message: `${displayName} was removed from the consultation room.`,
+                      });
+                    }
+                  }}
+                  disabled={rejectingId === patient.id}
+                  style={{
+                    backgroundColor: rejectingId === patient.id ? '#9ca3af' : '#b91c1c',
+                    color: 'white',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.375rem',
+                    border: 'none',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                    cursor: rejectingId === patient.id ? 'not-allowed' : 'pointer',
+                    width: '100%',
+                  }}
+                >
+                  {rejectingId === patient.id
+                    ? 'Removing...'
+                    : pendingRejectId === patient.id
+                      ? 'Confirm Remove'
+                      : 'Remove from Room'}
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }

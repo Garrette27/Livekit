@@ -18,6 +18,8 @@ interface CallSummary {
   riskLevel: string;
   category: string;
   createdAt: Timestamp;
+  startedAt?: Timestamp;
+  endedAt?: Timestamp;
   participants: string[];
   duration: number;
   metadata?: {
@@ -42,6 +44,8 @@ interface DoctorHistoryResponseItem {
   id: string;
   roomName?: string;
   createdAt?: string | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
   duration?: number;
   doctorEmail?: string;
   patientEmail?: string;
@@ -77,12 +81,27 @@ function mapHistoryRecordToSummary(record: DoctorHistoryResponseItem): CallSumma
     riskLevel: record.riskLevel || 'Low',
     category: record.category || 'General',
     createdAt: toTimestamp(record.createdAt),
+    startedAt: record.startedAt || record.createdAt ? toTimestamp(record.startedAt || record.createdAt || null) : undefined,
+    endedAt: record.endedAt ? toTimestamp(record.endedAt) : undefined,
     participants: [],
     duration: Math.max(0, Math.round(Number(record.duration || 0))),
     metadata: {
       totalParticipants: 1,
     },
   };
+}
+
+function formatTimestamp(value?: Timestamp): string {
+  if (!value) {
+    return 'Unknown';
+  }
+
+  const dateValue = value.toDate?.();
+  if (!dateValue || dateValue.getTime() <= 0) {
+    return 'Unknown';
+  }
+
+  return dateValue.toLocaleString();
 }
 
 export default function DoctorDashboard() {
@@ -381,7 +400,11 @@ export default function DoctorDashboard() {
                         )}
                       </h3>
                       <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                        {summary.createdAt?.toDate?.()?.toLocaleString() || 'Unknown date'}
+                        <strong>Started:</strong> {formatTimestamp(summary.startedAt || summary.createdAt)}
+                        {' | '}
+                        <strong>Ended:</strong> {formatTimestamp(summary.endedAt)}
+                        {' | '}
+                        <strong>Duration:</strong> {summary.duration} minute{summary.duration === 1 ? '' : 's'}
                         {summary.metadata?.lastEditedAt && (
                           <span style={{ marginLeft: '0.5rem', fontStyle: 'italic' }}>
                             | Last edited: {summary.metadata.lastEditedAt?.toDate?.()?.toLocaleString() || 'Unknown'}

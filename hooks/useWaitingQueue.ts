@@ -68,7 +68,7 @@ export function useWaitingQueue({
   doctorUserId,
   invitationIds,
   selectedInvitationId = null,
-  statuses = ['waiting'],
+  statuses,
   autoRefresh = true,
   pollIntervalMs = 15_000,
 }: UseWaitingQueueOptions): UseWaitingQueueResult {
@@ -92,7 +92,13 @@ export function useWaitingQueue({
     () => (invitationIds ? [...invitationIds].sort().join('|') : 'all'),
     [invitationIds]
   );
-  const statusScope = useMemo(() => [...statuses].sort().join('|'), [statuses]);
+  const normalizedStatuses = useMemo(() => {
+    const requestedStatuses: Array<'waiting' | 'admitted' | 'left' | 'rejected'> =
+      Array.isArray(statuses) && statuses.length > 0 ? statuses : ['waiting'];
+
+    return Array.from(new Set(requestedStatuses)).sort();
+  }, [Array.isArray(statuses) ? statuses.join('|') : 'waiting']);
+  const statusScope = useMemo(() => normalizedStatuses.join('|'), [normalizedStatuses]);
   const scopeKey = useMemo(
     () =>
       `${roomName || 'all-rooms'}::${doctorUserId || 'all-doctors'}::${selectedInvitationId || 'all'}::${invitationScope}::${statusScope}`,
@@ -144,7 +150,11 @@ export function useWaitingQueue({
           return;
         }
 
-        const result = await listWaitingPatients({ roomName, doctorUserId, statuses });
+        const result = await listWaitingPatients({
+          roomName,
+          doctorUserId,
+          statuses: normalizedStatuses,
+        });
         if (!result.success) {
           dispatch(
             setWaitingQueueSnapshot({
@@ -186,7 +196,15 @@ export function useWaitingQueue({
         }
       }
     },
-    [dispatch, doctorUserId, invitationIdsSet, roomName, scopeKey, selectedInvitationId, statuses]
+    [
+      dispatch,
+      doctorUserId,
+      invitationIdsSet,
+      normalizedStatuses,
+      roomName,
+      scopeKey,
+      selectedInvitationId,
+    ]
   );
 
   const admitPatient = useCallback(

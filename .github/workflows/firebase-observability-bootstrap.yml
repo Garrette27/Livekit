@@ -1,0 +1,45 @@
+name: Firebase Observability Bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      notification_channels:
+        description: "Comma-separated notification channel IDs or full resource names"
+        required: true
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+      NOTIFICATION_CHANNELS: ${{ github.event.inputs.notification_channels }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate required configuration
+        run: |
+          if [ -z "${GCP_PROJECT}" ]; then
+            echo "GCP_PROJECT_ID secret is required." >&2
+            exit 1
+          fi
+          if [ -z "${NOTIFICATION_CHANNELS}" ]; then
+            echo "notification_channels input is required." >&2
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Provision log metrics and alert policies
+        run: bash scripts/observability/provision-firebase-alerts.sh

@@ -55,37 +55,36 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
     }
   }, [isAuthenticated, user, doctorName, token, isJoining, generateDoctorToken]);
 
-  const handleLeave = async () => {
+  const handleLeave = () => {
     if (user?.uid) {
-      try {
-        await trackDoctorPresenceEvent({
+      void trackDoctorPresenceEvent(
+        {
           roomName,
           action: 'leave',
           doctorUserId: user.uid,
           doctorName: doctorName || user.displayName || user.email,
           doctorEmail: user.email || null,
-        });
-      } catch (presenceError) {
+        },
+        { keepalive: true }
+      ).catch((presenceError) => {
         console.error('Error tracking doctor leave:', presenceError);
-      }
+      });
     }
 
     clearToken();
 
     if (db && roomName) {
-      try {
-        const callRef = doc(db, 'calls', roomName);
-        await setDoc(
-          callRef,
-          {
-            status: 'completed',
-            endedAt: new Date(),
-          },
-          { merge: true }
-        );
-      } catch (error) {
+      const callRef = doc(db, 'calls', roomName);
+      void setDoc(
+        callRef,
+        {
+          status: 'completed',
+          endedAt: new Date(),
+        },
+        { merge: true }
+      ).catch((error) => {
         console.error('Error updating call status:', error);
-      }
+      });
     }
 
     window.location.href = '/doctor/invitations';

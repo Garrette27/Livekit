@@ -65,3 +65,54 @@ Adopt the same correlation keys in Vercel API logs and Firebase Function logs:
 - `requestId`
 
 This lets one incident be traced across invitation, waiting room, session lifecycle, and summary projection.
+
+## Repository Implementation
+
+Implemented artifacts:
+
+- Structured logging utility for Firebase Functions:
+  - `functions/structured-logger.js`
+- Functions updated to emit structured logs:
+  - `functions/index.js`
+  - `functions/activity-log-pipeline.js`
+- Post-deploy log check script:
+  - `scripts/ci/check-firebase-function-logs.js`
+- Alert policy + log metric provisioning script:
+  - `scripts/observability/provision-firebase-alerts.sh`
+- GitHub Actions workflows:
+  - `/.github/workflows/firebase-functions-deploy.yml`
+  - `/.github/workflows/firebase-observability-bootstrap.yml`
+
+## Required GitHub Secrets
+
+- `GCP_PROJECT_ID`: Google Cloud project id.
+- `GCP_SA_KEY`: Service account JSON key with permissions for:
+  - Firebase Functions deploy
+  - Cloud Logging read
+  - Cloud Monitoring policy create/update
+  - Logging metric create/update
+
+## How To Run
+
+1. Deploy functions + run post-deploy log check
+- Trigger workflow: `Firebase Functions Deploy`
+- Optional inputs:
+  - `log_lookback_minutes`
+  - `log_error_threshold`
+  - `log_warning_threshold`
+
+2. Provision log metrics + alert policies
+- Trigger workflow: `Firebase Observability Bootstrap`
+- Input:
+  - `notification_channels`
+  - Example: `1234567890123456789,projects/livekit-5eef6/notificationChannels/987654321`
+
+## Correlation Contract (enforced in function logs)
+
+Each structured log includes these keys (nullable when unknown):
+
+- `eventDomain`
+- `eventType`
+- `consultationSessionId`
+- `roomName`
+- `invitationId`

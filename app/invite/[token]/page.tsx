@@ -276,6 +276,17 @@ function InvitePageContent() {
     return '/patient/login';
   }, [isAuthenticated, user?.uid]);
 
+  const markWaitingEntryLeftWithBeacon = useCallback((waitingPatientId: string): boolean => {
+    if (typeof navigator === 'undefined' || typeof navigator.sendBeacon !== 'function') {
+      return false;
+    }
+
+    return navigator.sendBeacon(
+      '/api/waiting-room/mark-left',
+      JSON.stringify({ waitingPatientId })
+    );
+  }, []);
+
   const finalizeConsultationExit = useCallback(
     (redirectAfterExit: boolean) => {
       if (hasProcessedExitRef.current) {
@@ -289,14 +300,17 @@ function InvitePageContent() {
       const currentValidation = validationResultRef.current;
       const waitingPatientId = currentValidation?.waitingPatientId;
       if (waitingPatientId) {
-        void fetch('/api/waiting-room/mark-left', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ waitingPatientId }),
-          keepalive: true,
-        }).catch((markLeftError) => {
-          console.error('Error marking waiting entry as left:', markLeftError);
-        });
+        const markedWithBeacon = markWaitingEntryLeftWithBeacon(waitingPatientId);
+        if (!markedWithBeacon) {
+          void fetch('/api/waiting-room/mark-left', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ waitingPatientId }),
+            keepalive: true,
+          }).catch((markLeftError) => {
+            console.error('Error marking waiting entry as left:', markLeftError);
+          });
+        }
       }
 
       if (currentValidation?.roomName && !currentValidation.waitingRoomEnabled) {
@@ -341,7 +355,7 @@ function InvitePageContent() {
         router.push(getPostCallRedirectPath());
       }
     },
-    [getPostCallRedirectPath, invitationEmail, router, user?.email, user?.uid]
+    [getPostCallRedirectPath, invitationEmail, markWaitingEntryLeftWithBeacon, router, user?.email, user?.uid]
   );
 
   const handleConsultationExit = useCallback(() => {
@@ -352,15 +366,22 @@ function InvitePageContent() {
     const handleBrowserExit = () => {
       finalizeConsultationExit(false);
     };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        finalizeConsultationExit(false);
+      }
+    };
 
     window.addEventListener('beforeunload', handleBrowserExit);
     window.addEventListener('pagehide', handleBrowserExit);
     window.addEventListener('popstate', handleBrowserExit);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.removeEventListener('beforeunload', handleBrowserExit);
       window.removeEventListener('pagehide', handleBrowserExit);
       window.removeEventListener('popstate', handleBrowserExit);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [finalizeConsultationExit]);
 

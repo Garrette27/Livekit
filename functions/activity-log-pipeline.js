@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
+const { logInfo, logError } = require('./structured-logger');
 
 const AUDIT_LOG_COLLECTION = 'audit-logs';
 const ADMIN_ACTIVITY_FEED_COLLECTION = 'admin-activity-feed';
@@ -295,63 +296,101 @@ async function writeActivityDocuments({
   eventType,
   summary,
 }) {
-  const db = admin.firestore();
+  try {
+    const db = admin.firestore();
 
-  const auditRef = db.collection(AUDIT_LOG_COLLECTION).doc(eventId);
-  const adminFeedRef = db.collection(ADMIN_ACTIVITY_FEED_COLLECTION).doc(eventId);
+    const auditRef = db.collection(AUDIT_LOG_COLLECTION).doc(eventId);
+    const adminFeedRef = db.collection(ADMIN_ACTIVITY_FEED_COLLECTION).doc(eventId);
 
-  const auditPayload = {
-    schemaVersion: 1,
-    eventId,
-    operation,
-    sourceCollection,
-    sourcePath,
-    sourceDocumentId: documentId,
-    roomName: roomName || null,
-    consultationSessionId: consultationSessionId || null,
-    doctorUserId: doctorUserId || null,
-    patientUserId: patientUserId || null,
-    actorUserId: actorUserId || null,
-    actorEmail: actorEmail || null,
-    userId: actorUserId || patientUserId || doctorUserId || null,
-    eventType: eventType || null,
-    summary,
-    changedFields,
-    before: beforeSnapshot,
-    after: afterSnapshot,
-    occurredAt,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    source: 'cloud-function:onWrite',
-  };
-
-  const adminFeedPayload = {
-    schemaVersion: 1,
-    eventId,
-    operation,
-    sourceCollection,
-    sourcePath,
-    sourceDocumentId: documentId,
-    roomName: roomName || null,
-    consultationSessionId: consultationSessionId || null,
-    doctorUserId: doctorUserId || null,
-    patientUserId: patientUserId || null,
-    actorUserId: actorUserId || null,
-    actorEmail: actorEmail || null,
-    eventType: eventType || null,
-    summary,
-    changedFields: changedFields.slice(0, MAX_FEED_CHANGED_FIELDS),
-    occurredAt,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    tags: [
-      sourceCollection,
+    const auditPayload = {
+      schemaVersion: 1,
+      eventId,
       operation,
-      roomName || null,
-      consultationSessionId || null,
-      eventType || null,
-    ].filter(Boolean),
-  };
+      sourceCollection,
+      sourcePath,
+      sourceDocumentId: documentId,
+      roomName: roomName || null,
+      consultationSessionId: consultationSessionId || null,
+      doctorUserId: doctorUserId || null,
+      patientUserId: patientUserId || null,
+      actorUserId: actorUserId || null,
+      actorEmail: actorEmail || null,
+      userId: actorUserId || patientUserId || doctorUserId || null,
+      eventType: eventType || null,
+      summary,
+      changedFields,
+      before: beforeSnapshot,
+      after: afterSnapshot,
+      occurredAt,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      source: 'cloud-function:onWrite',
+    };
 
-  await Promise.all([auditRef.set(auditPayload), adminFeedRef.set(adminFeedPayload)]);
+    const adminFeedPayload = {
+      schemaVersion: 1,
+      eventId,
+      operation,
+      sourceCollection,
+      sourcePath,
+      sourceDocumentId: documentId,
+      roomName: roomName || null,
+      consultationSessionId: consultationSessionId || null,
+      doctorUserId: doctorUserId || null,
+      patientUserId: patientUserId || null,
+      actorUserId: actorUserId || null,
+      actorEmail: actorEmail || null,
+      eventType: eventType || null,
+      summary,
+      changedFields: changedFields.slice(0, MAX_FEED_CHANGED_FIELDS),
+      occurredAt,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      tags: [
+        sourceCollection,
+        operation,
+        roomName || null,
+        consultationSessionId || null,
+        eventType || null,
+      ].filter(Boolean),
+    };
+
+    await Promise.all([auditRef.set(auditPayload), adminFeedRef.set(adminFeedPayload)]);
+
+    logInfo({
+      message: 'Audit and admin activity documents written.',
+      correlation: {
+        eventDomain: 'audit.activity',
+        eventType: eventType || `firestore_${operation}`,
+        consultationSessionId,
+        roomName,
+      },
+      metadata: {
+        sourceCollection,
+        sourcePath,
+        sourceDocumentId: documentId,
+        operation,
+        eventId,
+      },
+    });
+  } catch (error) {
+    logError({
+      message: 'Failed to persist audit/admin activity documents.',
+      correlation: {
+        eventDomain: 'audit.activity',
+        eventType: eventType || `firestore_${operation}_failed`,
+        consultationSessionId,
+        roomName,
+      },
+      metadata: {
+        sourceCollection,
+        sourcePath,
+        sourceDocumentId: documentId,
+        operation,
+        eventId,
+      },
+      error,
+    });
+    throw error;
+  }
 }
 
 /**
@@ -359,60 +398,7 @@ async function writeActivityDocuments({
  */
 function createTopLevelCollectionTrigger(collectionName) {
   return functions.firestore.document(`${collectionName}/{documentId}`).onWrite(async (change, context) => {
-    const operation = resolveOperation(change);
-    const beforeData = change.before.exists ? change.before.data() : null;
-    const afterData = change.after.exists ? change.after.data() : null;
-
-    const beforeSnapshot = sanitizeForLog(beforeData);
-    const afterSnapshot = sanitizeForLog(afterData);
-    const changedFields =
-      operation === 'update'
-        ? collectChangedFields(beforeSnapshot, afterSnapshot).slice(0, MAX_CHANGED_FIELDS)
-        : [];
-
-    const actor = resolveActor(beforeData, afterData);
-    const entityContext = resolveEntityContext(collectionName, context.params || {}, beforeData, afterData);
-    const sourcePath = `${collectionName}/${context.params.documentId}`;
-    const eventId = `${collectionName}_${context.eventId}`;
-    const occurredAt = context.timestamp ? new Date(context.timestamp) : new Date();
-    const summary = buildSummary({
-      sourceCollection: collectionName,
-      operation,
-      documentId: context.params.documentId,
-      changedFields,
-      roomName: entityContext.roomName,
-      eventType: entityContext.eventType,
-    });
-
-    await writeActivityDocuments({
-      eventId,
-      occurredAt,
-      sourceCollection: collectionName,
-      sourcePath,
-      documentId: context.params.documentId,
-      operation,
-      changedFields,
-      beforeSnapshot,
-      afterSnapshot,
-      actorUserId: actor.actorUserId,
-      actorEmail: actor.actorEmail,
-      roomName: entityContext.roomName,
-      consultationSessionId: entityContext.consultationSessionId,
-      doctorUserId: entityContext.doctorUserId,
-      patientUserId: entityContext.patientUserId,
-      eventType: entityContext.eventType,
-      summary,
-    });
-  });
-}
-
-/**
- * Track immutable presence timeline writes from consultationSessions/{id}/events.
- */
-function createConsultationEventTrigger() {
-  return functions.firestore
-    .document('consultationSessions/{consultationSessionId}/events/{eventId}')
-    .onWrite(async (change, context) => {
+    try {
       const operation = resolveOperation(change);
       const beforeData = change.before.exists ? change.before.data() : null;
       const afterData = change.after.exists ? change.after.data() : null;
@@ -425,19 +411,14 @@ function createConsultationEventTrigger() {
           : [];
 
       const actor = resolveActor(beforeData, afterData);
-      const entityContext = resolveEntityContext(
-        'consultationSessionEvents',
-        context.params || {},
-        beforeData,
-        afterData
-      );
-      const sourcePath = `consultationSessions/${context.params.consultationSessionId}/events/${context.params.eventId}`;
-      const eventId = `consultationSessionEvents_${context.eventId}`;
+      const entityContext = resolveEntityContext(collectionName, context.params || {}, beforeData, afterData);
+      const sourcePath = `${collectionName}/${context.params.documentId}`;
+      const eventId = `${collectionName}_${context.eventId}`;
       const occurredAt = context.timestamp ? new Date(context.timestamp) : new Date();
       const summary = buildSummary({
-        sourceCollection: 'consultationSessionEvents',
+        sourceCollection: collectionName,
         operation,
-        documentId: context.params.eventId,
+        documentId: context.params.documentId,
         changedFields,
         roomName: entityContext.roomName,
         eventType: entityContext.eventType,
@@ -446,9 +427,9 @@ function createConsultationEventTrigger() {
       await writeActivityDocuments({
         eventId,
         occurredAt,
-        sourceCollection: 'consultationSessionEvents',
+        sourceCollection: collectionName,
         sourcePath,
-        documentId: context.params.eventId,
+        documentId: context.params.documentId,
         operation,
         changedFields,
         beforeSnapshot,
@@ -456,13 +437,110 @@ function createConsultationEventTrigger() {
         actorUserId: actor.actorUserId,
         actorEmail: actor.actorEmail,
         roomName: entityContext.roomName,
-        consultationSessionId:
-          entityContext.consultationSessionId || context.params.consultationSessionId || null,
+        consultationSessionId: entityContext.consultationSessionId,
         doctorUserId: entityContext.doctorUserId,
         patientUserId: entityContext.patientUserId,
         eventType: entityContext.eventType,
         summary,
       });
+    } catch (error) {
+      logError({
+        message: 'Top-level activity trigger failed.',
+        correlation: {
+          eventDomain: 'audit.activity',
+          eventType: 'top_level_trigger_failed',
+          roomName:
+            typeof change.after.data?.()?.roomName === 'string'
+              ? change.after.data().roomName
+              : null,
+        },
+        metadata: {
+          sourceCollection: collectionName,
+          sourceDocumentId: context.params.documentId,
+          triggerEventId: context.eventId,
+        },
+        error,
+      });
+      throw error;
+    }
+  });
+}
+
+/**
+ * Track immutable presence timeline writes from consultationSessions/{id}/events.
+ */
+function createConsultationEventTrigger() {
+  return functions.firestore
+    .document('consultationSessions/{consultationSessionId}/events/{eventId}')
+    .onWrite(async (change, context) => {
+      try {
+        const operation = resolveOperation(change);
+        const beforeData = change.before.exists ? change.before.data() : null;
+        const afterData = change.after.exists ? change.after.data() : null;
+
+        const beforeSnapshot = sanitizeForLog(beforeData);
+        const afterSnapshot = sanitizeForLog(afterData);
+        const changedFields =
+          operation === 'update'
+            ? collectChangedFields(beforeSnapshot, afterSnapshot).slice(0, MAX_CHANGED_FIELDS)
+            : [];
+
+        const actor = resolveActor(beforeData, afterData);
+        const entityContext = resolveEntityContext(
+          'consultationSessionEvents',
+          context.params || {},
+          beforeData,
+          afterData
+        );
+        const sourcePath = `consultationSessions/${context.params.consultationSessionId}/events/${context.params.eventId}`;
+        const eventId = `consultationSessionEvents_${context.eventId}`;
+        const occurredAt = context.timestamp ? new Date(context.timestamp) : new Date();
+        const summary = buildSummary({
+          sourceCollection: 'consultationSessionEvents',
+          operation,
+          documentId: context.params.eventId,
+          changedFields,
+          roomName: entityContext.roomName,
+          eventType: entityContext.eventType,
+        });
+
+        await writeActivityDocuments({
+          eventId,
+          occurredAt,
+          sourceCollection: 'consultationSessionEvents',
+          sourcePath,
+          documentId: context.params.eventId,
+          operation,
+          changedFields,
+          beforeSnapshot,
+          afterSnapshot,
+          actorUserId: actor.actorUserId,
+          actorEmail: actor.actorEmail,
+          roomName: entityContext.roomName,
+          consultationSessionId:
+            entityContext.consultationSessionId || context.params.consultationSessionId || null,
+          doctorUserId: entityContext.doctorUserId,
+          patientUserId: entityContext.patientUserId,
+          eventType: entityContext.eventType,
+          summary,
+        });
+      } catch (error) {
+        logError({
+          message: 'Consultation session event trigger failed.',
+          correlation: {
+            eventDomain: 'audit.activity',
+            eventType: 'consultation_event_trigger_failed',
+            consultationSessionId: context.params.consultationSessionId || null,
+          },
+          metadata: {
+            sourceCollection: 'consultationSessionEvents',
+            sourceDocumentId: context.params.eventId,
+            triggerEventId: context.eventId,
+          },
+          error,
+        });
+        throw error;
+      }
     });
 }
 

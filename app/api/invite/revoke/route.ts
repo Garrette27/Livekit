@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { finalizeConsultationForRoom } from '../../../../lib/consultations/session-finalization';
+import { FirestoreInvitationAccessCore } from '@/lib/services/invitation-access';
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,7 +33,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const invitation = invitationDoc.data() as { roomName?: string; status?: string };
+    const invitation = invitationDoc.data() as {
+      roomName?: string;
+      status?: string;
+      createdBy?: string;
+    };
     const revokedAt = new Date();
 
     if (invitation.status !== 'revoked') {
@@ -44,6 +49,21 @@ export async function POST(req: NextRequest) {
         { merge: true }
       );
     }
+
+    const invitationAccess = new FirestoreInvitationAccessCore(db);
+    const activeWaitingEntries = await invitationAccess.listWaitingEntries({
+      invitationId,
+      statuses: ['waiting', 'admitted'],
+    });
+
+    await Promise.all(
+      activeWaitingEntries.map((waitingEntry) =>
+        invitationAccess.rejectWaitingEntry({
+          waitingPatientId: waitingEntry.id,
+          doctorUserId: invitation.createdBy,
+        })
+      )
+    );
 
     let finalizationResult: { consultationSessionId: string; finalDurationMinutes: number } | null = null;
     if (invitation.roomName) {
@@ -63,6 +83,7 @@ export async function POST(req: NextRequest) {
                 reason: 'invitation_revoked',
                 consultationSessionId: finalizationResult.consultationSessionId,
                 finalDurationMinutes: finalizationResult.finalDurationMinutes,
+                removedParticipantsCount: activeWaitingEntries.length,
               },
             },
           },
@@ -75,6 +96,7 @@ export async function POST(req: NextRequest) {
       success: true,
       invitationId,
       revokedAt: revokedAt.toISOString(),
+      removedParticipantsCount: activeWaitingEntries.length,
       finalization: finalizationResult,
     });
   } catch (error) {

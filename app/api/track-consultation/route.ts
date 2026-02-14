@@ -11,7 +11,6 @@ import {
 } from '@/lib/consultations/identity-utils';
 import { calculateDurationMinutes } from '@/lib/consultations/session-timing';
 import { resolveLeaveSessionId } from '@/lib/consultations/consultation-session-store';
-import { generateAndStoreConsultationSummary } from '@/lib/consultations/summary-service';
 import { FirestoreConsultationSessionCore } from '@/lib/services/video-chat';
 
 type ConsultationAction = 'join' | 'leave';
@@ -140,25 +139,6 @@ function resolvePatientIdentity(params: {
       : resolvedPatientUserId || 'anonymous',
     patientEmail: resolvedPatientEmail || null,
   };
-}
-
-async function loadTranscriptionData(
-  db: Firestore,
-  roomName: string
-): Promise<any[] | null> {
-  try {
-    const callDoc = await db.collection('calls').doc(roomName).get();
-    if (!callDoc.exists) {
-      return null;
-    }
-
-    const callData = callDoc.data();
-    const transcription = callData?.transcription;
-    return Array.isArray(transcription) ? transcription : null;
-  } catch (error) {
-    console.error('Could not fetch transcription data:', error);
-    return null;
-  }
 }
 
 async function handleJoinEvent(
@@ -360,18 +340,6 @@ async function handleLeaveEvent(
       patientEmail,
       durationMinutes: finalDurationMinutes,
     },
-  });
-
-  const transcriptionData = await loadTranscriptionData(db, roomName);
-  await generateAndStoreConsultationSummary({
-    roomName,
-    patientName: patientName || existingData.patientName || 'Unknown Patient',
-    durationMinutes: finalDurationMinutes,
-    userId: doctorUserId,
-    consultationSessionId,
-    transcriptionData,
-    patientUserId,
-    patientEmail,
   });
 
   return {

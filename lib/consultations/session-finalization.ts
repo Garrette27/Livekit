@@ -55,6 +55,105 @@ function pickSessionDocument(docs: Array<{ id: string; data: Record<string, unkn
   return sortedByStart.find((candidate) => candidate.data.status === 'active') || sortedByStart[0] || null;
 }
 
+function hasActiveDoctorInPresence(
+  activeDoctors: Record<string, Record<string, unknown> | undefined>,
+  doctorUserId?: string | null
+): boolean {
+  if (doctorUserId && activeDoctors[doctorUserId]?.joinedAt) {
+    return true;
+  }
+
+  return Object.values(activeDoctors).some((doctorPresence) => Boolean(doctorPresence?.joinedAt));
+}
+
+async function resolveEffectiveSessionEndedAt(
+  db: Firestore,
+  input: {
+    roomName: string;
+    reason: FinalizationReason;
+    finalizedAt: Date;
+    sessionData: Record<string, unknown>;
+  }
+): Promise<Date> {
+  if (input.reason === 'doctor_left') {
+    return input.finalizedAt;
+  }
+
+  const sessionMetadata = (input.sessionData.metadata as Record<string, unknown> | undefined) || {};
+  const lastDoctorLeftAt = toDate(sessionMetadata.lastDoctorLeftAt);
+  if (!lastDoctorLeftAt || lastDoctorLeftAt.getTime() > input.finalizedAt.getTime()) {
+    return input.finalizedAt;
+  }
+
+  if (input.reason === 'invitation_expired') {
+    return lastDoctorLeftAt;
+  }
+
+  if (input.reason !== 'invitation_revoked') {
+    return input.finalizedAt;
+  }
+
+  try {
+    const presenceDoc = await db.collection('roomDoctorPresence').doc(input.roomName).get();
+    if (!presenceDoc.exists) {
+      return lastDoctorLeftAt;
+    }
+
+    const presenceData = presenceDoc.data() as Record<string, unknown>;
+    const activeDoctors =
+      (presenceData.activeDoctors as Record<string, Record<string, unknown> | undefined> | undefined) || {};
+    const doctorUserId =
+      typeof input.sessionData.doctorUserId === 'string' ? input.sessionData.doctorUserId : null;
+
+    return hasActiveDoctorInPresence(activeDoctors, doctorUserId)
+      ? input.finalizedAt
+      : lastDoctorLeftAt;
+  } catch (presenceLookupError) {
+    console.warn('Failed to resolve active doctor presence during finalization:', presenceLookupError);
+    return input.finalizedAt;
+  }
+}
+
+async function applyFinalizationToSummary(
+  db: Firestore,
+  input: {
+    consultationSessionId: string;
+    finalDurationMinutes: number;
+    sessionStartedAt: Date;
+    sessionEndedAt: Date;
+    finalizedAt: Date;
+    reason: FinalizationReason;
+  }
+): Promise<void> {
+  const summaryRef = db.collection('call-summaries').doc(input.consultationSessionId);
+  const summaryDoc = await summaryRef.get();
+  if (!summaryDoc.exists) {
+    return;
+  }
+
+  const summaryData = summaryDoc.data() as Record<string, unknown>;
+  const summaryMetadata = (summaryData.metadata as Record<string, unknown> | undefined) || {};
+  await summaryRef.set(
+    {
+      duration: Math.max(parseDuration(summaryData.duration), input.finalDurationMinutes),
+      startedAt: input.sessionStartedAt,
+      endedAt: input.sessionEndedAt,
+      metadata: {
+        ...summaryMetadata,
+        sessionStartedAt: input.sessionStartedAt.toISOString(),
+        durationMinutes: input.finalDurationMinutes,
+        finalDurationMinutes: input.finalDurationMinutes,
+        sessionEndedAt: input.sessionEndedAt.toISOString(),
+        finalizedAt: input.finalizedAt.toISOString(),
+        finalizationReason: input.reason,
+        durationSource: 'session_finalization',
+      },
+      updatedAt: new Date(),
+    },
+    { merge: true }
+  );
+}
+
 export async function finalizeConsultationForRoom(
   db: Firestore,
   {
@@ -92,12 +191,18 @@ export async function finalizeConsultationForRoom(
   const sessionDoc = await sessionRef.get();
   const sessionData = (sessionDoc.exists ? sessionDoc.data() : selectedSession.data) as Record<string, unknown>;
   const sessionMetadata = (sessionData.metadata as Record<string, unknown> | undefined) || {};
+  const effectiveSessionEndedAt = await resolveEffectiveSessionEndedAt(db, {
+    roomName,
+    reason,
+    finalizedAt,
+    sessionData,
+  });
 
   const sessionStartedAt =
     toDate(sessionData.sessionStartedAt || sessionData.createdAt || sessionData.updatedAt) || finalizedAt;
   const durationFromClock = calculateDurationMinutes({
     startedAt: sessionStartedAt,
-    endedAt: finalizedAt,
+    endedAt: effectiveSessionEndedAt,
   });
   const finalDurationMinutes = Math.max(
     durationFromClock,
@@ -113,12 +218,13 @@ export async function finalizeConsultationForRoom(
       roomName,
       status: 'completed',
       sessionStartedAt,
-      sessionEndedAt: finalizedAt,
+      sessionEndedAt: effectiveSessionEndedAt,
       duration: finalDurationMinutes,
       metadata: {
         ...sessionMetadata,
         durationMinutes: finalDurationMinutes,
         finalDurationMinutes: finalDurationMinutes,
+        sessionEndedAt: effectiveSessionEndedAt.toISOString(),
         finalizedAt: finalizedAt.toISOString(),
         finalizationReason: reason,
         updatedAt: new Date().toISOString(),
@@ -137,41 +243,20 @@ export async function finalizeConsultationForRoom(
       roomName,
       consultationSessionId,
       sessionStartedAt,
-      leftAt: finalizedAt,
+      leftAt: effectiveSessionEndedAt,
       duration: finalDurationMinutes,
       status: 'completed',
       metadata: {
         ...consultationMetadata,
         durationMinutes: finalDurationMinutes,
         finalDurationMinutes: finalDurationMinutes,
+        sessionEndedAt: effectiveSessionEndedAt.toISOString(),
         finalizedAt: finalizedAt.toISOString(),
         finalizationReason: reason,
       },
     },
     { merge: true }
   );
-
-  const summaryRef = db.collection('call-summaries').doc(consultationSessionId);
-  const summaryDoc = await summaryRef.get();
-  if (summaryDoc.exists) {
-    const summaryData = summaryDoc.data() as Record<string, unknown>;
-    const summaryMetadata = (summaryData.metadata as Record<string, unknown> | undefined) || {};
-    await summaryRef.set(
-      {
-        duration: Math.max(parseDuration(summaryData.duration), finalDurationMinutes),
-        metadata: {
-          ...summaryMetadata,
-          durationMinutes: finalDurationMinutes,
-          finalDurationMinutes: finalDurationMinutes,
-          finalizedAt: finalizedAt.toISOString(),
-          finalizationReason: reason,
-          durationSource: 'session_finalization',
-        },
-        updatedAt: new Date(),
-      },
-      { merge: true }
-    );
-  }
 
   if (regenerateSummary) {
     const doctorUserId =
@@ -204,6 +289,15 @@ export async function finalizeConsultationForRoom(
       });
     }
   }
+
+  await applyFinalizationToSummary(db, {
+    consultationSessionId,
+    finalDurationMinutes,
+    sessionStartedAt,
+    sessionEndedAt: effectiveSessionEndedAt,
+    finalizedAt,
+    reason,
+  });
 
   return {
     consultationSessionId,

@@ -1,0 +1,70 @@
+name: Firebase Functions Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      log_lookback_minutes:
+        description: "Post-deploy Firebase log check lookback window in minutes"
+        required: false
+        default: "20"
+      log_error_threshold:
+        description: "Fail build when error logs are >= this value"
+        required: false
+        default: "1"
+      log_warning_threshold:
+        description: "Warn when error logs are >= this value"
+        required: false
+        default: "1"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        run: |
+          if [ -z "${GCP_PROJECT}" ]; then
+            echo "GCP_PROJECT_ID secret is required." >&2
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Firebase Functions dependencies
+        working-directory: functions
+        run: npm ci
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools
+
+      - name: Deploy Firebase Functions
+        run: firebase deploy --only functions --project "${GCP_PROJECT}"
+
+      - name: Post-deploy Firebase function log check
+        env:
+          LOG_LOOKBACK_MINUTES: ${{ github.event.inputs.log_lookback_minutes || '20' }}
+          LOG_ERROR_THRESHOLD: ${{ github.event.inputs.log_error_threshold || '1' }}
+          LOG_WARNING_THRESHOLD: ${{ github.event.inputs.log_warning_threshold || '1' }}
+          LOG_READ_LIMIT: "250"
+          LOG_STRICT_CORRELATION: "false"
+        run: node scripts/ci/check-firebase-function-logs.js

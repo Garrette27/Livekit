@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withRateLimit, RateLimitConfigs } from '../../../lib/rate-limit';
-import { processRoomEndEvent, isRoomEndEvent } from '../../../lib/webhooks/room-end-processor';
+import { isRoomEndEvent } from '../../../lib/webhooks/room-end-processor';
 import { verifyWebhookSignature } from '../../../lib/webhooks/signature-utils';
 
 export async function POST(req: NextRequest) {
@@ -33,14 +33,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
-    if (event?.event === 'room_finished') {
-      console.log('Processing room_finished event');
-      const result = await processRoomEndEvent(event);
-      if (result.skipped) {
-        return NextResponse.json({ success: true, skipped: true });
-      }
-    } else if (isRoomEndEvent(event)) {
-      console.log(`Skipping ${event.event} summary generation; handled by consultation session tracking.`);
+    if (isRoomEndEvent(event)) {
+      console.log(`Skipping ${event.event} summary generation; handled by consultation finalization policy.`);
+      return NextResponse.json({ success: true, skipped: true });
     }
 
     return NextResponse.json({ success: true });

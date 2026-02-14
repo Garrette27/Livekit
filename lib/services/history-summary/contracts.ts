@@ -2,6 +2,8 @@ export interface HistoryRecord {
   id: string;
   roomName: string;
   createdAt: string | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
   duration: number;
   doctorEmail?: string;
   patientEmail?: string;

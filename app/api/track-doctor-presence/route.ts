@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { appendPresenceEvent } from '@/lib/consultations/consultation-session-store';
-import { finalizeConsultationForRoom } from '@/lib/consultations/session-finalization';
 
 type DoctorPresenceAction = 'join' | 'leave';
 
@@ -256,20 +255,12 @@ export async function POST(req: Request) {
       },
     });
 
-    const finalizationResult = await finalizeConsultationForRoom(db, {
-      roomName,
-      finalizedAt: now,
-      reason: 'doctor_left',
-      regenerateSummary: true,
-    });
-    const finalDurationMinutes = finalizationResult?.finalDurationMinutes || doctorDurationMinutes;
-
     return NextResponse.json({
       success: true,
       message: 'Doctor leave tracked',
       consultationSessionId,
       doctorDurationMinutes,
-      finalDurationMinutes,
+      finalDurationMinutes: doctorDurationMinutes,
     });
   } catch (error) {
     console.error('Track doctor presence error:', error);
