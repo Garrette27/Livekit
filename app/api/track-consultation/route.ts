@@ -34,6 +34,31 @@ interface ResolvedPatientIdentity {
   patientEmail: string | null;
 }
 
+async function parseTrackConsultationRequest(req: Request): Promise<TrackConsultationRequest | null> {
+  const rawBody = await req.text();
+  if (!rawBody) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawBody) as TrackConsultationRequest;
+  } catch {
+    const params = new URLSearchParams(rawBody);
+    const roomName = params.get('roomName') || undefined;
+    const action = params.get('action');
+    const consultationSessionId = params.get('consultationSessionId') || undefined;
+
+    return {
+      roomName,
+      action: action === 'join' || action === 'leave' ? action : undefined,
+      patientName: params.get('patientName') || undefined,
+      userId: params.get('userId') || undefined,
+      patientEmail: params.get('patientEmail') || undefined,
+      consultationSessionId,
+    };
+  }
+}
+
 function toDate(value: unknown): Date | null {
   if (!value) {
     return null;
@@ -78,31 +103,6 @@ async function lookupDoctorUserId(
   }
 }
 
-async function isDoctorActiveInRoom(
-  db: Firestore,
-  roomName: string,
-  doctorUserId: string
-): Promise<boolean> {
-  try {
-    const presenceDoc = await db.collection('roomDoctorPresence').doc(roomName).get();
-    if (!presenceDoc.exists) {
-      return false;
-    }
-
-    const presenceData = presenceDoc.data() as Record<string, unknown>;
-    const activeDoctors =
-      (presenceData.activeDoctors as Record<string, { joinedAt?: unknown } | undefined> | undefined) || {};
-    if (doctorUserId && activeDoctors[doctorUserId]) {
-      return true;
-    }
-
-    return Object.values(activeDoctors).some((entry) => Boolean(entry?.joinedAt));
-  } catch (error) {
-    console.error('Error checking active doctor presence:', error);
-    return false;
-  }
-}
-
 function resolvePatientIdentity(params: {
     roomName: string;
     userId?: string;
@@ -142,7 +142,6 @@ function resolvePatientIdentity(params: {
 }
 
 async function handleJoinEvent(
-  db: Firestore,
   sessionCore: FirestoreConsultationSessionCore,
   params: {
     roomName: string;
@@ -165,23 +164,9 @@ async function handleJoinEvent(
   } = params;
 
   const now = new Date();
-  const existingPatientUserId = existingData?.patientUserId || existingData?.metadata?.patientUserId || null;
   const existingVisibleToUsers = existingData?.metadata?.visibleToUsers || [];
-  const existingPatientEmail =
-    (typeof existingData?.patientEmail === 'string' ? existingData.patientEmail : null)
-    || (typeof existingData?.metadata?.patientEmail === 'string' ? existingData.metadata.patientEmail : null);
-  const hasActiveDoctor = await isDoctorActiveInRoom(db, roomName, doctorUserId);
-  const allowCompletedReuse = Boolean(
-    hasActiveDoctor &&
-    existingData?.status === 'completed' &&
-    existingData?.consultationSessionId &&
-    isKnownUserId(existingPatientUserId) &&
-    isKnownUserId(patientUserId) &&
-    existingPatientUserId === patientUserId &&
-    patientEmail &&
-    existingPatientEmail &&
-    patientEmail.toLowerCase() === existingPatientEmail.toLowerCase()
-  );
+  // Treat each completed encounter as immutable history. Rejoins must create a new session id.
+  const allowCompletedReuse = false;
 
   const session = await sessionCore.startSession({
     roomName,
@@ -350,7 +335,14 @@ async function handleLeaveEvent(
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as TrackConsultationRequest;
+    const body = await parseTrackConsultationRequest(req);
+    if (!body) {
+      return NextResponse.json(
+        { success: false, error: 'Request body is required' },
+        { status: 400 }
+      );
+    }
+
     const roomName = body.roomName?.trim();
     const action = body.action;
     const patientName = body.patientName?.trim() || 'Unknown Patient';
@@ -413,7 +405,7 @@ export async function POST(req: Request) {
     });
 
     if (action === 'join') {
-      const joinResult = await handleJoinEvent(db, sessionCore, {
+      const joinResult = await handleJoinEvent(sessionCore, {
         roomName,
         patientName,
         patientUserId: resolvedPatient.patientUserId,

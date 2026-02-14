@@ -106,9 +106,14 @@ function mergeHistoryRecords(existing: HistoryRecord, incoming: HistoryRecord): 
   };
 }
 
-function hasFinalizationMetadata(sessionData: Record<string, unknown>): boolean {
+function isCompletedSession(sessionData: Record<string, unknown>): boolean {
+  const status = typeof sessionData.status === 'string' ? sessionData.status.trim().toLowerCase() : '';
+  if (status === 'completed') {
+    return true;
+  }
+
   const metadata = (sessionData.metadata as Record<string, unknown> | undefined) || {};
-  return typeof metadata.finalizationReason === 'string' && metadata.finalizationReason.trim().length > 0;
+  return Boolean(toIsoString(sessionData.sessionEndedAt || metadata.sessionEndedAt));
 }
 
 function toFiniteNonNegativeNumber(value: unknown): number {
@@ -425,7 +430,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
 
     for (const sessionDoc of sessionDocs) {
       const sessionData = sessionDoc.data() as Record<string, unknown>;
-      if (!hasFinalizationMetadata(sessionData)) {
+      if (!isCompletedSession(sessionData)) {
         continue;
       }
       const sessionId =
@@ -541,7 +546,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
     const sessionRoomNames = new Set<string>();
     for (const { sessionId, doc } of sessionDocs) {
       const sessionData = doc.data() as Record<string, unknown>;
-      if (!hasFinalizationMetadata(sessionData)) {
+      if (!isCompletedSession(sessionData)) {
         continue;
       }
       const sessionMetadata = (sessionData.metadata as Record<string, unknown> | undefined) || {};

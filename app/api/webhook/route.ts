@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { withRateLimit, RateLimitConfigs } from '../../../lib/rate-limit';
 import { isRoomEndEvent } from '../../../lib/webhooks/room-end-processor';
 import { verifyWebhookSignature } from '../../../lib/webhooks/signature-utils';
+import { processWebhookFinalizationFallback } from '../../../lib/webhooks/webhook-finalization-fallback';
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,8 +36,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (isRoomEndEvent(event)) {
-      console.log(`Skipping ${event.event} summary generation; handled by consultation finalization policy.`);
-      return NextResponse.json({ success: true, skipped: true });
+      const db = getFirebaseAdmin();
+      if (!db) {
+        console.warn('Skipping webhook finalization fallback because Firebase Admin is not initialized.');
+        return NextResponse.json({ success: true, skipped: true, reason: 'database_unavailable' });
+      }
+
+      const fallbackResult = await processWebhookFinalizationFallback(db, event);
+      console.log(`Processed ${event.event} via webhook finalization fallback:`, fallbackResult);
+      return NextResponse.json({
+        success: true,
+        skipped: !fallbackResult.handled,
+        fallback: fallbackResult,
+      });
     }
 
     return NextResponse.json({ success: true });

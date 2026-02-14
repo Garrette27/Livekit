@@ -6,12 +6,18 @@ import {
   type WaitingRoomHistorySnapshot,
 } from './waiting-room-history';
 
-type FinalizationReason = 'doctor_left' | 'invitation_revoked' | 'invitation_expired';
+type FinalizationReason =
+  | 'doctor_left'
+  | 'invitation_revoked'
+  | 'invitation_expired'
+  | 'patient_left_webhook'
+  | 'room_finished_webhook';
 
 interface FinalizeConsultationInput {
   roomName: string;
   finalizedAt: Date;
   reason: FinalizationReason;
+  requireActiveSession?: boolean;
   regenerateSummary?: boolean;
 }
 
@@ -49,14 +55,22 @@ function parseDuration(value: unknown): number {
   return Math.round(parsed);
 }
 
-function pickSessionDocument(docs: Array<{ id: string; data: Record<string, unknown> }>) {
+function pickSessionDocument(
+  docs: Array<{ id: string; data: Record<string, unknown> }>,
+  input: { requireActiveSession: boolean }
+) {
   const sortedByStart = [...docs].sort((left, right) => {
     const leftStartedAt = toDate(left.data.sessionStartedAt || left.data.createdAt)?.getTime() || 0;
     const rightStartedAt = toDate(right.data.sessionStartedAt || right.data.createdAt)?.getTime() || 0;
     return rightStartedAt - leftStartedAt;
   });
 
-  return sortedByStart.find((candidate) => candidate.data.status === 'active') || sortedByStart[0] || null;
+  const activeSession = sortedByStart.find((candidate) => candidate.data.status === 'active') || null;
+  if (input.requireActiveSession) {
+    return activeSession;
+  }
+
+  return activeSession || sortedByStart[0] || null;
 }
 
 function hasActiveDoctorInPresence(
@@ -79,7 +93,11 @@ async function resolveEffectiveSessionEndedAt(
     sessionData: Record<string, unknown>;
   }
 ): Promise<Date> {
-  if (input.reason === 'doctor_left') {
+  if (
+    input.reason === 'doctor_left'
+    || input.reason === 'patient_left_webhook'
+    || input.reason === 'room_finished_webhook'
+  ) {
     return input.finalizedAt;
   }
 
@@ -166,6 +184,7 @@ export async function finalizeConsultationForRoom(
     roomName,
     finalizedAt,
     reason,
+    requireActiveSession = false,
     regenerateSummary = true,
   }: FinalizeConsultationInput
 ): Promise<FinalizationResult | null> {
@@ -183,7 +202,9 @@ export async function finalizeConsultationForRoom(
     id: doc.id,
     data: doc.data() as Record<string, unknown>,
   }));
-  const selectedSession = pickSessionDocument(sessionCandidates);
+  const selectedSession = pickSessionDocument(sessionCandidates, {
+    requireActiveSession,
+  });
   if (!selectedSession) {
     return null;
   }

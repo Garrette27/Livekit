@@ -133,6 +133,7 @@ function InvitePageContent() {
   const router = useRouter();
   const token = params.token as string;
   const { user, isAuthenticated, isLoading: authLoading } = useAuthSession();
+  const disableLiveKitForE2E = process.env.NEXT_PUBLIC_E2E_MODE === '1';
   
   const [isValidating, setIsValidating] = useState(true);
   const [validationResult, setValidationResult] = useState<ValidateInvitationResponse | null>(null);
@@ -140,10 +141,12 @@ function InvitePageContent() {
   const [deviceFingerprint, setDeviceFingerprint] = useState<DeviceFingerprint | null>(null);
   const [requiresRegistration, setRequiresRegistration] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
+  const [allowLiveKitMount, setAllowLiveKitMount] = useState(false);
   const trackedJoinKeyRef = useRef<string | null>(null);
   const activeConsultationSessionIdRef = useRef<string | null>(null);
   const hasProcessedExitRef = useRef(false);
   const validationResultRef = useRef<ValidateInvitationResponse | null>(null);
+  const finalizeConsultationExitRef = useRef<(redirectAfterExit: boolean) => void>(() => undefined);
 
   // Generate device fingerprint
   useEffect(() => {
@@ -287,6 +290,10 @@ function InvitePageContent() {
     );
   }, []);
 
+  useEffect(() => {
+    setAllowLiveKitMount(!disableLiveKitForE2E);
+  }, [disableLiveKitForE2E]);
+
   const finalizeConsultationExit = useCallback(
     (redirectAfterExit: boolean) => {
       if (hasProcessedExitRef.current) {
@@ -363,18 +370,30 @@ function InvitePageContent() {
   }, [finalizeConsultationExit]);
 
   useEffect(() => {
+    finalizeConsultationExitRef.current = finalizeConsultationExit;
+  }, [finalizeConsultationExit]);
+
+  useEffect(() => {
     const handleBrowserExit = () => {
-      finalizeConsultationExit(false);
+      finalizeConsultationExitRef.current(false);
     };
 
     window.addEventListener('beforeunload', handleBrowserExit);
     window.addEventListener('pagehide', handleBrowserExit);
+    window.addEventListener('popstate', handleBrowserExit);
 
     return () => {
       window.removeEventListener('beforeunload', handleBrowserExit);
       window.removeEventListener('pagehide', handleBrowserExit);
+      window.removeEventListener('popstate', handleBrowserExit);
     };
-  }, [finalizeConsultationExit]);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      finalizeConsultationExitRef.current(false);
+    };
+  }, []);
 
   // Handle registration requirement
   if (requiresRegistration) {
@@ -621,18 +640,28 @@ function InvitePageContent() {
             />
 
             {/* Hidden LiveKit connection for waiting room - patients can see each other */}
-            <div style={{ display: 'none' }}>
-            <PatientLiveKitRoom
-              token={validationResult.liveKitToken}
-              onDisconnected={() => {
-                console.log('Patient disconnected from waiting room');
-                router.push('/');
-              }}
-              onError={(error) => {
-                console.error('Waiting room error:', error);
-              }}
-            />
-            </div>
+            {allowLiveKitMount && (
+              <div style={{ display: 'none' }}>
+                <PatientLiveKitRoom
+                  token={validationResult.liveKitToken}
+                  onDisconnected={() => {
+                    console.log('Patient disconnected from waiting room');
+                    router.push('/');
+                  }}
+                  onError={(error) => {
+                    console.error('Waiting room error:', error);
+                  }}
+                />
+              </div>
+            )}
+            {disableLiveKitForE2E && (
+              <p
+                data-testid="e2e-livekit-disabled"
+                style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#6b7280' }}
+              >
+                LiveKit connection disabled for E2E lifecycle testing.
+              </p>
+            )}
 
             <style jsx>{`
               @keyframes spin {
@@ -650,6 +679,62 @@ function InvitePageContent() {
     }
 
     // Direct access to consultation room (no waiting room)
+    if (disableLiveKitForE2E) {
+      return (
+        <div
+          data-testid="e2e-consultation-placeholder"
+          style={{
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: '#000',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            flexDirection: 'column',
+            gap: '0.75rem',
+          }}
+        >
+          <p style={{ margin: 0, fontSize: '0.95rem' }}>
+            LiveKit connection disabled for E2E lifecycle testing.
+          </p>
+          <button
+            onClick={handleConsultationExit}
+            style={{
+              backgroundColor: '#1d4ed8',
+              color: '#fff',
+              padding: '0.6rem 1rem',
+              borderRadius: '0.5rem',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            Leave Consultation
+          </button>
+        </div>
+      );
+    }
+
+    if (!allowLiveKitMount) {
+      return (
+        <div
+          style={{
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: '#000',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            fontSize: '0.95rem',
+          }}
+        >
+          Preparing consultation...
+        </div>
+      );
+    }
+
     return (
       <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}>
         <PatientLiveKitRoom

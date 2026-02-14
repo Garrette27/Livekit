@@ -74,6 +74,15 @@ function toMillis(value: unknown): number {
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 }
 
+function toDate(value: unknown): Date | null {
+  const millis = toMillis(value);
+  if (millis <= 0) {
+    return null;
+  }
+
+  return new Date(millis);
+}
+
 function normalizePatientEmail(email?: string): string | undefined {
   if (!email) {
     return undefined;
@@ -197,7 +206,7 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
   constructor(
     private readonly db: Firestore,
     private readonly rtcAdapter: RtcTransportAdapter = new LiveKitRtcTransportAdapter(),
-    private readonly sessionStore: Pick<ConsultationSessionStore, 'appendEvent'> = new FirestoreConsultationSessionCore(db)
+    private readonly sessionStore: Pick<ConsultationSessionStore, 'appendEvent' | 'closeSession'> = new FirestoreConsultationSessionCore(db)
   ) {}
 
   private async resolveConsultationSessionId(roomName: string): Promise<string | null> {
@@ -254,6 +263,125 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
         patientEmail: input.waitingPatient.patientEmail || null,
         ...(input.metadata || {}),
       },
+    });
+  }
+
+  private async closeSessionAfterPatientTransition(input: {
+    roomName: string;
+    waitingPatient: WaitingPatient;
+    doctorUserId?: string;
+    eventType: 'left' | 'patient_removed_by_doctor';
+    actorType: 'patient' | 'doctor';
+    actorId?: string | null;
+    finalizationReason: 'patient_left' | 'patient_removed_by_doctor';
+    source: string;
+    transitionMetadata?: Record<string, unknown>;
+  }): Promise<boolean> {
+    const consultationSessionId = await this.resolveConsultationSessionId(input.roomName);
+    if (!consultationSessionId) {
+      return false;
+    }
+
+    const sessionDoc = await this.db.collection('consultationSessions').doc(consultationSessionId).get();
+    const sessionData = sessionDoc.exists ? (sessionDoc.data() as Record<string, unknown>) : {};
+    const sessionMetadata = (sessionData.metadata as Record<string, unknown> | undefined) || {};
+    const sessionStartedAt =
+      toDate(sessionData.sessionStartedAt || sessionData.createdAt || sessionMetadata.sessionStartedAt) || new Date();
+    const sessionEndedAt = new Date();
+    const durationMinutes = Math.max(0, Math.round((sessionEndedAt.getTime() - sessionStartedAt.getTime()) / 60000));
+    const normalizedPatientUserId = normalizeKnownPatientUserId(input.waitingPatient.patientId);
+
+    await this.sessionStore.closeSession({
+      sessionId: consultationSessionId,
+      roomName: input.roomName,
+      doctorUserId: input.doctorUserId || null,
+      patientUserId: normalizedPatientUserId,
+      sessionStartedAt,
+      sessionEndedAt,
+      eventType: input.eventType,
+      actorType: input.actorType,
+      actorId: input.actorId || null,
+      metadata: {
+        ...(input.transitionMetadata || {}),
+        waitingPatientId: input.waitingPatient.id,
+        patientEmail: input.waitingPatient.patientEmail || null,
+        durationMinutes,
+        source: input.source,
+      },
+    });
+
+    const consultationRef = this.db.collection('consultations').doc(input.roomName);
+    const consultationDoc = await consultationRef.get();
+    const consultationData = consultationDoc.exists ? (consultationDoc.data() as Record<string, unknown>) : {};
+    const consultationMetadata = (consultationData.metadata as Record<string, unknown> | undefined) || {};
+    await consultationRef.set(
+      {
+        roomName: input.roomName,
+        consultationSessionId,
+        sessionStartedAt,
+        leftAt: sessionEndedAt,
+        duration: durationMinutes,
+        status: 'completed',
+        ...(normalizedPatientUserId ? { patientUserId: normalizedPatientUserId } : {}),
+        ...(input.waitingPatient.patientEmail ? { patientEmail: input.waitingPatient.patientEmail } : {}),
+        metadata: {
+          ...consultationMetadata,
+          source: input.source,
+          trackedAt: sessionEndedAt,
+          durationMinutes,
+          finalizationReason: input.finalizationReason,
+          ...(normalizedPatientUserId ? { patientUserId: normalizedPatientUserId } : {}),
+          ...(input.waitingPatient.patientEmail ? { patientEmail: input.waitingPatient.patientEmail } : {}),
+          ...(input.doctorUserId ? { doctorUserId: input.doctorUserId } : {}),
+          consultationSessionId,
+          ...(input.finalizationReason === 'patient_removed_by_doctor'
+            ? { removedByDoctorAt: sessionEndedAt.toISOString() }
+            : { patientLeftAt: sessionEndedAt.toISOString() }),
+          ...(input.transitionMetadata || {}),
+        },
+      },
+      { merge: true }
+    );
+
+    return true;
+  }
+
+  private async closeSessionAfterDoctorRemoval(input: {
+    roomName: string;
+    waitingPatient: WaitingPatient;
+    doctorUserId?: string;
+  }): Promise<boolean> {
+    return this.closeSessionAfterPatientTransition({
+      roomName: input.roomName,
+      waitingPatient: input.waitingPatient,
+      doctorUserId: input.doctorUserId,
+      eventType: 'patient_removed_by_doctor',
+      actorType: 'doctor',
+      actorId: input.doctorUserId || null,
+      finalizationReason: 'patient_removed_by_doctor',
+      source: 'invitation-access-core.rejectWaitingEntry',
+      transitionMetadata: {
+        rejectionReason: 'doctor_moderation',
+      },
+    });
+  }
+
+  private async closeSessionAfterPatientLeft(input: {
+    roomName: string;
+    waitingPatient: WaitingPatient;
+  }): Promise<boolean> {
+    return this.closeSessionAfterPatientTransition({
+      roomName: input.roomName,
+      waitingPatient: input.waitingPatient,
+      doctorUserId:
+        (input.waitingPatient as unknown as { doctorUserId?: string }).doctorUserId
+        || (input.waitingPatient.metadata as { doctorUserId?: string } | undefined)?.doctorUserId
+        || undefined,
+      eventType: 'left',
+      actorType: 'patient',
+      actorId: normalizeKnownPatientUserId(input.waitingPatient.patientId),
+      finalizationReason: 'patient_left',
+      source: 'invitation-access-core.markWaitingEntryLeft',
     });
   }
 
@@ -813,23 +941,40 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
     );
 
     if (wasAdmitted) {
+      let sessionClosed = false;
       try {
-        await this.appendSessionModerationEvent({
+        sessionClosed = await this.closeSessionAfterDoctorRemoval({
           roomName: waitingPatient.roomName,
           waitingPatient,
-          eventType: 'patient_removed_by_doctor',
           doctorUserId: input.doctorUserId,
-          metadata: {
-            source: 'invitation-access-core.rejectWaitingEntry',
-            rejectionReason: 'doctor_moderation',
-          },
         });
       } catch (eventError) {
-        console.warn('Failed to append patient_removed_by_doctor event:', {
+        console.warn('Failed to close consultation session after patient removal:', {
           waitingPatientId: waitingPatient.id,
           roomName: waitingPatient.roomName,
           error: (eventError as Error).message,
         });
+      }
+
+      if (!sessionClosed) {
+        try {
+          await this.appendSessionModerationEvent({
+            roomName: waitingPatient.roomName,
+            waitingPatient,
+            eventType: 'patient_removed_by_doctor',
+            doctorUserId: input.doctorUserId,
+            metadata: {
+              source: 'invitation-access-core.rejectWaitingEntry',
+              rejectionReason: 'doctor_moderation',
+            },
+          });
+        } catch (eventError) {
+          console.warn('Failed to append patient_removed_by_doctor event:', {
+            waitingPatientId: waitingPatient.id,
+            roomName: waitingPatient.roomName,
+            error: (eventError as Error).message,
+          });
+        }
       }
     }
 
@@ -872,6 +1017,8 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
       };
     }
 
+    const wasAdmitted = waitingPatient.status === 'admitted';
+
     await waitingRef.set(
       {
         status: 'left',
@@ -883,6 +1030,21 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
       },
       { merge: true }
     );
+
+    if (wasAdmitted) {
+      try {
+        await this.closeSessionAfterPatientLeft({
+          roomName: waitingPatient.roomName,
+          waitingPatient,
+        });
+      } catch (closeSessionError) {
+        console.warn('Failed to close consultation session after patient left:', {
+          waitingPatientId: waitingPatient.id,
+          roomName: waitingPatient.roomName,
+          error: (closeSessionError as Error).message,
+        });
+      }
+    }
 
     return {
       waitingPatientId: waitingPatient.id,

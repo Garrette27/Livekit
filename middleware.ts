@@ -43,7 +43,7 @@ function handleInvitationAccess(request: NextRequest) {
 
   // Add security headers
   const response = NextResponse.next();
-  addSecurityHeaders(response);
+  addSecurityHeaders(response, request);
   
   return response;
 }
@@ -59,7 +59,7 @@ function handlePatientRoomAccess(request: NextRequest) {
 
   // Add security headers
   const response = NextResponse.next();
-  addSecurityHeaders(response);
+  addSecurityHeaders(response, request);
   
   return response;
 }
@@ -68,12 +68,26 @@ function handleDoctorRoomAccess(request: NextRequest) {
   // Doctor rooms can be accessed directly (they authenticate separately)
   // Add security headers to allow camera and microphone access
   const response = NextResponse.next();
-  addSecurityHeaders(response);
+  addSecurityHeaders(response, request);
   
   return response;
 }
 
-function addSecurityHeaders(response: NextResponse) {
+function shouldEnableUpgradeInsecureRequests(request: NextRequest): boolean {
+  const protocol = request.nextUrl.protocol;
+  const hostname = request.nextUrl.hostname.toLowerCase();
+
+  if (protocol !== 'https:') {
+    return false;
+  }
+
+  return hostname !== 'localhost' && hostname !== '127.0.0.1' && hostname !== '::1';
+}
+
+/**
+ * Apply route security headers while preserving local/dev browser compatibility.
+ */
+function addSecurityHeaders(response: NextResponse, request: NextRequest) {
   // Add security headers for invitation pages
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-Content-Type-Options', 'nosniff');
@@ -82,7 +96,7 @@ function addSecurityHeaders(response: NextResponse) {
   response.headers.set('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
   
   // Content Security Policy for invitation pages
-  const csp = [
+  const cspDirectives = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.google.com https://apis.google.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
@@ -95,8 +109,13 @@ function addSecurityHeaders(response: NextResponse) {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-    "upgrade-insecure-requests"
-  ].join('; ');
+  ];
+
+  if (shouldEnableUpgradeInsecureRequests(request)) {
+    cspDirectives.push('upgrade-insecure-requests');
+  }
+  
+  const csp = cspDirectives.join('; ');
   
   response.headers.set('Content-Security-Policy', csp);
   

@@ -119,6 +119,20 @@ interface PatientConsultationApiResponse {
   summaries?: PatientConsultationApiSummary[];
 }
 
+interface PendingWaitingRoomInfo {
+  waitingPatientId: string;
+  invitationId: string;
+  roomName: string;
+  joinedAt?: string;
+  invitePath: string;
+}
+
+interface PendingWaitingRoomApiResponse {
+  success: boolean;
+  error?: string;
+  pendingWaitingRoom?: PendingWaitingRoomInfo | null;
+}
+
 function toSafeDate(value?: string | null): Date | null {
   if (!value) {
     return null;
@@ -190,6 +204,8 @@ export default function PatientDashboard() {
   const [pendingDeleteSummaryId, setPendingDeleteSummaryId] = useState<string | null>(null);
   const [deleteErrorSummaryId, setDeleteErrorSummaryId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [pendingWaitingRoom, setPendingWaitingRoom] = useState<PendingWaitingRoomInfo | null>(null);
+  const [pendingWaitingRoomError, setPendingWaitingRoomError] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) {
@@ -252,6 +268,42 @@ export default function PatientDashboard() {
   useEffect(() => {
     void loadSummaries();
   }, [loadSummaries]);
+
+  const loadPendingWaitingRoom = useCallback(async () => {
+    if (!user || !isAuthorized) {
+      setPendingWaitingRoom(null);
+      setPendingWaitingRoomError(null);
+      return;
+    }
+
+    try {
+      setPendingWaitingRoomError(null);
+
+      const token = await user.getIdToken();
+      const response = await fetch('/api/patient/pending-waiting-room', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: 'no-store',
+      });
+
+      const payload = (await response.json()) as PendingWaitingRoomApiResponse;
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || 'Failed to check pending waiting room');
+      }
+
+      setPendingWaitingRoom(payload.pendingWaitingRoom || null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to check pending waiting room';
+      setPendingWaitingRoomError(message);
+      setPendingWaitingRoom(null);
+    }
+  }, [isAuthorized, user]);
+
+  useEffect(() => {
+    void loadPendingWaitingRoom();
+  }, [loadPendingWaitingRoom]);
 
   const handleDelete = async (summary: CallSummary) => {
     if (!user) {
@@ -490,6 +542,43 @@ export default function PatientDashboard() {
             Enter the invitation link provided by your doctor to join a consultation.
           </p>
           <JoinWithInvitationLink />
+          {pendingWaitingRoom && (
+            <div
+              style={{
+                marginTop: '1rem',
+                padding: '1rem',
+                border: '1px solid #86efac',
+                borderRadius: '0.5rem',
+                backgroundColor: '#f0fdf4',
+              }}
+            >
+              <p style={{ margin: 0, fontSize: '0.875rem', color: '#166534' }}>
+                You still have a pending waiting-room entry for <strong>{pendingWaitingRoom.roomName}</strong>.
+                {pendingWaitingRoom.joinedAt ? ` Joined: ${new Date(pendingWaitingRoom.joinedAt).toLocaleString()}.` : ''}
+              </p>
+              <button
+                onClick={() => router.push(pendingWaitingRoom.invitePath)}
+                style={{
+                  marginTop: '0.75rem',
+                  backgroundColor: '#059669',
+                  color: 'white',
+                  padding: '0.6rem 1rem',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Return to Waiting Room
+              </button>
+            </div>
+          )}
+          {pendingWaitingRoomError && (
+            <p style={{ color: '#b45309', fontSize: '0.75rem', marginTop: '0.75rem' }}>
+              Could not check pending waiting-room state: {pendingWaitingRoomError}
+            </p>
+          )}
         </div>
 
         <div
