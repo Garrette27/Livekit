@@ -366,22 +366,13 @@ function InvitePageContent() {
     const handleBrowserExit = () => {
       finalizeConsultationExit(false);
     };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        finalizeConsultationExit(false);
-      }
-    };
 
     window.addEventListener('beforeunload', handleBrowserExit);
     window.addEventListener('pagehide', handleBrowserExit);
-    window.addEventListener('popstate', handleBrowserExit);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.removeEventListener('beforeunload', handleBrowserExit);
       window.removeEventListener('pagehide', handleBrowserExit);
-      window.removeEventListener('popstate', handleBrowserExit);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [finalizeConsultationExit]);
 

@@ -1,6 +1,10 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { calculateDurationMinutes } from './session-timing';
 import { generateAndStoreConsultationSummary } from './summary-service';
+import {
+  buildWaitingRoomHistorySnapshot,
+  type WaitingRoomHistorySnapshot,
+} from './waiting-room-history';
 
 type FinalizationReason = 'doctor_left' | 'invitation_revoked' | 'invitation_expired';
 
@@ -123,6 +127,7 @@ async function applyFinalizationToSummary(
     sessionEndedAt: Date;
     finalizedAt: Date;
     reason: FinalizationReason;
+    waitingRoomHistory: WaitingRoomHistorySnapshot;
   }
 ): Promise<void> {
   const summaryRef = db.collection('call-summaries').doc(input.consultationSessionId);
@@ -147,6 +152,7 @@ async function applyFinalizationToSummary(
         finalizedAt: input.finalizedAt.toISOString(),
         finalizationReason: input.reason,
         durationSource: 'session_finalization',
+        waitingRoomHistory: input.waitingRoomHistory,
       },
       updatedAt: new Date(),
     },
@@ -211,15 +217,32 @@ export async function finalizeConsultationForRoom(
     parseDuration(sessionMetadata.doctorDurationMinutes),
     parseDuration(sessionMetadata.finalDurationMinutes)
   );
+  const doctorUserId =
+    (sessionData.doctorUserId as string | undefined)
+    || (typeof sessionMetadata.createdBy === 'string' ? sessionMetadata.createdBy : undefined)
+    || null;
+  const waitingRoomHistory = await buildWaitingRoomHistorySnapshot(db, {
+    roomName,
+    doctorUserId,
+    sessionStartedAt,
+    sessionEndedAt: effectiveSessionEndedAt,
+  });
+  const fallbackPatientEmail = waitingRoomHistory.participantEmails[0] || null;
+  const sessionPatientEmail =
+    (sessionData.patientEmail as string | undefined)
+    || (typeof sessionMetadata.patientEmail === 'string' ? sessionMetadata.patientEmail : null)
+    || fallbackPatientEmail;
 
   await sessionRef.set(
     {
       consultationSessionId,
       roomName,
+      ...(doctorUserId ? { doctorUserId } : {}),
       status: 'completed',
       sessionStartedAt,
       sessionEndedAt: effectiveSessionEndedAt,
       duration: finalDurationMinutes,
+      ...(sessionPatientEmail ? { patientEmail: sessionPatientEmail } : {}),
       metadata: {
         ...sessionMetadata,
         durationMinutes: finalDurationMinutes,
@@ -227,6 +250,7 @@ export async function finalizeConsultationForRoom(
         sessionEndedAt: effectiveSessionEndedAt.toISOString(),
         finalizedAt: finalizedAt.toISOString(),
         finalizationReason: reason,
+        waitingRoomHistory,
         updatedAt: new Date().toISOString(),
       },
       updatedAt: new Date(),
@@ -238,6 +262,10 @@ export async function finalizeConsultationForRoom(
   const consultationDoc = await consultationRef.get();
   const consultationData = (consultationDoc.exists ? consultationDoc.data() : {}) as Record<string, unknown>;
   const consultationMetadata = (consultationData.metadata as Record<string, unknown> | undefined) || {};
+  const consultationPatientEmail =
+    (consultationData.patientEmail as string | undefined)
+    || (typeof consultationMetadata.patientEmail === 'string' ? consultationMetadata.patientEmail : null)
+    || sessionPatientEmail;
   await consultationRef.set(
     {
       roomName,
@@ -246,6 +274,7 @@ export async function finalizeConsultationForRoom(
       leftAt: effectiveSessionEndedAt,
       duration: finalDurationMinutes,
       status: 'completed',
+      ...(consultationPatientEmail ? { patientEmail: consultationPatientEmail } : {}),
       metadata: {
         ...consultationMetadata,
         durationMinutes: finalDurationMinutes,
@@ -253,17 +282,18 @@ export async function finalizeConsultationForRoom(
         sessionEndedAt: effectiveSessionEndedAt.toISOString(),
         finalizedAt: finalizedAt.toISOString(),
         finalizationReason: reason,
+        waitingRoomHistory,
       },
     },
     { merge: true }
   );
 
   if (regenerateSummary) {
-    const doctorUserId =
-      (sessionData.doctorUserId as string | undefined) ||
+    const summaryDoctorUserId =
+      doctorUserId ||
       (consultationData.createdBy as string | undefined) ||
       (consultationMetadata.createdBy as string | undefined);
-    if (doctorUserId) {
+    if (summaryDoctorUserId) {
       const patientName =
         (consultationData.patientName as string | undefined) ||
         ((sessionMetadata.patientName as string | undefined) || 'Patient');
@@ -272,20 +302,15 @@ export async function finalizeConsultationForRoom(
         (consultationData.patientUserId as string | undefined) ||
         (consultationMetadata.patientUserId as string | undefined) ||
         null;
-      const patientEmail =
-        (sessionData.patientEmail as string | undefined) ||
-        (consultationData.patientEmail as string | undefined) ||
-        (consultationMetadata.patientEmail as string | undefined) ||
-        null;
 
       await generateAndStoreConsultationSummary({
         roomName,
         patientName,
         durationMinutes: finalDurationMinutes,
-        userId: doctorUserId,
+        userId: summaryDoctorUserId,
         consultationSessionId,
         patientUserId,
-        patientEmail,
+        patientEmail: consultationPatientEmail,
       });
     }
   }
@@ -297,6 +322,7 @@ export async function finalizeConsultationForRoom(
     sessionEndedAt: effectiveSessionEndedAt,
     finalizedAt,
     reason,
+    waitingRoomHistory,
   });
 
   return {

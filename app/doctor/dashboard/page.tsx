@@ -22,6 +22,25 @@ interface CallSummary {
   endedAt?: Timestamp;
   participants: string[];
   duration: number;
+  waitingRoomHistory?: {
+    totalParticipants: number;
+    registeredParticipantCount: number;
+    anonymousParticipantCount: number;
+    participantEmails: string[];
+    participants: Array<{
+      waitingPatientId: string;
+      invitationId: string | null;
+      displayName: string;
+      patientEmail: string | null;
+      isAnonymous: boolean;
+      status: 'waiting' | 'admitted' | 'left' | 'rejected';
+      joinedAt: string | null;
+      admittedAt: string | null;
+      leftAt: string | null;
+      removedAt: string | null;
+      waitingDurationMinutes: number | null;
+    }>;
+  };
   metadata?: {
     totalParticipants: number;
     createdBy?: string;
@@ -55,6 +74,25 @@ interface DoctorHistoryResponseItem {
   keyPoints?: string[];
   recommendations?: string[];
   followUpActions?: string[];
+  waitingRoomHistory?: {
+    totalParticipants: number;
+    registeredParticipantCount: number;
+    anonymousParticipantCount: number;
+    participantEmails: string[];
+    participants: Array<{
+      waitingPatientId: string;
+      invitationId: string | null;
+      displayName: string;
+      patientEmail: string | null;
+      isAnonymous: boolean;
+      status: 'waiting' | 'admitted' | 'left' | 'rejected';
+      joinedAt: string | null;
+      admittedAt: string | null;
+      leftAt: string | null;
+      removedAt: string | null;
+      waitingDurationMinutes: number | null;
+    }>;
+  };
 }
 
 function toTimestamp(value?: string | null): Timestamp {
@@ -85,6 +123,7 @@ function mapHistoryRecordToSummary(record: DoctorHistoryResponseItem): CallSumma
     endedAt: record.endedAt ? toTimestamp(record.endedAt) : undefined,
     participants: [],
     duration: Math.max(0, Math.round(Number(record.duration || 0))),
+    waitingRoomHistory: record.waitingRoomHistory,
     metadata: {
       totalParticipants: 1,
     },
@@ -102,6 +141,19 @@ function formatTimestamp(value?: Timestamp): string {
   }
 
   return dateValue.toLocaleString();
+}
+
+function formatIsoTimestamp(value?: string | null): string {
+  if (!value) {
+    return 'N/A';
+  }
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime()) || parsedDate.getTime() <= 0) {
+    return 'N/A';
+  }
+
+  return parsedDate.toLocaleString();
 }
 
 export default function DoctorDashboard() {
@@ -443,6 +495,64 @@ export default function DoctorDashboard() {
                   <p style={{ color: '#374151', marginBottom: '1rem', lineHeight: '1.6' }}>
                     {summary.summary}
                   </p>
+                  {summary.waitingRoomHistory && summary.waitingRoomHistory.totalParticipants > 0 && (
+                    <div
+                      style={{
+                        marginBottom: '1rem',
+                        padding: '0.75rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #d1fae5',
+                        backgroundColor: '#f0fdf4',
+                      }}
+                    >
+                      <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#065f46', marginBottom: '0.5rem' }}>
+                        Waiting Room Timeline
+                      </p>
+                      <p style={{ fontSize: '0.75rem', color: '#065f46', marginBottom: '0.5rem' }}>
+                        Registered: {summary.waitingRoomHistory.registeredParticipantCount}
+                        {' | '}
+                        Anonymous: {summary.waitingRoomHistory.anonymousParticipantCount}
+                      </p>
+                      {summary.waitingRoomHistory.participantEmails.length > 0 && (
+                        <p style={{ fontSize: '0.75rem', color: '#047857', marginBottom: '0.5rem' }}>
+                          Emails: {summary.waitingRoomHistory.participantEmails.join(', ')}
+                        </p>
+                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {summary.waitingRoomHistory.participants.map((participant) => (
+                          <div
+                            key={participant.waitingPatientId}
+                            style={{
+                              border: '1px solid #bbf7d0',
+                              borderRadius: '0.375rem',
+                              padding: '0.5rem',
+                              backgroundColor: '#ffffff',
+                            }}
+                          >
+                            <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#166534', marginBottom: '0.25rem' }}>
+                              {participant.displayName} ({participant.patientEmail || 'anonymous'})
+                            </p>
+                            <p style={{ fontSize: '0.7rem', color: '#166534', marginBottom: '0.25rem' }}>
+                              Joined: {formatIsoTimestamp(participant.joinedAt)}
+                              {' | '}
+                              Admitted: {formatIsoTimestamp(participant.admittedAt)}
+                            </p>
+                            <p style={{ fontSize: '0.7rem', color: '#166534', marginBottom: '0.25rem' }}>
+                              Left: {formatIsoTimestamp(participant.leftAt)}
+                              {' | '}
+                              Removed: {formatIsoTimestamp(participant.removedAt)}
+                            </p>
+                            <p style={{ fontSize: '0.7rem', color: '#166534' }}>
+                              Waiting duration: {participant.waitingDurationMinutes ?? 'N/A'} minute
+                              {participant.waitingDurationMinutes === 1 ? '' : 's'}
+                              {' | '}
+                              Final status: {participant.status}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {summary.keyPoints && summary.keyPoints.length > 0 && (
                     <div style={{ marginTop: '1rem' }}>
                       <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>

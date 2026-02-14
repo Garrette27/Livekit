@@ -16,9 +16,9 @@ interface WaitingRoomPanelProps {
   showRemoveControl?: boolean;
 }
 
-function toDate(value: unknown): Date {
+function toDate(value: unknown): Date | null {
   if (!value) {
-    return new Date(0);
+    return null;
   }
 
   if (typeof value === 'object' && value !== null) {
@@ -30,7 +30,7 @@ function toDate(value: unknown): Date {
 
   const parsed = new Date(value as string | number | Date);
   if (Number.isNaN(parsed.getTime())) {
-    return new Date(0);
+    return null;
   }
 
   return parsed;
@@ -198,7 +198,9 @@ export default function WaitingRoomPanel({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {waitingOnly.map((patient) => {
                   const joinedAt = toDate(patient.joinedAt);
-                  const waitTimeMinutes = Math.floor((Date.now() - joinedAt.getTime()) / 1000 / 60);
+                  const waitTimeMinutes = joinedAt
+                    ? Math.floor((Date.now() - joinedAt.getTime()) / 1000 / 60)
+                    : null;
                   const displayName = getDisplayName(patient);
 
                   return (
@@ -240,7 +242,9 @@ export default function WaitingRoomPanel({
                             margin: '0.25rem 0 0 0',
                           }}
                         >
-                          Waiting for {waitTimeMinutes} minute{waitTimeMinutes !== 1 ? 's' : ''}
+                          {waitTimeMinutes === null
+                            ? 'Waiting time unavailable'
+                            : `Waiting for ${waitTimeMinutes} minute${waitTimeMinutes !== 1 ? 's' : ''}`}
                         </p>
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -342,7 +346,9 @@ export default function WaitingRoomPanel({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {admittedOnly.map((patient) => {
                   const admittedAt = toDate(patient.admittedAt || patient.joinedAt);
-                  const admittedMinutes = Math.max(0, Math.floor((Date.now() - admittedAt.getTime()) / 1000 / 60));
+                  const admittedMinutes = admittedAt
+                    ? Math.max(0, Math.floor((Date.now() - admittedAt.getTime()) / 1000 / 60))
+                    : null;
                   const displayName = getDisplayName(patient);
 
                   return (
@@ -370,7 +376,9 @@ export default function WaitingRoomPanel({
                           <p style={{ fontSize: '0.75rem', color: '#047857', margin: 0 }}>{patient.patientEmail}</p>
                         )}
                         <p style={{ fontSize: '0.7rem', color: '#059669', margin: '0.25rem 0 0 0' }}>
-                          In room for {admittedMinutes} minute{admittedMinutes !== 1 ? 's' : ''}
+                          {admittedMinutes === null
+                            ? 'In-room duration unavailable'
+                            : `In room for ${admittedMinutes} minute${admittedMinutes !== 1 ? 's' : ''}`}
                         </p>
                       </div>
                       {showRemoveControl && (

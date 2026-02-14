@@ -219,11 +219,17 @@ export interface WaitingPatient {
   joinedAt: Timestamp | Date | any;
   status: 'waiting' | 'admitted' | 'left' | 'rejected';
   admittedAt?: Timestamp | Date | any;
+  leftAt?: Timestamp | Date | any;
   rejectedAt?: Timestamp | Date | any;
   metadata?: {
     deviceFingerprint?: string;
     ip?: string;
     userAgent?: string;
+    lastAccessed?: Timestamp | Date | any;
+    isAnonymous?: boolean;
+    admissionMode?: 'doctor-manual' | 'auto-email-match';
+    doctorUserId?: string;
+    consultationSessionId?: string;
   };
 }
 

@@ -15,6 +15,7 @@ interface ListWaitingPatientsArgs {
   roomName?: string;
   doctorUserId?: string;
   statuses?: Array<'waiting' | 'admitted' | 'left' | 'rejected'>;
+  activeOnly?: boolean;
 }
 
 function toTimestampMillis(value: unknown): number {
@@ -53,6 +54,7 @@ export async function listWaitingPatients({
   roomName,
   doctorUserId,
   statuses,
+  activeOnly = true,
 }: ListWaitingPatientsArgs): Promise<WaitingRoomListResponse> {
   const params = new URLSearchParams();
   if (roomName) {
@@ -64,10 +66,11 @@ export async function listWaitingPatients({
   if (Array.isArray(statuses) && statuses.length > 0) {
     params.set('statuses', statuses.join(','));
   }
+  params.set('activeOnly', activeOnly ? 'true' : 'false');
 
   const query = params.toString();
   const endpoint = query ? `/api/waiting-room/list?${query}` : '/api/waiting-room/list';
-  const response = await fetch(endpoint);
+  const response = await fetch(endpoint, { cache: 'no-store' });
   const result = await parseJsonResponse<WaitingRoomListResponse>(response);
 
   const waitingPatients = [...(result.waitingPatients || [])].sort((a, b) => {

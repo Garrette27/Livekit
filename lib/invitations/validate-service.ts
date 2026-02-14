@@ -461,13 +461,11 @@ async function validateUsageLimits(
 async function findExistingWaitingPatient(
   db: any,
   invitationId: string,
+  identity: WaitingPatientIdentity,
   deviceFingerprint: DeviceFingerprint | undefined,
   clientIP: string,
   userAgent: string
 ): Promise<WaitingPatient | null> {
-  const deviceFingerprintHash = deviceFingerprint?.hash
-    || (deviceFingerprint ? JSON.stringify(deviceFingerprint).substring(0, 50) : null);
-
   const existingPatientsQuery = await db.collection('waitingPatients')
     .where('invitationId', '==', invitationId)
     .get();
@@ -478,30 +476,66 @@ async function findExistingWaitingPatient(
 
   const waitingPatients: WaitingPatient[] = existingPatientsQuery.docs
     .map((doc: any) => ({ id: doc.id, ...doc.data() } as WaitingPatient))
-    .filter((patient: WaitingPatient) => patient.status === 'waiting');
+    .filter((patient: WaitingPatient) => patient.status === 'waiting')
+    .sort((left: WaitingPatient, right: WaitingPatient) => toMillis(right.joinedAt) - toMillis(left.joinedAt));
 
-  let existingWaitingPatient: WaitingPatient | undefined;
+  if (identity.patientEmail) {
+    const normalizedIdentityEmail = normalizeEmail(identity.patientEmail);
+    const exactIdentityMatch = waitingPatients.find((patient: WaitingPatient) => {
+      const normalizedPatientEmail = normalizeEmail(patient.patientEmail);
+      if (normalizedPatientEmail && normalizedIdentityEmail && normalizedPatientEmail === normalizedIdentityEmail) {
+        return true;
+      }
 
-  if (deviceFingerprintHash) {
-    existingWaitingPatient = waitingPatients.find((patient: WaitingPatient) => {
-      const fingerprint = patient.metadata?.deviceFingerprint;
-      return typeof fingerprint === 'string'
-        ? fingerprint.includes(deviceFingerprintHash.substring(0, 20))
-        : false;
+      if (identity.patientId && identity.patientId !== 'anonymous' && patient.patientId) {
+        return patient.patientId === identity.patientId;
+      }
+
+      return false;
     });
+
+    return exactIdentityMatch || null;
   }
 
-  if (!existingWaitingPatient) {
-    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-    existingWaitingPatient = waitingPatients.find((patient: WaitingPatient) => {
-      const joinedTime = toMillis(patient.joinedAt);
-      return patient.metadata?.ip === clientIP
-        && patient.metadata?.userAgent === userAgent
-        && joinedTime > fiveMinutesAgo;
-    });
-  }
+  const nowMs = Date.now();
+  const twoMinutesAgo = nowMs - (2 * 60 * 1000);
+  const anonymousCandidate = waitingPatients.find((patient: WaitingPatient) => {
+    const joinedTime = toMillis(patient.joinedAt);
+    if (joinedTime <= twoMinutesAgo) {
+      return false;
+    }
 
-  return existingWaitingPatient || null;
+    const patientEmail = normalizeEmail(patient.patientEmail);
+    if (patientEmail) {
+      return false;
+    }
+
+    const isAnonymousByMetadata = Boolean(patient.metadata?.isAnonymous);
+    if (!isAnonymousByMetadata && patient.patientName && patient.patientName !== 'Anonymous Patient') {
+      return false;
+    }
+
+    const sameNetworkIdentity =
+      patient.metadata?.ip === clientIP &&
+      patient.metadata?.userAgent === userAgent;
+    if (!sameNetworkIdentity) {
+      return false;
+    }
+
+    if (!deviceFingerprint) {
+      return true;
+    }
+
+    const incomingFingerprint = JSON.stringify(deviceFingerprint);
+    const storedFingerprint = patient.metadata?.deviceFingerprint;
+    if (!storedFingerprint || typeof storedFingerprint !== 'string') {
+      return true;
+    }
+
+    return storedFingerprint === incomingFingerprint;
+  });
+
+  return anonymousCandidate || null;
 }
 
 async function handleWaitingRoomAccess(params: {
@@ -616,6 +650,7 @@ async function handleWaitingRoomAccess(params: {
   const existingWaitingPatient = await findExistingWaitingPatient(
     db,
     tokenPayload.invitationId,
+    identity,
     deviceFingerprint,
     clientIP,
     userAgent

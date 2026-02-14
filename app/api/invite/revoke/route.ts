@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     const activeWaitingEntries = await invitationAccess.listWaitingEntries({
       invitationId,
       statuses: ['waiting', 'admitted'],
+      activeOnly: false,
     });
 
     await Promise.all(

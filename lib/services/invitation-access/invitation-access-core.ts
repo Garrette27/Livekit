@@ -18,10 +18,20 @@ import type {
 } from './contracts';
 
 const ALLOWED_WAITING_STATUSES: WaitingPatient['status'][] = ['waiting', 'admitted', 'left', 'rejected'];
+const MAX_ACTIVE_ENTRY_AGE_MS = 24 * 60 * 60 * 1000;
 
 interface DateLike {
   toDate?: () => Date;
   toMillis?: () => number;
+}
+
+interface InvitationSnapshot {
+  id: string;
+  status: string;
+  expiresAt: unknown;
+  roomName?: string;
+  waitingRoomEnabled?: boolean;
+  createdBy?: string;
 }
 
 class InvitationAccessError extends Error {
@@ -85,6 +95,52 @@ function normalizeKnownPatientUserId(value?: string): string | null {
   return value;
 }
 
+function isInvitationActive(invitation: InvitationSnapshot | undefined, nowMs: number): boolean {
+  if (!invitation) {
+    return false;
+  }
+
+  const status = invitation.status?.trim().toLowerCase();
+  if (status !== 'active') {
+    return false;
+  }
+
+  if (invitation.waitingRoomEnabled !== true) {
+    return false;
+  }
+
+  const expiresAtMs = toMillis(invitation.expiresAt);
+  if (expiresAtMs <= 0) {
+    return false;
+  }
+
+  return expiresAtMs > nowMs;
+}
+
+function matchesInvitationRoom(waitingPatient: WaitingPatient, invitation: InvitationSnapshot): boolean {
+  if (!invitation.roomName) {
+    return false;
+  }
+
+  return waitingPatient.roomName === invitation.roomName;
+}
+
+function hasValidJoinTimestamp(waitingPatient: WaitingPatient): boolean {
+  return toMillis(waitingPatient.joinedAt) > 0;
+}
+
+function toEntryActivityMillis(waitingPatient: WaitingPatient): number {
+  const metadata = (waitingPatient.metadata as Record<string, unknown> | undefined) || {};
+
+  return Math.max(
+    toMillis(waitingPatient.joinedAt),
+    toMillis(waitingPatient.admittedAt),
+    toMillis((waitingPatient as { leftAt?: unknown }).leftAt),
+    toMillis(waitingPatient.rejectedAt),
+    toMillis(metadata.lastAccessed)
+  );
+}
+
 function sortWaitingByJoinedAt(waitingPatients: WaitingPatient[]): WaitingPatient[] {
   return [...waitingPatients].sort((left, right) => toMillis(left.joinedAt) - toMillis(right.joinedAt));
 }
@@ -112,6 +168,7 @@ function mapWaitingDocToModel(input: { id: string; data: Record<string, unknown>
     joinedAt: input.data.joinedAt as WaitingPatient['joinedAt'],
     status: assertKnownStatus(input.data.status),
     admittedAt: input.data.admittedAt as WaitingPatient['admittedAt'],
+    leftAt: (input.data as { leftAt?: WaitingPatient['leftAt'] }).leftAt,
     rejectedAt: input.data.rejectedAt as WaitingPatient['rejectedAt'],
     metadata: (input.data.metadata as WaitingPatient['metadata']) || undefined,
   };
@@ -200,6 +257,116 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
     });
   }
 
+  private async loadInvitationsById(invitationIds: string[]): Promise<Map<string, InvitationSnapshot>> {
+    if (invitationIds.length === 0) {
+      return new Map();
+    }
+
+    const uniqueInvitationIds = Array.from(new Set(invitationIds.filter((invitationId) => invitationId.trim().length > 0)));
+    const invitationDocs = await Promise.all(
+      uniqueInvitationIds.map((invitationId) => this.db.collection('invitations').doc(invitationId).get())
+    );
+
+    const invitationsById = new Map<string, InvitationSnapshot>();
+    invitationDocs.forEach((invitationDoc) => {
+      if (!invitationDoc.exists) {
+        return;
+      }
+
+      const invitationData = invitationDoc.data() as Record<string, unknown>;
+      invitationsById.set(invitationDoc.id, {
+        id: invitationDoc.id,
+        status: typeof invitationData.status === 'string' ? invitationData.status : 'active',
+        expiresAt: invitationData.expiresAt,
+        roomName: typeof invitationData.roomName === 'string' ? invitationData.roomName : undefined,
+        waitingRoomEnabled: invitationData.waitingRoomEnabled === true,
+        createdBy: typeof invitationData.createdBy === 'string' ? invitationData.createdBy : undefined,
+      });
+    });
+
+    return invitationsById;
+  }
+
+  /**
+   * Returns invitation ids that are currently active for a doctor's waiting-room flow.
+   * Keeping this list centralized prevents stale waiting entries from leaking into doctor queue views.
+   */
+  private async loadDoctorActiveInvitationIds(input: {
+    doctorUserId: string;
+    roomName?: string;
+  }): Promise<Set<string>> {
+    const invitationsSnapshot = await this.db
+      .collection('invitations')
+      .where('createdBy', '==', input.doctorUserId)
+      .where('waitingRoomEnabled', '==', true)
+      .limit(500)
+      .get();
+
+    const nowMs = Date.now();
+    const activeInvitationIds = new Set<string>();
+
+    invitationsSnapshot.docs.forEach((invitationDoc) => {
+      const invitationData = invitationDoc.data() as Record<string, unknown>;
+      const invitation: InvitationSnapshot = {
+        id: invitationDoc.id,
+        status: typeof invitationData.status === 'string' ? invitationData.status : 'active',
+        expiresAt: invitationData.expiresAt,
+        roomName: typeof invitationData.roomName === 'string' ? invitationData.roomName : undefined,
+        waitingRoomEnabled: invitationData.waitingRoomEnabled === true,
+        createdBy: typeof invitationData.createdBy === 'string' ? invitationData.createdBy : undefined,
+      };
+
+      if (!isInvitationActive(invitation, nowMs)) {
+        return;
+      }
+
+      if (input.roomName && invitation.roomName !== input.roomName) {
+        return;
+      }
+
+      activeInvitationIds.add(invitation.id);
+    });
+
+    return activeInvitationIds;
+  }
+
+  private async filterActiveEntries(waitingPatients: WaitingPatient[]): Promise<WaitingPatient[]> {
+    if (waitingPatients.length === 0) {
+      return waitingPatients;
+    }
+
+    const invitationsById = await this.loadInvitationsById(
+      waitingPatients.map((waitingPatient) => waitingPatient.invitationId)
+    );
+    const nowMs = Date.now();
+
+    return waitingPatients.filter((waitingPatient) => {
+      const invitation = invitationsById.get(waitingPatient.invitationId);
+      if (!invitation) {
+        return false;
+      }
+
+      if (!isInvitationActive(invitation, nowMs)) {
+        return false;
+      }
+
+      if (!matchesInvitationRoom(waitingPatient, invitation)) {
+        return false;
+      }
+
+      if (!hasValidJoinTimestamp(waitingPatient)) {
+        return false;
+      }
+
+      const activityMs = toEntryActivityMillis(waitingPatient);
+      if (activityMs <= 0) {
+        return false;
+      }
+
+      return nowMs - activityMs <= MAX_ACTIVE_ENTRY_AGE_MS;
+    });
+  }
+
   async validateInvite(input: ValidateInviteContext): Promise<ValidateInviteResult> {
     return validateInvitationAndIssueToken(input);
   }
@@ -244,8 +411,20 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
   async listWaitingEntries(input: ListWaitingEntriesInput): Promise<WaitingPatient[]> {
     const statuses = (input.statuses || ['waiting']).filter((status) => ALLOWED_WAITING_STATUSES.includes(status));
     const singleStatus = statuses.length === 1 ? statuses[0] : null;
+    const activeOnly = input.activeOnly === true;
 
     if (input.doctorUserId) {
+      const activeInvitationIds = activeOnly
+        ? await this.loadDoctorActiveInvitationIds({
+            doctorUserId: input.doctorUserId,
+            roomName: input.roomName,
+          })
+        : null;
+
+      if (activeOnly && activeInvitationIds && activeInvitationIds.size === 0) {
+        return [];
+      }
+
       const baseQuery = this.db.collection('waitingPatients').where('doctorUserId', '==', input.doctorUserId);
       const snapshot = singleStatus
         ? await baseQuery.where('status', '==', singleStatus).get()
@@ -257,8 +436,14 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
       const roomScoped = input.roomName
         ? waitingPatients.filter((waitingPatient) => waitingPatient.roomName === input.roomName)
         : waitingPatients;
+      const invitationScoped =
+        activeOnly && activeInvitationIds
+          ? roomScoped.filter((waitingPatient) => activeInvitationIds.has(waitingPatient.invitationId))
+          : roomScoped;
+      const statusScoped = filterByStatus(invitationScoped, statuses);
+      const activeScoped = activeOnly ? await this.filterActiveEntries(statusScoped) : statusScoped;
 
-      return sortWaitingByJoinedAt(filterByStatus(roomScoped, statuses));
+      return sortWaitingByJoinedAt(activeScoped);
     }
 
     if (input.invitationId) {
@@ -267,14 +452,14 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
         ? await baseQuery.where('status', '==', singleStatus).get()
         : await baseQuery.get();
 
-      return sortWaitingByJoinedAt(
-        filterByStatus(
-          snapshot.docs.map((doc) =>
-            mapWaitingDocToModel({ id: doc.id, data: doc.data() as Record<string, unknown> })
-          ),
-          statuses
-        )
+      const statusScoped = filterByStatus(
+        snapshot.docs.map((doc) =>
+          mapWaitingDocToModel({ id: doc.id, data: doc.data() as Record<string, unknown> })
+        ),
+        statuses
       );
+      const activeScoped = activeOnly ? await this.filterActiveEntries(statusScoped) : statusScoped;
+      return sortWaitingByJoinedAt(activeScoped);
     }
 
     if (input.roomName) {
@@ -285,7 +470,25 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
         .limit(200)
         .get();
 
-      const invitationIds = invitationsSnapshot.docs.map((doc) => doc.id);
+      const nowMs = Date.now();
+      const invitationIds = invitationsSnapshot.docs
+        .filter((doc) => {
+          if (!activeOnly) {
+            return true;
+          }
+
+          const invitationData = doc.data() as Record<string, unknown>;
+          const invitation: InvitationSnapshot = {
+            id: doc.id,
+            status: typeof invitationData.status === 'string' ? invitationData.status : 'active',
+            expiresAt: invitationData.expiresAt,
+            roomName: typeof invitationData.roomName === 'string' ? invitationData.roomName : undefined,
+            waitingRoomEnabled: invitationData.waitingRoomEnabled === true,
+            createdBy: typeof invitationData.createdBy === 'string' ? invitationData.createdBy : undefined,
+          };
+          return isInvitationActive(invitation, nowMs);
+        })
+        .map((doc) => doc.id);
       if (invitationIds.length === 0) {
         return [];
       }
@@ -300,8 +503,9 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
           mapWaitingDocToModel({ id: doc.id, data: doc.data() as Record<string, unknown> })
         )
       );
-
-      return sortWaitingByJoinedAt(filterByStatus(waitingPatients, statuses));
+      const statusScoped = filterByStatus(waitingPatients, statuses);
+      const activeScoped = activeOnly ? await this.filterActiveEntries(statusScoped) : statusScoped;
+      return sortWaitingByJoinedAt(activeScoped);
     }
 
     throw new InvitationAccessError(
@@ -432,7 +636,7 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
     if (latestEntry.status === 'admitted') {
       return buildAdmittedResponse(latestEntry);
     }
-    if (latestEntry.status === 'rejected') {
+    if (latestEntry.status === 'rejected' && normalizedPatientEmail) {
       return {
         success: true,
         admitted: false,
@@ -441,7 +645,7 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
         error: 'You were rejected by the doctor. Please request a new invite if needed.',
       };
     }
-    if (latestEntry.status === 'left') {
+    if (latestEntry.status === 'left' && normalizedPatientEmail) {
       return {
         success: true,
         admitted: false,

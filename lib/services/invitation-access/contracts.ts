@@ -39,6 +39,7 @@ export interface ListWaitingEntriesInput {
   invitationId?: string;
   doctorUserId?: string;
   statuses?: Array<WaitingPatient['status']>;
+  activeOnly?: boolean;
 }
 
 export interface CheckAdmissionInput {

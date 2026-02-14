@@ -1,7 +1,12 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { isKnownUserId } from '@/lib/consultations/identity-utils';
 import { generateAndStoreConsultationSummary } from '@/lib/consultations/summary-service';
-import type { HistoryRecord, SummaryProjectionService } from './contracts';
+import type {
+  HistoryRecord,
+  SummaryProjectionService,
+  WaitingRoomHistoryRecord,
+  WaitingRoomParticipantHistoryRecord,
+} from './contracts';
 
 interface TimestampLike {
   toDate?: () => Date;
@@ -65,6 +70,11 @@ function durationFromSessionData(sessionData: Record<string, unknown>): number {
 }
 
 function mergeHistoryRecords(existing: HistoryRecord, incoming: HistoryRecord): HistoryRecord {
+  const mergedWaitingRoomHistory =
+    (incoming.waitingRoomHistory && incoming.waitingRoomHistory.totalParticipants > 0)
+      ? incoming.waitingRoomHistory
+      : existing.waitingRoomHistory;
+
   return {
     ...existing,
     ...incoming,
@@ -92,12 +102,98 @@ function mergeHistoryRecords(existing: HistoryRecord, incoming: HistoryRecord): 
       Array.isArray(incoming.followUpActions) && incoming.followUpActions.length > 0
         ? incoming.followUpActions
         : existing.followUpActions,
+    waitingRoomHistory: mergedWaitingRoomHistory,
   };
 }
 
 function hasFinalizationMetadata(sessionData: Record<string, unknown>): boolean {
   const metadata = (sessionData.metadata as Record<string, unknown> | undefined) || {};
   return typeof metadata.finalizationReason === 'string' && metadata.finalizationReason.trim().length > 0;
+}
+
+function toFiniteNonNegativeNumber(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+
+  return Math.round(parsed);
+}
+
+function normalizeWaitingRoomParticipant(value: unknown): WaitingRoomParticipantHistoryRecord | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const raw = value as Record<string, unknown>;
+  const waitingPatientId = typeof raw.waitingPatientId === 'string' ? raw.waitingPatientId : '';
+  if (!waitingPatientId) {
+    return null;
+  }
+
+  const status = raw.status;
+  const normalizedStatus: WaitingRoomParticipantHistoryRecord['status'] =
+    status === 'admitted' || status === 'left' || status === 'rejected' ? status : 'waiting';
+
+  const waitingDurationMinutesRaw = raw.waitingDurationMinutes;
+  const waitingDurationMinutes =
+    waitingDurationMinutesRaw === null || typeof waitingDurationMinutesRaw === 'undefined'
+      ? null
+      : toFiniteNonNegativeNumber(waitingDurationMinutesRaw);
+
+  return {
+    waitingPatientId,
+    invitationId: typeof raw.invitationId === 'string' ? raw.invitationId : null,
+    displayName: typeof raw.displayName === 'string' ? raw.displayName : 'Anonymous Patient',
+    patientEmail: typeof raw.patientEmail === 'string' ? raw.patientEmail : null,
+    isAnonymous: Boolean(raw.isAnonymous),
+    status: normalizedStatus,
+    joinedAt: toIsoString(raw.joinedAt),
+    admittedAt: toIsoString(raw.admittedAt),
+    leftAt: toIsoString(raw.leftAt),
+    removedAt: toIsoString(raw.removedAt),
+    waitingDurationMinutes,
+  };
+}
+
+function normalizeWaitingRoomHistory(value: unknown): WaitingRoomHistoryRecord | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const raw = value as Record<string, unknown>;
+  const participants = Array.isArray(raw.participants)
+    ? raw.participants
+        .map((participant) => normalizeWaitingRoomParticipant(participant))
+        .filter((participant): participant is WaitingRoomParticipantHistoryRecord => Boolean(participant))
+    : [];
+
+  const participantEmails = Array.from(
+    new Set(
+      participants
+        .map((participant) => participant.patientEmail)
+        .filter((patientEmail): patientEmail is string => Boolean(patientEmail))
+    )
+  );
+
+  const anonymousParticipantCount = participants.filter((participant) => participant.isAnonymous).length;
+  const registeredParticipantCount = participants.length - anonymousParticipantCount;
+  const totalParticipantsRaw = Number(raw.totalParticipants);
+  const totalParticipants = Number.isFinite(totalParticipantsRaw) && totalParticipantsRaw > 0
+    ? Math.round(totalParticipantsRaw)
+    : participants.length;
+
+  if (participants.length === 0 && totalParticipants === 0 && participantEmails.length === 0) {
+    return undefined;
+  }
+
+  return {
+    totalParticipants: Math.max(totalParticipants, participants.length),
+    registeredParticipantCount,
+    anonymousParticipantCount,
+    participantEmails,
+    participants,
+  };
 }
 
 async function resolveUserEmail(
@@ -286,19 +382,23 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
 
     for (const summaryDoc of summaryDocs) {
       const summaryData = summaryDoc.data() as Record<string, unknown>;
+      const summaryMetadata = (summaryData.metadata as Record<string, unknown> | undefined) || {};
       const patientUserId =
         (summaryData.patientUserId as string | undefined)
-        || ((summaryData.metadata as { patientUserId?: string } | undefined)?.patientUserId as string | undefined);
+        || (summaryMetadata.patientUserId as string | undefined);
       const patientEmail =
         (summaryData.patientEmail as string | undefined)
-        || ((summaryData.metadata as { patientEmail?: string } | undefined)?.patientEmail as string | undefined)
+        || (summaryMetadata.patientEmail as string | undefined)
         || (await resolveUserEmail(this.db, userEmailCache, patientUserId));
+      const waitingRoomHistory = normalizeWaitingRoomHistory(
+        summaryData.waitingRoomHistory || summaryMetadata.waitingRoomHistory
+      );
       const record: HistoryRecord = {
         id: summaryDoc.id,
         roomName: (summaryData.roomName as string) || 'Unknown Room',
         createdAt: toIsoString(summaryData.createdAt),
-        startedAt: toIsoString(summaryData.startedAt || (summaryData.metadata as { sessionStartedAt?: unknown } | undefined)?.sessionStartedAt),
-        endedAt: toIsoString(summaryData.endedAt || (summaryData.metadata as { sessionEndedAt?: unknown } | undefined)?.sessionEndedAt),
+        startedAt: toIsoString(summaryData.startedAt || summaryMetadata.sessionStartedAt),
+        endedAt: toIsoString(summaryData.endedAt || summaryMetadata.sessionEndedAt),
         duration: normalizeDuration(summaryData.duration),
         doctorEmail,
         patientEmail: patientEmail || undefined,
@@ -316,6 +416,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
         followUpActions: Array.isArray(summaryData.followUpActions)
           ? (summaryData.followUpActions as string[])
           : undefined,
+        waitingRoomHistory,
       };
 
       const existing = historyById.get(record.id);
@@ -338,10 +439,12 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
         (sessionData.patientEmail as string | undefined)
         || ((sessionData.metadata as { patientEmail?: string } | undefined)?.patientEmail as string | undefined)
         || (await resolveUserEmail(this.db, userEmailCache, patientUserId));
+      const sessionMetadata = (sessionData.metadata as Record<string, unknown> | undefined) || {};
+      const waitingRoomHistory = normalizeWaitingRoomHistory(sessionMetadata.waitingRoomHistory);
       const startedAt = toIsoString(sessionData.sessionStartedAt || sessionData.createdAt || sessionData.updatedAt);
       const endedAt = toIsoString(
         sessionData.sessionEndedAt
-        || (sessionData.metadata as { sessionEndedAt?: unknown } | undefined)?.sessionEndedAt
+        || (sessionMetadata.sessionEndedAt as unknown)
       );
       const record: HistoryRecord = {
         id: sessionId,
@@ -354,6 +457,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
         patientEmail: patientEmail || undefined,
         createdBy: normalizedDoctorUserId,
         patientUserId: patientUserId || undefined,
+        waitingRoomHistory,
       };
 
       const existing = historyById.get(record.id);
@@ -387,25 +491,29 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
 
     for (const summaryDoc of summaryDocs) {
       const summaryData = summaryDoc.data() as Record<string, unknown>;
+      const summaryMetadata = (summaryData.metadata as Record<string, unknown> | undefined) || {};
       const doctorUserId =
         (summaryData.createdBy as string | undefined)
-        || ((summaryData.metadata as { createdBy?: string } | undefined)?.createdBy as string | undefined);
+        || (summaryMetadata.createdBy as string | undefined);
       const resolvedPatientUserId =
         (summaryData.patientUserId as string | undefined)
-        || ((summaryData.metadata as { patientUserId?: string } | undefined)?.patientUserId as string | undefined);
+        || (summaryMetadata.patientUserId as string | undefined);
       const doctorEmail = await resolveUserEmail(this.db, userEmailCache, doctorUserId);
       const patientEmail =
         (summaryData.patientEmail as string | undefined)
-        || ((summaryData.metadata as { patientEmail?: string } | undefined)?.patientEmail as string | undefined)
+        || (summaryMetadata.patientEmail as string | undefined)
         || input.patientEmail
         || undefined;
+      const waitingRoomHistory = normalizeWaitingRoomHistory(
+        summaryData.waitingRoomHistory || summaryMetadata.waitingRoomHistory
+      );
 
       const record: HistoryRecord = {
         id: summaryDoc.id,
         roomName: (summaryData.roomName as string) || 'Unknown Room',
         createdAt: toIsoString(summaryData.createdAt),
-        startedAt: toIsoString(summaryData.startedAt || (summaryData.metadata as { sessionStartedAt?: unknown } | undefined)?.sessionStartedAt),
-        endedAt: toIsoString(summaryData.endedAt || (summaryData.metadata as { sessionEndedAt?: unknown } | undefined)?.sessionEndedAt),
+        startedAt: toIsoString(summaryData.startedAt || summaryMetadata.sessionStartedAt),
+        endedAt: toIsoString(summaryData.endedAt || summaryMetadata.sessionEndedAt),
         duration: normalizeDuration(summaryData.duration),
         doctorEmail: doctorEmail || undefined,
         patientEmail: patientEmail || undefined,
@@ -423,6 +531,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
         followUpActions: Array.isArray(summaryData.followUpActions)
           ? (summaryData.followUpActions as string[])
           : undefined,
+        waitingRoomHistory,
       };
 
       const existing = historyById.get(record.id);
@@ -435,21 +544,23 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
       if (!hasFinalizationMetadata(sessionData)) {
         continue;
       }
+      const sessionMetadata = (sessionData.metadata as Record<string, unknown> | undefined) || {};
       const doctorUserId = (sessionData.doctorUserId as string | undefined) || undefined;
       const resolvedPatientUserId =
         (sessionData.patientUserId as string | undefined)
-        || ((sessionData.metadata as { patientUserId?: string } | undefined)?.patientUserId as string | undefined);
+        || (sessionMetadata.patientUserId as string | undefined);
       const doctorEmail = await resolveUserEmail(this.db, userEmailCache, doctorUserId);
       const patientEmail =
         (sessionData.patientEmail as string | undefined)
-        || ((sessionData.metadata as { patientEmail?: string } | undefined)?.patientEmail as string | undefined)
+        || (sessionMetadata.patientEmail as string | undefined)
         || input.patientEmail
         || undefined;
+      const waitingRoomHistory = normalizeWaitingRoomHistory(sessionMetadata.waitingRoomHistory);
 
       const startedAt = toIsoString(sessionData.sessionStartedAt || sessionData.createdAt || sessionData.updatedAt);
       const endedAt = toIsoString(
         sessionData.sessionEndedAt
-        || (sessionData.metadata as { sessionEndedAt?: unknown } | undefined)?.sessionEndedAt
+        || (sessionMetadata.sessionEndedAt as unknown)
       );
       const record: HistoryRecord = {
         id: sessionId,
@@ -462,6 +573,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
         patientEmail: patientEmail || undefined,
         createdBy: doctorUserId,
         patientUserId: resolvedPatientUserId,
+        waitingRoomHistory,
       };
       sessionRoomNames.add(record.roomName.toLowerCase());
 
