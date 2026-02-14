@@ -141,6 +141,10 @@ export default function WaitingPatientsList({
       {waitingPatients.map((patient) => {
         const joinedAt = toDate(patient.joinedAt);
         const waitTime = Math.floor((Date.now() - joinedAt.getTime()) / 1000 / 60);
+        const displayName =
+          patient.patientName && patient.patientName !== 'Anonymous Patient'
+            ? patient.patientName
+            : patient.patientEmail || 'Anonymous Patient';
 
         return (
           <div
@@ -169,7 +173,7 @@ export default function WaitingPatientsList({
                   <strong>Email:</strong> {patient.patientEmail || 'Unknown'}
                 </p>
                 <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '0.25rem' }}>
-                  <strong>Name:</strong> {patient.patientName || 'Anonymous Patient'}
+                  <strong>Name:</strong> {displayName}
                 </p>
                 <p style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '0.25rem' }}>
                   <strong>Joined:</strong> {joinedAt.toLocaleString()}
@@ -188,7 +192,7 @@ export default function WaitingPatientsList({
                     showToast({
                       kind: 'success',
                       title: 'Patient admitted',
-                      message: `${patient.patientName || patient.patientEmail || 'Anonymous patient'} can now join the consultation room.`,
+                      message: `${displayName} can now join the consultation room.`,
                     });
                   }
                 }}
@@ -225,7 +229,7 @@ export default function WaitingPatientsList({
                     showToast({
                       kind: 'success',
                       title: 'Patient removed',
-                      message: `${patient.patientName || patient.patientEmail || 'Patient'} was removed from the waiting room.`,
+                      message: `${displayName} was removed from the waiting room.`,
                     });
                   }
                 }}

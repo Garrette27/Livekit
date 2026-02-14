@@ -79,10 +79,6 @@ export function useAuthSession({
         if (resolveRole) {
           role = await resolveUserRole(user);
         }
-
-        if (onAuthenticated) {
-          await onAuthenticated(user);
-        }
       } catch (error) {
         console.error('Error resolving auth session state:', error);
       }
@@ -99,6 +95,12 @@ export function useAuthSession({
         isAuthorized,
         isLoading: false,
       });
+
+      if (onAuthenticated) {
+        void Promise.resolve(onAuthenticated(user)).catch((error) => {
+          console.error('Error in onAuthenticated callback:', error);
+        });
+      }
     });
   }, [onAuthenticated, requiredRole, resolveRole]);
 

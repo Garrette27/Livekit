@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { getDoctorHistoryRoute } from '@/lib/routes/doctor-routes';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,5 +8,5 @@ export const dynamic = 'force-dynamic';
  * stays at /doctor/dashboard.
  */
 export default function DoctorHistoryAliasPage() {
-  redirect('/doctor/dashboard');
+  redirect(getDoctorHistoryRoute());
 }

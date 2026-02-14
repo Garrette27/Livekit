@@ -39,6 +39,7 @@ export default function DoctorSessionPanel({
             autoRefresh={policy.panels.waitingQueue.autoRefresh}
             pollIntervalMs={policy.panels.waitingQueue.pollIntervalMs}
             showRefreshButton={policy.panels.waitingQueue.showRefreshButton}
+            showAdmitControl={policy.panels.waitingQueue.showAdmitControl}
           />
         </SidebarPortal>
       )}
@@ -56,7 +57,9 @@ export default function DoctorSessionPanel({
             doctorName={doctorName || user.displayName || user.email || 'Doctor'}
             roomName={roomName}
             onLeave={onLeave}
+            showCopyInvitationLinkControl={policy.panels.doctorSession.showCopyInvitationLinkControl}
             showRefreshInvitationLinkControl={policy.panels.doctorSession.showRefreshInvitationLinkControl}
+            showLeaveCallControl={policy.panels.doctorSession.showLeaveCallControl}
           />
         </SidebarPortal>
       )}

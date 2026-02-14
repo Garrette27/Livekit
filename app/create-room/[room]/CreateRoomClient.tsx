@@ -5,6 +5,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { useAuthSession } from '@/hooks/useAuthSession';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
+import { getDoctorHistoryRoute } from '@/lib/routes/doctor-routes';
 
 interface CreateRoomClientProps {
   room: string;
@@ -250,7 +251,7 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
 
         {/* Navigation */}
         <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-          <Link href="/doctor/history" style={{
+          <Link href={getDoctorHistoryRoute()} style={{
             backgroundColor: '#6B7280',
             color: 'white',
             padding: '0.75rem 1.5rem',

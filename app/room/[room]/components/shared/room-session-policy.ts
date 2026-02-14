@@ -29,13 +29,16 @@ export interface SidebarPolicy {
 }
 
 export interface DoctorSessionPanelPolicy extends SidebarPolicy {
+  showCopyInvitationLinkControl: boolean;
   showRefreshInvitationLinkControl: boolean;
+  showLeaveCallControl: boolean;
 }
 
 export interface WaitingQueuePanelPolicy extends SidebarPolicy {
   autoRefresh: boolean;
   pollIntervalMs: number;
   showRefreshButton: boolean;
+  showAdmitControl: boolean;
 }
 
 export interface RoomSessionPolicy {
@@ -65,11 +68,14 @@ const DISABLED_WAITING_QUEUE_PANEL: WaitingQueuePanelPolicy = {
   autoRefresh: false,
   pollIntervalMs: 15_000,
   showRefreshButton: false,
+  showAdmitControl: false,
 };
 
 const DISABLED_DOCTOR_SESSION_PANEL: DoctorSessionPanelPolicy = {
   ...DISABLED_PANEL,
+  showCopyInvitationLinkControl: false,
   showRefreshInvitationLinkControl: false,
+  showLeaveCallControl: false,
 };
 
 const DEFAULT_GRID_POLICY: RoomGridPolicy = {
@@ -103,6 +109,7 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
         autoRefresh: true,
         pollIntervalMs: 15_000,
         showRefreshButton: false,
+        showAdmitControl: true,
       },
       doctorSession: {
         enabled: true,
@@ -112,7 +119,9 @@ const ROOM_SESSION_POLICIES: Record<RoomRole, RoomSessionPolicy> = {
         width: 300,
         collapsedWidth: 60,
         defaultCollapsed: false,
+        showCopyInvitationLinkControl: true,
         showRefreshInvitationLinkControl: false,
+        showLeaveCallControl: true,
       },
       patientSession: DISABLED_PANEL,
       notes: DISABLED_PANEL,

@@ -1,5 +1,6 @@
 import { FieldValue, Firestore, Timestamp } from 'firebase-admin/firestore';
 import { isKnownUserId } from './identity-utils';
+import { EVENT_DOMAINS, EVENT_SCHEMA_VERSION } from '../events/event-schema';
 
 export type ConsultationPresenceEventType = 'joined' | 'left' | 'rejoined';
 export type SessionChatVisibilityPolicy = 'join-time-only' | 'full-history';
@@ -235,12 +236,15 @@ export async function appendPresenceEvent(
     .collection('events');
 
   await eventsRef.add({
+    eventDomain: EVENT_DOMAINS.CONSULTATION_PRESENCE,
+    eventVersion: EVENT_SCHEMA_VERSION,
     consultationSessionId,
     roomName,
     doctorUserId: doctorUserId || null,
     patientUserId: patientUserId || null,
     actorType,
     eventType,
+    occurredAt: Timestamp.fromDate(eventAt),
     eventAt: Timestamp.fromDate(eventAt),
     metadata,
     createdAt: FieldValue.serverTimestamp(),

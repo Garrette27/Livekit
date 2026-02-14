@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { trackDoctorPresenceEvent } from '@/lib/consultations/doctor-presence-client';
 
 interface RoomLifecycleArgs {
   token: string | null;
@@ -55,12 +56,35 @@ export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLife
           },
           { merge: true }
         );
+
+        await trackDoctorPresenceEvent({
+          roomName,
+          action: 'join',
+          doctorUserId: user.uid,
+          doctorName: doctorName || user.displayName || user.email,
+          doctorEmail: user.email || null,
+        });
       } catch (error) {
         console.error('Error creating room/call records:', error);
       }
     };
 
     createRecords();
+
+    return () => {
+      void trackDoctorPresenceEvent(
+        {
+          roomName,
+          action: 'leave',
+          doctorUserId: user.uid,
+          doctorName: doctorName || user.displayName || user.email,
+          doctorEmail: user.email || null,
+        },
+        { keepalive: true }
+      ).catch((presenceError) => {
+        console.error('Error tracking doctor leave on room lifecycle cleanup:', presenceError);
+      });
+    };
   }, [token, user, roomName, doctorName]);
 }
 

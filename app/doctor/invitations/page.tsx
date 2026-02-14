@@ -10,6 +10,7 @@ import WaitingPatientsList from './components/WaitingPatientsList';
 import { useAuthSession } from '@/hooks/useAuthSession';
 import { copyTextToClipboard, fetchInvitationLink as getInvitationLink } from '@/lib/invitations/invitation-link-client';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
+import { getDoctorHistoryRoute } from '@/lib/routes/doctor-routes';
 
 export default function DoctorInvitationsPage() {
   const { showToast } = useToast();
@@ -30,10 +31,11 @@ export default function DoctorInvitationsPage() {
   const router = useRouter();
 
   const navigateToConsultationHistory = useCallback(() => {
-    router.push('/doctor/dashboard');
+    const doctorHistoryRoute = getDoctorHistoryRoute();
+    router.push(doctorHistoryRoute);
     window.setTimeout(() => {
-      if (window.location.pathname !== '/doctor/dashboard') {
-        window.location.assign('/doctor/dashboard');
+      if (window.location.pathname !== doctorHistoryRoute) {
+        window.location.assign(doctorHistoryRoute);
       }
     }, 250);
   }, [router]);

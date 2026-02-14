@@ -12,6 +12,8 @@ import { getGeolocationFromIP } from './geolocation-utils';
 import { signLiveKitRoomToken, verifyInvitationToken } from './token-utils';
 import { detectBrowser, generateDeviceFingerprintHash, toDate } from './utils';
 import { buildWaitingPatientIdentity } from './waiting-patient-identity';
+import { EVENT_DOMAINS, EVENT_SCHEMA_VERSION } from '../events/event-schema';
+import { getInvitationEmailAllowlist, isEmailAllowedByInvitation } from './email-allowlist';
 
 export interface ValidateInvitationContext {
   token: string;
@@ -32,6 +34,13 @@ interface UserLookupContext {
   userProfile?: any;
 }
 
+interface WaitingPatientIdentity {
+  patientId: string;
+  patientName: string;
+  patientEmail?: string;
+  isAnonymous: boolean;
+}
+
 function result(status: number, body: ValidateInvitationResponse): ValidateInvitationResult {
   return { status, body };
 }
@@ -46,8 +55,12 @@ function buildAccessAttempt(
   country?: string,
   deviceFingerprint?: DeviceFingerprint
 ): AccessAttempt {
+  const occurredAt = new Date() as any;
   return {
-    timestamp: new Date() as any,
+    eventDomain: EVENT_DOMAINS.INVITATION_AUDIT,
+    eventVersion: EVENT_SCHEMA_VERSION,
+    occurredAt,
+    timestamp: occurredAt,
     ip: clientIP,
     userAgent,
     country,
@@ -59,6 +72,9 @@ function buildAccessAttempt(
 
 function toAccessAttemptData(accessAttempt: AccessAttempt): Record<string, any> {
   return {
+    eventDomain: accessAttempt.eventDomain || EVENT_DOMAINS.INVITATION_AUDIT,
+    eventVersion: accessAttempt.eventVersion || EVENT_SCHEMA_VERSION,
+    occurredAt: accessAttempt.occurredAt || accessAttempt.timestamp,
     timestamp: accessAttempt.timestamp,
     ip: accessAttempt.ip,
     userAgent: accessAttempt.userAgent,
@@ -83,6 +99,118 @@ function toMillis(value: any): number {
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 }
 
+function buildParticipantDisplayName(lookup: UserLookupContext): string {
+  return (
+    lookup.userProfile?.displayName
+    || lookup.userEmailToCheck
+    || 'Anonymous Patient'
+  );
+}
+
+function createWaitingPatientId(invitationId: string): string {
+  return `waiting_${invitationId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+function isAutoAdmissionCandidate(invitation: Invitation, lookup: UserLookupContext): boolean {
+  return Boolean(isEmailAllowedByInvitation(invitation, lookup.userEmailToCheck) && lookup.userDocId);
+}
+
+async function lookupRegisteredAdmissionHistory(
+  db: any,
+  invitationId: string,
+  patientEmail: string
+): Promise<{ hasLeft: boolean; latestAdmitted: WaitingPatient | null }> {
+  const existingPatientsQuery = await db.collection('waitingPatients')
+    .where('invitationId', '==', invitationId)
+    .where('patientEmail', '==', patientEmail)
+    .get();
+
+  if (existingPatientsQuery.empty) {
+    return { hasLeft: false, latestAdmitted: null };
+  }
+
+  let hasLeft = false;
+  let latestAdmitted: WaitingPatient | null = null;
+  let latestAdmittedTime = 0;
+
+  existingPatientsQuery.docs.forEach((doc: any) => {
+    const data = { id: doc.id, ...doc.data() } as WaitingPatient;
+
+    if (data.status === 'left') {
+      hasLeft = true;
+      return;
+    }
+
+    if (data.status === 'admitted') {
+      const joinedAtMillis = toMillis(data.joinedAt);
+      if (!latestAdmitted || joinedAtMillis >= latestAdmittedTime) {
+        latestAdmitted = data;
+        latestAdmittedTime = joinedAtMillis;
+      }
+    }
+  });
+
+  return { hasLeft, latestAdmitted };
+}
+
+async function appendInvitationAccessAudit(
+  db: any,
+  invitationId: string,
+  invitation: Invitation,
+  accessAttemptData: Record<string, any>
+): Promise<void> {
+  await db.collection('invitations').doc(invitationId).update({
+    currentUses: (invitation.currentUses || 0) + 1,
+    'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
+    'audit.lastAccessed': new Date(),
+  });
+}
+
+async function persistWaitingPatient(
+  db: any,
+  input: {
+    invitationId: string;
+    roomName: string;
+    doctorUserId: string;
+    identity: WaitingPatientIdentity;
+    status: WaitingPatient['status'];
+    clientIP: string;
+    userAgent: string;
+    deviceFingerprint?: DeviceFingerprint;
+    admissionMode?: 'doctor-manual' | 'auto-email-match';
+  }
+): Promise<string> {
+  const waitingPatientId = createWaitingPatientId(input.invitationId);
+  const now = new Date();
+
+  const waitingPatient: any = {
+    id: waitingPatientId,
+    patientId: input.identity.patientId,
+    patientName: input.identity.patientName,
+    ...(input.identity.patientEmail && { patientEmail: input.identity.patientEmail }),
+    roomName: input.roomName,
+    invitationId: input.invitationId,
+    doctorUserId: input.doctorUserId,
+    joinedAt: now,
+    status: input.status,
+    metadata: {
+      ...(input.deviceFingerprint && { deviceFingerprint: JSON.stringify(input.deviceFingerprint) }),
+      ip: input.clientIP,
+      userAgent: input.userAgent,
+      lastAccessed: now,
+      ...(input.admissionMode && { admissionMode: input.admissionMode }),
+      isAnonymous: input.identity.isAnonymous,
+    },
+  };
+
+  if (input.status === 'admitted') {
+    waitingPatient.admittedAt = now;
+  }
+
+  await db.collection('waitingPatients').doc(waitingPatientId).set(waitingPatient);
+  return waitingPatientId;
+}
+
 async function resolveUserContext(
   db: any,
   invitation: Invitation,
@@ -92,8 +220,10 @@ async function resolveUserContext(
   userAgent: string,
   violations: SecurityViolation[]
 ): Promise<{ lookup: UserLookupContext; earlyResult?: ValidateInvitationResult }> {
+  const emailAllowlist = getInvitationEmailAllowlist(invitation);
+  const defaultInvitationEmail = emailAllowlist[0];
   const lookup: UserLookupContext = {
-    userEmailToCheck: normalizeEmail(userEmail || tokenPayload.email || invitation.emailAllowed),
+    userEmailToCheck: normalizeEmail(userEmail || tokenPayload.email || defaultInvitationEmail),
   };
 
   if (!lookup.userEmailToCheck) {
@@ -113,7 +243,7 @@ async function resolveUserContext(
         success: false,
         error: 'User not registered. Please register first.',
         requiresRegistration: true,
-        registeredEmail: invitation.emailAllowed || lookup.userEmailToCheck,
+        registeredEmail: defaultInvitationEmail || lookup.userEmailToCheck,
       }),
     };
   }
@@ -128,19 +258,20 @@ async function resolveUserContext(
         success: false,
         error: 'Consent required. Please provide consent to store device information.',
         requiresRegistration: true,
-        registeredEmail: invitation.emailAllowed || lookup.userEmailToCheck,
+        registeredEmail: defaultInvitationEmail || lookup.userEmailToCheck,
       }),
     };
   }
 
-  if (
-    invitation.emailAllowed &&
-    lookup.userEmailToCheck !== invitation.emailAllowed.toLowerCase().trim()
-  ) {
+  if (emailAllowlist.length > 0 && !isEmailAllowedByInvitation(invitation, lookup.userEmailToCheck)) {
+    const violationTimestamp = new Date() as any;
     violations.push({
-      timestamp: new Date() as any,
+      eventDomain: EVENT_DOMAINS.INVITATION_AUDIT,
+      eventVersion: EVENT_SCHEMA_VERSION,
+      occurredAt: violationTimestamp,
+      timestamp: violationTimestamp,
       type: 'wrong_email',
-      details: `Expected: ${invitation.emailAllowed}, Got: ${lookup.userEmailToCheck}`,
+      details: `Expected one of: ${emailAllowlist.join(', ')}, Got: ${lookup.userEmailToCheck}`,
       ip: clientIP,
       userAgent,
     });
@@ -167,8 +298,12 @@ async function collectSecurityViolations(
   if (deviceFingerprint && lookup.userProfile.deviceInfo && !isWaitingRoomEnabled) {
     const currentDeviceHash = generateDeviceFingerprintHash(deviceFingerprint);
     if (lookup.userProfile.deviceInfo.deviceFingerprintHash !== currentDeviceHash) {
+      const violationTimestamp = new Date() as any;
       violations.push({
-        timestamp: new Date() as any,
+        eventDomain: EVENT_DOMAINS.INVITATION_AUDIT,
+        eventVersion: EVENT_SCHEMA_VERSION,
+        occurredAt: violationTimestamp,
+        timestamp: violationTimestamp,
         type: 'wrong_device',
         details: 'Device fingerprint does not match registered device',
         ip: clientIP,
@@ -192,8 +327,12 @@ async function collectSecurityViolations(
       lookup.userProfile.locationInfo.country !== geolocation.country &&
       lookup.userProfile.locationInfo.countryCode !== geolocation.countryCode
     ) {
+      const violationTimestamp = new Date() as any;
       violations.push({
-        timestamp: new Date() as any,
+        eventDomain: EVENT_DOMAINS.INVITATION_AUDIT,
+        eventVersion: EVENT_SCHEMA_VERSION,
+        occurredAt: violationTimestamp,
+        timestamp: violationTimestamp,
         type: 'wrong_country',
         details:
           `Expected: ${lookup.userProfile.locationInfo.country} ` +
@@ -205,8 +344,12 @@ async function collectSecurityViolations(
   }
 
   if (lookup.userProfile.browserInfo && lookup.userProfile.browserInfo.name !== detectedBrowser) {
+    const violationTimestamp = new Date() as any;
     violations.push({
-      timestamp: new Date() as any,
+      eventDomain: EVENT_DOMAINS.INVITATION_AUDIT,
+      eventVersion: EVENT_SCHEMA_VERSION,
+      occurredAt: violationTimestamp,
+      timestamp: violationTimestamp,
       type: 'wrong_browser',
       details: `Expected: ${lookup.userProfile.browserInfo.name}, Got: ${detectedBrowser}`,
       ip: clientIP,
@@ -334,7 +477,7 @@ async function handleWaitingRoomAccess(params: {
   lookup: UserLookupContext;
   explicitUserEmail?: string;
   accessAttemptData: Record<string, any>;
-  liveKitToken: string;
+  participantDisplayName: string;
   waitingRoomName: string;
   clientIP: string;
   userAgent: string;
@@ -347,45 +490,14 @@ async function handleWaitingRoomAccess(params: {
     lookup,
     explicitUserEmail,
     accessAttemptData,
-    liveKitToken,
+    participantDisplayName,
     waitingRoomName,
     clientIP,
     userAgent,
     deviceFingerprint,
   } = params;
 
-  const existingWaitingPatient = await findExistingWaitingPatient(
-    db,
-    tokenPayload.invitationId,
-    deviceFingerprint,
-    clientIP,
-    userAgent
-  );
-
-  if (existingWaitingPatient) {
-    console.log('Existing waiting patient found, reusing instead of creating duplicate:', {
-      waitingPatientId: existingWaitingPatient.id,
-      invitationId: tokenPayload.invitationId,
-    });
-
-    await db.collection('waitingPatients').doc(existingWaitingPatient.id).update({
-      'metadata.lastAccessed': new Date(),
-    });
-
-    return result(200, {
-      success: true,
-      liveKitToken,
-      roomName: waitingRoomName,
-      waitingRoomToken: true,
-      waitingRoomEnabled: true,
-      invitationId: tokenPayload.invitationId,
-    });
-  }
-
-  const waitingPatientId =
-    `waiting_${tokenPayload.invitationId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const doctorUserId = invitation.createdBy;
-
   if (!doctorUserId || doctorUserId === 'system') {
     console.error('CRITICAL: Cannot create waiting patient - doctorUserId is invalid:', {
       doctorUserId,
@@ -401,42 +513,145 @@ async function handleWaitingRoomAccess(params: {
   const identity = buildWaitingPatientIdentity({
     explicitUserEmail,
     profileEmail: lookup.userProfile?.email,
-    invitationEmail: lookup.userEmailToCheck || invitation.emailAllowed,
+    invitationEmail: lookup.userEmailToCheck || getInvitationEmailAllowlist(invitation)[0],
     userDocId: lookup.userDocId,
   });
 
-  const waitingPatient: any = {
-    id: waitingPatientId,
-    patientId: identity.patientId,
-    patientName: identity.patientName,
-    ...(identity.patientEmail && { patientEmail: identity.patientEmail }),
-    roomName: tokenPayload.roomName,
-    invitationId: tokenPayload.invitationId,
-    doctorUserId,
-    joinedAt: new Date(),
-    status: 'waiting',
-    metadata: {
-      ...(deviceFingerprint && { deviceFingerprint: JSON.stringify(deviceFingerprint) }),
-      ip: clientIP,
-      userAgent,
-      lastAccessed: new Date(),
-    },
-  };
+  if (isAutoAdmissionCandidate(invitation, lookup) && identity.patientEmail) {
+    const admissionHistory = await lookupRegisteredAdmissionHistory(
+      db,
+      tokenPayload.invitationId,
+      identity.patientEmail
+    );
 
-  await db.collection('waitingPatients').doc(waitingPatientId).set(waitingPatient);
-  await db.collection('invitations').doc(tokenPayload.invitationId).update({
-    currentUses: (invitation.currentUses || 0) + 1,
-    'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
-    'audit.lastAccessed': new Date(),
+    if (!admissionHistory.hasLeft) {
+      if (admissionHistory.latestAdmitted) {
+        await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
+
+        const admittedToken = signLiveKitRoomToken({
+          subject: `patient_${tokenPayload.invitationId}_${admissionHistory.latestAdmitted.id}`,
+          roomName: tokenPayload.roomName,
+          participantName: participantDisplayName,
+          expiresIn: '2h',
+        });
+
+        return result(200, {
+          success: true,
+          liveKitToken: admittedToken,
+          roomName: tokenPayload.roomName,
+          waitingRoomToken: false,
+          waitingRoomEnabled: false,
+          invitationId: tokenPayload.invitationId,
+          waitingPatientId: admissionHistory.latestAdmitted.id,
+        });
+      }
+
+      const admittedWaitingPatientId = await persistWaitingPatient(db, {
+        invitationId: tokenPayload.invitationId,
+        roomName: tokenPayload.roomName,
+        doctorUserId,
+        identity,
+        status: 'admitted',
+        clientIP,
+        userAgent,
+        deviceFingerprint,
+        admissionMode: 'auto-email-match',
+      });
+
+      await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
+
+      const admittedToken = signLiveKitRoomToken({
+        subject: `patient_${tokenPayload.invitationId}_${admittedWaitingPatientId}`,
+        roomName: tokenPayload.roomName,
+        participantName: participantDisplayName,
+        expiresIn: '2h',
+      });
+
+      return result(200, {
+        success: true,
+        liveKitToken: admittedToken,
+        roomName: tokenPayload.roomName,
+        waitingRoomToken: false,
+        waitingRoomEnabled: false,
+        invitationId: tokenPayload.invitationId,
+        waitingPatientId: admittedWaitingPatientId,
+      });
+    }
+  }
+
+  const existingWaitingPatient = await findExistingWaitingPatient(
+    db,
+    tokenPayload.invitationId,
+    deviceFingerprint,
+    clientIP,
+    userAgent
+  );
+
+  if (existingWaitingPatient) {
+    console.log('Existing waiting patient found, reusing instead of creating duplicate:', {
+      waitingPatientId: existingWaitingPatient.id,
+      invitationId: tokenPayload.invitationId,
+    });
+
+    const patch: Record<string, unknown> = {
+      'metadata.lastAccessed': new Date(),
+    };
+    if (!existingWaitingPatient.patientEmail && identity.patientEmail) {
+      patch.patientEmail = identity.patientEmail;
+    }
+    if (
+      (existingWaitingPatient.patientName === 'Anonymous Patient' || !existingWaitingPatient.patientName)
+      && identity.patientName
+      && identity.patientName !== 'Anonymous Patient'
+    ) {
+      patch.patientName = identity.patientName;
+      patch.patientId = identity.patientId;
+    }
+    await db.collection('waitingPatients').doc(existingWaitingPatient.id).update(patch);
+
+    return result(200, {
+      success: true,
+      liveKitToken: signLiveKitRoomToken({
+        subject: `patient_${tokenPayload.invitationId}_${existingWaitingPatient.id}`,
+        roomName: waitingRoomName,
+        participantName: participantDisplayName,
+        expiresIn: '1h',
+      }),
+      roomName: waitingRoomName,
+      waitingRoomToken: true,
+      waitingRoomEnabled: true,
+      invitationId: tokenPayload.invitationId,
+      waitingPatientId: existingWaitingPatient.id,
+    });
+  }
+
+  const waitingPatientId = await persistWaitingPatient(db, {
+    invitationId: tokenPayload.invitationId,
+    roomName: tokenPayload.roomName,
+    doctorUserId,
+    identity,
+    status: 'waiting',
+    clientIP,
+    userAgent,
+    deviceFingerprint,
+    admissionMode: 'doctor-manual',
   });
+
+  await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
 
   return result(200, {
     success: true,
-    liveKitToken,
+    liveKitToken: signLiveKitRoomToken({
+      subject: `patient_${tokenPayload.invitationId}_${waitingPatientId}`,
+      roomName: waitingRoomName,
+      participantName: participantDisplayName,
+      expiresIn: '1h',
+    }),
     roomName: waitingRoomName,
     waitingRoomToken: true,
     waitingRoomEnabled: true,
     invitationId: tokenPayload.invitationId,
+    waitingPatientId,
   });
 }
 
@@ -542,17 +757,7 @@ export async function validateInvitationAndIssueToken(
       return usageError;
     }
 
-    const targetRoomName = isWaitingRoomEnabled ? waitingRoomName : tokenPayload.roomName;
-    const participantDisplayName =
-      userResolution.lookup.userProfile?.displayName
-      || userResolution.lookup.userEmailToCheck
-      || 'Anonymous Patient';
-    const liveKitToken = signLiveKitRoomToken({
-      subject: `patient_${tokenPayload.invitationId}_${Date.now()}`,
-      roomName: targetRoomName,
-      participantName: participantDisplayName,
-      expiresIn: '1h',
-    });
+    const participantDisplayName = buildParticipantDisplayName(userResolution.lookup);
 
     accessAttempt.success = true;
     accessAttempt.reason = 'Access granted successfully';
@@ -566,13 +771,20 @@ export async function validateInvitationAndIssueToken(
         lookup: userResolution.lookup,
         explicitUserEmail: context.userEmail,
         accessAttemptData,
-        liveKitToken,
+        participantDisplayName,
         waitingRoomName,
         clientIP: context.clientIP,
         userAgent: context.userAgent,
         deviceFingerprint: context.deviceFingerprint,
       });
     }
+
+    const liveKitToken = signLiveKitRoomToken({
+      subject: `patient_${tokenPayload.invitationId}_${Date.now()}`,
+      roomName: tokenPayload.roomName,
+      participantName: participantDisplayName,
+      expiresIn: '1h',
+    });
 
     await db.collection('invitations').doc(tokenPayload.invitationId).update({
       status: 'used',

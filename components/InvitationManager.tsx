@@ -62,6 +62,7 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
             roomName: formData.roomName,
             constraints: {
               email: formData.emailAllowed,
+              ...(formData.emailAllowed ? { emails: [formData.emailAllowed.toLowerCase().trim()] } : {}),
               phone: formData.phoneAllowed,
             },
             security: {

@@ -4,10 +4,10 @@ import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import { validateEmail, validateRoomName, sanitizeInput } from '../../../../lib/validation';
 import { signInvitationToken } from '../../../../lib/invitations/token-utils';
 import { buildInviteUrl, getInviteBaseUrl } from '../../../../lib/invitations/utils';
+import { EVENT_DOMAINS, EVENT_SCHEMA_VERSION } from '../../../../lib/events/event-schema';
 import { 
   CreateInvitationRequest, 
   CreateInvitationResponse, 
-  Invitation,
   InvitationToken 
 } from '../../../../lib/types';
 
@@ -125,6 +125,7 @@ export async function POST(req: NextRequest) {
         roomName: sanitizedRoomName,
         constraints: {
           ...(sanitizedEmail && { email: sanitizedEmail }),
+          ...(sanitizedEmail && { emails: [sanitizedEmail] }),
           ...(sanitizedPhone && { phone: sanitizedPhone }),
         },
         security: {
@@ -134,6 +135,8 @@ export async function POST(req: NextRequest) {
         },
       },
       audit: {
+        eventDomain: EVENT_DOMAINS.INVITATION_AUDIT,
+        eventVersion: EVENT_SCHEMA_VERSION,
         created: new Date() as any,
         accessAttempts: [],
         violations: [],

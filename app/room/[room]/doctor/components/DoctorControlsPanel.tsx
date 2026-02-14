@@ -8,7 +8,9 @@ interface DoctorControlsPanelProps {
   doctorName: string;
   roomName: string;
   onLeave: () => void;
+  showCopyInvitationLinkControl?: boolean;
   showRefreshInvitationLinkControl?: boolean;
+  showLeaveCallControl?: boolean;
 }
 
 interface InvitationLinkResponse {
@@ -21,7 +23,9 @@ export default function DoctorControlsPanel({
   doctorName,
   roomName,
   onLeave,
+  showCopyInvitationLinkControl = true,
   showRefreshInvitationLinkControl = false,
+  showLeaveCallControl = true,
 }: DoctorControlsPanelProps) {
   const { showToast } = useToast();
   const [invitationLink, setInvitationLink] = useState<string | null>(null);
@@ -142,43 +146,45 @@ export default function DoctorControlsPanel({
           {patientLink}
         </p>
 
-        <button
-          onClick={async () => {
-            try {
-              await copyTextToClipboard(patientLink);
-              setCopied(true);
-              showToast({
-                kind: 'success',
-                title: 'Link copied',
-                message: invitationLink ? 'Invitation link copied to clipboard.' : 'Patient link copied to clipboard.',
-              });
-            } catch (copyError) {
-              console.error('Failed to copy patient link:', copyError);
-              showToast({
-                kind: 'error',
-                title: 'Copy failed',
-                message: 'Unable to copy link. Please try again.',
-              });
-            }
-          }}
-          disabled={loadingLink}
-          style={{
-            backgroundColor: loadingLink ? '#9ca3af' : copied ? '#16a34a' : '#22c55e',
-            color: 'white',
-            border: 'none',
-            borderRadius: '0.5rem',
-            padding: '0.5rem 1rem',
-            fontSize: '0.75rem',
-            fontWeight: '500',
-            cursor: loadingLink ? 'not-allowed' : 'pointer',
-            width: '100%',
-            marginBottom: '0.5rem',
-            transform: copied ? 'translateY(1px) scale(0.99)' : 'none',
-            transition: 'all 140ms ease',
-          }}
-        >
-          {loadingLink ? 'Loading...' : copied ? 'Copied' : 'Copy Link'}
-        </button>
+        {showCopyInvitationLinkControl && (
+          <button
+            onClick={async () => {
+              try {
+                await copyTextToClipboard(patientLink);
+                setCopied(true);
+                showToast({
+                  kind: 'success',
+                  title: 'Link copied',
+                  message: invitationLink ? 'Invitation link copied to clipboard.' : 'Patient link copied to clipboard.',
+                });
+              } catch (copyError) {
+                console.error('Failed to copy patient link:', copyError);
+                showToast({
+                  kind: 'error',
+                  title: 'Copy failed',
+                  message: 'Unable to copy link. Please try again.',
+                });
+              }
+            }}
+            disabled={loadingLink}
+            style={{
+              backgroundColor: loadingLink ? '#9ca3af' : copied ? '#16a34a' : '#22c55e',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.5rem',
+              padding: '0.5rem 1rem',
+              fontSize: '0.75rem',
+              fontWeight: '500',
+              cursor: loadingLink ? 'not-allowed' : 'pointer',
+              width: '100%',
+              marginBottom: '0.5rem',
+              transform: copied ? 'translateY(1px) scale(0.99)' : 'none',
+              transition: 'all 140ms ease',
+            }}
+          >
+            {loadingLink ? 'Loading...' : copied ? 'Copied' : 'Copy Link'}
+          </button>
+        )}
 
         {showRefreshInvitationLinkControl && (
           <button
@@ -201,28 +207,30 @@ export default function DoctorControlsPanel({
           </button>
         )}
 
-        <button
-          onClick={onLeave}
-          style={{
-            backgroundColor: '#dc2626',
-            color: 'white',
-            border: 'none',
-            borderRadius: '0.5rem',
-            padding: '0.75rem 1rem',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            cursor: 'pointer',
-            textDecoration: 'none',
-            display: 'inline-block',
-            textAlign: 'center',
-            width: '100%',
-            transition: 'all 0.2s ease',
-            boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-            marginTop: '0.25rem',
-          }}
-        >
-          Leave Call
-        </button>
+        {showLeaveCallControl && (
+          <button
+            onClick={onLeave}
+            style={{
+              backgroundColor: '#dc2626',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.5rem',
+              padding: '0.75rem 1rem',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              textDecoration: 'none',
+              display: 'inline-block',
+              textAlign: 'center',
+              width: '100%',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+              marginTop: '0.25rem',
+            }}
+          >
+            Leave Call
+          </button>
+        )}
       </div>
     </div>
   );

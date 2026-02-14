@@ -78,14 +78,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Find patient by invitation ID across both waiting and admitted statuses.
+    // Find patient by invitation ID.
     const allPatientsQuery = db.collection('waitingPatients')
       .where('invitationId', '==', invitationId);
 
     const querySnapshot = await allPatientsQuery.get();
 
-    // Resolve the most relevant record for this visit.
-    // Priority: newest waiting -> newest admitted -> newest any.
+    // Resolve the most relevant waiting record for this visit.
+    // Priority: newest waiting only. We intentionally do not auto-reuse
+    // older admitted records without an explicit waitingPatientId.
     let waitingPatient: WaitingPatient | null = null;
     if (!querySnapshot.empty) {
       const allPatients = querySnapshot.docs.map((snapshotDoc) => ({
@@ -112,19 +113,14 @@ export async function POST(req: NextRequest) {
         return bTime - aTime;
       });
 
-      if (sortedPatients.length > 0) {
-        waitingPatient =
-          sortedPatients.find((patient) => patient.status === 'waiting')
-          || sortedPatients.find((patient) => patient.status === 'admitted')
-          || sortedPatients[0];
-      }
+      waitingPatient = sortedPatients.find((patient) => patient.status === 'waiting') || null;
     }
 
     if (!waitingPatient) {
       return NextResponse.json({
-        success: false,
+        success: true,
         admitted: false,
-        error: 'Waiting patient not found',
+        error: 'No active waiting entry found for this visit. Please re-open the invitation link.',
       });
     }
 

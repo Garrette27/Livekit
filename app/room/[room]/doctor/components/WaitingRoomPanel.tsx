@@ -10,6 +10,7 @@ interface WaitingRoomPanelProps {
   autoRefresh?: boolean;
   pollIntervalMs?: number;
   showRefreshButton?: boolean;
+  showAdmitControl?: boolean;
 }
 
 export default function WaitingRoomPanel({
@@ -18,6 +19,7 @@ export default function WaitingRoomPanel({
   autoRefresh = true,
   pollIntervalMs = 15_000,
   showRefreshButton = false,
+  showAdmitControl = true,
 }: WaitingRoomPanelProps) {
   const { showToast } = useToast();
   const {
@@ -117,6 +119,10 @@ export default function WaitingRoomPanel({
           {waitingPatients.map((patient) => {
             const joinedAt = patient.joinedAt?.toDate ? patient.joinedAt.toDate() : new Date(patient.joinedAt);
             const waitTimeMinutes = Math.floor((Date.now() - joinedAt.getTime()) / 1000 / 60);
+            const displayName =
+              patient.patientName && patient.patientName !== 'Anonymous Patient'
+                ? patient.patientName
+                : patient.patientEmail || 'Anonymous Patient';
 
             return (
               <div
@@ -131,7 +137,7 @@ export default function WaitingRoomPanel({
                 <div
                   style={{
                     display: 'flex',
-                    justifyContent: 'space-between',
+                    justifyContent: showAdmitControl ? 'space-between' : 'flex-start',
                     alignItems: 'flex-start',
                     marginBottom: '0.5rem',
                   }}
@@ -145,7 +151,7 @@ export default function WaitingRoomPanel({
                         margin: '0 0 0.25rem 0',
                       }}
                     >
-                      {patient.patientName || 'Anonymous Patient'}
+                      {displayName}
                     </p>
                     {patient.patientEmail && (
                       <p
@@ -168,32 +174,34 @@ export default function WaitingRoomPanel({
                       Waiting for {waitTimeMinutes} minute{waitTimeMinutes !== 1 ? 's' : ''}
                     </p>
                   </div>
-                  <button
-                    onClick={async () => {
-                      const admitted = await admitPatient(patient.id);
-                      if (admitted) {
-                        showToast({
-                          kind: 'success',
-                          title: 'Patient admitted',
-                          message: `${patient.patientName || 'Anonymous patient'} can now join the main room.`,
-                        });
-                      }
-                    }}
-                    disabled={admittingId === patient.id}
-                    style={{
-                      backgroundColor: admittingId === patient.id ? '#9ca3af' : '#059669',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.375rem',
-                      padding: '0.5rem 1rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '500',
-                      cursor: admittingId === patient.id ? 'not-allowed' : 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {admittingId === patient.id ? 'Admitting...' : 'Admit'}
-                  </button>
+                  {showAdmitControl && (
+                    <button
+                      onClick={async () => {
+                        const admitted = await admitPatient(patient.id);
+                        if (admitted) {
+                          showToast({
+                            kind: 'success',
+                            title: 'Patient admitted',
+                            message: `${displayName} can now join the main room.`,
+                          });
+                        }
+                      }}
+                      disabled={admittingId === patient.id}
+                      style={{
+                        backgroundColor: admittingId === patient.id ? '#9ca3af' : '#059669',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '0.375rem',
+                        padding: '0.5rem 1rem',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        cursor: admittingId === patient.id ? 'not-allowed' : 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {admittingId === patient.id ? 'Admitting...' : 'Admit'}
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -215,7 +223,11 @@ export default function WaitingRoomPanel({
         <p style={{ margin: 0, fontWeight: '500' }}>How it works:</p>
         <ul style={{ margin: '0.25rem 0 0 0', paddingLeft: '1.25rem' }}>
           <li>Patients join the waiting room automatically.</li>
-          <li>Click Admit to allow a patient into the consultation.</li>
+          <li>
+            {showAdmitControl
+              ? 'Click Admit to allow a patient into the consultation.'
+              : 'Manual admit control is currently disabled by policy.'}
+          </li>
           <li>
             {autoRefresh
               ? `The list refreshes automatically every ${pollSeconds} second${pollSeconds === 1 ? '' : 's'}.`

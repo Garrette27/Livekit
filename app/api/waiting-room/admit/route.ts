@@ -62,6 +62,8 @@ export async function POST(req: NextRequest) {
     await db.collection('waitingPatients').doc(waitingPatientId).update({
       status: 'admitted',
       admittedAt: new Date(),
+      'metadata.lastAccessed': new Date(),
+      'metadata.admissionMode': 'doctor-manual',
     });
 
     const response: AdmitPatientResponse = {

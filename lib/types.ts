@@ -65,10 +65,11 @@ export interface Invitation {
     doctorName: string;
     doctorEmail: string;
     roomName: string;
-    constraints: {
-      email?: string; // Optional email constraint
-      phone?: string;
-    };
+        constraints: {
+          email?: string; // Optional email constraint
+          emails?: string[]; // Future multi-email allowlist constraint
+          phone?: string;
+        };
     security: {
       singleUse: boolean;
       timeLimited: boolean;
@@ -76,6 +77,8 @@ export interface Invitation {
     };
   };
   audit: {
+    eventDomain?: string;
+    eventVersion?: number;
     created: Timestamp;
     lastAccessed?: Timestamp;
     accessAttempts: AccessAttempt[];
@@ -84,6 +87,9 @@ export interface Invitation {
 }
 
 export interface AccessAttempt {
+  eventDomain?: string;
+  eventVersion?: number;
+  occurredAt?: Timestamp;
   timestamp: Timestamp;
   ip: string;
   userAgent: string;
@@ -94,6 +100,9 @@ export interface AccessAttempt {
 }
 
 export interface SecurityViolation {
+  eventDomain?: string;
+  eventVersion?: number;
+  occurredAt?: Timestamp;
   timestamp: Timestamp;
   type: 'wrong_email' | 'wrong_country' | 'wrong_browser' | 'wrong_device' | 'wrong_ip' | 'expired' | 'already_used' | 'not_registered' | 'consent_not_given';
   details: string;
@@ -172,6 +181,7 @@ export interface ValidateInvitationResponse {
   roomName?: string; // This will be the waiting room name if waiting room is enabled
   waitingRoomToken?: boolean; // Indicates this is a waiting room token
   invitationId?: string; // Invitation ID for checking admission status
+  waitingPatientId?: string; // Stable waiting-patient reference for admission polling
   error?: string;
   violations?: SecurityViolation[];
   requiresRegistration?: boolean; // If true, user needs to register first

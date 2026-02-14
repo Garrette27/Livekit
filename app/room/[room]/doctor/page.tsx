@@ -13,6 +13,7 @@ import { useDoctorToken } from './hooks/useDoctorToken';
 import { useRoomLifecycle } from './hooks/useRoomLifecycle';
 import { useSpeechCapture } from './hooks/useSpeechCapture';
 import { useErrorHandler } from './hooks/useErrorHandler';
+import { trackDoctorPresenceEvent } from '@/lib/consultations/doctor-presence-client';
 
 function DoctorRoomClient({ roomName }: { roomName: string }) {
   const {
@@ -55,6 +56,20 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
   }, [isAuthenticated, user, doctorName, token, isJoining, generateDoctorToken]);
 
   const handleLeave = async () => {
+    if (user?.uid) {
+      try {
+        await trackDoctorPresenceEvent({
+          roomName,
+          action: 'leave',
+          doctorUserId: user.uid,
+          doctorName: doctorName || user.displayName || user.email,
+          doctorEmail: user.email || null,
+        });
+      } catch (presenceError) {
+        console.error('Error tracking doctor leave:', presenceError);
+      }
+    }
+
     clearToken();
 
     if (db && roomName) {

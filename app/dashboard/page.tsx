@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthSession } from '@/hooks/useAuthSession';
 import { getUserRole } from '@/lib/auth-utils';
+import { getDoctorHistoryRoute } from '@/lib/routes/doctor-routes';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,7 @@ export default function LegacyDashboardAlias() {
 
     void getUserRole(user).then((role) => {
       if (role === 'doctor') {
-        router.replace('/doctor/history');
+        router.replace(getDoctorHistoryRoute());
         return;
       }
       if (role === 'patient') {

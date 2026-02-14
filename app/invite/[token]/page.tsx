@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, Suspense } from 'react';
+import { useEffect, useRef, useState, Suspense, Dispatch, SetStateAction } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import PatientLiveKitRoom from './components/PatientLiveKitRoom';
 import PatientRegistration from '@/components/PatientRegistration';
@@ -25,10 +25,14 @@ function WaitingRoomView({
 }: { 
   validationResult: ValidateInvitationResponse; 
   invitationEmail: string;
-  setValidationResult: (result: ValidateInvitationResponse) => void;
+  setValidationResult: Dispatch<SetStateAction<ValidateInvitationResponse | null>>;
   setError: (error: string | null) => void;
 }) {
   const waitingPatientIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    waitingPatientIdRef.current = validationResult.waitingPatientId || waitingPatientIdRef.current;
+  }, [validationResult.waitingPatientId]);
 
   useEffect(() => {
     if (!validationResult?.invitationId) return;
@@ -60,12 +64,14 @@ function WaitingRoomView({
           // Clear any previous errors
           setError(null);
           // Patient has been admitted - update to show consultation room
-          const admittedState = {
+          const admittedState: ValidateInvitationResponse = {
             ...validationResult,
+            success: true,
             liveKitToken: result.liveKitToken,
             roomName: result.roomName,
             waitingRoomEnabled: false,
             waitingRoomToken: false,
+            waitingPatientId: result.waitingPatientId || waitingPatientIdRef.current || validationResult.waitingPatientId,
           };
           setValidationResult(admittedState);
           
@@ -73,6 +79,10 @@ function WaitingRoomView({
           console.error('Error checking admission:', result.error);
           // Don't set error for waiting status - that's expected
           if (result.error !== 'Waiting patient not found' && !result.error.includes('waiting')) {
+            setError(result.error);
+          }
+        } else if (result.success && !result.admitted && result.error) {
+          if (result.error.includes('No active waiting entry')) {
             setError(result.error);
           }
         } else if (result.success && !result.admitted && result.waitingPatientId) {
@@ -100,6 +110,7 @@ function WaitingRoomView({
     validationResult?.roomName,
     validationResult?.waitingRoomEnabled,
     validationResult?.waitingRoomToken,
+    validationResult,
   ]);
 
   return null;
@@ -109,7 +120,7 @@ function InvitePageContent() {
   const params = useParams();
   const router = useRouter();
   const token = params.token as string;
-  const { user, isAuthenticated } = useAuthSession();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthSession();
   
   const [isValidating, setIsValidating] = useState(true);
   const [validationResult, setValidationResult] = useState<ValidateInvitationResponse | null>(null);
@@ -139,7 +150,7 @@ function InvitePageContent() {
 
   // Validate invitation
   useEffect(() => {
-    if (!token || !deviceFingerprint) return;
+    if (!token || !deviceFingerprint || authLoading) return;
 
     const validateInvitation = async () => {
       try {
@@ -149,6 +160,7 @@ function InvitePageContent() {
         const request: ValidateInvitationRequest = {
           token,
           deviceFingerprint,
+          ...(user?.email ? { userEmail: user.email.toLowerCase() } : {}),
         };
 
         const response = await fetch('/api/invite/validate', {
@@ -162,6 +174,9 @@ function InvitePageContent() {
         const result: ValidateInvitationResponse = await response.json();
 
         if (result.success) {
+          if (user?.email) {
+            setInvitationEmail(user.email.toLowerCase());
+          }
           setValidationResult(result);
         } else if (result.requiresRegistration) {
           // User needs to register first
@@ -182,7 +197,7 @@ function InvitePageContent() {
     };
 
     validateInvitation();
-  }, [token, deviceFingerprint]);
+  }, [authLoading, deviceFingerprint, token, user?.email]);
 
   useEffect(() => {
     if (!validationResult?.roomName || validationResult.waitingRoomEnabled) {
@@ -240,6 +255,18 @@ function InvitePageContent() {
   };
 
   const handleConsultationExit = () => {
+    const waitingPatientId = validationResult?.waitingPatientId;
+    if (waitingPatientId) {
+      void fetch('/api/waiting-room/mark-left', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ waitingPatientId }),
+        keepalive: true,
+      }).catch((markLeftError) => {
+        console.error('Error marking waiting entry as left:', markLeftError);
+      });
+    }
+
     if (validationResult?.roomName && !validationResult.waitingRoomEnabled) {
       const trackedWithBeacon = trackConsultationEventWithBeacon({
         roomName: validationResult.roomName,

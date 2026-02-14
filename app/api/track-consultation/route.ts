@@ -276,6 +276,7 @@ async function handleLeaveEvent(
       now,
     });
   let sessionStartedAt = toDate(existingData.sessionStartedAt || existingData.joinedAt) || now;
+  let doctorDurationFromSessionMinutes = 0;
 
   try {
     const sessionDoc = await db.collection('consultationSessions').doc(consultationSessionId).get();
@@ -285,6 +286,12 @@ async function handleLeaveEvent(
       if (sessionSnapshotStartedAt) {
         sessionStartedAt = sessionSnapshotStartedAt;
       }
+      const doctorDurationCandidate = Number(
+        (sessionData?.metadata as Record<string, unknown> | undefined)?.doctorDurationMinutes || 0
+      );
+      if (Number.isFinite(doctorDurationCandidate) && doctorDurationCandidate > 0) {
+        doctorDurationFromSessionMinutes = Math.round(doctorDurationCandidate);
+      }
     }
   } catch (sessionLookupError) {
     console.error('Error resolving sessionStartedAt from session snapshot:', sessionLookupError);
@@ -293,6 +300,7 @@ async function handleLeaveEvent(
     startedAt: sessionStartedAt,
     endedAt: now,
   });
+  const finalDurationMinutes = Math.max(durationMinutes, doctorDurationFromSessionMinutes);
 
   const existingVisibleToUsers = existingData.metadata?.visibleToUsers || [];
 
@@ -305,7 +313,7 @@ async function handleLeaveEvent(
       consultationSessionId,
       sessionStartedAt,
       leftAt: now,
-      duration: durationMinutes,
+      duration: finalDurationMinutes,
       status: 'completed',
       isRealConsultation: true,
       createdBy: doctorUserId,
@@ -313,7 +321,7 @@ async function handleLeaveEvent(
         ...(existingData.metadata || {}),
         source: 'patient_leave',
         trackedAt: now,
-        durationMinutes,
+        durationMinutes: finalDurationMinutes,
         createdBy: doctorUserId,
         patientUserId,
         patientEmail,
@@ -337,7 +345,7 @@ async function handleLeaveEvent(
       source: 'track-consultation-leave',
       patientName,
       patientEmail,
-      durationMinutes,
+      durationMinutes: finalDurationMinutes,
     },
   });
 
@@ -351,7 +359,7 @@ async function handleLeaveEvent(
     eventAt: now,
     metadata: {
       patientName,
-      durationMinutes,
+      durationMinutes: finalDurationMinutes,
     },
   });
 
@@ -359,7 +367,7 @@ async function handleLeaveEvent(
   await generateAndStoreConsultationSummary({
     roomName,
     patientName: patientName || existingData.patientName || 'Unknown Patient',
-    durationMinutes,
+    durationMinutes: finalDurationMinutes,
     userId: doctorUserId,
     consultationSessionId,
     transcriptionData,
@@ -369,7 +377,7 @@ async function handleLeaveEvent(
 
   return {
     consultationSessionId,
-    durationMinutes,
+    durationMinutes: finalDurationMinutes,
   };
 }
 
