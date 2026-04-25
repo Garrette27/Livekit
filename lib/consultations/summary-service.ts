@@ -444,6 +444,41 @@ async function writeSummary(
   await summaryRef.set(summaryData);
 }
 
+// Returns true when an existing summary document represents finalized content
+// that must not be overwritten by a webhook-triggered regeneration:
+//   - the doctor has edited it (metadata.isEdited)
+//   - a previous AI run already produced a successful summary
+//     (metadata.aiSummaryGenerated)
+// Fallback / error / gated placeholders intentionally do NOT set
+// aiSummaryGenerated, so they remain regeneratable.
+async function shouldSkipSummaryRegeneration(
+  db: any,
+  summaryDocumentId: string
+): Promise<boolean> {
+  try {
+    const existing = await db.collection('call-summaries').doc(summaryDocumentId).get();
+    if (!existing.exists) {
+      return false;
+    }
+
+    const data = (existing.data() as Record<string, unknown>) || {};
+    const metadata = (data.metadata as Record<string, unknown> | undefined) || {};
+
+    if (metadata.isEdited === true) {
+      return true;
+    }
+
+    if (metadata.aiSummaryGenerated === true) {
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Error checking existing summary for idempotency:', error);
+    return false;
+  }
+}
+
 function attachPatientFields(
   summaryData: Record<string, any>,
   patientUserId: string | null | undefined,
@@ -477,6 +512,16 @@ export async function generateAndStoreConsultationSummary({
     console.error('Firebase Admin not initialized for summary generation');
     return;
   }
+
+  const summaryDocumentId = consultationSessionId || roomName;
+  if (await shouldSkipSummaryRegeneration(db, summaryDocumentId)) {
+    console.log(
+      'Skipping summary regeneration; preserved existing finalized summary:',
+      summaryDocumentId
+    );
+    return;
+  }
+
   let presenceTimeline: PresenceTimeline | null = null;
   let presenceTimelineMetadata = buildPresenceTimelineMetadata(null);
   let serializedPresenceTimeline = serializePresenceTimelineForSummary(null);
@@ -520,7 +565,7 @@ export async function generateAndStoreConsultationSummary({
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail, 'Storing patient email in gated summary:');
-      await writeSummary(db, consultationSessionId || roomName, summaryData);
+      await writeSummary(db, summaryDocumentId, summaryData);
       return;
     }
 
@@ -559,7 +604,7 @@ export async function generateAndStoreConsultationSummary({
         'Storing patient email in fallback summary:'
       );
 
-      await writeSummary(db, consultationSessionId || roomName, summaryData);
+      await writeSummary(db, summaryDocumentId, summaryData);
       console.log('Fallback summary stored successfully with user ID:', userId);
       console.log('Fallback summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
       return;
@@ -637,12 +682,15 @@ export async function generateAndStoreConsultationSummary({
           ...defaultMetadata(userId, transcriptionData, consultationSessionId),
           ...presenceTimelineMetadata,
           hasAttachmentContext: Boolean(attachmentContext),
+          // Marks this document as a real, successful AI generation so that
+          // shouldSkipSummaryRegeneration preserves it on webhook replays.
+          aiSummaryGenerated: true,
         },
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail, 'Storing patient email in AI summary:');
 
-      await writeSummary(db, consultationSessionId || roomName, summaryData);
+      await writeSummary(db, summaryDocumentId, summaryData);
       console.log('AI summary stored successfully in Firestore with user ID:', userId);
       console.log('Summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
     } catch (parseError) {
@@ -671,7 +719,7 @@ export async function generateAndStoreConsultationSummary({
         },
       };
 
-      await writeSummary(db, consultationSessionId || roomName, summaryData);
+      await writeSummary(db, summaryDocumentId, summaryData);
       console.log('Parse error fallback summary stored successfully with user ID:', userId);
       console.log('Parse error fallback summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
     }
@@ -700,7 +748,7 @@ export async function generateAndStoreConsultationSummary({
         },
       };
 
-      await writeSummary(db, consultationSessionId || roomName, summaryData);
+      await writeSummary(db, summaryDocumentId, summaryData);
       console.log('Error summary stored successfully with user ID:', userId);
       console.log('Error summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
     } catch (storeError) {
