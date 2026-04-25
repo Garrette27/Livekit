@@ -126,11 +126,17 @@ async function finalizeSessionFromWebhook(input: {
   reason: 'patient_left_webhook' | 'room_finished_webhook';
   finalizedAt: Date;
 }): Promise<boolean> {
+  // Accept the most recent session even if it has already been marked
+  // 'completed' by an earlier code path (e.g. track-consultation leave or
+  // closeSession). Without this, room_finished webhooks routinely log
+  // 'no_active_session_to_finalize' and the AI summary is never generated.
+  // Idempotency for summary writes is enforced inside
+  // generateAndStoreConsultationSummary via shouldSkipSummaryRegeneration.
   const finalizedSession = await finalizeConsultationForRoom(input.db, {
     roomName: input.roomName,
     finalizedAt: input.finalizedAt,
     reason: input.reason,
-    requireActiveSession: true,
+    requireActiveSession: false,
     regenerateSummary: true,
   });
 
