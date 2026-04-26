@@ -9,7 +9,8 @@
     "lint": "next lint",
     "test:e2e": "playwright test",
     "test:e2e:mobile": "playwright test --project=mobile-chromium",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "backfill:summaries": "tsx --env-file=.env.local scripts/backfill-summaries.ts"
   },
   "dependencies": {
     "@livekit/components-react": "^2.9.14",
@@ -36,6 +37,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.4.8",
+    "tsx": "^4.19.2",
     "typescript": "^5"
   }
 }
