@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { appendPresenceEvent } from '@/lib/consultations/consultation-session-store';
+import { finalizeConsultationForRoom } from '@/lib/consultations/session-finalization';
 
 type DoctorPresenceAction = 'join' | 'leave';
 
@@ -98,6 +100,25 @@ async function applyDoctorDurationToSession(
   );
 
   return nextDurationMinutes;
+}
+
+async function finalizeOnLastDoctorLeave(
+  db: Firestore,
+  input: { roomName: string; finalizedAt: Date }
+): Promise<void> {
+  try {
+    await finalizeConsultationForRoom(db, {
+      roomName: input.roomName,
+      finalizedAt: input.finalizedAt,
+      reason: 'doctor_left',
+      requireActiveSession: false,
+      regenerateSummary: true,
+    });
+  } catch (error) {
+    // Never let summary finalization fail the leave-tracking response. Webhooks
+    // and revoke remain as fallback triggers, and summary writes are idempotent.
+    console.error('Failed to finalize consultation on doctor leave:', error);
+  }
 }
 
 export async function POST(req: Request) {
@@ -254,6 +275,15 @@ export async function POST(req: Request) {
         source: 'doctor-presence-tracker',
       },
     });
+
+    // The doctor leaving the room is the canonical "consultation ended" event.
+    // Finalize here so the AI summary is generated deterministically rather than
+    // depending on revoke/expire/webhook side-paths. Idempotency is enforced inside
+    // generateAndStoreConsultationSummary (metadata.aiSummaryGenerated / isEdited).
+    const noActiveDoctorsRemain = Object.keys(activeDoctors).length === 0;
+    if (noActiveDoctorsRemain) {
+      await finalizeOnLastDoctorLeave(db, { roomName, finalizedAt: now });
+    }
 
     return NextResponse.json({
       success: true,
