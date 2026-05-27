@@ -1,6 +1,9 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { isKnownUserId } from '@/lib/consultations/identity-utils';
-import { generateAndStoreConsultationSummary } from '@/lib/consultations/summary-service';
+import { generateAndStoreConsultationSummary } from '@/lib/services/consultation-finalization';
+import { CallSummaryRepository } from '@/lib/repositories/call-summary-repository';
+import { ConsultationSessionRepository } from '@/lib/repositories/consultation-session-repository';
+import { UserRepository } from '@/lib/repositories/user-repository';
 import type {
   HistoryChatMessageRecord,
   HistoryChatRecord,
@@ -314,8 +317,7 @@ async function resolveUserEmail(
   }
 
   try {
-    const userDoc = await db.collection('users').doc(userId).get();
-    const email = userDoc.exists ? (userDoc.data()?.email as string | undefined) : undefined;
+    const email = await new UserRepository(db).getEmail(userId);
     userEmailCache.set(userId, email);
     return email;
   } catch {
@@ -325,21 +327,11 @@ async function resolveUserEmail(
 }
 
 async function getSummaryDocsByDoctor(db: Firestore, doctorUserId: string) {
-  const snapshot = await db
-    .collection('call-summaries')
-    .where('createdBy', '==', doctorUserId)
-    .limit(300)
-    .get();
-  return snapshot.docs;
+  return new CallSummaryRepository(db).findByDoctor(doctorUserId, 300);
 }
 
 async function getSessionDocsByDoctor(db: Firestore, doctorUserId: string) {
-  const snapshot = await db
-    .collection('consultationSessions')
-    .where('doctorUserId', '==', doctorUserId)
-    .limit(300)
-    .get();
-  return snapshot.docs;
+  return new ConsultationSessionRepository(db).findByDoctor(doctorUserId, 300);
 }
 
 async function getSummaryDocsByPatient(
@@ -347,22 +339,10 @@ async function getSummaryDocsByPatient(
   patientUserId: string,
   patientEmailCandidates: string[]
 ) {
-  const userScopedQueries = [
-    db.collection('call-summaries').where('patientUserId', '==', patientUserId).limit(300).get(),
-    db.collection('call-summaries').where('metadata.patientUserId', '==', patientUserId).limit(300).get(),
-  ];
-  const emailScopedQueries = patientEmailCandidates.flatMap((email) => [
-    db.collection('call-summaries').where('patientEmail', '==', email).limit(300).get(),
-    db.collection('call-summaries').where('metadata.patientEmail', '==', email).limit(300).get(),
-  ]);
-  const snapshots = await Promise.all([...userScopedQueries, ...emailScopedQueries]);
-
-  const docsById = new Map<string, (typeof snapshots)[number]['docs'][number]>();
-  snapshots.forEach((snapshot) => {
-    snapshot.docs.forEach((doc) => docsById.set(doc.id, doc));
-  });
-
-  return Array.from(docsById.values());
+  return new CallSummaryRepository(db).findByPatient(
+    { patientUserId, emails: patientEmailCandidates },
+    300
+  );
 }
 
 async function getSessionDocsByPatient(
@@ -475,14 +455,14 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
       throw new Error('consultationSessionId is required');
     }
 
-    const sessionDoc = await this.db.collection('consultationSessions').doc(consultationSessionId).get();
+    const sessionDoc = await new ConsultationSessionRepository(this.db).getById(consultationSessionId);
     if (!sessionDoc.exists) {
       throw new Error('Consultation session not found');
     }
 
     const sessionData = sessionDoc.data() as Record<string, unknown>;
-    const summaryRef = this.db.collection('call-summaries').doc(consultationSessionId);
-    const existingSummaryDoc = await summaryRef.get();
+    const summaryRepo = new CallSummaryRepository(this.db);
+    const existingSummaryDoc = await summaryRepo.getById(consultationSessionId);
 
     if (!input.regenerate && existingSummaryDoc.exists) {
       return {
@@ -522,7 +502,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
       patientEmail,
     });
 
-    const rebuiltSummaryDoc = await summaryRef.get();
+    const rebuiltSummaryDoc = await summaryRepo.getById(consultationSessionId);
     return {
       summaryId: consultationSessionId,
       summary: rebuiltSummaryDoc.exists ? (rebuiltSummaryDoc.data() as Record<string, unknown>) : null,

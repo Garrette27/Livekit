@@ -1,5 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
+import { UserRepository } from '../../../../lib/repositories/user-repository';
+import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
 import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import { validateEmail, validateRoomName, sanitizeInput } from '../../../../lib/validation';
 import { signInvitationToken } from '../../../../lib/invitations/token-utils';
@@ -91,12 +93,12 @@ export async function POST(req: NextRequest) {
     let existingAccount = null;
     if (sanitizedEmail) {
       try {
-        const existingUserQuery = await db.collection('users').where('email', '==', sanitizedEmail).limit(1).get();
-        if (!existingUserQuery.empty) {
+        const existingUser = await new UserRepository(db).findByEmail(sanitizedEmail);
+        if (existingUser) {
           existingAccount = {
             exists: true,
-            uid: existingUserQuery.docs[0].id,
-            userData: existingUserQuery.docs[0].data()
+            uid: existingUser.id,
+            userData: existingUser.data()
           };
           console.log('Email already has an account:', existingAccount);
         }
@@ -177,7 +179,7 @@ export async function POST(req: NextRequest) {
 
     // Store invitation in Firestore
     try {
-      await db.collection('invitations').doc(invitationId).set(invitation);
+      await new InvitationRepository(db).create(invitationId, invitation);
       console.log('Invitation stored successfully in Firestore');
     } catch (firestoreError) {
       console.error('Firestore error:', firestoreError);

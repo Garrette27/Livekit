@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
+import { UserRepository } from '../../../../lib/repositories/user-repository';
 import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import { validateEmail, sanitizeInput } from '../../../../lib/validation';
 import crypto from 'crypto';
@@ -115,10 +116,8 @@ export async function POST(req: NextRequest) {
     const sanitizedPhone = phone ? sanitizeInput(phone.trim()) : undefined;
 
     // Check if user already exists
-    const existingUserQuery = await db.collection('users')
-      .where('email', '==', sanitizedEmail)
-      .limit(1)
-      .get();
+    const userRepo = new UserRepository(db);
+    const existingUser = await userRepo.findByEmail(sanitizedEmail);
 
     const deviceHash = generateDeviceFingerprintHash(deviceFingerprint);
     const detectedBrowser = detectBrowser(deviceFingerprint.userAgent);
@@ -179,19 +178,18 @@ export async function POST(req: NextRequest) {
 
     let userId: string;
 
-    if (!existingUserQuery.empty) {
+    if (existingUser) {
       // Update existing user
-      userId = existingUserQuery.docs[0].id;
-      userProfileData.registeredAt = existingUserQuery.docs[0].data().registeredAt || new Date();
-      
-      await db.collection('users').doc(userId).update(userProfileData);
+      userId = existingUser.id;
+      userProfileData.registeredAt = existingUser.data().registeredAt || new Date();
+
+      await userRepo.update(userId, userProfileData);
       console.log('Updated existing user profile:', userId);
     } else {
       // Create new user
       userProfileData.registeredAt = new Date();
-      
-      const userRef = await db.collection('users').add(userProfileData);
-      userId = userRef.id;
+
+      userId = await userRepo.create(userProfileData);
       console.log('Created new user profile:', userId);
     }
 

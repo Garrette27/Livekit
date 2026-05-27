@@ -1,18 +1,11 @@
-import { getFirebaseAdmin } from '../firebase-admin';
-import { isKnownUserId } from './identity-utils';
-import { resolveAiEntitlement } from '../ai/ai-entitlement-policy';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import { isKnownUserId } from '@/lib/consultations/identity-utils';
+import { resolveAiEntitlement } from '@/lib/ai/ai-entitlement-policy';
+import { CallSummaryRepository } from '@/lib/repositories/call-summary-repository';
+import { CallRepository } from '@/lib/repositories/call-repository';
+import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
 import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
-
-export interface GenerateConsultationSummaryParams {
-  roomName: string;
-  patientName: string;
-  durationMinutes: number;
-  userId: string;
-  consultationSessionId?: string | null;
-  transcriptionData?: any[] | null;
-  patientUserId?: string | null;
-  patientEmail?: string | null;
-}
+import type { GenerateConsultationSummaryParams } from './contracts';
 
 interface ParsedSummary {
   summary: string;
@@ -305,7 +298,7 @@ async function loadPresenceTimeline(
 
 function defaultMetadata(
   userId: string,
-  transcriptionData: any[] | null | undefined,
+  transcriptionData: string[] | null | undefined,
   consultationSessionId: string | null | undefined
 ) {
   return {
@@ -345,7 +338,7 @@ function buildPrompt(
   roomName: string,
   patientName: string,
   durationMinutes: number,
-  transcriptionData: any[] | null,
+  transcriptionData: string[] | null,
   attachmentContext: string | null,
   presenceTimelineContext: string | null
 ): string {
@@ -361,8 +354,8 @@ function buildPrompt(
     ? `\n\nPatient presence timeline events:\n${presenceTimelineContext}`
     : '\n\nNo patient join/leave timeline available.';
 
-  return `You are a medical AI assistant specializing in summarizing telehealth consultations. 
-    
+  return `You are a medical AI assistant specializing in summarizing telehealth consultations.
+
 Generate a comprehensive, structured summary for a medical consultation that took place in room: ${roomName}.
 
 Consultation details:
@@ -398,19 +391,13 @@ async function buildAttachmentContext(
   }
 
   try {
-    const snapshot = await db
-      .collection('consultationSessions')
-      .doc(consultationSessionId)
-      .collection('attachments')
-      .where('extractionStatus', '==', 'ready')
-      .limit(20)
-      .get();
+    const attachmentDocs = await new AttachmentRepository(db).findReady(consultationSessionId, 20);
 
-    if (snapshot.empty) {
+    if (attachmentDocs.length === 0) {
       return null;
     }
 
-    const sections = snapshot.docs
+    const sections = attachmentDocs
       .map((doc: QueryDocumentSnapshot, index: number) => {
         const data = doc.data() as { name?: string; extractedText?: string | null };
         const extractedText = (data.extractedText || '').trim();
@@ -435,15 +422,6 @@ async function buildAttachmentContext(
   }
 }
 
-async function writeSummary(
-  db: any,
-  summaryDocumentId: string,
-  summaryData: Record<string, any>
-): Promise<void> {
-  const summaryRef = db.collection('call-summaries').doc(summaryDocumentId);
-  await summaryRef.set(summaryData);
-}
-
 // Returns true when an existing summary document represents finalized content
 // that must not be overwritten by a webhook-triggered regeneration:
 //   - the doctor has edited it (metadata.isEdited)
@@ -452,11 +430,11 @@ async function writeSummary(
 // Fallback / error / gated placeholders intentionally do NOT set
 // aiSummaryGenerated, so they remain regeneratable.
 async function shouldSkipSummaryRegeneration(
-  db: any,
+  summaryRepo: CallSummaryRepository,
   summaryDocumentId: string
 ): Promise<boolean> {
   try {
-    const existing = await db.collection('call-summaries').doc(summaryDocumentId).get();
+    const existing = await summaryRepo.getById(summaryDocumentId);
     if (!existing.exists) {
       return false;
     }
@@ -513,14 +491,23 @@ export async function generateAndStoreConsultationSummary({
     return;
   }
 
+  const summaryRepo = new CallSummaryRepository(db);
   const summaryDocumentId = consultationSessionId || roomName;
-  if (await shouldSkipSummaryRegeneration(db, summaryDocumentId)) {
+  if (await shouldSkipSummaryRegeneration(summaryRepo, summaryDocumentId)) {
     console.log(
       'Skipping summary regeneration; preserved existing finalized summary:',
       summaryDocumentId
     );
     return;
   }
+
+  // Fall back to stored transcript text when the caller did not pass one, so
+  // every finalization path (client leave, webhook, history rebuild) produces a
+  // transcript-grounded summary rather than the "no transcript available" path.
+  const resolvedTranscription =
+    transcriptionData && transcriptionData.length > 0
+      ? transcriptionData
+      : await new CallRepository(db).getTranscriptLines(roomName);
 
   let presenceTimeline: PresenceTimeline | null = null;
   let presenceTimelineMetadata = buildPresenceTimelineMetadata(null);
@@ -557,7 +544,7 @@ export async function generateAndStoreConsultationSummary({
         createdAt: new Date(),
         createdBy: userId,
         metadata: {
-          ...defaultMetadata(userId, transcriptionData, consultationSessionId),
+          ...defaultMetadata(userId, resolvedTranscription, consultationSessionId),
           ...presenceTimelineMetadata,
           aiSummaryEnabled: false,
           aiSummaryDisabledReason: entitlement.reason,
@@ -565,7 +552,7 @@ export async function generateAndStoreConsultationSummary({
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail, 'Storing patient email in gated summary:');
-      await writeSummary(db, summaryDocumentId, summaryData);
+      await summaryRepo.overwrite(summaryDocumentId, summaryData);
       return;
     }
 
@@ -590,7 +577,7 @@ export async function generateAndStoreConsultationSummary({
         createdAt: new Date(),
         createdBy: userId,
         metadata: {
-          ...defaultMetadata(userId, transcriptionData, consultationSessionId),
+          ...defaultMetadata(userId, resolvedTranscription, consultationSessionId),
           ...presenceTimelineMetadata,
           aiSummaryEnabled: false,
           aiSummaryDisabledReason: 'OPENAI_API_KEY not configured',
@@ -604,7 +591,7 @@ export async function generateAndStoreConsultationSummary({
         'Storing patient email in fallback summary:'
       );
 
-      await writeSummary(db, summaryDocumentId, summaryData);
+      await summaryRepo.overwrite(summaryDocumentId, summaryData);
       console.log('Fallback summary stored successfully with user ID:', userId);
       console.log('Fallback summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
       return;
@@ -617,7 +604,7 @@ export async function generateAndStoreConsultationSummary({
       roomName,
       patientName,
       durationMinutes,
-      transcriptionData,
+      resolvedTranscription,
       attachmentContext,
       presenceTimeline?.promptContext || null
     );
@@ -679,7 +666,7 @@ export async function generateAndStoreConsultationSummary({
         createdAt: new Date(),
         createdBy: userId,
         metadata: {
-          ...defaultMetadata(userId, transcriptionData, consultationSessionId),
+          ...defaultMetadata(userId, resolvedTranscription, consultationSessionId),
           ...presenceTimelineMetadata,
           hasAttachmentContext: Boolean(attachmentContext),
           // Marks this document as a real, successful AI generation so that
@@ -690,7 +677,7 @@ export async function generateAndStoreConsultationSummary({
 
       attachPatientFields(summaryData, patientUserId, patientEmail, 'Storing patient email in AI summary:');
 
-      await writeSummary(db, summaryDocumentId, summaryData);
+      await summaryRepo.overwrite(summaryDocumentId, summaryData);
       console.log('AI summary stored successfully in Firestore with user ID:', userId);
       console.log('Summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
     } catch (parseError) {
@@ -714,12 +701,12 @@ export async function generateAndStoreConsultationSummary({
         createdAt: new Date(),
         createdBy: userId,
         metadata: {
-          ...defaultMetadata(userId, transcriptionData, consultationSessionId),
+          ...defaultMetadata(userId, resolvedTranscription, consultationSessionId),
           ...presenceTimelineMetadata,
         },
       };
 
-      await writeSummary(db, summaryDocumentId, summaryData);
+      await summaryRepo.overwrite(summaryDocumentId, summaryData);
       console.log('Parse error fallback summary stored successfully with user ID:', userId);
       console.log('Parse error fallback summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
     }
@@ -742,13 +729,13 @@ export async function generateAndStoreConsultationSummary({
         createdAt: new Date(),
         createdBy: userId,
         metadata: {
-          ...defaultMetadata(userId, transcriptionData, consultationSessionId),
+          ...defaultMetadata(userId, resolvedTranscription, consultationSessionId),
           ...presenceTimelineMetadata,
           error: error instanceof Error ? error.message : 'Unknown error',
         },
       };
 
-      await writeSummary(db, summaryDocumentId, summaryData);
+      await summaryRepo.overwrite(summaryDocumentId, summaryData);
       console.log('Error summary stored successfully with user ID:', userId);
       console.log('Error summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
     } catch (storeError) {

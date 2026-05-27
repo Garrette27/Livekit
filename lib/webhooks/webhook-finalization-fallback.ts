@@ -1,5 +1,5 @@
 import type { Firestore } from 'firebase-admin/firestore';
-import { finalizeConsultationForRoom } from '@/lib/consultations/session-finalization';
+import { finalizeConsultationForRoom } from '@/lib/services/consultation-finalization';
 import { FirestoreInvitationAccessCore } from '@/lib/services/invitation-access';
 
 type SupportedWebhookEventType = 'participant_left' | 'room_finished';

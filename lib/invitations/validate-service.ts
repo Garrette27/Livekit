@@ -14,7 +14,8 @@ import { detectBrowser, generateDeviceFingerprintHash, toDate } from './utils';
 import { buildWaitingPatientIdentity } from './waiting-patient-identity';
 import { EVENT_DOMAINS, EVENT_SCHEMA_VERSION } from '../events/event-schema';
 import { getInvitationEmailAllowlist, isEmailAllowedByInvitation } from './email-allowlist';
-import { finalizeConsultationForRoom } from '../consultations/session-finalization';
+import { finalizeConsultationForRoom } from '../services/consultation-finalization';
+import { UserRepository } from '../repositories/user-repository';
 
 export interface ValidateInvitationContext {
   token: string;
@@ -269,12 +270,9 @@ async function resolveUserContext(
     return { lookup };
   }
 
-  const userQuery = await db.collection('users')
-    .where('email', '==', lookup.userEmailToCheck)
-    .limit(1)
-    .get();
+  const userDoc = await new UserRepository(db).findByEmail(lookup.userEmailToCheck);
 
-  if (userQuery.empty) {
+  if (!userDoc) {
     return {
       lookup,
       earlyResult: result(403, {
@@ -286,8 +284,8 @@ async function resolveUserContext(
     };
   }
 
-  lookup.userDocId = userQuery.docs[0].id;
-  lookup.userProfile = userQuery.docs[0].data();
+  lookup.userDocId = userDoc.id;
+  lookup.userProfile = userDoc.data();
 
   if (!lookup.userProfile.consentGiven) {
     return {
@@ -348,7 +346,7 @@ async function collectSecurityViolations(
     }
   } else if (deviceFingerprint && !lookup.userProfile.deviceInfo && lookup.userDocId) {
     const deviceHash = generateDeviceFingerprintHash(deviceFingerprint);
-    await db.collection('users').doc(lookup.userDocId).update({
+    await new UserRepository(db).update(lookup.userDocId, {
       'deviceInfo.deviceFingerprintHash': deviceHash,
       'deviceInfo.userAgent': deviceFingerprint.userAgent,
       'deviceInfo.platform': deviceFingerprint.platform,

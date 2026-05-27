@@ -1,0 +1,11 @@
+export { CallSummaryRepository } from './call-summary-repository';
+export { ConsultationRepository } from './consultation-repository';
+export { ConsultationSessionRepository } from './consultation-session-repository';
+export { RoomRepository } from './room-repository';
+export { RoomDoctorPresenceRepository } from './room-doctor-presence-repository';
+export { CallRepository } from './call-repository';
+export { UserRepository } from './user-repository';
+export { ScheduledDeletionRepository } from './scheduled-deletion-repository';
+export { InvitationRepository } from './invitation-repository';
+export { WaitingPatientRepository } from './waiting-patient-repository';
+export { AttachmentRepository } from './attachment-repository';

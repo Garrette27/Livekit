@@ -1,5 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
+import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
+import { WaitingPatientRepository } from '../../../../lib/repositories/waiting-patient-repository';
 
 /**
  * Migration endpoint to fix waiting patient documents with incorrect doctorUserId
@@ -35,11 +37,14 @@ export async function POST(req: NextRequest) {
       console.log('⚠️ DRY RUN MODE - No changes will be made');
     }
 
+    const invitationRepo = new InvitationRepository(db);
+    const waitingPatientRepo = new WaitingPatientRepository(db);
+
     // Get all waiting patient documents
-    const waitingPatientsSnapshot = await db.collection('waitingPatients').get();
-    
+    const waitingPatientDocs = await waitingPatientRepo.listAll();
+
     const results = {
-      total: waitingPatientsSnapshot.size,
+      total: waitingPatientDocs.length,
       processed: 0,
       fixed: 0,
       skipped: 0,
@@ -56,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     let processedCount = 0;
 
-    for (const doc of waitingPatientsSnapshot.docs) {
+    for (const doc of waitingPatientDocs) {
       // Apply limit if specified
       if (limit && processedCount >= limit) {
         break;
@@ -97,8 +102,8 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        const invitationDoc = await db.collection('invitations').doc(waitingPatient.invitationId).get();
-        
+        const invitationDoc = await invitationRepo.getById(waitingPatient.invitationId);
+
         if (!invitationDoc.exists) {
           results.errors.push(`Invitation ${waitingPatient.invitationId} not found for waiting patient ${waitingPatientId}`);
           results.details.push({
@@ -130,9 +135,7 @@ export async function POST(req: NextRequest) {
 
         // Update the waiting patient document
         if (!dryRun) {
-          await db.collection('waitingPatients').doc(waitingPatientId).update({
-            doctorUserId: correctDoctorUserId
-          });
+          await waitingPatientRepo.setDoctorUserId(waitingPatientId, correctDoctorUserId);
         }
 
         results.fixed++;

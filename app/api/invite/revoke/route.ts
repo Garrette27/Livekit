@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
-import { finalizeConsultationForRoom } from '../../../../lib/consultations/session-finalization';
+import { finalizeConsultationForRoom } from '../../../../lib/services/consultation-finalization';
 import { FirestoreInvitationAccessCore } from '@/lib/services/invitation-access';
+import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,8 +25,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const invitationRef = db.collection('invitations').doc(invitationId);
-    const invitationDoc = await invitationRef.get();
+    const invitationRepo = new InvitationRepository(db);
+    const invitationDoc = await invitationRepo.getById(invitationId);
     if (!invitationDoc.exists) {
       return NextResponse.json(
         { success: false, error: 'Invitation not found' },
@@ -41,13 +42,10 @@ export async function POST(req: NextRequest) {
     const revokedAt = new Date();
 
     if (invitation.status !== 'revoked') {
-      await invitationRef.set(
-        {
-          status: 'revoked',
-          revokedAt,
-        },
-        { merge: true }
-      );
+      await invitationRepo.mergeFields(invitationId, {
+        status: 'revoked',
+        revokedAt,
+      });
     }
 
     const invitationAccess = new FirestoreInvitationAccessCore(db);
@@ -76,20 +74,17 @@ export async function POST(req: NextRequest) {
       });
 
       if (finalizationResult) {
-        await invitationRef.set(
-          {
-            metadata: {
-              finalization: {
-                at: revokedAt.toISOString(),
-                reason: 'invitation_revoked',
-                consultationSessionId: finalizationResult.consultationSessionId,
-                finalDurationMinutes: finalizationResult.finalDurationMinutes,
-                removedParticipantsCount: activeWaitingEntries.length,
-              },
+        await invitationRepo.mergeFields(invitationId, {
+          metadata: {
+            finalization: {
+              at: revokedAt.toISOString(),
+              reason: 'invitation_revoked',
+              consultationSessionId: finalizationResult.consultationSessionId,
+              finalDurationMinutes: finalizationResult.finalDurationMinutes,
+              removedParticipantsCount: activeWaitingEntries.length,
             },
           },
-          { merge: true }
-        );
+        });
       }
     }
 

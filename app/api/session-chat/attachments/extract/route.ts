@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FieldValue } from 'firebase-admin/firestore';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
 
 interface ExtractAttachmentBody {
   consultationSessionId: string;
@@ -40,21 +40,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await db
-      .collection('consultationSessions')
-      .doc(consultationSessionId)
-      .collection('attachments')
-      .doc(attachmentId)
-      .set(
-        {
-          extractionStatus,
-          extractedText,
-          extractionError: errorMessage,
-          extractedAtIso: new Date().toISOString(),
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
+    await new AttachmentRepository(db).updateExtraction(consultationSessionId, attachmentId, {
+      extractionStatus,
+      extractedText,
+      errorMessage,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

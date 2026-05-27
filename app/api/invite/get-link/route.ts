@@ -3,9 +3,8 @@ import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { signInvitationToken } from '../../../../lib/invitations/token-utils';
 import { buildInviteUrl, toDate } from '../../../../lib/invitations/utils';
 import { InvitationToken } from '../../../../lib/types';
-import { finalizeConsultationForRoom } from '../../../../lib/consultations/session-finalization';
-
-let hasLoggedMissingInvitationIndexWarning = false;
+import { finalizeConsultationForRoom } from '../../../../lib/services/consultation-finalization';
+import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
 
 function isExpiredInvitation(invitation: any): boolean {
   const expiresAtDate = invitation?.expiresAt
@@ -49,68 +48,27 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const invitationRepo = new InvitationRepository(db);
     let invitationDoc;
-    
+
     if (invitationId) {
-      invitationDoc = await db.collection('invitations').doc(invitationId).get();
+      invitationDoc = await invitationRepo.getById(invitationId);
     } else {
-      // Find the most recent active invitation for this room
-      try {
-        const invitationsQuery = await db.collection('invitations')
-          .where('roomName', '==', roomName)
-          .where('status', '==', 'active')
-          .orderBy('createdAt', 'desc')
-          .limit(20)
-          .get();
-        
-        if (invitationsQuery.empty) {
-          return NextResponse.json(
-            { success: false, error: 'No active invitation found for this room' },
-            { status: 404 }
-          );
-        }
+      // Find the most recent usable invitation for this room.
+      const candidateDocs = await invitationRepo.findActiveByRoom(roomName!, 20);
+      if (candidateDocs.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'No active invitation found for this room' },
+          { status: 404 }
+        );
+      }
 
-        invitationDoc = pickLatestUsableInvitation(invitationsQuery.docs);
-        if (!invitationDoc) {
-          return NextResponse.json(
-            { success: false, error: 'No active non-expired invitation found for this room' },
-            { status: 404 }
-          );
-        }
-      } catch (queryError: any) {
-        const isMissingIndexError =
-          queryError?.code === 9 ||
-          queryError?.details?.includes?.('requires an index') ||
-          queryError?.message?.includes?.('requires an index');
-
-        if (!isMissingIndexError) {
-          throw queryError;
-        }
-
-        if (!hasLoggedMissingInvitationIndexWarning) {
-          console.warn('Primary invitation query requires index. Falling back to roomName-only query.');
-          hasLoggedMissingInvitationIndexWarning = true;
-        }
-
-        const fallbackQuery = await db.collection('invitations')
-          .where('roomName', '==', roomName)
-          .limit(20)
-          .get();
-
-        if (fallbackQuery.empty) {
-          return NextResponse.json(
-            { success: false, error: 'No invitation found for this room' },
-            { status: 404 }
-          );
-        }
-
-        invitationDoc = pickLatestUsableInvitation(fallbackQuery.docs);
-        if (!invitationDoc) {
-          return NextResponse.json(
-            { success: false, error: 'No active invitation found for this room' },
-            { status: 404 }
-          );
-        }
+      invitationDoc = pickLatestUsableInvitation(candidateDocs);
+      if (!invitationDoc) {
+        return NextResponse.json(
+          { success: false, error: 'No active non-expired invitation found for this room' },
+          { status: 404 }
+        );
       }
     }
 
@@ -159,13 +117,10 @@ export async function GET(req: NextRequest) {
     if (isExpired) {
       if (invitation.status === 'active') {
         try {
-          await db.collection('invitations').doc(invitationDoc.id).set(
-            {
-              status: 'expired',
-              expiredAt: expiresAtDate,
-            },
-            { merge: true }
-          );
+          await invitationRepo.mergeFields(invitationDoc.id, {
+            status: 'expired',
+            expiredAt: expiresAtDate,
+          });
           await finalizeConsultationForRoom(db, {
             roomName: invitation.roomName,
             finalizedAt: expiresAtDate,

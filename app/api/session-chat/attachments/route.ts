@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FieldValue } from 'firebase-admin/firestore';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
 
 interface CreateAttachmentBody {
   consultationSessionId: string;
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const attachmentPayload = {
+    const attachmentId = await new AttachmentRepository(db).create(consultationSessionId, {
       consultationSessionId,
       uploaderId,
       uploaderName,
@@ -57,20 +57,11 @@ export async function POST(req: NextRequest) {
       downloadUrl: downloadUrl || null,
       extractedText: extractedText || null,
       extractionStatus,
-      uploadedAtIso: new Date().toISOString(),
-      uploadedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    };
-
-    const attachmentRef = await db
-      .collection('consultationSessions')
-      .doc(consultationSessionId)
-      .collection('attachments')
-      .add(attachmentPayload);
+    });
 
     return NextResponse.json({
       success: true,
-      attachmentId: attachmentRef.id,
+      attachmentId,
     });
   } catch (error) {
     console.error('Error creating session attachment metadata:', error);
