@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import { ConsultationSessionRepository } from '@/lib/repositories/consultation-session-repository';
 
 interface DateLike {
   toDate?: () => Date;
@@ -49,8 +50,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const snapshot = await db.collection('consultationSessions').where('roomName', '==', roomName).limit(50).get();
-    const sessions = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Record<string, any>[];
+    const sessionDocs = await new ConsultationSessionRepository(db).findByRoom(roomName, 50);
+    const sessions = sessionDocs.map((doc) => ({ id: doc.id, ...doc.data() })) as Record<string, any>[];
 
     const scopedSessions = sessions.filter((session) => {
       if (doctorUserId && session.doctorUserId && session.doctorUserId !== doctorUserId) {

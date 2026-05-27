@@ -1,31 +1,22 @@
 import type { Firestore } from 'firebase-admin/firestore';
-import { calculateDurationMinutes } from './session-timing';
-import { generateAndStoreConsultationSummary } from './summary-service';
-import { isKnownUserId } from './identity-utils';
+import { calculateDurationMinutes } from '@/lib/consultations/session-timing';
+import { isKnownUserId } from '@/lib/consultations/identity-utils';
 import {
   buildWaitingRoomHistorySnapshot,
   type WaitingRoomHistorySnapshot,
-} from './waiting-room-history';
-
-type FinalizationReason =
-  | 'doctor_left'
-  | 'invitation_revoked'
-  | 'invitation_expired'
-  | 'patient_left_webhook'
-  | 'room_finished_webhook';
-
-interface FinalizeConsultationInput {
-  roomName: string;
-  finalizedAt: Date;
-  reason: FinalizationReason;
-  requireActiveSession?: boolean;
-  regenerateSummary?: boolean;
-}
-
-interface FinalizationResult {
-  consultationSessionId: string;
-  finalDurationMinutes: number;
-}
+} from '@/lib/consultations/waiting-room-history';
+import { serviceOk, type ServiceResult } from '@/lib/services/shared/service-result';
+import { CallSummaryRepository } from '@/lib/repositories/call-summary-repository';
+import { ConsultationRepository } from '@/lib/repositories/consultation-repository';
+import { ConsultationSessionRepository } from '@/lib/repositories/consultation-session-repository';
+import { RoomDoctorPresenceRepository } from '@/lib/repositories/room-doctor-presence-repository';
+import { generateAndStoreConsultationSummary } from './summary-generator';
+import type {
+  ConsultationFinalizationService,
+  FinalizationReason,
+  FinalizationResult,
+  FinalizeConsultationInput,
+} from './contracts';
 
 function toDate(value: unknown): Date | null {
   if (!value) {
@@ -128,6 +119,7 @@ async function resolveEffectiveSessionEndedAt(
 ): Promise<Date> {
   if (
     input.reason === 'doctor_left'
+    || input.reason === 'patient_left'
     || input.reason === 'patient_left_webhook'
     || input.reason === 'room_finished_webhook'
   ) {
@@ -149,7 +141,7 @@ async function resolveEffectiveSessionEndedAt(
   }
 
   try {
-    const presenceDoc = await db.collection('roomDoctorPresence').doc(input.roomName).get();
+    const presenceDoc = await new RoomDoctorPresenceRepository(db).getByRoom(input.roomName);
     if (!presenceDoc.exists) {
       return lastDoctorLeftAt;
     }
@@ -181,37 +173,71 @@ async function applyFinalizationToSummary(
     waitingRoomHistory: WaitingRoomHistorySnapshot;
   }
 ): Promise<void> {
-  const summaryRef = db.collection('call-summaries').doc(input.consultationSessionId);
-  const summaryDoc = await summaryRef.get();
+  const summaryRepo = new CallSummaryRepository(db);
+  const summaryDoc = await summaryRepo.getById(input.consultationSessionId);
   if (!summaryDoc.exists) {
     return;
   }
 
   const summaryData = summaryDoc.data() as Record<string, unknown>;
   const summaryMetadata = (summaryData.metadata as Record<string, unknown> | undefined) || {};
-  await summaryRef.set(
-    {
-      duration: Math.max(parseDuration(summaryData.duration), input.finalDurationMinutes),
-      startedAt: input.sessionStartedAt,
-      endedAt: input.sessionEndedAt,
-      metadata: {
-        ...summaryMetadata,
-        sessionStartedAt: input.sessionStartedAt.toISOString(),
-        durationMinutes: input.finalDurationMinutes,
-        finalDurationMinutes: input.finalDurationMinutes,
-        sessionEndedAt: input.sessionEndedAt.toISOString(),
-        finalizedAt: input.finalizedAt.toISOString(),
-        finalizationReason: input.reason,
-        durationSource: 'session_finalization',
-        waitingRoomHistory: input.waitingRoomHistory,
-      },
-      updatedAt: new Date(),
+  await summaryRepo.mergeFields(input.consultationSessionId, {
+    duration: Math.max(parseDuration(summaryData.duration), input.finalDurationMinutes),
+    startedAt: input.sessionStartedAt,
+    endedAt: input.sessionEndedAt,
+    metadata: {
+      ...summaryMetadata,
+      sessionStartedAt: input.sessionStartedAt.toISOString(),
+      durationMinutes: input.finalDurationMinutes,
+      finalDurationMinutes: input.finalDurationMinutes,
+      sessionEndedAt: input.sessionEndedAt.toISOString(),
+      finalizedAt: input.finalizedAt.toISOString(),
+      finalizationReason: input.reason,
+      durationSource: 'session_finalization',
+      waitingRoomHistory: input.waitingRoomHistory,
     },
-    { merge: true }
-  );
+    updatedAt: new Date(),
+  });
 }
 
-export async function finalizeConsultationForRoom(
+// Event-level idempotency guard. When a backstop (webhook) fires after the
+// reliable client-leave path has already finalized and produced a real summary,
+// re-running the full finalization is wasted work. If the session is completed
+// and its summary is already finalized (real AI generation or a doctor edit),
+// short-circuit and return the existing result.
+async function findAlreadyFinalizedResult(
+  db: Firestore,
+  consultationSessionId: string,
+  sessionStatus: unknown
+): Promise<FinalizationResult | null> {
+  if (sessionStatus !== 'completed') {
+    return null;
+  }
+
+  try {
+    const summaryDoc = await new CallSummaryRepository(db).getById(consultationSessionId);
+    if (!summaryDoc.exists) {
+      return null;
+    }
+
+    const summaryData = (summaryDoc.data() as Record<string, unknown>) || {};
+    const metadata = (summaryData.metadata as Record<string, unknown> | undefined) || {};
+    const isFinalized = metadata.isEdited === true || metadata.aiSummaryGenerated === true;
+    if (!isFinalized) {
+      return null;
+    }
+
+    return {
+      consultationSessionId,
+      finalDurationMinutes: parseDuration(summaryData.duration),
+    };
+  } catch (error) {
+    console.warn('Failed idempotency lookup during finalization:', error);
+    return null;
+  }
+}
+
+async function runFinalization(
   db: Firestore,
   {
     roomName,
@@ -221,17 +247,15 @@ export async function finalizeConsultationForRoom(
     regenerateSummary = true,
   }: FinalizeConsultationInput
 ): Promise<FinalizationResult | null> {
-  const snapshot = await db
-    .collection('consultationSessions')
-    .where('roomName', '==', roomName)
-    .limit(50)
-    .get();
+  const sessionRepo = new ConsultationSessionRepository(db);
+  const consultationRepo = new ConsultationRepository(db);
 
-  if (snapshot.empty) {
+  const sessionDocs = await sessionRepo.findByRoom(roomName, 50);
+  if (sessionDocs.length === 0) {
     return null;
   }
 
-  const sessionCandidates = snapshot.docs.map((doc) => ({
+  const sessionCandidates = sessionDocs.map((doc) => ({
     id: doc.id,
     data: doc.data() as Record<string, unknown>,
   }));
@@ -247,8 +271,25 @@ export async function finalizeConsultationForRoom(
     selectedSession.data.consultationSessionId.trim()
       ? selectedSession.data.consultationSessionId.trim()
       : selectedSession.id;
-  const sessionRef = db.collection('consultationSessions').doc(consultationSessionId);
-  const sessionDoc = await sessionRef.get();
+
+  // Skip duplicate finalization triggered by a backstop after the primary path
+  // already produced a finalized summary for this session.
+  const alreadyFinalized = await findAlreadyFinalizedResult(
+    db,
+    consultationSessionId,
+    selectedSession.data.status
+  );
+  if (alreadyFinalized) {
+    console.log(
+      'Skipping duplicate finalization; session already finalized:',
+      consultationSessionId,
+      'reason:',
+      reason
+    );
+    return alreadyFinalized;
+  }
+
+  const sessionDoc = await sessionRepo.getById(consultationSessionId);
   const sessionData = (sessionDoc.exists ? sessionDoc.data() : selectedSession.data) as Record<string, unknown>;
   const sessionMetadata = (sessionData.metadata as Record<string, unknown> | undefined) || {};
   const effectiveSessionEndedAt = await resolveEffectiveSessionEndedAt(db, {
@@ -291,35 +332,31 @@ export async function finalizeConsultationForRoom(
     || (typeof sessionMetadata.patientEmail === 'string' ? sessionMetadata.patientEmail : null)
     || waitingHistoryPatientEmail;
 
-  await sessionRef.set(
-    {
-      consultationSessionId,
-      roomName,
-      ...(doctorUserId ? { doctorUserId } : {}),
-      status: 'completed',
-      sessionStartedAt,
-      sessionEndedAt: effectiveSessionEndedAt,
-      duration: finalDurationMinutes,
+  await sessionRepo.mergeFields(consultationSessionId, {
+    consultationSessionId,
+    roomName,
+    ...(doctorUserId ? { doctorUserId } : {}),
+    status: 'completed',
+    sessionStartedAt,
+    sessionEndedAt: effectiveSessionEndedAt,
+    duration: finalDurationMinutes,
+    patientUserId: sessionPatientUserId,
+    ...(sessionPatientEmail ? { patientEmail: sessionPatientEmail } : {}),
+    metadata: {
+      ...sessionMetadata,
+      durationMinutes: finalDurationMinutes,
+      finalDurationMinutes: finalDurationMinutes,
+      sessionEndedAt: effectiveSessionEndedAt.toISOString(),
+      finalizedAt: finalizedAt.toISOString(),
+      finalizationReason: reason,
+      waitingRoomHistory,
       patientUserId: sessionPatientUserId,
-      ...(sessionPatientEmail ? { patientEmail: sessionPatientEmail } : {}),
-      metadata: {
-        ...sessionMetadata,
-        durationMinutes: finalDurationMinutes,
-        finalDurationMinutes: finalDurationMinutes,
-        sessionEndedAt: effectiveSessionEndedAt.toISOString(),
-        finalizedAt: finalizedAt.toISOString(),
-        finalizationReason: reason,
-        waitingRoomHistory,
-        patientUserId: sessionPatientUserId,
-        updatedAt: new Date().toISOString(),
-      },
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(),
     },
-    { merge: true }
-  );
+    updatedAt: new Date(),
+  });
 
-  const consultationRef = db.collection('consultations').doc(roomName);
-  const consultationDoc = await consultationRef.get();
+  const consultationDoc = await consultationRepo.getByRoom(roomName);
   const consultationData = (consultationDoc.exists ? consultationDoc.data() : {}) as Record<string, unknown>;
   const consultationMetadata = (consultationData.metadata as Record<string, unknown> | undefined) || {};
   const consultationDocSessionId = resolveConsultationSessionIdFromDoc(consultationData);
@@ -331,29 +368,26 @@ export async function finalizeConsultationForRoom(
       ? (consultationData.patientEmail as string | undefined)
         || (typeof consultationMetadata.patientEmail === 'string' ? consultationMetadata.patientEmail : null)
       : null);
-  await consultationRef.set(
-    {
-      roomName,
-      consultationSessionId,
-      sessionStartedAt,
-      leftAt: effectiveSessionEndedAt,
-      duration: finalDurationMinutes,
-      status: 'completed',
+  await consultationRepo.mergeFields(roomName, {
+    roomName,
+    consultationSessionId,
+    sessionStartedAt,
+    leftAt: effectiveSessionEndedAt,
+    duration: finalDurationMinutes,
+    status: 'completed',
+    patientUserId: sessionPatientUserId,
+    ...(consultationPatientEmail ? { patientEmail: consultationPatientEmail } : {}),
+    metadata: {
+      ...consultationMetadata,
+      durationMinutes: finalDurationMinutes,
+      finalDurationMinutes: finalDurationMinutes,
+      sessionEndedAt: effectiveSessionEndedAt.toISOString(),
+      finalizedAt: finalizedAt.toISOString(),
+      finalizationReason: reason,
+      waitingRoomHistory,
       patientUserId: sessionPatientUserId,
-      ...(consultationPatientEmail ? { patientEmail: consultationPatientEmail } : {}),
-      metadata: {
-        ...consultationMetadata,
-        durationMinutes: finalDurationMinutes,
-        finalDurationMinutes: finalDurationMinutes,
-        sessionEndedAt: effectiveSessionEndedAt.toISOString(),
-        finalizedAt: finalizedAt.toISOString(),
-        finalizationReason: reason,
-        waitingRoomHistory,
-        patientUserId: sessionPatientUserId,
-      },
     },
-    { merge: true }
-  );
+  });
 
   if (regenerateSummary) {
     const summaryDoctorUserId =
@@ -397,4 +431,34 @@ export async function finalizeConsultationForRoom(
     consultationSessionId,
     finalDurationMinutes,
   };
+}
+
+/**
+ * Deep service that owns consultation finalization end-to-end: it selects the
+ * session for a room, records final duration/timestamps, snapshots waiting-room
+ * history, and (re)generates the stored AI summary. Idempotent across the
+ * multiple lifecycle triggers (client leave, webhook backstop, invitation
+ * endings, history rebuild).
+ */
+export class ConsultationFinalizationCore implements ConsultationFinalizationService {
+  constructor(private readonly db: Firestore) {}
+
+  async finalizeConsultation(
+    input: FinalizeConsultationInput
+  ): Promise<ServiceResult<FinalizationResult | null>> {
+    const result = await runFinalization(this.db, input);
+    return serviceOk(result);
+  }
+}
+
+/**
+ * Backward-compatible free-function entry point. Prefer ConsultationFinalizationCore
+ * for new call sites; this exists so existing lifecycle callers keep working
+ * while the service idiom is rolled out.
+ */
+export async function finalizeConsultationForRoom(
+  db: Firestore,
+  input: FinalizeConsultationInput
+): Promise<FinalizationResult | null> {
+  return runFinalization(db, input);
 }

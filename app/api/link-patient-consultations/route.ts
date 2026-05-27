@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import { CallSummaryRepository } from '@/lib/repositories/call-summary-repository';
+import { ConsultationRepository } from '@/lib/repositories/consultation-repository';
+import { ConsultationSessionRepository } from '@/lib/repositories/consultation-session-repository';
+import { InvitationRepository } from '@/lib/repositories/invitation-repository';
 
 interface LinkConsultationsRequest {
   userId?: string;
@@ -68,6 +72,10 @@ export async function POST(req: Request) {
       );
     }
 
+    const summaryRepo = new CallSummaryRepository(db);
+    const sessionRepo = new ConsultationSessionRepository(db);
+    const consultationRepo = new ConsultationRepository(db);
+    const invitationRepo = new InvitationRepository(db);
     let linkedCount = 0;
     const linkedSessionIds = new Set<string>();
 
@@ -76,8 +84,7 @@ export async function POST(req: Request) {
       options?: { forceRelink?: boolean }
     ) => {
       const forceRelink = Boolean(options?.forceRelink);
-      const sessionRef = db.collection('consultationSessions').doc(consultationSessionId);
-      const sessionDoc = await sessionRef.get();
+      const sessionDoc = await sessionRepo.getById(consultationSessionId);
       if (!sessionDoc.exists) {
         return;
       }
@@ -94,26 +101,22 @@ export async function POST(req: Request) {
         return;
       }
 
-      await sessionRef.set(
-        {
+      await sessionRepo.mergeFields(consultationSessionId, {
+        patientUserId: userId,
+        metadata: {
+          ...(sessionData.metadata || {}),
           patientUserId: userId,
-          metadata: {
-            ...(sessionData.metadata || {}),
-            patientUserId: userId,
-            patientEmail: userEmail,
-          },
-          updatedAt: new Date(),
+          patientEmail: userEmail,
         },
-        { merge: true }
-      );
+        updatedAt: new Date(),
+      });
 
       linkedSessionIds.add(consultationSessionId);
       linkedCount += 1;
 
       const roomName = sessionData.roomName;
       if (typeof roomName === 'string' && roomName.trim()) {
-        const consultationRef = db.collection('consultations').doc(roomName);
-        const consultationDoc = await consultationRef.get();
+        const consultationDoc = await consultationRepo.getByRoom(roomName);
         if (consultationDoc.exists) {
           const consultationData = consultationDoc.data() || {};
           const consultationDoctorUserId =
@@ -128,41 +131,34 @@ export async function POST(req: Request) {
               userId
             );
 
-            await consultationRef.set(
-              {
+            await consultationRepo.mergeFields(roomName, {
+              patientUserId: userId,
+              patientEmail: userEmail,
+              metadata: {
+                ...(consultationData.metadata || {}),
                 patientUserId: userId,
                 patientEmail: userEmail,
-                metadata: {
-                  ...(consultationData.metadata || {}),
-                  patientUserId: userId,
-                  patientEmail: userEmail,
-                  visibleToUsers,
-                },
+                visibleToUsers,
               },
-              { merge: true }
-            );
+            });
           }
         }
       }
 
-      const summaryRef = db.collection('call-summaries').doc(consultationSessionId);
-      const summaryDoc = await summaryRef.get();
+      const summaryDoc = await summaryRepo.getById(consultationSessionId);
       if (summaryDoc.exists) {
         const summaryData = summaryDoc.data() || {};
         const summaryDoctorUserId = summaryData.createdBy || summaryData.metadata?.createdBy;
         if (summaryDoctorUserId !== userId) {
-          await summaryRef.set(
-            {
+          await summaryRepo.mergeFields(consultationSessionId, {
+            patientUserId: userId,
+            patientEmail: userEmail,
+            metadata: {
+              ...(summaryData.metadata || {}),
               patientUserId: userId,
               patientEmail: userEmail,
-              metadata: {
-                ...(summaryData.metadata || {}),
-                patientUserId: userId,
-                patientEmail: userEmail,
-              },
             },
-            { merge: true }
-          );
+          });
         }
       }
     };
@@ -175,23 +171,9 @@ export async function POST(req: Request) {
       }
     }
 
-    const summaryQueries = await Promise.all([
-      db.collection('call-summaries').where('patientEmail', '==', userEmail).limit(200).get(),
-      db
-        .collection('call-summaries')
-        .where('metadata.patientEmail', '==', userEmail)
-        .limit(200)
-        .get(),
-    ]);
+    const summaryDocsList = await summaryRepo.findByPatient({ emails: [userEmail] }, 200);
 
-    const summaryDocs = new Map<string, any>();
-    summaryQueries.forEach((snapshot) => {
-      snapshot.docs.forEach((summaryDoc) => {
-        summaryDocs.set(summaryDoc.id, summaryDoc);
-      });
-    });
-
-    for (const summaryDoc of summaryDocs.values()) {
+    for (const summaryDoc of summaryDocsList) {
       try {
         const summaryData = summaryDoc.data() || {};
         const summaryDoctorUserId = summaryData.createdBy || summaryData.metadata?.createdBy;
@@ -204,18 +186,15 @@ export async function POST(req: Request) {
           continue;
         }
 
-        await summaryDoc.ref.set(
-          {
+        await summaryRepo.mergeFields(summaryDoc.id, {
+          patientUserId: userId,
+          patientEmail: userEmail,
+          metadata: {
+            ...(summaryData.metadata || {}),
             patientUserId: userId,
             patientEmail: userEmail,
-            metadata: {
-              ...(summaryData.metadata || {}),
-              patientUserId: userId,
-              patientEmail: userEmail,
-            },
           },
-          { merge: true }
-        );
+        });
         linkedCount += 1;
 
         const summarySessionId =
@@ -234,21 +213,16 @@ export async function POST(req: Request) {
       }
     }
 
-    const sessionEmailQueries = await Promise.all([
-      db.collection('consultationSessions').where('patientEmail', '==', userEmail).limit(200).get(),
-      db.collection('consultationSessions').where('metadata.patientEmail', '==', userEmail).limit(200).get(),
-    ]);
+    const sessionDocsFromEmail = await sessionRepo.findByPatient({ emails: [userEmail] }, 200);
 
     const sessionIdsFromEmail = new Set<string>();
-    sessionEmailQueries.forEach((snapshot) => {
-      snapshot.docs.forEach((sessionDoc) => {
-        const sessionData = sessionDoc.data() || {};
-        const sessionId =
-          (typeof sessionData.consultationSessionId === 'string' && sessionData.consultationSessionId.trim())
-            ? sessionData.consultationSessionId.trim()
-            : sessionDoc.id;
-        sessionIdsFromEmail.add(sessionId);
-      });
+    sessionDocsFromEmail.forEach((sessionDoc) => {
+      const sessionData = sessionDoc.data() || {};
+      const sessionId =
+        typeof sessionData.consultationSessionId === 'string' && sessionData.consultationSessionId.trim()
+          ? sessionData.consultationSessionId.trim()
+          : sessionDoc.id;
+      sessionIdsFromEmail.add(sessionId);
     });
 
     for (const sessionId of sessionIdsFromEmail) {
@@ -259,37 +233,27 @@ export async function POST(req: Request) {
       }
     }
 
-    const invitationSnapshot = await db
-      .collection('invitations')
-      .where('emailAllowed', '==', userEmail)
-      .limit(200)
-      .get();
+    const invitationDocsByEmail = await invitationRepo.findByEmailAllowed(userEmail, 200);
 
     const roomNamesFromInvitations = Array.from(
       new Set(
-        invitationSnapshot.docs
+        invitationDocsByEmail
           .map((invitationDoc) => invitationDoc.data()?.roomName)
           .filter((roomName): roomName is string => typeof roomName === 'string' && roomName.trim().length > 0)
       )
     );
 
-    const consultationEmailQueries = await Promise.all([
-      db.collection('consultations').where('patientEmail', '==', userEmail).limit(200).get(),
-      db.collection('consultations').where('metadata.patientEmail', '==', userEmail).limit(200).get(),
-    ]);
+    const consultationDocsByEmail = await consultationRepo.findByPatientEmail(userEmail, 200);
 
-    const roomNamesFromConsultations = consultationEmailQueries.flatMap((snapshot) =>
-      snapshot.docs
-        .map((consultationDoc) => consultationDoc.id)
-        .filter((roomName): roomName is string => typeof roomName === 'string' && roomName.trim().length > 0)
-    );
+    const roomNamesFromConsultations = consultationDocsByEmail
+      .map((consultationDoc) => consultationDoc.id)
+      .filter((roomName): roomName is string => typeof roomName === 'string' && roomName.trim().length > 0);
 
     const roomNames = Array.from(new Set([...roomNamesFromInvitations, ...roomNamesFromConsultations]));
 
     for (const roomName of roomNames) {
       try {
-        const consultationRef = db.collection('consultations').doc(roomName);
-        const consultationDoc = await consultationRef.get();
+        const consultationDoc = await consultationRepo.getByRoom(roomName);
 
         if (consultationDoc.exists) {
           const consultationData = consultationDoc.data() || {};
@@ -322,7 +286,7 @@ export async function POST(req: Request) {
               linkedCount += 1;
             }
 
-            await consultationRef.set(updatePayload, { merge: true });
+            await consultationRepo.mergeFields(roomName, updatePayload);
           }
         }
       } catch (consultationLinkError) {

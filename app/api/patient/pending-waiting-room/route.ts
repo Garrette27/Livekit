@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { Firestore } from 'firebase-admin/firestore';
 import { getFirebaseAdmin, getFirebaseAdminAuth } from '@/lib/firebase-admin';
 import { signInvitationToken } from '@/lib/invitations/token-utils';
 import { toDate } from '@/lib/invitations/utils';
 import type { InvitationToken } from '@/lib/types';
+import { WaitingPatientRepository } from '@/lib/repositories/waiting-patient-repository';
+import { InvitationRepository } from '@/lib/repositories/invitation-repository';
 
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -23,20 +24,6 @@ interface InvitationSnapshot {
   status: string;
   waitingRoomEnabled: boolean;
   expiresAt: unknown;
-}
-
-function isMissingIndexError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') {
-    return false;
-  }
-
-  const firestoreError = error as { code?: number; message?: string; details?: string };
-  if (firestoreError.code === 9) {
-    return true;
-  }
-
-  const message = `${firestoreError.message || ''} ${firestoreError.details || ''}`.toLowerCase();
-  return message.includes('requires an index');
 }
 
 function toMillis(value: unknown): number {
@@ -99,36 +86,6 @@ function toInvitationSnapshot(
   };
 }
 
-async function listWaitingEntriesByPatientEmail(
-  db: Firestore,
-  patientEmail: string
-): Promise<WaitingEntrySnapshot[]> {
-  try {
-    const snapshot = await db
-      .collection('waitingPatients')
-      .where('patientEmail', '==', patientEmail)
-      .where('status', '==', 'waiting')
-      .limit(100)
-      .get();
-
-    return snapshot.docs.map((doc) => toWaitingEntrySnapshot(doc.id, doc.data() as Record<string, unknown>));
-  } catch (error) {
-    if (!isMissingIndexError(error)) {
-      throw error;
-    }
-
-    const fallbackSnapshot = await db
-      .collection('waitingPatients')
-      .where('patientEmail', '==', patientEmail)
-      .limit(200)
-      .get();
-
-    return fallbackSnapshot.docs
-      .map((doc) => toWaitingEntrySnapshot(doc.id, doc.data() as Record<string, unknown>))
-      .filter((entry) => entry.status === 'waiting');
-  }
-}
-
 export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');
@@ -165,7 +122,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const waitingEntries = await listWaitingEntriesByPatientEmail(db, patientEmail);
+    const waitingDocs = await new WaitingPatientRepository(db).findWaitingByPatientEmail(patientEmail);
+    const waitingEntries = waitingDocs.map((doc) =>
+      toWaitingEntrySnapshot(doc.id, doc.data() as Record<string, unknown>)
+    );
     if (waitingEntries.length === 0) {
       return NextResponse.json(
         { success: true, pendingWaitingRoom: null },
@@ -183,8 +143,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const invitationRepo = new InvitationRepository(db);
     const invitationDocs = await Promise.all(
-      invitationIds.map((invitationId) => db.collection('invitations').doc(invitationId).get())
+      invitationIds.map((invitationId) => invitationRepo.getById(invitationId))
     );
     const invitationsById = new Map<string, InvitationSnapshot>();
     invitationDocs.forEach((invitationDoc) => {
