@@ -1,3 +1,4 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { FirestoreInvitationAccessCore, toInvitationAccessError } from '@/lib/services/invitation-access';
@@ -26,7 +27,7 @@ function parseActiveOnly(rawActiveOnly: string | null): boolean {
   return rawActiveOnly !== 'false';
 }
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const roomName = searchParams.get('roomName') || undefined;
@@ -73,3 +74,5 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export const GET = withRequestLogging(handleGET);

@@ -1,3 +1,4 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestore, collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
@@ -11,7 +12,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     // Security check - only allow admin users
     const authHeader = request.headers.get('authorization');
@@ -54,3 +55,5 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+export const POST = withRequestLogging(handlePOST);

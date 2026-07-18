@@ -1,3 +1,4 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { ConsultationSessionRepository } from '@/lib/repositories/consultation-session-repository';
@@ -28,7 +29,7 @@ function toMillis(value: unknown): number {
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 }
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const roomName = searchParams.get('roomName');
@@ -86,3 +87,5 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export const GET = withRequestLogging(handleGET);

@@ -1,5 +1,8 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
+import { authenticateBearerToken } from '@/lib/services/shared/request-auth';
+import { serviceResultToResponse } from '@/lib/services/shared/http';
 import { UserRepository } from '../../../../lib/repositories/user-repository';
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
 import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
@@ -13,13 +16,21 @@ import {
   InvitationToken 
 } from '../../../../lib/types';
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     // Apply rate limiting
     const rateLimitResponse = withRateLimit(RateLimitConfigs.TOKEN_GENERATION)(req);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
+
+    // Invitations are doctor-issued credentials, so the doctor identity must
+    // come from a verified Firebase token — never from the request body.
+    const auth = await authenticateBearerToken(req);
+    if (!auth.ok) {
+      return serviceResultToResponse(auth);
+    }
+    const doctorUserId = auth.data.userId;
 
     const body: CreateInvitationRequest = await req.json();
     const {
@@ -31,10 +42,9 @@ export async function POST(req: NextRequest) {
       waitingRoomEnabled,
       maxPatients,
       maxUses,
-      doctorUserId,
-      doctorEmail,
       doctorName,
     } = body;
+    const doctorEmail = auth.data.email || body.doctorEmail;
 
     // Input validation - only roomName is required
     if (!roomName) {
@@ -115,15 +125,6 @@ export async function POST(req: NextRequest) {
     const isWaitingRoomEnabled = waitingRoomEnabled === true;
     const finalMaxUses = maxUses !== undefined ? maxUses : (isWaitingRoomEnabled ? 999999 : 1); // Unlimited uses if waiting room enabled
     const finalMaxPatients = isWaitingRoomEnabled ? (maxPatients || 10) : 1;
-
-    // Validate doctorUserId
-    if (!doctorUserId) {
-      console.error('ERROR: doctorUserId is required but not provided in request');
-      return NextResponse.json(
-        { success: false, error: 'Doctor user ID is required' },
-        { status: 400 }
-      );
-    }
 
     console.log('Creating invitation with doctorUserId:', {
       doctorUserId,
@@ -240,3 +241,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withRequestLogging(handlePOST);

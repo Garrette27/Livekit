@@ -1,3 +1,4 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { signInvitationToken } from '../../../../lib/invitations/token-utils';
@@ -27,7 +28,7 @@ function pickLatestUsableInvitation(docs: any[]) {
   return usableInvitations[0]?.doc || null;
 }
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const roomName = searchParams.get('roomName');
@@ -184,3 +185,4 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export const GET = withRequestLogging(handleGET);

@@ -1,9 +1,12 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextResponse, NextRequest } from "next/server";
+import { getFirebaseAdmin } from "../../../lib/firebase-admin";
+import { RoomRepository } from "../../../lib/repositories/room-repository";
 import { withRateLimit, RateLimitConfigs } from "../../../lib/rate-limit";
 import { validateRoomName, validateParticipantName, sanitizeInput } from "../../../lib/validation";
 import { signLiveKitRoomToken } from "../../../lib/invitations/token-utils";
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     // Apply rate limiting
     const rateLimitResponse = withRateLimit(RateLimitConfigs.TOKEN_GENERATION)(req);
@@ -35,6 +38,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid participant name. Must be 2-100 characters, letters, numbers, spaces, and basic punctuation only' },
         { status: 400 }
+      );
+    }
+
+    // Only issue join tokens for rooms a doctor actually created. Without
+    // this check anyone could mint a token for an arbitrary room name and
+    // eavesdrop the moment a real room with that name is used.
+    const db = getFirebaseAdmin();
+    if (db) {
+      const roomDoc = await new RoomRepository(db).getByRoom(sanitizedRoomName);
+      if (!roomDoc.exists) {
+        return NextResponse.json(
+          { error: 'Room not found. Please use the link your doctor shared with you.' },
+          { status: 404 }
+        );
+      }
+    } else {
+      console.error('Firebase Admin unavailable; cannot verify room exists');
+      return NextResponse.json(
+        { error: 'Service temporarily unavailable' },
+        { status: 503 }
       );
     }
 
@@ -104,3 +127,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withRequestLogging(handlePOST);

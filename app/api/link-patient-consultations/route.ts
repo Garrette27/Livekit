@@ -1,3 +1,4 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { CallSummaryRepository } from '@/lib/repositories/call-summary-repository';
@@ -50,7 +51,7 @@ function mergeVisibleUsers(existingVisibleToUsers: unknown, doctorUserId: unknow
   );
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   try {
     const body = (await req.json()) as LinkConsultationsRequest;
     const userId = (body.userId || '').trim();
@@ -312,3 +313,5 @@ export async function POST(req: Request) {
     );
   }
 }
+
+export const POST = withRequestLogging(handlePOST);

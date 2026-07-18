@@ -1,3 +1,4 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { serviceResultToResponse } from '@/lib/services/shared/http';
 import { serviceError } from '@/lib/services/shared/service-result';
@@ -13,7 +14,7 @@ interface TrackDoctorPresenceRequest {
   consultationSessionId?: string | null;
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   const body = (await req.json()) as TrackDoctorPresenceRequest;
   const roomName = body.roomName?.trim();
   const action = body.action;
@@ -43,3 +44,5 @@ export async function POST(req: Request) {
   });
   return serviceResultToResponse(result);
 }
+
+export const POST = withRequestLogging(handlePOST);

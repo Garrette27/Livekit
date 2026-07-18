@@ -1,10 +1,17 @@
 import jwt from 'jsonwebtoken';
 import { InvitationToken } from '../types';
 
-const FALLBACK_SECRET = 'fallback-secret';
-
+/**
+ * Signing secret for invitation and LiveKit room tokens. Fails closed: a
+ * missing LIVEKIT_API_SECRET must never silently downgrade to a guessable
+ * secret, because anyone could then forge invite links for any room.
+ */
 export function getJwtSecret(): string {
-  return process.env.LIVEKIT_API_SECRET || FALLBACK_SECRET;
+  const secret = process.env.LIVEKIT_API_SECRET;
+  if (!secret) {
+    throw new Error('LIVEKIT_API_SECRET is not configured; refusing to sign or verify tokens');
+  }
+  return secret;
 }
 
 export function getLiveKitIssuer(): string | undefined {

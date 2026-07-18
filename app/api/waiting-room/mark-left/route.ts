@@ -1,3 +1,4 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { FirestoreInvitationAccessCore, toInvitationAccessError } from '@/lib/services/invitation-access';
@@ -18,7 +19,7 @@ async function parseRequestBody(req: NextRequest): Promise<Record<string, unknow
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     const body = await parseRequestBody(req);
     const waitingPatientId = typeof body.waitingPatientId === 'string' ? body.waitingPatientId.trim() : '';
@@ -62,3 +63,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withRequestLogging(handlePOST);

@@ -1,4 +1,5 @@
 import { getFirebaseAdminAuth } from '@/lib/firebase-admin';
+import { recordAuthenticatedUser } from './request-logging';
 import { serviceError, serviceOk, type ServiceResult } from './service-result';
 
 export interface AuthenticatedRequester {
@@ -27,6 +28,7 @@ export async function authenticateBearerToken(
 
   try {
     const decoded = await auth.verifyIdToken(authHeader.substring(7));
+    recordAuthenticatedUser(decoded.uid);
     return serviceOk({ userId: decoded.uid, email: decoded.email });
   } catch (error) {
     console.error('Token verification error:', error);

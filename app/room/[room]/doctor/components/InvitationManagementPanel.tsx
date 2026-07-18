@@ -67,15 +67,15 @@ export default function InvitationManagementPanel({ user, roomName, onInvitation
         waitingRoomEnabled: formData.waitingRoomEnabled || false,
         maxPatients: formData.waitingRoomEnabled ? (formData.maxPatients || 10) : undefined,
         maxUses: formData.waitingRoomEnabled ? undefined : 1,
-        doctorUserId: user.uid,
-        doctorEmail: user.email || undefined,
         doctorName: user.displayName || undefined,
       };
 
+      const idToken = await user.getIdToken();
       const response = await fetch('/api/invite/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify(request),
       });

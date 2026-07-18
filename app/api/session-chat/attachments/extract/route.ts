@@ -1,3 +1,4 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
@@ -14,7 +15,7 @@ interface ExtractAttachmentBody {
  * Extraction worker endpoint.
  * A background worker can call this after OCR/text parsing to update attachment extraction status.
  */
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     const body = (await req.json()) as ExtractAttachmentBody;
     const {
@@ -55,3 +56,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withRequestLogging(handlePOST);

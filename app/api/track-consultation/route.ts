@@ -1,8 +1,13 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { serviceResultToResponse } from '@/lib/services/shared/http';
 import { serviceError } from '@/lib/services/shared/service-result';
 import { FirestoreConsultationTrackingCore } from '@/lib/services/consultation-tracking';
 import type { ConsultationAction } from '@/lib/services/consultation-tracking';
+
+// Leave events can trigger finalization + AI summarization; give them more
+// than the 10s default.
+export const maxDuration = 60;
 
 interface TrackConsultationRequest {
   roomName?: string;
@@ -37,7 +42,7 @@ async function parseRequest(req: Request): Promise<TrackConsultationRequest | nu
   }
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   try {
     const body = await parseRequest(req);
     if (!body) {
@@ -79,3 +84,5 @@ export async function POST(req: Request) {
     );
   }
 }
+
+export const POST = withRequestLogging(handlePOST);

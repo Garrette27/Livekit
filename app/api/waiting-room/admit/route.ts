@@ -1,9 +1,10 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { FirestoreInvitationAccessCore, toInvitationAccessError } from '@/lib/services/invitation-access';
 import { AdmitPatientRequest, AdmitPatientResponse } from '../../../../lib/types';
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     const body: AdmitPatientRequest = await req.json();
     const { waitingPatientId, roomName } = body;
@@ -61,3 +62,4 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export const POST = withRequestLogging(handlePOST);

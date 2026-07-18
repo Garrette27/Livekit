@@ -1,3 +1,4 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import type { SessionChatVisibilityPolicy } from '@/lib/chat/session-chat-model';
@@ -16,7 +17,7 @@ function parseVisibilityPolicy(raw: string | null): SessionChatVisibilityPolicy 
   return raw === 'full-history' ? 'full-history' : 'join-time-only';
 }
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const consultationSessionId = searchParams.get('consultationSessionId');
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     const body = await req.json();
     const consultationSessionId =
@@ -119,3 +120,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const GET = withRequestLogging(handleGET);
+export const POST = withRequestLogging(handlePOST);

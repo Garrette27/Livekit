@@ -1,7 +1,8 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdminAuth } from '../../../lib/firebase-admin';
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     const body = await req.json();
     const { email } = body;
@@ -189,7 +190,7 @@ export async function POST(req: NextRequest) {
 }
 
 // GET endpoint for checking user status
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
     const email = searchParams.get('email');
@@ -261,3 +262,5 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export const GET = withRequestLogging(handleGET);
+export const POST = withRequestLogging(handlePOST);

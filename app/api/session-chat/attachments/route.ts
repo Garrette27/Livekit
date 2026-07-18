@@ -1,3 +1,4 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
@@ -15,7 +16,7 @@ interface CreateAttachmentBody {
   extractionStatus?: 'pending' | 'ready' | 'failed';
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     const body = (await req.json()) as CreateAttachmentBody;
     const {
@@ -71,3 +72,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withRequestLogging(handlePOST);

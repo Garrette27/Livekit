@@ -1,10 +1,15 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { finalizeConsultationForRoom } from '../../../../lib/services/consultation-finalization';
 import { FirestoreInvitationAccessCore } from '@/lib/services/invitation-access';
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
 
-export async function POST(req: NextRequest) {
+// Revocation can finalize the consultation and run AI summarization; give it
+// more than the 10s default.
+export const maxDuration = 60;
+
+async function handlePOST(req: NextRequest) {
   try {
     const body = await req.json();
     const invitationId =
@@ -107,3 +112,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withRequestLogging(handlePOST);

@@ -1,3 +1,4 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
@@ -17,7 +18,7 @@ import { WaitingPatientRepository } from '../../../../lib/repositories/waiting-p
  * - dryRun=true: Only show what would be updated without actually updating
  * - limit=N: Limit the number of documents to process (for testing)
  */
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const dryRun = searchParams.get('dryRun') === 'true';
@@ -199,3 +200,4 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export const POST = withRequestLogging(handlePOST);

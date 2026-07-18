@@ -1,3 +1,4 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { UserRepository } from '../../../../lib/repositories/user-repository';
@@ -62,7 +63,7 @@ function detectBrowser(userAgent: string): string {
   return 'Unknown';
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     // Apply rate limiting
     const rateLimitResponse = withRateLimit(RateLimitConfigs.TOKEN_GENERATION)(req);
@@ -209,3 +210,4 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export const POST = withRequestLogging(handlePOST);

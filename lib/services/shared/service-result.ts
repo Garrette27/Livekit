@@ -5,11 +5,13 @@ export interface ServiceError {
   details?: unknown;
 }
 
-export interface ServiceResult<T> {
-  ok: boolean;
-  data?: T;
-  error?: ServiceError;
-}
+/**
+ * Discriminated on `ok` so a successful result always carries `data` and a
+ * failed one always carries `error` — checking `result.ok` narrows the type.
+ */
+export type ServiceResult<T> =
+  | { ok: true; data: T; error?: undefined }
+  | { ok: false; data?: undefined; error: ServiceError };
 
 export function serviceOk<T>(data: T): ServiceResult<T> {
   return {

@@ -40,6 +40,38 @@ interface PresenceTimeline {
 
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_MODEL = 'gpt-4o-mini';
+const OPENAI_TIMEOUT_MS = 25_000;
+
+/**
+ * Calls OpenAI with a bounded timeout and one retry on transient failures
+ * (timeouts, rate limits, 5xx). Without the bound, a hung request would eat
+ * the serverless time budget and finalization would die before it could even
+ * store a fallback summary.
+ */
+async function requestOpenAiCompletion(requestBody: string): Promise<Response> {
+  const attempt = () =>
+    fetch(OPENAI_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: requestBody,
+      signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
+    });
+
+  try {
+    const response = await attempt();
+    if (response.status !== 429 && response.status < 500) {
+      return response;
+    }
+    console.warn('Transient OpenAI error, retrying once:', response.status);
+  } catch (error) {
+    console.warn('OpenAI request failed, retrying once:', error);
+  }
+
+  return attempt();
+}
 
 function toDate(value: unknown): Date | null {
   if (!value) {
@@ -610,13 +642,8 @@ export async function generateAndStoreConsultationSummary({
     );
 
     console.log('Calling OpenAI API for consultation summary...');
-    const response = await fetch(OPENAI_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await requestOpenAiCompletion(
+      JSON.stringify({
         model: OPENAI_MODEL,
         messages: [
           {
@@ -630,8 +657,9 @@ export async function generateAndStoreConsultationSummary({
         ],
         max_tokens: 800,
         temperature: 0.3,
-      }),
-    });
+        response_format: { type: 'json_object' },
+      })
+    );
 
     if (!response.ok) {
       const errorText = await response.text();

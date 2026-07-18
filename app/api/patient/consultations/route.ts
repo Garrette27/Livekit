@@ -1,8 +1,9 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin, getFirebaseAdminAuth } from '@/lib/firebase-admin';
 import { FirestoreSummaryProjectionService } from '@/lib/services/history-summary';
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -49,3 +50,5 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export const GET = withRequestLogging(handleGET);

@@ -34,17 +34,17 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
       );
       const primaryEmail = normalizedAllowlist[0];
 
+      const idToken = await user.getIdToken();
       const response = await fetch('/api/invite/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify({
           ...formData,
           emailAllowed: primaryEmail,
           emailAllowlist: normalizedAllowlist,
-          doctorUserId: user.uid,
-          doctorEmail: user.email,
           doctorName: user.displayName || user.email || 'Doctor',
         }),
       });

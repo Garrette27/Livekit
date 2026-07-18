@@ -1,3 +1,4 @@
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import { getClientIP } from '../../../../lib/invitations/utils';
@@ -5,7 +6,7 @@ import { ValidateInvitationRequest } from '../../../../lib/types';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { FirestoreInvitationAccessCore } from '@/lib/services/invitation-access';
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const rateLimitResponse = withRateLimit(RateLimitConfigs.TOKEN_GENERATION)(req);
   if (rateLimitResponse) {
     return rateLimitResponse;
@@ -40,3 +41,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json(result.body, { status: result.status });
 }
+
+export const POST = withRequestLogging(handlePOST);

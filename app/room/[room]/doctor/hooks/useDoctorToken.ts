@@ -39,17 +39,25 @@ export function useDoctorToken({ roomName, doctorName, user }: DoctorTokenArgs):
       return null;
     }
 
+    if (!user) {
+      setTokenError('Please sign in as a doctor to join this room');
+      return null;
+    }
+
     setIsJoining(true);
     setTokenError(null);
 
     try {
+      const idToken = await user.getIdToken();
       const response = await fetch('/api/doctor-access', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           roomName,
           doctorName,
-          doctorEmail: user?.email || 'anonymous@example.com'
         })
       });
 
