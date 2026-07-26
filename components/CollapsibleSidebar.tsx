@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 
 const SIDEBAR_Z_INDEX = 10020;
 
@@ -111,7 +111,7 @@ export default function CollapsibleSidebar({
     });
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
     if (isDragging) {
       const diffX = e.clientX - dragStart.x;
       const diffY = e.clientY - dragStart.y;
@@ -129,11 +129,11 @@ export default function CollapsibleSidebar({
         }
       }
     }
-  };
+  }, [dragStart, isDragging, position]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-  };
+  }, []);
 
   useEffect(() => {
     if (isDragging) {
@@ -144,7 +144,7 @@ export default function CollapsibleSidebar({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, dragStart, position]);
+  }, [handleMouseMove, handleMouseUp, isDragging]);
 
   const sidebarStyle: React.CSSProperties = {
     position: 'fixed',

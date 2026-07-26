@@ -492,8 +492,7 @@ async function shouldSkipSummaryRegeneration(
 function attachPatientFields(
   summaryData: Record<string, any>,
   patientUserId: string | null | undefined,
-  patientEmail: string | null | undefined,
-  logPrefix: string
+  patientEmail: string | null | undefined
 ) {
   if (isKnownUserId(patientUserId)) {
     summaryData.patientUserId = patientUserId;
@@ -503,7 +502,6 @@ function attachPatientFields(
   if (patientEmail) {
     summaryData.patientEmail = patientEmail;
     summaryData.metadata.patientEmail = patientEmail;
-    console.log(`${logPrefix} ${patientEmail}`);
   }
 }
 
@@ -583,7 +581,7 @@ export async function generateAndStoreConsultationSummary({
         },
       };
 
-      attachPatientFields(summaryData, patientUserId, patientEmail, 'Storing patient email in gated summary:');
+      attachPatientFields(summaryData, patientUserId, patientEmail);
       await summaryRepo.overwrite(summaryDocumentId, summaryData);
       return;
     }
@@ -616,16 +614,10 @@ export async function generateAndStoreConsultationSummary({
         },
       };
 
-      attachPatientFields(
-        summaryData,
-        patientUserId,
-        patientEmail,
-        'Storing patient email in fallback summary:'
-      );
+      attachPatientFields(summaryData, patientUserId, patientEmail);
 
       await summaryRepo.overwrite(summaryDocumentId, summaryData);
       console.log('Fallback summary stored successfully with user ID:', userId);
-      console.log('Fallback summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
       return;
     }
 
@@ -669,8 +661,6 @@ export async function generateAndStoreConsultationSummary({
 
     const data = await response.json();
     const content = data.choices[0]?.message?.content || '{}';
-    console.log('OpenAI response received:', content);
-
     try {
       const parsedSummary = normalizeSummary(JSON.parse(stripMarkdownCodeFence(content)));
       parsedSummary.keyPoints = augmentKeyPointsWithPresenceTimeline(
@@ -703,11 +693,10 @@ export async function generateAndStoreConsultationSummary({
         },
       };
 
-      attachPatientFields(summaryData, patientUserId, patientEmail, 'Storing patient email in AI summary:');
+      attachPatientFields(summaryData, patientUserId, patientEmail);
 
       await summaryRepo.overwrite(summaryDocumentId, summaryData);
       console.log('AI summary stored successfully in Firestore with user ID:', userId);
-      console.log('Summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError);
 
@@ -734,9 +723,9 @@ export async function generateAndStoreConsultationSummary({
         },
       };
 
+      attachPatientFields(summaryData, patientUserId, patientEmail);
       await summaryRepo.overwrite(summaryDocumentId, summaryData);
       console.log('Parse error fallback summary stored successfully with user ID:', userId);
-      console.log('Parse error fallback summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
     }
   } catch (error) {
     console.error('Error generating consultation summary:', error);
@@ -763,9 +752,9 @@ export async function generateAndStoreConsultationSummary({
         },
       };
 
+      attachPatientFields(summaryData, patientUserId, patientEmail);
       await summaryRepo.overwrite(summaryDocumentId, summaryData);
       console.log('Error summary stored successfully with user ID:', userId);
-      console.log('Error summary data:', { roomName, createdBy: summaryData.createdBy, metadata: summaryData.metadata });
     } catch (storeError) {
       console.error('Error storing error summary:', storeError);
     }

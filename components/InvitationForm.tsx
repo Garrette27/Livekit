@@ -74,7 +74,7 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
     } else {
       setFormData(prev => ({
         ...prev,
-        [name]: value,
+        [name]: type === 'number' || name === 'expiresInHours' ? Number(value) : value,
       }));
     }
   };
@@ -92,35 +92,10 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
         color: '#111827', 
         marginBottom: '1rem' 
       }}>
-        Create Invitation
+        Invitation Settings
       </h3>
       
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ 
-            display: 'block', 
-            fontSize: '0.875rem', 
-            fontWeight: '500', 
-            color: '#374151', 
-            marginBottom: '0.5rem' 
-          }}>
-            Room Name
-          </label>
-          <div
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.375rem',
-              fontSize: '1rem',
-              backgroundColor: '#f9fafb',
-              color: '#111827',
-            }}
-          >
-            {formData.roomName}
-          </div>
-        </div>
-
         <div style={{ marginBottom: '1rem' }}>
           <label style={{ 
             display: 'block', 

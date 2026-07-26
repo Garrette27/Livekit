@@ -1,4 +1,5 @@
 import { AdmitPatientResponse, WaitingPatient } from '@/lib/types';
+import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 
 interface WaitingRoomListResponse {
   success: boolean;
@@ -70,7 +71,7 @@ export async function listWaitingPatients({
 
   const query = params.toString();
   const endpoint = query ? `/api/waiting-room/list?${query}` : '/api/waiting-room/list';
-  const response = await fetch(endpoint, { cache: 'no-store' });
+  const response = await authenticatedFetch(endpoint, { cache: 'no-store' });
   const result = await parseJsonResponse<WaitingRoomListResponse>(response);
 
   const waitingPatients = [...(result.waitingPatients || [])].sort((a, b) => {
@@ -88,7 +89,7 @@ export async function admitWaitingPatient(
   roomName: string,
   doctorUserId?: string
 ): Promise<AdmitPatientResponse> {
-  const response = await fetch('/api/waiting-room/admit', {
+  const response = await authenticatedFetch('/api/waiting-room/admit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ waitingPatientId, roomName, doctorUserId }),
@@ -101,7 +102,7 @@ export async function rejectWaitingPatient(
   waitingPatientId: string,
   doctorUserId?: string
 ): Promise<WaitingRoomMutationResponse> {
-  const response = await fetch('/api/waiting-room/reject', {
+  const response = await authenticatedFetch('/api/waiting-room/reject', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ waitingPatientId, doctorUserId }),

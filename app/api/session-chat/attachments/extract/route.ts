@@ -2,6 +2,8 @@ import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
+import { authorizeAdminSecret } from '@/lib/services/shared/admin-secret-auth';
+import { serviceResultToResponse } from '@/lib/services/shared/http';
 
 interface ExtractAttachmentBody {
   consultationSessionId: string;
@@ -17,6 +19,11 @@ interface ExtractAttachmentBody {
  */
 async function handlePOST(req: NextRequest) {
   try {
+    const authorization = authorizeAdminSecret(req);
+    if (!authorization.ok) {
+      return serviceResultToResponse(authorization);
+    }
+
     const body = (await req.json()) as ExtractAttachmentBody;
     const {
       consultationSessionId,

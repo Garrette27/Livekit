@@ -31,6 +31,7 @@ interface SendSessionChatResponse {
 }
 
 interface UseSessionChatOptions {
+  accessToken?: string | null;
   consultationSessionId?: string | null;
   visibilityPolicy?: SessionChatVisibilityPolicy;
   participantJoinedAt?: Date | null;
@@ -55,6 +56,7 @@ function toDateString(value: Date | null | undefined): string | null {
 }
 
 export function useSessionChat({
+  accessToken,
   consultationSessionId,
   visibilityPolicy = 'join-time-only',
   participantJoinedAt = null,
@@ -67,7 +69,7 @@ export function useSessionChat({
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!consultationSessionId) {
+    if (!consultationSessionId || !accessToken) {
       setMessages([]);
       return;
     }
@@ -85,7 +87,9 @@ export function useSessionChat({
         params.set('participantJoinedAt', participantJoinedAtIso);
       }
 
-      const response = await fetch(`/api/session-chat/messages?${params.toString()}`);
+      const response = await fetch(`/api/session-chat/messages?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
       const result = (await response.json()) as FetchSessionChatResponse;
       if (!response.ok || !result.success) {
         setError(result.error || 'Failed to load session chat');
@@ -98,12 +102,12 @@ export function useSessionChat({
     } finally {
       setLoading(false);
     }
-  }, [consultationSessionId, participantJoinedAt, visibilityPolicy]);
+  }, [accessToken, consultationSessionId, participantJoinedAt, visibilityPolicy]);
 
   const sendMessage = useCallback(
     async (input: Omit<SessionChatMessageInput, 'consultationSessionId'>) => {
-      if (!consultationSessionId) {
-        setError('Missing consultationSessionId');
+      if (!consultationSessionId || !accessToken) {
+        setError('Missing consultation session or room access token');
         return false;
       }
 
@@ -112,7 +116,10 @@ export function useSessionChat({
       try {
         const response = await fetch('/api/session-chat/messages', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
           body: JSON.stringify({
             ...input,
             consultationSessionId,
@@ -133,7 +140,7 @@ export function useSessionChat({
         setSending(false);
       }
     },
-    [consultationSessionId, refresh]
+    [accessToken, consultationSessionId, refresh]
   );
 
   useEffect(() => {

@@ -1,13 +1,13 @@
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
-import { authenticateBearerToken } from '../../../../lib/services/shared/request-auth';
+import { authorizeBearerRequest } from '../../../../lib/services/shared/request-auth';
 import { serviceResultToResponse } from '../../../../lib/services/shared/http';
 import { serviceError } from '../../../../lib/services/shared/service-result';
 import { FirestoreSummaryManagementCore } from '../../../../lib/services/summary-management';
 
 async function handlePUT(req: NextRequest) {
-  const auth = await authenticateBearerToken(req);
+  const auth = await authorizeBearerRequest(req, 'summary:manage-own');
   if (!auth.ok) {
     return serviceResultToResponse(auth);
   }

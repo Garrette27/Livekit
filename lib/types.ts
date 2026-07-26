@@ -262,7 +262,7 @@ export interface UserProfile {
   id: string;
   email: string;
   phone?: string;
-  role: 'doctor' | 'patient'; // User role
+  role: 'doctor' | 'patient' | 'faculty_reviewer' | 'admin';
   consentGiven: boolean;
   consentGivenAt: Timestamp | Date | any; // Flexible for client/server compatibility
   deviceInfo?: { // Only for patients who gave consent
@@ -291,6 +291,7 @@ export interface UserProfile {
 }
 
 export interface RegisterUserRequest {
+  invitationToken: string;
   email: string;
   phone?: string;
   consentGiven: boolean;

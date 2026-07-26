@@ -79,17 +79,23 @@ service cloud.firestore {
       allow write: if false;
     }
     
-    // Users collection - users can read their own data and email of other users (for dashboard display)
+    // User profiles are private. Elevated roles must be provisioned through
+    // trusted Firebase custom claims before their profile can be created.
     match /users/{userId} {
-      // Allow users to read their own document
-      // Also allow authenticated users to read email and role fields of other users for dashboard display
-      allow read: if request.auth != null;
-      // Allow users to create their own document during registration
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        request.auth.token.admin == true
+      );
       allow create: if request.auth != null && 
         request.auth.uid == userId &&
         request.resource.data.keys().hasAll(['email', 'role']) &&
         request.resource.data.email is string &&
-        request.resource.data.role in ['patient', 'doctor'];
+        request.resource.data.role in ['patient', 'doctor', 'faculty_reviewer', 'admin'] &&
+        (
+          request.resource.data.role == 'patient' ||
+          request.auth.token.role == request.resource.data.role ||
+          request.auth.token.admin == true
+        );
       // Allow users to update their own profile while keeping email and role immutable.
       allow update: if request.auth != null &&
         request.auth.uid == userId &&

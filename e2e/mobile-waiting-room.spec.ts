@@ -61,6 +61,7 @@ test.describe('Mobile Waiting Room Lifecycle', () => {
 
     await context.route('**/api/waiting-room/check-admission', async (route, request) => {
       const body = parseRequestBody(request.postData());
+      expect(body.accessToken).toBe('e2e-fake-livekit-token');
       const resolvedWaitingPatientId =
         typeof body.waitingPatientId === 'string' && body.waitingPatientId.trim().length > 0
           ? body.waitingPatientId
@@ -80,6 +81,7 @@ test.describe('Mobile Waiting Room Lifecycle', () => {
 
     await context.route('**/api/waiting-room/mark-left', async (route, request) => {
       const body = parseRequestBody(request.postData());
+      expect(body.accessToken).toBe('e2e-fake-livekit-token');
       const markedWaitingPatientId =
         typeof body.waitingPatientId === 'string' ? body.waitingPatientId : waitingPatientId;
       markedLeftIds.push(markedWaitingPatientId);
@@ -138,6 +140,7 @@ test.describe('Mobile Waiting Room Lifecycle', () => {
 
     await context.route('**/api/waiting-room/mark-left', async (route, request) => {
       const body = parseRequestBody(request.postData());
+      expect(body.accessToken).toBe('e2e-fake-livekit-token');
       const markedWaitingPatientId =
         typeof body.waitingPatientId === 'string' ? body.waitingPatientId : waitingPatientId;
       markedLeftIds.push(markedWaitingPatientId);

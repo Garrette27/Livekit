@@ -43,8 +43,8 @@ function serializeQuery(url: URL): Record<string, string> | undefined {
   }
 
   const query: Record<string, string> = {};
-  url.searchParams.forEach((value, name) => {
-    query[name] = SENSITIVE_QUERY_PARAMS.has(name.toLowerCase()) ? '[redacted]' : value;
+  url.searchParams.forEach((_value, name) => {
+    query[name] = SENSITIVE_QUERY_PARAMS.has(name.toLowerCase()) ? '[redacted]' : '[present]';
   });
   return query;
 }

@@ -11,6 +11,8 @@ import { useAuthSession } from '@/hooks/useAuthSession';
 import { copyTextToClipboard, fetchInvitationLink as getInvitationLink } from '@/lib/invitations/invitation-link-client';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
 import { getDoctorHistoryRoute } from '@/lib/routes/doctor-routes';
+import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
+import { compactInvitationUrl } from '@/lib/invitations/invitation-link-display';
 
 export default function DoctorInvitationsPage() {
   const { showToast } = useToast();
@@ -217,7 +219,7 @@ export default function DoctorInvitationsPage() {
     }
 
     try {
-      const response = await fetch('/api/invite/revoke', {
+      const response = await authenticatedFetch('/api/invite/revoke', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invitationId }),
@@ -449,7 +451,7 @@ export default function DoctorInvitationsPage() {
         </div>
 
         {/* Two Column Layout: Created Invitations and Waiting Queue */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+        <div className="invitation-columns">
           {/* Created Invitations List */}
           <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: '2rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>
@@ -611,10 +613,9 @@ export default function DoctorInvitationsPage() {
                                 margin: 0, 
                                 fontSize: '0.7rem', 
                                 color: '#1e40af', 
-                                wordBreak: 'break-all',
                                 flex: 1
                               }}>
-                                {invitationLinks[invitation.id]}
+                                {compactInvitationUrl(invitationLinks[invitation.id])}
                               </p>
                               <button
                                 onClick={(e) => {
@@ -816,6 +817,18 @@ export default function DoctorInvitationsPage() {
       </div>
 
       <style jsx>{`
+        .invitation-columns {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          gap: 2rem;
+        }
+
+        @media (max-width: 900px) {
+          .invitation-columns {
+            grid-template-columns: 1fr;
+          }
+        }
+
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }

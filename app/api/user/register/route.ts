@@ -1,208 +1,188 @@
-import { withRequestLogging } from '@/lib/services/shared/request-logging';
-import { NextResponse, NextRequest } from 'next/server';
-import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
-import { UserRepository } from '../../../../lib/repositories/user-repository';
-import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
-import { validateEmail, sanitizeInput } from '../../../../lib/validation';
 import crypto from 'crypto';
-import { 
-  RegisterUserRequest, 
-  RegisterUserResponse,
+import { NextRequest, NextResponse } from 'next/server';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import { verifyInvitationToken } from '@/lib/invitations/token-utils';
+import { InvitationRepository } from '@/lib/repositories/invitation-repository';
+import { UserRepository } from '@/lib/repositories/user-repository';
+import { RateLimitConfigs, withRateLimit } from '@/lib/rate-limit';
+import { withRequestLogging } from '@/lib/services/shared/request-logging';
+import type {
   DeviceFingerprint,
-  GeolocationData
-} from '../../../../lib/types';
+  RegisterUserRequest,
+  RegisterUserResponse,
+} from '@/lib/types';
+import { sanitizeInput, validateEmail } from '@/lib/validation';
 
-// Helper function to generate device fingerprint hash
-function generateDeviceFingerprintHash(deviceData: DeviceFingerprint): string {
-  const fingerprintString = [
-    deviceData.userAgent,
-    deviceData.language,
-    deviceData.platform,
-    deviceData.screenResolution,
-    deviceData.timezone,
-    deviceData.cookieEnabled.toString(),
-    deviceData.doNotTrack,
-  ].join('|');
-  
-  return crypto.createHash('sha256').update(fingerprintString).digest('hex');
+function hashValue(value: string): string {
+  return crypto.createHash('sha256').update(value).digest('hex');
 }
 
-// Helper function to hash IP address for privacy
-function hashIP(ip: string): string {
-  return crypto.createHash('sha256').update(ip).digest('hex');
+function fingerprintHash(device: DeviceFingerprint): string {
+  return hashValue([
+    device.userAgent,
+    device.language,
+    device.platform,
+    device.screenResolution,
+    device.timezone,
+    String(device.cookieEnabled),
+    device.doNotTrack,
+  ].join('|'));
 }
 
-// Helper function to get client IP
-function getClientIP(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  const realIP = request.headers.get('x-real-ip');
-  const cfConnectingIP = request.headers.get('cf-connecting-ip');
-  
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
-  
-  if (realIP) {
-    return realIP;
-  }
-  
-  if (cfConnectingIP) {
-    return cfConnectingIP;
-  }
-  
-  return (request as any).ip || 'unknown';
-}
-
-// Helper function to detect browser from user agent
 function detectBrowser(userAgent: string): string {
+  if (userAgent.includes('Edg/')) return 'Edge';
+  if (userAgent.includes('OPR/')) return 'Opera';
   if (userAgent.includes('Chrome')) return 'Chrome';
   if (userAgent.includes('Firefox')) return 'Firefox';
   if (userAgent.includes('Safari')) return 'Safari';
-  if (userAgent.includes('Edge')) return 'Edge';
-  if (userAgent.includes('Opera')) return 'Opera';
   return 'Unknown';
 }
 
+function expirationDate(value: unknown): Date | null {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (value && typeof value === 'object' && 'toDate' in value) {
+    const toDate = (value as { toDate?: unknown }).toDate;
+    return typeof toDate === 'function'
+      ? (toDate as () => Date).call(value)
+      : null;
+  }
+  return null;
+}
+
+function allowedInvitationEmails(invitation: Record<string, unknown>): string[] {
+  const metadata = (invitation.metadata as Record<string, unknown> | undefined) || {};
+  const constraints = (metadata.constraints as Record<string, unknown> | undefined) || {};
+  const candidates = [
+    invitation.emailAllowed,
+    constraints.email,
+    ...(Array.isArray(constraints.emails) ? constraints.emails : []),
+  ];
+  return Array.from(new Set(
+    candidates
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean)
+  ));
+}
+
+/**
+ * Registers an invited patient only after validating the signed invitation and
+ * its persisted state. Existing non-patient profiles are never rewritten.
+ */
 async function handlePOST(req: NextRequest) {
+  const rateLimitResponse = withRateLimit(RateLimitConfigs.TOKEN_GENERATION)(req);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   try {
-    // Apply rate limiting
-    const rateLimitResponse = withRateLimit(RateLimitConfigs.TOKEN_GENERATION)(req);
-    if (rateLimitResponse) {
-      return rateLimitResponse;
-    }
-
-    const body: RegisterUserRequest = await req.json();
-    const { email, phone, consentGiven, deviceFingerprint, geolocation } = body;
-
-    // Validate required fields
-    if (!email || !consentGiven || !deviceFingerprint) {
+    const body = (await req.json()) as RegisterUserRequest;
+    const { invitationToken, email, phone, consentGiven, deviceFingerprint } = body;
+    if (!invitationToken || !email || !consentGiven || !deviceFingerprint) {
       return NextResponse.json(
-        { success: false, error: 'Email, consent, and device fingerprint are required' },
+        { success: false, error: 'Invitation, email, consent, and device information are required' },
         { status: 400 }
       );
     }
-
-    // Validate email
     if (!validateEmail(email)) {
+      return NextResponse.json({ success: false, error: 'Invalid email address' }, { status: 400 });
+    }
+
+    let tokenPayload;
+    try {
+      tokenPayload = verifyInvitationToken(invitationToken);
+    } catch {
       return NextResponse.json(
-        { success: false, error: 'Invalid email address' },
-        { status: 400 }
+        { success: false, error: 'Invitation is invalid or expired' },
+        { status: 401 }
       );
     }
 
-    // Check if consent is given
-    if (!consentGiven) {
-      return NextResponse.json(
-        { success: false, error: 'Consent is required to store device information', requiresConsent: true },
-        { status: 400 }
-      );
-    }
-
-    // Get client IP for geolocation if not provided
-    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
-                     req.headers.get('x-real-ip') || 
-                     'unknown';
-
-    // Get Firebase admin
     const db = getFirebaseAdmin();
     if (!db) {
+      return NextResponse.json({ success: false, error: 'Database not available' }, { status: 500 });
+    }
+
+    const invitationDoc = await new InvitationRepository(db).getById(tokenPayload.invitationId);
+    if (!invitationDoc.exists) {
+      return NextResponse.json({ success: false, error: 'Invitation not found' }, { status: 404 });
+    }
+
+    const invitation = invitationDoc.data() as Record<string, unknown>;
+    const expiresAt = expirationDate(invitation.expiresAt);
+    if (
+      invitation.status !== 'active'
+      || invitation.roomName !== tokenPayload.roomName
+      || (expiresAt && expiresAt.getTime() <= Date.now())
+    ) {
       return NextResponse.json(
-        { success: false, error: 'Database not available' },
-        { status: 500 }
+        { success: false, error: 'Invitation is no longer active' },
+        { status: 410 }
       );
     }
 
-    // Sanitize inputs
-    const sanitizedEmail = sanitizeInput(email.toLowerCase().trim());
-    const sanitizedPhone = phone ? sanitizeInput(phone.trim()) : undefined;
+    const sanitizedEmail = sanitizeInput(email.trim().toLowerCase());
+    const allowlist = allowedInvitationEmails(invitation);
+    if (
+      (tokenPayload.email && tokenPayload.email.trim().toLowerCase() !== sanitizedEmail)
+      || (allowlist.length > 0 && !allowlist.includes(sanitizedEmail))
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'Email does not match this invitation' },
+        { status: 403 }
+      );
+    }
 
-    // Check if user already exists
-    const userRepo = new UserRepository(db);
-    const existingUser = await userRepo.findByEmail(sanitizedEmail);
-
-    const deviceHash = generateDeviceFingerprintHash(deviceFingerprint);
-    const detectedBrowser = detectBrowser(deviceFingerprint.userAgent);
-    const ipHash = hashIP(clientIP);
-
-    // Prepare user profile data
-    // Default to 'patient' role - doctors are registered separately via login
-    const userProfileData: any = {
+    const clientIp = (
+      req.headers.get('x-forwarded-for')?.split(',')[0]
+      || req.headers.get('x-real-ip')
+      || 'unknown'
+    ).trim();
+    const profileFields: Record<string, unknown> = {
       email: sanitizedEmail,
-      role: 'patient', // Patients register via invitation flow
       consentGiven: true,
       consentGivenAt: new Date(),
       deviceInfo: {
-        deviceFingerprintHash: deviceHash,
+        deviceFingerprintHash: fingerprintHash(deviceFingerprint),
         userAgent: deviceFingerprint.userAgent,
         platform: deviceFingerprint.platform,
         screenResolution: deviceFingerprint.screenResolution,
         timezone: deviceFingerprint.timezone,
       },
-      browserInfo: {
-        name: detectedBrowser,
-      },
+      browserInfo: { name: detectBrowser(deviceFingerprint.userAgent) },
+      securityInfo: { ipHash: hashValue(clientIp) },
       lastLoginAt: new Date(),
     };
-
-    if (sanitizedPhone) {
-      userProfileData.phone = sanitizedPhone;
+    if (phone?.trim()) {
+      profileFields.phone = sanitizeInput(phone.trim());
     }
 
-    // Add location info if geolocation is provided
-    if (geolocation) {
-      userProfileData.locationInfo = {
-        country: geolocation.country,
-        countryCode: geolocation.countryCode,
-        region: geolocation.region,
-        city: geolocation.city,
-        ipHash: ipHash,
-      };
-    } else {
-      // Try to get geolocation from IP if not provided
-      try {
-        const geoResponse = await fetch(`http://ip-api.com/json/${clientIP}?fields=status,country,countryCode,region,city`);
-        const geoData = await geoResponse.json();
-        if (geoData.status === 'success') {
-          userProfileData.locationInfo = {
-            country: geoData.country,
-            countryCode: geoData.countryCode,
-            region: geoData.region,
-            city: geoData.city,
-            ipHash: ipHash,
-          };
-        }
-      } catch (error) {
-        console.error('Error fetching geolocation:', error);
-        // Continue without location info
-      }
-    }
-
+    const users = new UserRepository(db);
+    const existingUser = await users.findByEmail(sanitizedEmail);
     let userId: string;
-
     if (existingUser) {
-      // Update existing user
+      if (existingUser.data()?.role !== 'patient') {
+        return NextResponse.json(
+          { success: false, error: 'This email belongs to a non-patient account' },
+          { status: 409 }
+        );
+      }
       userId = existingUser.id;
-      userProfileData.registeredAt = existingUser.data().registeredAt || new Date();
-
-      await userRepo.update(userId, userProfileData);
-      console.log('Updated existing user profile:', userId);
+      await users.update(userId, profileFields);
     } else {
-      // Create new user
-      userProfileData.registeredAt = new Date();
-
-      userId = await userRepo.create(userProfileData);
-      console.log('Created new user profile:', userId);
+      userId = await users.create({
+        ...profileFields,
+        role: 'patient',
+        registeredAt: new Date(),
+      });
     }
 
-    const response: RegisterUserResponse = {
-      success: true,
-      userId,
-    };
-
+    const response: RegisterUserResponse = { success: true, userId };
     return NextResponse.json(response);
-
   } catch (error) {
-    console.error('Error registering user:', error);
+    console.error('Error registering invited patient:', error);
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

@@ -1,27 +1,24 @@
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirebaseAdmin, getFirebaseAdminAuth } from '@/lib/firebase-admin';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { FirestoreSummaryProjectionService } from '@/lib/services/history-summary';
+import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
+import { serviceResultToResponse } from '@/lib/services/shared/http';
 
 async function handleGET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, error: 'Authorization token required' }, { status: 401 });
+    const auth = await authorizeBearerRequest(req, 'consultation:read-own');
+    if (!auth.ok) {
+      return serviceResultToResponse(auth);
     }
-
-    const idToken = authHeader.slice(7);
-    const adminAuth = getFirebaseAdminAuth();
-    if (!adminAuth) {
+    if (auth.data.role !== 'doctor' && auth.data.role !== 'admin') {
       return NextResponse.json(
-        { success: false, error: 'Firebase Admin auth not initialized' },
-        { status: 500 }
+        { success: false, error: 'Doctor role required' },
+        { status: 403 }
       );
     }
-
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
-    const doctorUserId = decodedToken.uid;
+    const doctorUserId = auth.data.userId;
 
     const db = getFirebaseAdmin();
     if (!db) {

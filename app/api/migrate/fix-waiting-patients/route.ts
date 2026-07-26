@@ -3,6 +3,8 @@ import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
 import { WaitingPatientRepository } from '../../../../lib/repositories/waiting-patient-repository';
+import { authorizeAdminSecret } from '@/lib/services/shared/admin-secret-auth';
+import { serviceResultToResponse } from '@/lib/services/shared/http';
 
 /**
  * Migration endpoint to fix waiting patient documents with incorrect doctorUserId
@@ -20,6 +22,11 @@ import { WaitingPatientRepository } from '../../../../lib/repositories/waiting-p
  */
 async function handlePOST(req: NextRequest) {
   try {
+    const authorization = authorizeAdminSecret(req);
+    if (!authorization.ok) {
+      return serviceResultToResponse(authorization);
+    }
+
     const { searchParams } = new URL(req.url);
     const dryRun = searchParams.get('dryRun') === 'true';
     const limitParam = searchParams.get('limit');

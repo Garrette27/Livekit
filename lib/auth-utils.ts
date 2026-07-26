@@ -2,13 +2,14 @@ import { User } from 'firebase/auth';
 import { db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { UserProfile } from './types';
+import type { AppRole } from './auth/access-policy';
 
 /**
  * Get user role from Firestore user profile
  * @param user Firebase Auth user object
- * @returns Promise resolving to 'doctor' | 'patient' | null
+ * @returns the profile's recognized application role, or null
  */
-export async function getUserRole(user: User | null): Promise<'doctor' | 'patient' | null> {
+export async function getUserRole(user: User | null): Promise<AppRole | null> {
   if (!user || !db) return null;
 
   try {

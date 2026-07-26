@@ -4,17 +4,18 @@ import { useState, useEffect } from 'react';
 import { 
   RegisterUserRequest, 
   RegisterUserResponse,
-  DeviceFingerprint,
-  GeolocationData
+  DeviceFingerprint
 } from '@/lib/types';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 interface PatientRegistrationProps {
+  invitationToken: string;
   invitationEmail: string;
   onRegistrationComplete: (email: string) => void;
 }
 
 export default function PatientRegistration({ 
+  invitationToken,
   invitationEmail, 
   onRegistrationComplete 
 }: PatientRegistrationProps) {
@@ -25,7 +26,6 @@ export default function PatientRegistration({
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deviceFingerprint, setDeviceFingerprint] = useState<DeviceFingerprint | null>(null);
-  const [geolocation, setGeolocation] = useState<GeolocationData | null>(null);
 
   // Generate device fingerprint on mount
   useEffect(() => {
@@ -42,26 +42,6 @@ export default function PatientRegistration({
       };
       setDeviceFingerprint(fingerprint);
 
-      // Try to get geolocation from IP
-      fetch('http://ip-api.com/json?fields=status,country,countryCode,region,city,timezone,isp')
-        .then(res => res.json())
-        .then(data => {
-          if (data.status === 'success') {
-            setGeolocation({
-              ip: data.query || 'unknown',
-              country: data.country,
-              countryCode: data.countryCode,
-              region: data.region,
-              city: data.city,
-              timezone: data.timezone,
-              isp: data.isp,
-            });
-          }
-        })
-        .catch(err => {
-          console.error('Error fetching geolocation:', err);
-          // Continue without geolocation
-        });
     }
   }, []);
 
@@ -86,11 +66,11 @@ export default function PatientRegistration({
 
     try {
       const request: RegisterUserRequest = {
+        invitationToken,
         email: email.trim(),
         phone: phone.trim() || undefined,
         consentGiven: true,
         deviceFingerprint,
-        geolocation: geolocation || undefined,
       };
 
       const response = await fetch('/api/user/register', {
@@ -295,7 +275,9 @@ export default function PatientRegistration({
                   color: '#4b5563',
                   lineHeight: '1.5'
                 }}>
-                  I consent to the system storing my device ID, location, and browser information for security verification purposes. This information will be used to verify my identity when accessing consultation links and will be stored securely in accordance with privacy regulations.
+                  I consent to the system storing a protected device fingerprint and browser
+                  information for invitation security. The complete signed invitation is required
+                  to submit this registration.
                 </p>
               </div>
             </label>

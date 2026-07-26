@@ -26,6 +26,45 @@ export function verifyInvitationToken(token: string): InvitationToken {
   return jwt.verify(token, getJwtSecret()) as InvitationToken;
 }
 
+export interface VerifiedLiveKitRoomToken {
+  identity: string;
+  participantName?: string;
+  roomName: string;
+  issuedAt?: number;
+}
+
+/**
+ * Verifies the same signed room credential used by LiveKit and exposes only
+ * the participant fields needed by first-party room APIs.
+ */
+export function verifyLiveKitRoomToken(token: string): VerifiedLiveKitRoomToken {
+  const issuer = getLiveKitIssuer();
+  const payload = jwt.verify(token, getJwtSecret(), {
+    algorithms: ['HS256'],
+    ...(issuer ? { issuer } : {}),
+  }) as jwt.JwtPayload & {
+    name?: string;
+    video?: { roomJoin?: boolean; room?: string };
+  };
+
+  if (
+    typeof payload.sub !== 'string'
+    || !payload.sub.trim()
+    || payload.video?.roomJoin !== true
+    || typeof payload.video.room !== 'string'
+    || !payload.video.room.trim()
+  ) {
+    throw new Error('Invalid LiveKit room token');
+  }
+
+  return {
+    identity: payload.sub,
+    participantName: typeof payload.name === 'string' ? payload.name : undefined,
+    roomName: payload.video.room,
+    issuedAt: payload.iat,
+  };
+}
+
 interface LiveKitTokenOptions {
   subject: string;
   roomName: string;

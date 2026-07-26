@@ -1,6 +1,8 @@
 export type ConsultationEventAction = 'join' | 'leave';
 
 export interface ConsultationEventInput {
+  /** Signed LiveKit credential proving this participant belongs to the room. */
+  accessToken: string;
   roomName: string;
   action: ConsultationEventAction;
   patientName: string;
@@ -20,6 +22,7 @@ export interface TrackConsultationEventResponse {
 }
 
 interface TrackConsultationRequestBody {
+  accessToken: string;
   roomName: string;
   action: ConsultationEventAction;
   patientName: string;
@@ -39,6 +42,7 @@ function normalizeUserId(userId?: string | null): string {
 
 function buildBody(input: ConsultationEventInput): TrackConsultationRequestBody {
   return {
+    accessToken: input.accessToken,
     roomName: input.roomName,
     action: input.action,
     patientName: input.patientName,

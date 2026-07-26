@@ -1,11 +1,12 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
 import Link from 'next/link';
 import { useAuthSession } from '@/hooks/useAuthSession';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
 import { getDoctorHistoryRoute } from '@/lib/routes/doctor-routes';
+import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
+import { compactInvitationUrl } from '@/lib/invitations/invitation-link-display';
 
 interface CreateRoomClientProps {
   room: string;
@@ -13,7 +14,7 @@ interface CreateRoomClientProps {
 
 export default function CreateRoomClient({ room }: CreateRoomClientProps) {
   const { showToast } = useToast();
-  const { user, isLoading: authLoading } = useAuthSession();
+  const { user, isAuthorized, isLoading: authLoading } = useAuthSession({ requiredRole: 'doctor' });
   const [shareUrl, setShareUrl] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +22,7 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
 
   useEffect(() => {
     // Check if Firebase is initialized
-    if (auth && db) {
+    if (auth) {
       setIsFirebaseReady(true);
     } else {
       console.warn('Firebase not initialized');
@@ -34,65 +35,55 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
       return;
     }
 
-    if (!db) {
-      setError('Firebase not initialized. Please refresh the page.');
-      return;
-    }
-
     try {
       setIsCreating(true);
       setError(null);
-      
-      // Store room creation with user ID
-      const roomRef = doc(db, 'rooms', room);
-      await setDoc(roomRef, {
-        roomName: room,
-        createdBy: user?.uid || 'anonymous',
-        createdAt: new Date(),
-        status: 'active',
-        metadata: {
-          createdBy: user?.uid || 'anonymous',
-          userId: user?.uid || 'anonymous',
-          userEmail: user?.email,
-          userName: user?.displayName
-        }
-      });
 
-      // Generate share URL
-      const shareUrl = `${window.location.origin}/room/${room}/patient`;
-      setShareUrl(shareUrl);
-      
-      console.log('Generated share URL:', shareUrl);
-      
-      // Copy to clipboard
+      const response = await authenticatedFetch('/api/invite/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomName: room,
+          expiresInHours: 24,
+          waitingRoomEnabled: true,
+          maxPatients: 10,
+          maxUses: 999999,
+          doctorName: user?.displayName || undefined,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success || !result.inviteUrl) {
+        throw new Error(result.error || 'Could not create a secure invitation');
+      }
+      setShareUrl(result.inviteUrl);
+
       try {
-        await navigator.clipboard.writeText(shareUrl);
+        await navigator.clipboard.writeText(result.inviteUrl);
         showToast({
           kind: 'success',
-          title: 'Room created',
-          message: 'Patient link copied to clipboard.',
+          title: 'Invitation created',
+          message: 'Secure patient invitation copied to clipboard.',
         });
       } catch {
         showToast({
           kind: 'info',
-          title: 'Room created',
-          message: 'Patient link is ready below. Copy it manually if needed.',
+          title: 'Invitation created',
+          message: 'Use the Copy Link button to share the secure invitation.',
         });
       }
-      
     } catch (error) {
       console.error('Error creating room:', error);
-      setError('Error creating room. Please try again.');
+      setError(error instanceof Error ? error.message : 'Error creating secure invitation');
     } finally {
       setIsCreating(false);
     }
-  }, [db, room, showToast, user?.displayName, user?.email, user?.uid]);
+  }, [room, showToast, user?.displayName]);
 
   useEffect(() => {
-    if (user && room && db) {
+    if (user && isAuthorized && room) {
       void createRoom();
     }
-  }, [createRoom, db, room, user]);
+  }, [createRoom, isAuthorized, room, user]);
 
   // Loading state while Firebase initializes
   if (!isFirebaseReady || authLoading) {
@@ -108,12 +99,14 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
   }
 
   // Signed-out view
-  if (!user) {
+  if (!user || !isAuthorized) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
         <div style={{ textAlign: 'center', maxWidth: '28rem' }}>
           <h1 style={{ fontSize: '2.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>Telehealth Console</h1>
-          <p style={{ fontSize: '1.25rem', color: '#4B5563', marginBottom: '2rem' }}>Please sign in to create a room</p>
+          <p style={{ fontSize: '1.25rem', color: '#4B5563', marginBottom: '2rem' }}>
+            Please sign in with a provisioned doctor account to create a room
+          </p>
           <button
             onClick={() => {
               // This will be handled by the main page login
@@ -143,13 +136,13 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
           <h1 style={{ fontSize: '2.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>
-            Room Created Successfully! 🎉
+            Secure Invitation Created
           </h1>
           <p style={{ fontSize: '1.125rem', color: '#6B7280', marginBottom: '0.5rem' }}>
             Room: <strong>{room}</strong>
           </p>
           <p style={{ fontSize: '1rem', color: '#9CA3AF' }}>
-            Share the link below with your patient
+            Share the signed invitation below with your patient
           </p>
         </div>
 
@@ -164,7 +157,7 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
             textAlign: 'center'
           }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#374151', marginBottom: '1rem' }}>
-              📋 Patient Link
+              Patient Invitation
             </h2>
             <div style={{
               backgroundColor: 'white',
@@ -172,12 +165,11 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
               borderRadius: '0.5rem',
               padding: '1rem',
               marginBottom: '1rem',
-              wordBreak: 'break-all',
               fontFamily: 'monospace',
               fontSize: '0.875rem',
               color: '#374151'
             }}>
-              {shareUrl}
+              {compactInvitationUrl(shareUrl)}
             </div>
             <button
               onClick={async () => {
@@ -186,7 +178,7 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
                   showToast({
                     kind: 'success',
                     title: 'Link copied',
-                    message: 'Patient link copied to clipboard.',
+                    message: 'Secure invitation copied to clipboard.',
                   });
                 } catch {
                   showToast({
@@ -210,7 +202,7 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
             >
               📋 Copy Link
             </button>
-            <Link href={`/room/${room}`} style={{
+            <Link href={`/room/${room}/doctor`} style={{
               backgroundColor: '#2563EB',
               color: 'white',
               padding: '0.75rem 1.5rem',

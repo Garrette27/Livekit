@@ -1,11 +1,12 @@
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirebaseAdmin, getFirebaseAdminAuth } from '@/lib/firebase-admin';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { signInvitationToken } from '@/lib/invitations/token-utils';
 import { toDate } from '@/lib/invitations/utils';
 import type { InvitationToken } from '@/lib/types';
 import { WaitingPatientRepository } from '@/lib/repositories/waiting-patient-repository';
 import { InvitationRepository } from '@/lib/repositories/invitation-repository';
+import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
 
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -89,25 +90,19 @@ function toInvitationSnapshot(
 
 async function handleGET(req: NextRequest) {
   try {
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const authorization = await authorizeBearerRequest(req, 'room:join-patient');
+    if (!authorization.ok) {
       return NextResponse.json(
-        { success: false, error: 'Authorization token required' },
-        { status: 401, headers: NO_STORE_HEADERS }
+        {
+          success: false,
+          error: authorization.error.message,
+          code: authorization.error.code,
+        },
+        { status: authorization.error.status, headers: NO_STORE_HEADERS }
       );
     }
 
-    const idToken = authHeader.slice(7);
-    const adminAuth = getFirebaseAdminAuth();
-    if (!adminAuth) {
-      return NextResponse.json(
-        { success: false, error: 'Firebase Admin auth not initialized' },
-        { status: 500, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
-    const patientEmail = (decodedToken.email || '').trim().toLowerCase();
+    const patientEmail = (authorization.data.email || '').trim().toLowerCase();
     if (!patientEmail) {
       return NextResponse.json(
         { success: true, pendingWaitingRoom: null },

@@ -1,14 +1,15 @@
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
-import { authenticateBearerToken } from '@/lib/services/shared/request-auth';
+import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
 import { serviceResultToResponse } from '@/lib/services/shared/http';
+import { DoctorRoomAccess } from '@/lib/services/room-access';
 import { UserRepository } from '../../../../lib/repositories/user-repository';
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
 import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import { validateEmail, validateRoomName, sanitizeInput } from '../../../../lib/validation';
 import { signInvitationToken } from '../../../../lib/invitations/token-utils';
-import { buildInviteUrl, getInviteBaseUrl } from '../../../../lib/invitations/utils';
+import { buildInviteUrl } from '../../../../lib/invitations/utils';
 import { EVENT_DOMAINS, EVENT_SCHEMA_VERSION } from '../../../../lib/events/event-schema';
 import { 
   CreateInvitationRequest, 
@@ -26,7 +27,7 @@ async function handlePOST(req: NextRequest) {
 
     // Invitations are doctor-issued credentials, so the doctor identity must
     // come from a verified Firebase token — never from the request body.
-    const auth = await authenticateBearerToken(req);
+    const auth = await authorizeBearerRequest(req, 'invitation:manage');
     if (!auth.ok) {
       return serviceResultToResponse(auth);
     }
@@ -44,7 +45,7 @@ async function handlePOST(req: NextRequest) {
       maxUses,
       doctorName,
     } = body;
-    const doctorEmail = auth.data.email || body.doctorEmail;
+    const doctorEmail = auth.data.email;
 
     // Input validation - only roomName is required
     if (!roomName) {
@@ -98,6 +99,18 @@ async function handlePOST(req: NextRequest) {
       );
     }
 
+    const roomAccess = await new DoctorRoomAccess(db).claimInvitationRoom({
+      roomName: sanitizedRoomName,
+      doctor: {
+        userId: doctorUserId,
+        email: doctorEmail,
+        name: doctorName,
+      },
+    });
+    if (!roomAccess.ok) {
+      return serviceResultToResponse(roomAccess);
+    }
+
     // Check if email already has an account (optional - for informational purposes)
     // Only check if email is provided
     let existingAccount = null;
@@ -110,7 +123,6 @@ async function handlePOST(req: NextRequest) {
             uid: existingUser.id,
             userData: existingUser.data()
           };
-          console.log('Email already has an account:', existingAccount);
         }
       } catch (error) {
         console.log('Could not check for existing account:', error);
@@ -123,14 +135,16 @@ async function handlePOST(req: NextRequest) {
 
     // Determine waiting room settings
     const isWaitingRoomEnabled = waitingRoomEnabled === true;
-    const finalMaxUses = maxUses !== undefined ? maxUses : (isWaitingRoomEnabled ? 999999 : 1); // Unlimited uses if waiting room enabled
-    const finalMaxPatients = isWaitingRoomEnabled ? (maxPatients || 10) : 1;
-
-    console.log('Creating invitation with doctorUserId:', {
-      doctorUserId,
-      roomName: sanitizedRoomName,
-      waitingRoomEnabled: isWaitingRoomEnabled
-    });
+    const requestedMaxUses = Number(maxUses);
+    const requestedMaxPatients = Number(maxPatients);
+    const finalMaxUses = Number.isFinite(requestedMaxUses) && requestedMaxUses > 0
+      ? Math.min(999999, Math.floor(requestedMaxUses))
+      : isWaitingRoomEnabled ? 999999 : 1;
+    const finalMaxPatients = isWaitingRoomEnabled
+      ? Number.isFinite(requestedMaxPatients) && requestedMaxPatients > 0
+        ? Math.min(100, Math.floor(requestedMaxPatients))
+        : 10
+      : 1;
 
     // Create invitation document
     const invitation: any = {
@@ -140,11 +154,11 @@ async function handlePOST(req: NextRequest) {
       currentUses: 0, // Initialize current uses counter
       waitingRoomEnabled: isWaitingRoomEnabled,
       ...(isWaitingRoomEnabled && { maxPatients: finalMaxPatients }),
-      createdBy: doctorUserId, // Always use provided doctor user ID
+      createdBy: doctorUserId,
       createdAt: new Date() as any,
       status: 'active',
       metadata: {
-        createdBy: doctorUserId || 'system',
+        createdBy: doctorUserId,
         doctorName: doctorName || 'Dr. System',
         doctorEmail: doctorEmail || 'system@example.com',
         roomName: sanitizedRoomName,
@@ -201,16 +215,7 @@ async function handlePOST(req: NextRequest) {
     const inviteToken = signInvitationToken(tokenPayload);
 
     // Generate invite URL
-    const baseUrl = getInviteBaseUrl();
     const inviteUrl = buildInviteUrl(inviteToken);
-
-    // Debug logging for URL generation
-    console.log('Environment variables for URL generation:', {
-      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-      VERCEL_URL: process.env.VERCEL_URL,
-      baseUrl: baseUrl,
-      inviteUrl: inviteUrl
-    });
 
     const response: CreateInvitationResponse = {
       success: true,
@@ -226,7 +231,6 @@ async function handlePOST(req: NextRequest) {
     console.log('Invitation created successfully:', {
       invitationId,
       roomName: sanitizedRoomName,
-      email: sanitizedEmail || 'none',
       allowlistCount: sanitizedEmailAllowlist.length,
       expiresAt: expiresAt.toISOString(),
     });

@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { FirestoreInvitationAccessCore, toInvitationAccessError } from '@/lib/services/invitation-access';
 import type { WaitingPatient } from '@/lib/types';
+import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
+import { serviceResultToResponse } from '@/lib/services/shared/http';
 
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -29,10 +31,15 @@ function parseActiveOnly(rawActiveOnly: string | null): boolean {
 
 async function handleGET(req: NextRequest) {
   try {
+    const auth = await authorizeBearerRequest(req, 'waiting-room:manage');
+    if (!auth.ok) {
+      return serviceResultToResponse(auth);
+    }
+
     const { searchParams } = new URL(req.url);
     const roomName = searchParams.get('roomName') || undefined;
     const invitationId = searchParams.get('invitationId') || undefined;
-    const doctorUserId = searchParams.get('doctorUserId') || undefined;
+    const doctorUserId = auth.data.userId;
     const statuses = parseStatuses(searchParams.get('statuses'));
     const activeOnly = parseActiveOnly(searchParams.get('activeOnly'));
 

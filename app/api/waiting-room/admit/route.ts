@@ -3,12 +3,19 @@ import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { FirestoreInvitationAccessCore, toInvitationAccessError } from '@/lib/services/invitation-access';
 import { AdmitPatientRequest, AdmitPatientResponse } from '../../../../lib/types';
+import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
+import { serviceResultToResponse } from '@/lib/services/shared/http';
 
 async function handlePOST(req: NextRequest) {
   try {
+    const auth = await authorizeBearerRequest(req, 'waiting-room:manage');
+    if (!auth.ok) {
+      return serviceResultToResponse(auth);
+    }
+
     const body: AdmitPatientRequest = await req.json();
     const { waitingPatientId, roomName } = body;
-    const doctorUserId = (body as { doctorUserId?: string }).doctorUserId;
+    const doctorUserId = auth.data.userId;
 
     if (!waitingPatientId || !roomName) {
       return NextResponse.json(

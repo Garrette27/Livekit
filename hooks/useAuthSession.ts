@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getUserRole } from '@/lib/auth-utils';
+import type { AppRole } from '@/lib/auth/access-policy';
 
-type UserRole = 'doctor' | 'patient' | null;
+type UserRole = AppRole | null;
 
 interface UseAuthSessionOptions {
   requiredRole?: Exclude<UserRole, null>;
