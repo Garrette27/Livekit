@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { signInWithPopup, signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { auth, provider } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { db } from "@/lib/firebase";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { checkRoleConflictByEmail } from "@/lib/auth/role-conflict";
@@ -11,12 +12,11 @@ import { checkRoleConflictByEmail } from "@/lib/auth/role-conflict";
 export const dynamic = 'force-dynamic';
 
 export default function DoctorLoginPage() {
-  const [isFirebaseReady, setIsFirebaseReady] = useState<boolean>(false);
+  const [firebaseStatus, setFirebaseStatus] = useState<'checking' | 'ready' | 'unavailable'>('checking');
   const [error, setError] = useState<string | null>(null);
   const [loginMethod, setLoginMethod] = useState<'google' | 'email'>('google');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
@@ -25,9 +25,10 @@ export default function DoctorLoginPage() {
 
   useEffect(() => {
     if (auth && provider) {
-      setIsFirebaseReady(true);
+      setFirebaseStatus('ready');
     } else {
       console.warn('Firebase not initialized');
+      setFirebaseStatus('unavailable');
     }
   }, []);
 
@@ -110,7 +111,9 @@ export default function DoctorLoginPage() {
       // Redirect to doctor invitations page
       router.push('/doctor/invitations');
     } catch (err: unknown) {
-      if (err instanceof Error) {
+      if ((err as { code?: string })?.code === 'permission-denied') {
+        setError('This doctor account has not been provisioned. Please contact the system administrator.');
+      } else if (err instanceof Error) {
         console.error('Login error:', err.message);
         setError('Failed to sign in. Please try again.');
       } else {
@@ -133,126 +136,14 @@ export default function DoctorLoginPage() {
     }
 
     try {
-      if (isSignUp) {
-        // Create new Firebase Auth account first
-        let userCredential;
-        try {
-          userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        } catch (authError: any) {
-          if (authError.code === 'auth/email-already-in-use') {
-            setError('This email is already registered. Please sign in instead.');
-            setIsSignUp(false);
-            setLoading(false);
-            return;
-          }
-          throw authError;
-        }
+      await signInWithEmailAndPassword(auth, email, password);
 
-        const user = userCredential.user;
-
-        // Now that user is authenticated, check if user document exists
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            if (userData.role !== 'doctor') {
-              setError('This email is registered as a patient. Please use patient login.');
-              // Sign out and clean up
-              await auth.signOut();
-              setLoading(false);
-              return;
-            }
-            // User document already exists, just redirect
-            router.push('/doctor/invitations');
-            return;
-          }
-
-          const conflictResult = await checkRoleConflictByEmail({
-            db,
-            email: normalizedEmail,
-            expectedRole: 'doctor',
-            currentUserId: user.uid,
-          });
-
-          if (conflictResult.hasConflict) {
-            setError('This email is already registered as a patient account. Please use patient login.');
-            await auth.signOut();
-            setLoading(false);
-            return;
-          }
-
-          // Create doctor profile - user is now authenticated so Firestore rules allow this
-          await setDoc(doc(db, 'users', user.uid), {
-            email: normalizedEmail,
-            role: 'doctor',
-            doctorName: 'Dr. ' + (email.split('@')[0] || 'User'),
-            doctorEmail: normalizedEmail,
-            registeredAt: serverTimestamp(),
-            lastLoginAt: serverTimestamp(),
-          });
-
-          console.log('Doctor profile created successfully');
-          router.push('/doctor/invitations');
-        } catch (firestoreError: any) {
-          console.error('Firestore error during sign-up:', {
-            code: firestoreError.code,
-            message: firestoreError.message,
-            uid: user.uid,
-            email: email
-          });
-          
-          // Sign out on Firestore error
-          try {
-            await auth.signOut();
-          } catch (signOutError) {
-            console.error('Error signing out after Firestore failure:', signOutError);
-          }
-          
-          if (firestoreError.code === 'permission-denied') {
-            setError('Permission denied. Please contact support or try signing in with Google.');
-          } else {
-            setError('Failed to create account. Please try again or contact support.');
-          }
-          setLoading(false);
-          return;
-        }
-      } else {
-        // Sign in
-        await signInWithEmailAndPassword(auth, email, password);
-        
-        // Check user role
-        const user = auth.currentUser;
-        if (user && db) {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            if (userData.role === 'doctor') {
-              const conflictResult = await checkRoleConflictByEmail({
-                db,
-                email: normalizedEmail,
-                expectedRole: 'doctor',
-                currentUserId: user.uid,
-              });
-
-              if (conflictResult.hasConflict) {
-                setError('This email is linked to both patient and doctor profiles. Please contact support to resolve account roles.');
-                await auth.signOut();
-                return;
-              }
-
-              // Update last login
-              await setDoc(doc(db, 'users', user.uid), { 
-                lastLoginAt: serverTimestamp() 
-              }, { merge: true });
-              router.push('/doctor/invitations');
-            } else {
-              setError('This account is for patients. Please use patient login.');
-              if (auth) {
-                await auth.signOut();
-              }
-            }
-          } else {
+      const user = auth.currentUser;
+      if (user) {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.role === 'doctor') {
             const conflictResult = await checkRoleConflictByEmail({
               db,
               email: normalizedEmail,
@@ -261,37 +152,56 @@ export default function DoctorLoginPage() {
             });
 
             if (conflictResult.hasConflict) {
-              setError('This account is linked to a patient profile. Please use patient login.');
+              setError('This email is linked to both patient and doctor profiles. Please contact support to resolve account roles.');
               await auth.signOut();
               return;
             }
 
-            await setDoc(
-              doc(db, 'users', user.uid),
-              {
-                email: normalizedEmail,
-                role: 'doctor',
-                doctorName: 'Dr. ' + (normalizedEmail.split('@')[0] || 'User'),
-                doctorEmail: normalizedEmail,
-                registeredAt: serverTimestamp(),
-                lastLoginAt: serverTimestamp(),
-              },
-              { merge: true }
-            );
+            await setDoc(doc(db, 'users', user.uid), {
+              lastLoginAt: serverTimestamp(),
+            }, { merge: true });
             router.push('/doctor/invitations');
+          } else {
+            setError('This account is for patients. Please use patient login.');
+            await auth.signOut();
           }
+        } else {
+          const conflictResult = await checkRoleConflictByEmail({
+            db,
+            email: normalizedEmail,
+            expectedRole: 'doctor',
+            currentUserId: user.uid,
+          });
+
+          if (conflictResult.hasConflict) {
+            setError('This account is linked to a patient profile. Please use patient login.');
+            await auth.signOut();
+            return;
+          }
+
+          // Only a pre-provisioned doctor custom claim can create this profile;
+          // Firestore rules reject ordinary self-registration.
+          await setDoc(
+            doc(db, 'users', user.uid),
+            {
+              email: normalizedEmail,
+              role: 'doctor',
+              doctorName: 'Dr. ' + (normalizedEmail.split('@')[0] || 'User'),
+              doctorEmail: normalizedEmail,
+              registeredAt: serverTimestamp(),
+              lastLoginAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+          router.push('/doctor/invitations');
         }
       }
     } catch (err: any) {
       console.error('Auth error:', err);
       if (err.code === 'auth/user-not-found') {
-        setError('No account found with this email. Please sign up.');
-        setIsSignUp(true);
+        setError('No provisioned doctor account was found. Please contact the system administrator.');
       } else if (err.code === 'auth/wrong-password') {
         setError('Incorrect password. Please try again or reset your password.');
-      } else if (err.code === 'auth/email-already-in-use') {
-        setError('This email is already registered. Please sign in.');
-        setIsSignUp(false);
       } else if (err.code === 'auth/operation-not-allowed') {
         setError('Email/password authentication is not enabled. Please contact support or use Google sign in.');
       } else {
@@ -370,13 +280,21 @@ export default function DoctorLoginPage() {
     }
   };
 
-  if (!isFirebaseReady) {
+  if (firebaseStatus !== 'ready') {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded shadow-md text-center">
           <h1 className="text-2xl font-bold mb-4">Doctor Login</h1>
-          <p className="text-gray-600 mb-4">Loading...</p>
-          <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+          <p className="text-gray-600 mb-4">
+            {firebaseStatus === 'checking'
+              ? 'Loading...'
+              : 'Authentication is not configured for this deployment.'}
+          </p>
+          {firebaseStatus === 'checking' ? (
+            <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+          ) : (
+            <Link className="text-blue-600 font-medium" href="/">Return home</Link>
+          )}
         </div>
       </div>
     );
@@ -689,7 +607,7 @@ export default function DoctorLoginPage() {
                   marginBottom: '1rem'
                 }}
               >
-                {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
+                {loading ? 'Please wait...' : 'Sign In'}
               </button>
             )}
           </form>
@@ -701,23 +619,10 @@ export default function DoctorLoginPage() {
             paddingTop: '1rem',
             borderTop: '1px solid #e5e7eb'
           }}>
-            <button
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setError(null);
-                setShowForgotPassword(false);
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#2563eb',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                textDecoration: 'underline'
-              }}
-            >
-              {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-            </button>
+            <p style={{ margin: 0, color: '#6b7280', fontSize: '0.8rem', lineHeight: 1.5 }}>
+              Doctor accounts are provisioned by an administrator. Contact your thesis system
+              administrator if you need access.
+            </p>
           </div>
         )}
 
@@ -743,7 +648,7 @@ export default function DoctorLoginPage() {
           }}>
             Are you a patient?
           </p>
-          <a
+          <Link
             href="/patient/login"
             style={{
               color: '#2563eb',
@@ -759,7 +664,7 @@ export default function DoctorLoginPage() {
             }}
           >
             Go to Patient Login →
-          </a>
+          </Link>
         </div>
       </div>
     </div>

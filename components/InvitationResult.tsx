@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Invitation } from '@/lib/types';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
+import { compactInvitationUrl } from '@/lib/invitations/invitation-link-display';
 
 interface InvitationResultProps {
   invitation: Invitation;
@@ -150,10 +151,9 @@ export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: 
             margin: 0, 
             fontSize: '0.875rem', 
             color: '#1e40af', 
-            wordBreak: 'break-all',
             flex: 1
           }}>
-            {inviteUrl}
+            {compactInvitationUrl(inviteUrl)}
           </p>
           <button
             onClick={copyInvitationLink}

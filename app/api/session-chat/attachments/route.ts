@@ -2,6 +2,8 @@ import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
+import { authorizeSessionParticipant } from '@/lib/services/shared/session-participant-auth';
+import { serviceResultToResponse } from '@/lib/services/shared/http';
 
 interface CreateAttachmentBody {
   consultationSessionId: string;
@@ -21,8 +23,6 @@ async function handlePOST(req: NextRequest) {
     const body = (await req.json()) as CreateAttachmentBody;
     const {
       consultationSessionId,
-      uploaderId,
-      uploaderName,
       name,
       mimeType,
       size,
@@ -32,7 +32,7 @@ async function handlePOST(req: NextRequest) {
       extractionStatus = extractedText ? 'ready' : 'pending',
     } = body;
 
-    if (!consultationSessionId || !uploaderId || !uploaderName || !name || !mimeType || !size) {
+    if (!consultationSessionId || !name || !mimeType || !Number.isFinite(size) || size <= 0) {
       return NextResponse.json(
         { success: false, error: 'Missing required attachment fields' },
         { status: 400 }
@@ -47,10 +47,15 @@ async function handlePOST(req: NextRequest) {
       );
     }
 
+    const participant = await authorizeSessionParticipant(req, db, consultationSessionId);
+    if (!participant.ok) {
+      return serviceResultToResponse(participant);
+    }
+
     const attachmentId = await new AttachmentRepository(db).create(consultationSessionId, {
       consultationSessionId,
-      uploaderId,
-      uploaderName,
+      uploaderId: participant.data.identity,
+      uploaderName: participant.data.participantName,
       name,
       mimeType,
       size,

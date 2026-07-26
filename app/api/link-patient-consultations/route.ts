@@ -5,6 +5,8 @@ import { CallSummaryRepository } from '@/lib/repositories/call-summary-repositor
 import { ConsultationRepository } from '@/lib/repositories/consultation-repository';
 import { ConsultationSessionRepository } from '@/lib/repositories/consultation-session-repository';
 import { InvitationRepository } from '@/lib/repositories/invitation-repository';
+import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
+import { serviceResultToResponse } from '@/lib/services/shared/http';
 
 interface LinkConsultationsRequest {
   userId?: string;
@@ -53,14 +55,19 @@ function mergeVisibleUsers(existingVisibleToUsers: unknown, doctorUserId: unknow
 
 async function handlePOST(req: Request) {
   try {
+    const auth = await authorizeBearerRequest(req, 'consultation:link-own');
+    if (!auth.ok) {
+      return serviceResultToResponse(auth);
+    }
+
     const body = (await req.json()) as LinkConsultationsRequest;
-    const userId = (body.userId || '').trim();
-    const userEmail = normalizeEmail(body.userEmail);
+    const userId = auth.data.userId;
+    const userEmail = normalizeEmail(auth.data.email);
     const pendingSessionIds = normalizeSessionIds(body.pendingSessionIds);
 
     if (!userId || !userEmail) {
       return NextResponse.json(
-        { success: false, error: 'userId and userEmail are required' },
+        { success: false, error: 'A verified account email is required' },
         { status: 400 }
       );
     }

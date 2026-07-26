@@ -1,4 +1,5 @@
-import { Firestore, collection, getDocs, query, where } from 'firebase/firestore';
+import type { Firestore } from 'firebase/firestore';
+import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 
 export type AccountRole = 'doctor' | 'patient';
 
@@ -24,40 +25,30 @@ function oppositeRole(role: AccountRole): AccountRole {
 }
 
 /**
- * Verify that an email is not already used by a profile in the opposite role.
- * This keeps role ownership deterministic per email across doctor/patient flows.
+ * Verifies role uniqueness without granting browsers collection-wide access to
+ * user profiles. The server binds the check to the authenticated token email.
  */
 export async function checkRoleConflictByEmail({
-  db,
   email,
   expectedRole,
-  currentUserId,
 }: RoleConflictCheckInput): Promise<RoleConflictCheckResult> {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) {
     return { hasConflict: false };
   }
 
-  const conflictRole = oppositeRole(expectedRole);
-  const emailQuery = query(collection(db, 'users'), where('email', '==', normalizedEmail));
-  const snapshot = await getDocs(emailQuery);
-
-  const conflictingDoc = snapshot.docs.find((snapshotDoc) => {
-    if (currentUserId && snapshotDoc.id === currentUserId) {
-      return false;
-    }
-
-    const profile = snapshotDoc.data() as { role?: AccountRole };
-    return profile.role === conflictRole;
+  const response = await authenticatedFetch('/api/user/role-conflict', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: normalizedEmail, expectedRole }),
   });
-
-  if (!conflictingDoc) {
-    return { hasConflict: false };
+  const data = await response.json();
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || 'Could not verify account role');
   }
 
   return {
-    hasConflict: true,
-    conflictRole,
-    conflictUserId: conflictingDoc.id,
+    hasConflict: data.hasConflict === true,
+    conflictRole: data.hasConflict === true ? oppositeRole(expectedRole) : undefined,
   };
 }

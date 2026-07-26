@@ -6,6 +6,8 @@ import { buildInviteUrl, toDate } from '../../../../lib/invitations/utils';
 import { InvitationToken } from '../../../../lib/types';
 import { finalizeConsultationForRoom } from '../../../../lib/services/consultation-finalization';
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
+import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
+import { serviceResultToResponse } from '@/lib/services/shared/http';
 
 function isExpiredInvitation(invitation: any): boolean {
   const expiresAtDate = invitation?.expiresAt
@@ -15,10 +17,15 @@ function isExpiredInvitation(invitation: any): boolean {
   return expiresAtDate.getTime() > 0 && new Date() > expiresAtDate;
 }
 
-function pickLatestUsableInvitation(docs: any[]) {
+function pickLatestUsableInvitation(docs: any[], doctorUserId: string) {
   const usableInvitations = docs
     .map((doc) => ({ doc, data: doc.data?.() }))
-    .filter(({ data }) => (data?.status || 'active') === 'active' && !isExpiredInvitation(data))
+    .filter(
+      ({ data }) =>
+        data?.createdBy === doctorUserId
+        && (data?.status || 'active') === 'active'
+        && !isExpiredInvitation(data)
+    )
     .sort((a, b) => {
       const aDate = toDate(a.data?.createdAt, new Date(0)).getTime();
       const bDate = toDate(b.data?.createdAt, new Date(0)).getTime();
@@ -30,6 +37,11 @@ function pickLatestUsableInvitation(docs: any[]) {
 
 async function handleGET(req: NextRequest) {
   try {
+    const auth = await authorizeBearerRequest(req, 'invitation:manage');
+    if (!auth.ok) {
+      return serviceResultToResponse(auth);
+    }
+
     const { searchParams } = new URL(req.url);
     const roomName = searchParams.get('roomName');
     const invitationId = searchParams.get('invitationId');
@@ -64,7 +76,7 @@ async function handleGET(req: NextRequest) {
         );
       }
 
-      invitationDoc = pickLatestUsableInvitation(candidateDocs);
+      invitationDoc = pickLatestUsableInvitation(candidateDocs, auth.data.userId);
       if (!invitationDoc) {
         return NextResponse.json(
           { success: false, error: 'No active non-expired invitation found for this room' },
@@ -85,6 +97,13 @@ async function handleGET(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Invitation data not found' },
         { status: 404 }
+      );
+    }
+
+    if (invitation.createdBy !== auth.data.userId) {
+      return NextResponse.json(
+        { success: false, error: 'You can only access invitations created by your account' },
+        { status: 403 }
       );
     }
 

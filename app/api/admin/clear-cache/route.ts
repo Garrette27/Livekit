@@ -2,6 +2,8 @@ import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestore, collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
+import { authorizeAdminSecret } from '@/lib/services/shared/admin-secret-auth';
+import { serviceResultToResponse } from '@/lib/services/shared/http';
 
 // Firebase config should be in environment variables
 const firebaseConfig = {
@@ -15,9 +17,9 @@ const db = getFirestore(app);
 async function handlePOST(request: NextRequest) {
   try {
     // Security check - only allow admin users
-    const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.ADMIN_SECRET_KEY}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authorization = authorizeAdminSecret(request);
+    if (!authorization.ok) {
+      return serviceResultToResponse(authorization);
     }
 
     console.log('Clearing Firestore cache...');

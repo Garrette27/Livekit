@@ -50,6 +50,7 @@ function WaitingRoomView({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            accessToken: validationResult.liveKitToken,
             invitationId: validationResult.invitationId,
             patientEmail: validationResult.registeredEmail || invitationEmail || undefined,
             waitingPatientId: waitingPatientIdRef.current || undefined,
@@ -228,7 +229,11 @@ function InvitePageContent() {
   }, [authLoading, deviceFingerprint, token, user?.email]);
 
   useEffect(() => {
-    if (!validationResult?.roomName || validationResult.waitingRoomEnabled) {
+    if (
+      !validationResult?.roomName
+      || !validationResult.liveKitToken
+      || validationResult.waitingRoomEnabled
+    ) {
       trackedJoinKeyRef.current = null;
       updateActiveConsultationSessionId(null);
       return;
@@ -242,6 +247,7 @@ function InvitePageContent() {
     updateActiveConsultationSessionId(null);
 
     void trackConsultationEvent({
+      accessToken: validationResult.liveKitToken,
       roomName: validationResult.roomName,
       action: 'join',
       patientName: 'Patient',
@@ -291,14 +297,17 @@ function InvitePageContent() {
     return '/patient/login';
   }, [isAuthenticated, user?.uid]);
 
-  const markWaitingEntryLeftWithBeacon = useCallback((waitingPatientId: string): boolean => {
+  const markWaitingEntryLeftWithBeacon = useCallback((
+    waitingPatientId: string,
+    accessToken: string
+  ): boolean => {
     if (typeof navigator === 'undefined' || typeof navigator.sendBeacon !== 'function') {
       return false;
     }
 
     return navigator.sendBeacon(
       '/api/waiting-room/mark-left',
-      JSON.stringify({ waitingPatientId })
+      JSON.stringify({ waitingPatientId, accessToken })
     );
   }, []);
 
@@ -318,13 +327,14 @@ function InvitePageContent() {
       hasProcessedExitRef.current = true;
       const currentValidation = validationResultRef.current;
       const waitingPatientId = currentValidation?.waitingPatientId;
-      if (waitingPatientId) {
-        const markedWithBeacon = markWaitingEntryLeftWithBeacon(waitingPatientId);
+      const accessToken = currentValidation?.liveKitToken;
+      if (waitingPatientId && accessToken) {
+        const markedWithBeacon = markWaitingEntryLeftWithBeacon(waitingPatientId, accessToken);
         if (!markedWithBeacon) {
           void fetch('/api/waiting-room/mark-left', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ waitingPatientId }),
+            body: JSON.stringify({ waitingPatientId, accessToken }),
             keepalive: true,
           }).catch((markLeftError) => {
             console.error('Error marking waiting entry as left:', markLeftError);
@@ -332,8 +342,13 @@ function InvitePageContent() {
         }
       }
 
-      if (currentValidation?.roomName && !currentValidation.waitingRoomEnabled) {
+      if (
+        currentValidation?.roomName
+        && currentValidation.liveKitToken
+        && !currentValidation.waitingRoomEnabled
+      ) {
         const trackedWithBeacon = trackConsultationEventWithBeacon({
+          accessToken: currentValidation.liveKitToken,
           roomName: currentValidation.roomName,
           action: 'leave',
           patientName: 'Patient',
@@ -345,6 +360,7 @@ function InvitePageContent() {
         if (!trackedWithBeacon) {
           void trackConsultationEvent(
             {
+              accessToken: currentValidation.liveKitToken,
               roomName: currentValidation.roomName,
               action: 'leave',
               patientName: 'Patient',
@@ -419,6 +435,7 @@ function InvitePageContent() {
   if (requiresRegistration) {
     return (
       <PatientRegistration
+        invitationToken={token}
         invitationEmail={invitationEmail}
         onRegistrationComplete={async (registeredEmail: string) => {
           // After registration, re-validate the invitation

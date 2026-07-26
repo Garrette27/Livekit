@@ -4,6 +4,8 @@ import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { finalizeConsultationForRoom } from '../../../../lib/services/consultation-finalization';
 import { FirestoreInvitationAccessCore } from '@/lib/services/invitation-access';
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
+import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
+import { serviceResultToResponse } from '@/lib/services/shared/http';
 
 // Revocation can finalize the consultation and run AI summarization; give it
 // more than the 10s default.
@@ -11,6 +13,11 @@ export const maxDuration = 60;
 
 async function handlePOST(req: NextRequest) {
   try {
+    const auth = await authorizeBearerRequest(req, 'invitation:manage');
+    if (!auth.ok) {
+      return serviceResultToResponse(auth);
+    }
+
     const body = await req.json();
     const invitationId =
       typeof body.invitationId === 'string' ? body.invitationId.trim() : '';
@@ -44,6 +51,13 @@ async function handlePOST(req: NextRequest) {
       status?: string;
       createdBy?: string;
     };
+    if (invitation.createdBy !== auth.data.userId) {
+      return NextResponse.json(
+        { success: false, error: 'You can only revoke invitations created by your account' },
+        { status: 403 }
+      );
+    }
+
     const revokedAt = new Date();
 
     if (invitation.status !== 'revoked') {

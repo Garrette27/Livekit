@@ -11,13 +11,6 @@ declare global {
   }
 }
 
-interface TranscriptionEntry {
-  timestamp: string;
-  text: string;
-  confidence?: number;
-  isFinal?: boolean;
-}
-
 export function useTranscription(roomName: string) {
   const [transcription, setTranscription] = useState<string[]>([]);
   const [manualNotes, setManualNotes] = useState<string[]>([]);
@@ -29,6 +22,7 @@ export function useTranscription(roomName: string) {
   const recognitionRef = useRef<any>(null);
   const isInitializedRef = useRef<boolean>(false);
   const userInteractedRef = useRef<boolean>(false);
+  const storeTranscriptionEntryRef = useRef<(entries: string[]) => void>(() => undefined);
 
   // Initialize speech recognition
   const initializeSpeechRecognition = useCallback(() => {
@@ -72,7 +66,7 @@ export function useTranscription(roomName: string) {
             const newTranscription = [...prev, entry];
             
             // Store in Firestore immediately
-            storeTranscriptionEntry(newTranscription);
+            storeTranscriptionEntryRef.current(newTranscription);
             
             return newTranscription;
           });
@@ -163,7 +157,7 @@ export function useTranscription(roomName: string) {
     setManualNotes(prev => [...prev, entry]);
     setTranscription(prev => {
       const newTranscription = [...prev, entry];
-      storeTranscriptionEntry(newTranscription);
+      storeTranscriptionEntryRef.current(newTranscription);
       return newTranscription;
     });
   }, []);
@@ -190,6 +184,7 @@ export function useTranscription(roomName: string) {
       console.error('Error storing transcription:', error);
     }
   }, [roomName]);
+  storeTranscriptionEntryRef.current = storeTranscriptionEntry;
 
   // Clear transcription
   const clearTranscription = useCallback(() => {

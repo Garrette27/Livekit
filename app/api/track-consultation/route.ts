@@ -4,12 +4,14 @@ import { serviceResultToResponse } from '@/lib/services/shared/http';
 import { serviceError } from '@/lib/services/shared/service-result';
 import { FirestoreConsultationTrackingCore } from '@/lib/services/consultation-tracking';
 import type { ConsultationAction } from '@/lib/services/consultation-tracking';
+import { verifyLiveKitRoomToken } from '@/lib/invitations/token-utils';
 
 // Leave events can trigger finalization + AI summarization; give them more
 // than the 10s default.
 export const maxDuration = 60;
 
 interface TrackConsultationRequest {
+  accessToken?: string;
   roomName?: string;
   action?: ConsultationAction;
   patientName?: string;
@@ -32,6 +34,7 @@ async function parseRequest(req: Request): Promise<TrackConsultationRequest | nu
     const params = new URLSearchParams(rawBody);
     const action = params.get('action');
     return {
+      accessToken: params.get('accessToken') || undefined,
       roomName: params.get('roomName') || undefined,
       action: action === 'join' || action === 'leave' ? action : undefined,
       patientName: params.get('patientName') || undefined,
@@ -49,6 +52,28 @@ async function handlePOST(req: Request) {
       return serviceResultToResponse(serviceError(400, 'missing_body', 'Request body is required'));
     }
 
+    const accessToken = body.accessToken?.trim();
+    if (!accessToken) {
+      return serviceResultToResponse(
+        serviceError(401, 'missing_room_token', 'LiveKit room token is required')
+      );
+    }
+
+    let participant;
+    try {
+      participant = verifyLiveKitRoomToken(accessToken);
+    } catch {
+      return serviceResultToResponse(
+        serviceError(401, 'invalid_room_token', 'LiveKit room token is invalid or expired')
+      );
+    }
+
+    if (!participant.identity.startsWith('patient_')) {
+      return serviceResultToResponse(
+        serviceError(403, 'patient_token_required', 'A patient room token is required')
+      );
+    }
+
     const roomName = body.roomName?.trim();
     const action = body.action;
     if (!roomName || !action) {
@@ -56,6 +81,11 @@ async function handlePOST(req: Request) {
     }
     if (action !== 'join' && action !== 'leave') {
       return serviceResultToResponse(serviceError(400, 'unsupported_action', `Unsupported action: ${action}`));
+    }
+    if (participant.roomName !== roomName) {
+      return serviceResultToResponse(
+        serviceError(403, 'room_token_mismatch', 'Room token does not grant access to this consultation')
+      );
     }
 
     const db = getFirebaseAdmin();
@@ -66,9 +96,8 @@ async function handlePOST(req: Request) {
     const result = await new FirestoreConsultationTrackingCore(db).trackConsultation({
       roomName,
       action,
-      patientName: body.patientName?.trim() || 'Unknown Patient',
-      userId: body.userId?.trim() || 'anonymous',
-      patientEmail: body.patientEmail?.trim().toLowerCase() || undefined,
+      patientName: participant.participantName?.trim() || 'Patient',
+      userId: participant.identity,
       consultationSessionId: body.consultationSessionId?.trim() || undefined,
     });
     return serviceResultToResponse(result);

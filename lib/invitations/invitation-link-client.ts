@@ -1,3 +1,5 @@
+import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
+
 interface InvitationLinkResponse {
   success: boolean;
   inviteUrl?: string;
@@ -80,7 +82,7 @@ export async function fetchInvitationLink({
     query.set('roomName', roomName);
   }
 
-  const response = await fetch(`/api/invite/get-link?${query.toString()}`);
+  const response = await authenticatedFetch(`/api/invite/get-link?${query.toString()}`);
   const result = await parseJsonResponse<InvitationLinkResponse>(response);
 
   if (!result.success || !result.inviteUrl) {
@@ -100,4 +102,3 @@ export async function fetchInvitationLink({
 export async function copyTextToClipboard(value: string): Promise<void> {
   await navigator.clipboard.writeText(value);
 }
-

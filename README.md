@@ -1,6 +1,6 @@
 # Secure Teleconsultation Platform
 
-A HIPAA-compliant video consultation platform built with Next.js, LiveKit, Firebase, and AI-powered summarization.
+A thesis teleconsultation platform built with Next.js, LiveKit, Firebase, and AI-powered summarization. It includes security controls that support a compliance review, but it has not been independently audited or certified as HIPAA compliant.
 
 ## 🚀 Features
 
@@ -15,7 +15,7 @@ A HIPAA-compliant video consultation platform built with Next.js, LiveKit, Fireb
 - **Automatic consultation summaries** generated after each call
 - **Structured medical analysis** with key points, recommendations, and follow-up actions
 - **Risk level assessment** and consultation categorization
-- **HIPAA-compliant** data handling
+- **Privacy-conscious** server-side summary handling
 
 ### 🔒 Security & Compliance
 - **Automatic deletion** of summaries after 30 days
@@ -76,6 +76,9 @@ NEXT_PUBLIC_LIVEKIT_URL=your_livekit_url
 LIVEKIT_API_KEY=your_livekit_api_key
 LIVEKIT_API_SECRET=your_livekit_api_secret
 
+# Maintenance endpoints (use a long random value)
+ADMIN_SECRET_KEY=your_admin_secret
+
 # Firebase Configuration
 NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
@@ -126,6 +129,7 @@ Open [http://localhost:3000](http://localhost:3000) to see the application.
 - [AI Summarization Setup](./AI_SUMMARIZATION_SETUP.md) - Detailed guide for AI features
 - [LiveKit Setup](./LIVEKIT_SETUP.md) - LiveKit configuration guide
 - [General Setup](./SETUP.md) - Complete setup instructions
+- [Access Control](./docs/access-control.md) - Roles, permissions, and faculty-review readiness
 
 ## 🔧 Configuration
 
@@ -140,21 +144,9 @@ Configure your LiveKit webhook to trigger AI summarization:
 
 ### Firebase Security Rules
 
-Ensure your Firestore security rules allow authenticated access:
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /call-summaries/{document} {
-      allow read, write: if request.auth != null;
-    }
-    match /scheduled-deletions/{document} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-```
+Deploy the repository's [`firestore.rules`](./firestore.rules). Do not replace it
+with a blanket `request.auth != null` rule; authenticated users must still be
+restricted by ownership and role.
 
 ## 🚀 Deployment
 
@@ -177,25 +169,25 @@ firebase deploy --only functions
 ### For Doctors
 
 1. **Start a Consultation**: Create a new room from the dashboard
-2. **Share Room Link**: Send the unique room URL to patients
+2. **Create an Invitation**: Share the signed, time-limited invitation link
 3. **Conduct Video Call**: Use video, audio, screen sharing, and chat
 4. **Review Summaries**: Access AI-generated summaries in the dashboard
 5. **Manage Records**: View, filter, and manually delete summaries as needed
 
 ### For Patients
 
-1. **Join Consultation**: Click the room link provided by the doctor
+1. **Join Consultation**: Click the signed invitation provided by the doctor
 2. **Enter Name**: Provide your name to join the call
 3. **Participate**: Use video, audio, and chat features
 4. **End Call**: Close the browser when consultation is complete
 
 ## 🔒 Security Features
 
-- **HIPAA Compliance**: 30-day automatic deletion of all data
+- **Retention Control**: scheduled deletion support for consultation artifacts
 - **Encrypted Storage**: All data encrypted in transit and at rest
 - **Access Control**: Authentication required for all sensitive operations
 - **Audit Logging**: Complete audit trail of all activities
-- **Secure Communication**: End-to-end encrypted video calls
+- **Secure Communication**: LiveKit transport encryption; end-to-end encryption requires separate LiveKit E2EE configuration and verification
 
 ## 🛠️ Development
 

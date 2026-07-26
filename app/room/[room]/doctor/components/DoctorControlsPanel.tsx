@@ -1,7 +1,9 @@
 ﻿'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { copyTextToClipboard, fetchInvitationLink } from '@/lib/invitations/invitation-link-client';
+import { compactInvitationUrl } from '@/lib/invitations/invitation-link-display';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 interface DoctorControlsPanelProps {
@@ -32,7 +34,6 @@ export default function DoctorControlsPanel({
   const [loadingLink, setLoadingLink] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const fallbackLink = `https://livekit-frontend-tau.vercel.app/room/${roomName}/patient`;
 
   const loadInvitationLink = useCallback(
     async (forceRefresh = false) => {
@@ -79,8 +80,6 @@ export default function DoctorControlsPanel({
     return () => window.clearTimeout(timer);
   }, [copied]);
 
-  const patientLink = invitationLink || fallbackLink;
-
   return (
     <div style={{ marginBottom: '0.75rem' }}>
       <div style={{ marginBottom: '0.75rem' }}>
@@ -108,8 +107,8 @@ export default function DoctorControlsPanel({
 
       <div
         style={{
-          backgroundColor: '#f0fdf4',
-          border: '1px solid #22c55e',
+          backgroundColor: invitationLink ? '#f0fdf4' : '#fffbeb',
+          border: `1px solid ${invitationLink ? '#22c55e' : '#f59e0b'}`,
           borderRadius: '0.5rem',
           padding: '0.75rem',
           marginBottom: '0.75rem',
@@ -120,42 +119,52 @@ export default function DoctorControlsPanel({
             margin: '0 0 0.5rem 0',
             fontSize: '0.875rem',
             fontWeight: '600',
-            color: '#15803d',
+            color: invitationLink ? '#15803d' : '#92400e',
           }}
         >
-          {invitationLink ? 'Patient Invitation Link:' : 'Patient Link:'}
+          Patient Invitation Link
         </h4>
 
         {loadingLink ? (
           <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.7rem', color: '#6b7280' }}>Loading invitation link...</p>
         ) : linkError ? (
           <div style={{ marginBottom: '0.5rem' }}>
-            <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.7rem', color: '#dc2626' }}>{linkError}</p>
-            <p style={{ margin: '0', fontSize: '0.65rem', color: '#6b7280' }}>Using fallback link (direct room access).</p>
+            <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.7rem', color: '#92400e' }}>{linkError}</p>
+            <Link
+              href="/doctor/invitations"
+              style={{ fontSize: '0.7rem', color: '#1d4ed8', fontWeight: 600 }}
+            >
+              Create or manage an invitation
+            </Link>
           </div>
         ) : null}
 
-        <p
-          style={{
-            margin: '0 0 0.5rem 0',
-            fontSize: '0.7rem',
-            color: '#6b7280',
-            wordBreak: 'break-all',
-          }}
-        >
-          {patientLink}
-        </p>
+        {invitationLink && (
+          <p
+            title="Use Copy Link to share the complete signed invitation"
+            style={{
+              margin: '0 0 0.5rem 0',
+              fontSize: '0.7rem',
+              color: '#166534',
+            }}
+          >
+            {compactInvitationUrl(invitationLink)}
+          </p>
+        )}
 
         {showCopyInvitationLinkControl && (
           <button
             onClick={async () => {
+              if (!invitationLink) {
+                return;
+              }
               try {
-                await copyTextToClipboard(patientLink);
+                await copyTextToClipboard(invitationLink);
                 setCopied(true);
                 showToast({
                   kind: 'success',
                   title: 'Link copied',
-                  message: invitationLink ? 'Invitation link copied to clipboard.' : 'Patient link copied to clipboard.',
+                  message: 'Invitation link copied to clipboard.',
                 });
               } catch (copyError) {
                 console.error('Failed to copy patient link:', copyError);
@@ -166,23 +175,23 @@ export default function DoctorControlsPanel({
                 });
               }
             }}
-            disabled={loadingLink}
+            disabled={loadingLink || !invitationLink}
             style={{
-              backgroundColor: loadingLink ? '#9ca3af' : copied ? '#16a34a' : '#22c55e',
+              backgroundColor: loadingLink || !invitationLink ? '#9ca3af' : copied ? '#16a34a' : '#22c55e',
               color: 'white',
               border: 'none',
               borderRadius: '0.5rem',
               padding: '0.5rem 1rem',
               fontSize: '0.75rem',
               fontWeight: '500',
-              cursor: loadingLink ? 'not-allowed' : 'pointer',
+              cursor: loadingLink || !invitationLink ? 'not-allowed' : 'pointer',
               width: '100%',
               marginBottom: '0.5rem',
               transform: copied ? 'translateY(1px) scale(0.99)' : 'none',
               transition: 'all 140ms ease',
             }}
           >
-            {loadingLink ? 'Loading...' : copied ? 'Copied' : 'Copy Link'}
+            {loadingLink ? 'Loading...' : copied ? 'Copied' : invitationLink ? 'Copy Link' : 'No Active Link'}
           </button>
         )}
 

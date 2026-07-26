@@ -1,3 +1,5 @@
+import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
+
 export type DoctorPresenceAction = 'join' | 'leave';
 
 export interface DoctorPresenceEventInput {
@@ -33,7 +35,7 @@ export async function trackDoctorPresenceEvent(
   input: DoctorPresenceEventInput,
   options: { keepalive?: boolean } = {}
 ): Promise<TrackDoctorPresenceResponse> {
-  const response = await fetch('/api/track-doctor-presence', {
+  const response = await authenticatedFetch('/api/track-doctor-presence', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(buildPayload(input)),

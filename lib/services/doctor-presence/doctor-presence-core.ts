@@ -9,6 +9,7 @@ import type {
   TrackDoctorPresenceInput,
   TrackDoctorPresenceResult,
 } from './contracts';
+import { finalizeConsultationForRoom } from '@/lib/services/consultation-finalization';
 
 function toDate(value: unknown): Date | null {
   if (!value) {
@@ -184,6 +185,24 @@ export class FirestoreDoctorPresenceCore implements DoctorPresenceService {
       eventAt: now,
       metadata: { doctorName, doctorEmail, segmentDurationMs, doctorDurationMinutes, source: 'doctor-presence-tracker' },
     });
+
+    // Last-doctor leave is the canonical consultation-ending command. Summary
+    // finalization is idempotent, while webhook/revoke paths remain backstops.
+    if (Object.keys(activeDoctors).length === 0) {
+      try {
+        await finalizeConsultationForRoom(this.db, {
+          roomName,
+          finalizedAt: now,
+          reason: 'doctor_left',
+          requireActiveSession: false,
+          regenerateSummary: true,
+        });
+      } catch (error) {
+        // Presence is already committed; keep the leave response successful so
+        // webhook/revoke can retry the same idempotent finalization later.
+        console.error('Failed to finalize consultation on last doctor leave:', error);
+      }
+    }
 
     return serviceOk({
       message: 'Doctor leave tracked',

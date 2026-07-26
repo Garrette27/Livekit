@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import type { SessionChatVisibilityPolicy } from '@/lib/chat/session-chat-model';
 import { FirestoreChatMessageStore } from '@/lib/services/video-chat';
+import { authorizeSessionParticipant } from '@/lib/services/shared/session-participant-auth';
+import { serviceResultToResponse } from '@/lib/services/shared/http';
 
 function toDate(value: unknown): Date | null {
   if (!value) {
@@ -21,9 +23,8 @@ async function handleGET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const consultationSessionId = searchParams.get('consultationSessionId');
-    const visibilityPolicy = parseVisibilityPolicy(searchParams.get('visibilityPolicy'));
-    const participantJoinedAt = toDate(searchParams.get('participantJoinedAt'));
-    const participantId = searchParams.get('participantId') || 'anonymous';
+    const requestedVisibilityPolicy = parseVisibilityPolicy(searchParams.get('visibilityPolicy'));
+    const requestedParticipantJoinedAt = toDate(searchParams.get('participantJoinedAt'));
 
     if (!consultationSessionId) {
       return NextResponse.json(
@@ -40,10 +41,21 @@ async function handleGET(req: NextRequest) {
       );
     }
 
+    const participant = await authorizeSessionParticipant(req, db, consultationSessionId);
+    if (!participant.ok) {
+      return serviceResultToResponse(participant);
+    }
+    const visibilityPolicy = participant.data.participantType === 'doctor'
+      ? requestedVisibilityPolicy
+      : 'join-time-only';
+    const participantJoinedAt = participant.data.participantType === 'doctor'
+      ? requestedParticipantJoinedAt
+      : participant.data.joinedAt;
+
     const chatStore = new FirestoreChatMessageStore(db);
     const messages = await chatStore.listVisibleMessages({
       sessionId: consultationSessionId,
-      participantId,
+      participantId: participant.data.identity,
       participantJoinedAt,
       visibilityPolicy,
     });
@@ -67,22 +79,13 @@ async function handlePOST(req: NextRequest) {
     const body = await req.json();
     const consultationSessionId =
       typeof body.consultationSessionId === 'string' ? body.consultationSessionId.trim() : '';
-    const senderId = typeof body.senderId === 'string' ? body.senderId.trim() : '';
-    const senderName = typeof body.senderName === 'string' ? body.senderName.trim() : '';
-    const senderType = body.senderType as 'doctor' | 'patient' | 'system';
     const text = typeof body.text === 'string' ? body.text : '';
     const attachments = Array.isArray(body.attachments) ? body.attachments : [];
     const messageId = typeof body.messageId === 'string' ? body.messageId.trim() : undefined;
 
-    if (!consultationSessionId || !senderId || !senderName || !senderType) {
+    if (!consultationSessionId) {
       return NextResponse.json(
-        { success: false, error: 'Missing required message fields' },
-        { status: 400 }
-      );
-    }
-    if (senderType !== 'doctor' && senderType !== 'patient' && senderType !== 'system') {
-      return NextResponse.json(
-        { success: false, error: 'senderType must be doctor, patient, or system' },
+        { success: false, error: 'consultationSessionId is required' },
         { status: 400 }
       );
     }
@@ -95,13 +98,18 @@ async function handlePOST(req: NextRequest) {
       );
     }
 
+    const participant = await authorizeSessionParticipant(req, db, consultationSessionId);
+    if (!participant.ok) {
+      return serviceResultToResponse(participant);
+    }
+
     const chatStore = new FirestoreChatMessageStore(db);
     const result = await chatStore.appendMessage({
       sessionId: consultationSessionId,
       messageId,
-      senderId,
-      senderName,
-      senderType,
+      senderId: participant.data.identity,
+      senderName: participant.data.participantName,
+      senderType: participant.data.participantType,
       message: text,
       attachments,
     });

@@ -92,13 +92,15 @@ export function useWaitingQueue({
     () => (invitationIds ? [...invitationIds].sort().join('|') : 'all'),
     [invitationIds]
   );
-  const normalizedStatuses = useMemo(() => {
-    const requestedStatuses: Array<'waiting' | 'admitted' | 'left' | 'rejected'> =
-      Array.isArray(statuses) && statuses.length > 0 ? statuses : ['waiting'];
-
-    return Array.from(new Set(requestedStatuses)).sort();
-  }, [Array.isArray(statuses) ? statuses.join('|') : 'waiting']);
-  const statusScope = useMemo(() => normalizedStatuses.join('|'), [normalizedStatuses]);
+  const statusScope = (
+    Array.isArray(statuses) && statuses.length > 0
+      ? Array.from(new Set(statuses)).sort()
+      : ['waiting']
+  ).join('|');
+  const normalizedStatuses = useMemo(
+    () => statusScope.split('|') as Array<'waiting' | 'admitted' | 'left' | 'rejected'>,
+    [statusScope]
+  );
   const scopeKey = useMemo(
     () =>
       `${roomName || 'all-rooms'}::${doctorUserId || 'all-doctors'}::${selectedInvitationId || 'all'}::${invitationScope}::${statusScope}`,

@@ -163,9 +163,11 @@ function inferSenderType(senderId: string): 'doctor' | 'patient' | 'system' {
 function ChatPersistenceBridge({
   enabled,
   consultationSessionId,
+  accessToken,
 }: {
   enabled: boolean;
   consultationSessionId?: string | null;
+  accessToken: string;
 }) {
   const { chatMessages } = useChat();
   const persistedMessageIdsRef = React.useRef<Set<string>>(new Set());
@@ -216,7 +218,10 @@ function ChatPersistenceBridge({
         try {
           const response = await fetch('/api/session-chat/messages', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
             body: JSON.stringify({
               consultationSessionId: normalizedSessionId,
               senderId,
@@ -238,7 +243,7 @@ function ChatPersistenceBridge({
     };
 
     void persistMessages();
-  }, [chatMessages, consultationSessionId, enabled]);
+  }, [accessToken, chatMessages, consultationSessionId, enabled]);
 
   return null;
 }
@@ -378,6 +383,7 @@ export default function RoomShell({
         <ChatPersistenceBridge
           enabled={chatEnabled}
           consultationSessionId={consultationSessionId}
+          accessToken={token}
         />
         <VideoConference />
       </LiveKitRoom>

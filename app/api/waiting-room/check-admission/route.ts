@@ -2,6 +2,7 @@ import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { FirestoreInvitationAccessCore, toInvitationAccessError } from '@/lib/services/invitation-access';
+import { authorizeWaitingRoomRequest } from '@/lib/services/shared/waiting-room-auth';
 
 async function handlePOST(req: NextRequest) {
   try {
@@ -9,11 +10,24 @@ async function handlePOST(req: NextRequest) {
     const invitationId = typeof body.invitationId === 'string' ? body.invitationId.trim() : undefined;
     const waitingPatientId = typeof body.waitingPatientId === 'string' ? body.waitingPatientId.trim() : undefined;
     const patientEmail = typeof body.patientEmail === 'string' ? body.patientEmail.trim() : undefined;
+    const accessToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : undefined;
 
     if (!invitationId && !waitingPatientId) {
       return NextResponse.json(
         { success: false, error: 'Missing required field: invitationId or waitingPatientId' },
         { status: 400 }
+      );
+    }
+
+    const authorization = authorizeWaitingRoomRequest({
+      accessToken,
+      invitationId,
+      waitingPatientId,
+    });
+    if (!authorization.credential) {
+      return NextResponse.json(
+        { success: false, error: authorization.error },
+        { status: authorization.status }
       );
     }
 

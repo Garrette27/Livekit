@@ -2,9 +2,10 @@ import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextResponse, NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
-import { authenticateBearerToken } from '@/lib/services/shared/request-auth';
+import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
 import { serviceResultToResponse } from '@/lib/services/shared/http';
 import { getJwtSecret } from '@/lib/invitations/token-utils';
+import { DoctorRoomAccess } from '@/lib/services/room-access';
 
 /**
  * Issues a LiveKit room token for a doctor joining their own room. Doctor
@@ -14,7 +15,7 @@ import { getJwtSecret } from '@/lib/invitations/token-utils';
  */
 async function handlePOST(req: NextRequest) {
   try {
-    const auth = await authenticateBearerToken(req);
+    const auth = await authorizeBearerRequest(req, 'room:join-doctor');
     if (!auth.ok) {
       return serviceResultToResponse(auth);
     }
@@ -37,16 +38,19 @@ async function handlePOST(req: NextRequest) {
       );
     }
 
-    const userDoc = await db.collection('users').doc(auth.data.userId).get();
-    const role = userDoc.exists ? userDoc.data()?.role : null;
-    if (role !== 'doctor') {
-      return NextResponse.json(
-        { success: false, error: 'Doctor role required' },
-        { status: 403 }
-      );
+    const roomAccess = await new DoctorRoomAccess(db).authorizeDoctorRoom({
+      roomName,
+      doctor: {
+        userId: auth.data.userId,
+        email: auth.data.email,
+        name: doctorName,
+      },
+    });
+    if (!roomAccess.ok) {
+      return serviceResultToResponse(roomAccess);
     }
 
-    const doctorEmail = auth.data.email || userDoc.data()?.email || null;
+    const doctorEmail = auth.data.email || null;
     const liveKitToken = jwt.sign(
       {
         sub: `doctor_${auth.data.userId}`,

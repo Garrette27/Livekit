@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 
 export function useErrorHandler(...errors: (string | null | undefined)[]) {
   const [pageError, setPageError] = useState<string | null>(null);
+  const activeError = errors.find((error) => error) || null;
 
   useEffect(() => {
-    const error = errors.find((err) => err);
-    setPageError(error || null);
-  }, [...errors]);
+    setPageError(activeError);
+  }, [activeError]);
 
   return { pageError, setPageError };
 }

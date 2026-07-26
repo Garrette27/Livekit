@@ -5,11 +5,13 @@ import { Timestamp } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthSession } from '@/hooks/useAuthSession';
+import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 
 export const dynamic = 'force-dynamic';
 
 interface CallSummary {
   id: string;
+  hasGeneratedSummary: boolean;
   roomName: string;
   summary: string;
   keyPoints: string[];
@@ -137,14 +139,16 @@ function toTimestamp(value?: string | null): Timestamp {
 }
 
 function mapHistoryRecordToSummary(record: DoctorHistoryResponseItem): CallSummary {
+  const generatedSummary = typeof record.summary === 'string' ? record.summary.trim() : '';
   return {
     id: record.id,
+    hasGeneratedSummary: generatedSummary.length > 0,
     roomName: record.roomName || 'Unknown Room',
-    summary: record.summary || 'No AI summary available yet.',
+    summary: generatedSummary || 'This completed consultation does not have a summary yet.',
     keyPoints: Array.isArray(record.keyPoints) ? record.keyPoints : [],
     recommendations: Array.isArray(record.recommendations) ? record.recommendations : [],
     followUpActions: Array.isArray(record.followUpActions) ? record.followUpActions : [],
-    riskLevel: record.riskLevel || 'Low',
+    riskLevel: record.riskLevel || 'Pending',
     category: record.category || 'General',
     createdAt: toTimestamp(record.createdAt),
     startedAt: record.startedAt || record.createdAt ? toTimestamp(record.startedAt || record.createdAt || null) : undefined,
@@ -203,6 +207,8 @@ export default function DoctorDashboard() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [generatingSummaryId, setGeneratingSummaryId] = useState<string | null>(null);
+  const [summaryActionError, setSummaryActionError] = useState<string | null>(null);
   const router = useRouter();
 
   // Handle authentication and role check
@@ -267,6 +273,29 @@ export default function DoctorDashboard() {
       category: summary.category || ''
     });
     setSaveError(null);
+  };
+
+  const handleGenerateSummary = async (summary: CallSummary) => {
+    setGeneratingSummaryId(summary.id);
+    setSummaryActionError(null);
+    try {
+      const response = await authenticatedFetch('/api/summary/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consultationSessionId: summary.id }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to generate consultation summary');
+      }
+      await loadSummaries();
+    } catch (error) {
+      setSummaryActionError(
+        error instanceof Error ? error.message : 'Failed to generate consultation summary'
+      );
+    } finally {
+      setGeneratingSummaryId(null);
+    }
   };
 
   const handleCancelEdit = () => {
@@ -435,6 +464,22 @@ export default function DoctorDashboard() {
             </button>
           </div>
 
+          {summaryActionError && (
+            <div
+              role="alert"
+              style={{
+                marginBottom: '1rem',
+                padding: '0.75rem 1rem',
+                border: '1px solid #fecaca',
+                borderRadius: '0.5rem',
+                backgroundColor: '#fef2f2',
+                color: '#991b1b',
+              }}
+            >
+              {summaryActionError}
+            </div>
+          )}
+
           {loading ? (
             <div style={{ textAlign: 'center', padding: '3rem' }}>
               <div style={{
@@ -499,13 +544,16 @@ export default function DoctorDashboard() {
                         borderRadius: '9999px',
                         fontSize: '0.75rem',
                         fontWeight: '500',
-                        backgroundColor: summary.riskLevel === 'High' ? '#fef2f2' : summary.riskLevel === 'Medium' ? '#fef3c7' : '#f0fdf4',
-                        color: summary.riskLevel === 'High' ? '#dc2626' : summary.riskLevel === 'Medium' ? '#d97706' : '#059669'
+                        backgroundColor: summary.riskLevel === 'High' ? '#fef2f2' : summary.riskLevel === 'Medium' ? '#fef3c7' : summary.riskLevel === 'Pending' ? '#f3f4f6' : '#f0fdf4',
+                        color: summary.riskLevel === 'High' ? '#dc2626' : summary.riskLevel === 'Medium' ? '#d97706' : summary.riskLevel === 'Pending' ? '#4b5563' : '#059669'
                       }}>
                         {summary.riskLevel}
                       </span>
                       <button
-                        onClick={() => handleEdit(summary)}
+                        onClick={() => summary.hasGeneratedSummary
+                          ? handleEdit(summary)
+                          : void handleGenerateSummary(summary)}
+                        disabled={generatingSummaryId === summary.id}
                         style={{
                           padding: '0.375rem 0.75rem',
                           backgroundColor: '#2563eb',
@@ -517,11 +565,20 @@ export default function DoctorDashboard() {
                           fontWeight: '500'
                         }}
                       >
-                        Edit
+                        {summary.hasGeneratedSummary
+                          ? 'Edit'
+                          : generatingSummaryId === summary.id
+                            ? 'Generating...'
+                            : 'Generate Summary'}
                       </button>
                     </div>
                   </div>
-                  <p style={{ color: '#374151', marginBottom: '1rem', lineHeight: '1.6' }}>
+                  <p style={{
+                    color: summary.hasGeneratedSummary ? '#374151' : '#6b7280',
+                    marginBottom: '1rem',
+                    lineHeight: '1.6',
+                    fontStyle: summary.hasGeneratedSummary ? 'normal' : 'italic',
+                  }}>
                     {summary.summary}
                   </p>
                   {summary.waitingRoomHistory && summary.waitingRoomHistory.totalParticipants > 0 && (
@@ -597,7 +654,8 @@ export default function DoctorDashboard() {
                           fontSize: '0.875rem',
                           fontWeight: 600,
                           color: '#1e3a8a',
-                          cursor: 'pointer',
+                          cursor: generatingSummaryId === summary.id ? 'wait' : 'pointer',
+                          opacity: generatingSummaryId === summary.id ? 0.7 : 1,
                         }}
                       >
                         Chat Transcript ({summary.chatHistory.totalMessages} message

@@ -227,7 +227,7 @@ export class FirestoreConsultationTrackingCore implements ConsultationTrackingSe
     }
 
     const now = new Date();
-    const consultationSessionId =
+    let consultationSessionId =
       preferredConsultationSessionId?.trim() || resolveLeaveSessionId({ roomName, existingData, now });
     let sessionStartedAt = toDate(existingData.sessionStartedAt || existingData.joinedAt) || now;
     let doctorDurationFromSessionMinutes = 0;
@@ -236,14 +236,21 @@ export class FirestoreConsultationTrackingCore implements ConsultationTrackingSe
       const sessionDoc = await this.sessionRepo.getById(consultationSessionId);
       if (sessionDoc.exists) {
         const sessionData = sessionDoc.data() as Record<string, unknown>;
+        if (sessionData.roomName !== roomName) {
+          consultationSessionId = resolveLeaveSessionId({ roomName, existingData, now });
+        }
         const sessionSnapshotStartedAt = toDate(sessionData?.sessionStartedAt);
-        if (sessionSnapshotStartedAt) {
+        if (sessionData.roomName === roomName && sessionSnapshotStartedAt) {
           sessionStartedAt = sessionSnapshotStartedAt;
         }
         const doctorDurationCandidate = Number(
           (sessionData?.metadata as Record<string, unknown> | undefined)?.doctorDurationMinutes || 0
         );
-        if (Number.isFinite(doctorDurationCandidate) && doctorDurationCandidate > 0) {
+        if (
+          sessionData.roomName === roomName
+          && Number.isFinite(doctorDurationCandidate)
+          && doctorDurationCandidate > 0
+        ) {
           doctorDurationFromSessionMinutes = Math.round(doctorDurationCandidate);
         }
       }

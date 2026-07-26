@@ -130,7 +130,7 @@ export default function Page() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 16rem), 1fr))',
             gap: '2rem',
             marginBottom: '2rem',
           }}

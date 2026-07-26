@@ -2,13 +2,20 @@ import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { FirestoreInvitationAccessCore, toInvitationAccessError } from '@/lib/services/invitation-access';
+import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
+import { serviceResultToResponse } from '@/lib/services/shared/http';
 
 async function handlePOST(req: NextRequest) {
   try {
+    const auth = await authorizeBearerRequest(req, 'waiting-room:manage');
+    if (!auth.ok) {
+      return serviceResultToResponse(auth);
+    }
+
     const body = await req.json();
     const waitingPatientId =
       typeof body.waitingPatientId === 'string' ? body.waitingPatientId.trim() : '';
-    const doctorUserId = typeof body.doctorUserId === 'string' ? body.doctorUserId.trim() : undefined;
+    const doctorUserId = auth.data.userId;
 
     if (!waitingPatientId) {
       return NextResponse.json(

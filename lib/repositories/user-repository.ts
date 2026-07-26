@@ -26,6 +26,11 @@ export class UserRepository {
     return snapshot.empty ? null : snapshot.docs[0];
   }
 
+  async findAllByEmail(email: string, limit = 20): Promise<QueryDocumentSnapshot[]> {
+    const snapshot = await this.db.collection(COLLECTION).where('email', '==', email).limit(limit).get();
+    return snapshot.docs;
+  }
+
   async mergeFields(userId: string, data: Record<string, unknown>): Promise<void> {
     await this.db.collection(COLLECTION).doc(userId).set(data, { merge: true });
   }
