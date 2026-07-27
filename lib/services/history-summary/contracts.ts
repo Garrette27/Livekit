@@ -54,6 +54,10 @@ export interface HistoryRecord {
   keyPoints?: string[];
   recommendations?: string[];
   followUpActions?: string[];
+  summaryStatus?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable' | 'reviewed';
+  requiresClinicianReview?: boolean;
+  isEdited?: boolean;
+  lastEditedAt?: string | null;
   waitingRoomHistory?: WaitingRoomHistoryRecord;
   chatHistory?: HistoryChatRecord;
 }

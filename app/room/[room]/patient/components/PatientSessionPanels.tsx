@@ -49,6 +49,23 @@ export default function PatientSessionPanels({ roomName, patientName, onLeave }:
         </p>
       </div>
 
+      <div
+        role="note"
+        style={{
+          marginBottom: '0.75rem',
+          padding: '0.65rem',
+          borderRadius: '0.5rem',
+          border: '1px solid #bfdbfe',
+          backgroundColor: '#eff6ff',
+          color: '#1e3a8a',
+          fontSize: '0.72rem',
+          lineHeight: 1.45,
+        }}
+      >
+        This app does not transcribe automatically. A clinician must ask for your consent before
+        starting optional browser-generated speech notes.
+      </div>
+
       <button
         onClick={onLeave}
         style={{

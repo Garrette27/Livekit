@@ -4,6 +4,7 @@ import { resolveAiEntitlement } from '@/lib/ai/ai-entitlement-policy';
 import { CallSummaryRepository } from '@/lib/repositories/call-summary-repository';
 import { CallRepository } from '@/lib/repositories/call-repository';
 import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
+import { SummaryJobRepository } from '@/lib/repositories/summary-job-repository';
 import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import type { GenerateConsultationSummaryParams } from './contracts';
 
@@ -340,6 +341,12 @@ function defaultMetadata(
     source: 'consultation_tracking',
     hasTranscriptionData: Boolean(transcriptionData && transcriptionData.length > 0),
     transcriptionEntries: transcriptionData ? transcriptionData.length : 0,
+    transcriptionSource: transcriptionData?.length
+      ? 'doctor-device-browser-speech-recognition'
+      : 'none',
+    transcriptionLimitation: transcriptionData?.length
+      ? 'Browser speech notes may be incomplete or inaccurate and may not contain every speaker.'
+      : 'No speech-note text was available.',
     summaryGeneratedAt: new Date(),
   };
 }
@@ -375,8 +382,8 @@ function buildPrompt(
   presenceTimelineContext: string | null
 ): string {
   const conversationContext = transcriptionData && transcriptionData.length > 0
-    ? `\n\nActual conversation transcript:\n${transcriptionData.join('\n')}`
-    : '\n\nNo conversation transcript available. This may be a video-only consultation or transcription was not enabled.';
+    ? `\n\nDoctor-device browser speech notes (not a complete or authoritative transcript; speaker identity is unverified):\n${transcriptionData.join('\n')}`
+    : '\n\nNo speech-note text is available. Do not infer conversation details.';
 
   const attachmentSummaryContext = attachmentContext
     ? `\n\nExtracted attachment context:\n${attachmentContext}`
@@ -404,11 +411,12 @@ Please provide the following structured response in JSON format:
   "keyPoints": ["List of 3-5 main topics discussed", "Important symptoms mentioned", "Key findings from the conversation"],
   "recommendations": ["List of 2-4 recommendations made by the doctor", "Prescriptions if any", "Lifestyle advice"],
   "followUpActions": ["List of 2-3 follow-up actions needed", "Appointment scheduling", "Tests required"],
-  "riskLevel": "Low/Medium/High based on the consultation content",
+  "riskLevel": "Low/Medium/High draft signal based only on the supplied text",
   "category": "Primary Care/Specialist/Emergency/Follow-up/General Consultation"
 }
 
-IMPORTANT: Base your summary on the actual conversation content provided. If no conversation transcript is available, indicate this clearly in the summary.
+IMPORTANT: Base your summary only on the supplied evidence. Never invent diagnoses, medications, symptoms, speaker identities, or recommendations. If speech notes are missing or ambiguous, state that clearly.
+This output is a clinician-review draft and must not be presented as a diagnosis or autonomous triage decision.
 If the patient left and rejoined, explicitly mention this in both the summary and key points.
 
 Focus on medical accuracy, patient privacy, and actionable insights.`;
@@ -522,14 +530,26 @@ export async function generateAndStoreConsultationSummary({
   }
 
   const summaryRepo = new CallSummaryRepository(db);
+  const summaryJobRepo = new SummaryJobRepository(db);
   const summaryDocumentId = consultationSessionId || roomName;
   if (await shouldSkipSummaryRegeneration(summaryRepo, summaryDocumentId)) {
+    await summaryJobRepo.markCompleted(summaryDocumentId, 'ready').catch((error) => {
+      console.error('Failed to reconcile completed summary job:', error);
+    });
     console.log(
       'Skipping summary regeneration; preserved existing finalized summary:',
       summaryDocumentId
     );
     return;
   }
+
+  await summaryJobRepo.markProcessing({
+    summaryId: summaryDocumentId,
+    consultationSessionId: consultationSessionId || roomName,
+    doctorUserId: userId,
+  }).catch((error) => {
+    console.error('Failed to persist summary processing job:', error);
+  });
 
   // Fall back to stored transcript text when the caller did not pass one, so
   // every finalization path (client leave, webhook, history rebuild) produces a
@@ -578,11 +598,15 @@ export async function generateAndStoreConsultationSummary({
           ...presenceTimelineMetadata,
           aiSummaryEnabled: false,
           aiSummaryDisabledReason: entitlement.reason,
+          summaryStatus: 'unavailable',
         },
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail);
       await summaryRepo.overwrite(summaryDocumentId, summaryData);
+      await summaryJobRepo.markCompleted(summaryDocumentId, 'unavailable').catch((error) => {
+        console.error('Failed to complete unavailable summary job:', error);
+      });
       return;
     }
 
@@ -611,17 +635,19 @@ export async function generateAndStoreConsultationSummary({
           ...presenceTimelineMetadata,
           aiSummaryEnabled: false,
           aiSummaryDisabledReason: 'OPENAI_API_KEY not configured',
+          summaryStatus: 'unavailable',
         },
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail);
 
       await summaryRepo.overwrite(summaryDocumentId, summaryData);
+      await summaryJobRepo.markCompleted(summaryDocumentId, 'unavailable').catch((error) => {
+        console.error('Failed to complete unavailable summary job:', error);
+      });
       console.log('Fallback summary stored successfully with user ID:', userId);
       return;
     }
-
-    console.log('OpenAI API key found, generating AI summary...');
 
     const attachmentContext = await buildAttachmentContext(db, consultationSessionId);
     const prompt = buildPrompt(
@@ -633,7 +659,31 @@ export async function generateAndStoreConsultationSummary({
       presenceTimeline?.promptContext || null
     );
 
-    console.log('Calling OpenAI API for consultation summary...');
+    const processingSummary: Record<string, any> = {
+      roomName,
+      consultationSessionId,
+      summary: '',
+      keyPoints: [],
+      recommendations: [],
+      followUpActions: [],
+      riskLevel: 'Pending',
+      category: 'General Consultation',
+      participants: [patientName],
+      duration: durationMinutes,
+      presenceTimeline: serializedPresenceTimeline,
+      createdAt: new Date(),
+      createdBy: userId,
+      metadata: {
+        ...defaultMetadata(userId, resolvedTranscription, consultationSessionId),
+        ...presenceTimelineMetadata,
+        hasAttachmentContext: Boolean(attachmentContext),
+        summaryStatus: 'processing',
+        summaryAttemptedAt: new Date(),
+      },
+    };
+    attachPatientFields(processingSummary, patientUserId, patientEmail);
+    await summaryRepo.overwrite(summaryDocumentId, processingSummary);
+
     const response = await requestOpenAiCompletion(
       JSON.stringify({
         model: OPENAI_MODEL,
@@ -654,9 +704,8 @@ export async function generateAndStoreConsultationSummary({
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OpenAI API error:', response.status, errorText);
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+      console.error('OpenAI API request failed with status:', response.status);
+      throw new Error(`OpenAI API request failed with status ${response.status}`);
     }
 
     const data = await response.json();
@@ -690,12 +739,17 @@ export async function generateAndStoreConsultationSummary({
           // Marks this document as a real, successful AI generation so that
           // shouldSkipSummaryRegeneration preserves it on webhook replays.
           aiSummaryGenerated: true,
+          summaryStatus: 'ready',
+          requiresClinicianReview: true,
         },
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail);
 
       await summaryRepo.overwrite(summaryDocumentId, summaryData);
+      await summaryJobRepo.markCompleted(summaryDocumentId, 'ready').catch((error) => {
+        console.error('Failed to complete ready summary job:', error);
+      });
       console.log('AI summary stored successfully in Firestore with user ID:', userId);
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError);
@@ -703,7 +757,7 @@ export async function generateAndStoreConsultationSummary({
       const summaryData = {
         roomName,
         consultationSessionId,
-        summary: `${content || 'Summary generation failed'}${presenceTimelineNarrativeSuffix}`,
+        summary: `AI summary generation returned an invalid response. Manual review is required.${presenceTimelineNarrativeSuffix}`,
         keyPoints: augmentKeyPointsWithPresenceTimeline(
           ['Unable to parse structured data'],
           presenceTimeline
@@ -720,11 +774,17 @@ export async function generateAndStoreConsultationSummary({
         metadata: {
           ...defaultMetadata(userId, resolvedTranscription, consultationSessionId),
           ...presenceTimelineMetadata,
+          summaryStatus: 'failed',
+          requiresClinicianReview: true,
+          failureCode: 'invalid_model_response',
         },
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail);
       await summaryRepo.overwrite(summaryDocumentId, summaryData);
+      await summaryJobRepo.markFailed(summaryDocumentId, 'invalid_model_response').catch((error) => {
+        console.error('Failed to persist invalid-response retry state:', error);
+      });
       console.log('Parse error fallback summary stored successfully with user ID:', userId);
     }
   } catch (error) {
@@ -748,15 +808,25 @@ export async function generateAndStoreConsultationSummary({
         metadata: {
           ...defaultMetadata(userId, resolvedTranscription, consultationSessionId),
           ...presenceTimelineMetadata,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          summaryStatus: 'failed',
+          requiresClinicianReview: true,
+          failureCode: 'generation_failed',
         },
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail);
       await summaryRepo.overwrite(summaryDocumentId, summaryData);
+      await summaryJobRepo.markFailed(summaryDocumentId, 'generation_failed').catch((jobError) => {
+        console.error('Failed to persist generation retry state:', jobError);
+      });
       console.log('Error summary stored successfully with user ID:', userId);
     } catch (storeError) {
       console.error('Error storing error summary:', storeError);
+      await summaryJobRepo.markFailed(summaryDocumentId, 'summary_persistence_failed').catch(
+        (jobError) => {
+          console.error('Error persisting summary retry state:', jobError);
+        }
+      );
     }
   }
 }

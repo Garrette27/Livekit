@@ -57,8 +57,8 @@ jobs:
       - name: Install Firebase CLI
         run: npm install --global firebase-tools
 
-      - name: Deploy Firebase Functions
-        run: firebase deploy --only functions --project "${GCP_PROJECT}"
+      - name: Deploy backend functions and access rules
+        run: firebase deploy --only functions,firestore:rules,firestore:indexes,storage --project "${GCP_PROJECT}"
 
       - name: Post-deploy Firebase function log check
         env:

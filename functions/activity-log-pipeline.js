@@ -275,7 +275,8 @@ function buildSummary({
 }
 
 /**
- * Persist one immutable audit log row and one admin feed row for each write.
+ * Persist one immutable, metadata-only audit row and one admin feed row.
+ * Clinical content and document snapshots never enter the audit collections.
  */
 async function writeActivityDocuments({
   eventId,
@@ -285,10 +286,7 @@ async function writeActivityDocuments({
   documentId,
   operation,
   changedFields,
-  beforeSnapshot,
-  afterSnapshot,
   actorUserId,
-  actorEmail,
   roomName,
   consultationSessionId,
   doctorUserId,
@@ -314,13 +312,10 @@ async function writeActivityDocuments({
       doctorUserId: doctorUserId || null,
       patientUserId: patientUserId || null,
       actorUserId: actorUserId || null,
-      actorEmail: actorEmail || null,
       userId: actorUserId || patientUserId || doctorUserId || null,
       eventType: eventType || null,
       summary,
       changedFields,
-      before: beforeSnapshot,
-      after: afterSnapshot,
       occurredAt,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       source: 'cloud-function:onWrite',
@@ -338,7 +333,6 @@ async function writeActivityDocuments({
       doctorUserId: doctorUserId || null,
       patientUserId: patientUserId || null,
       actorUserId: actorUserId || null,
-      actorEmail: actorEmail || null,
       eventType: eventType || null,
       summary,
       changedFields: changedFields.slice(0, MAX_FEED_CHANGED_FIELDS),
@@ -432,10 +426,7 @@ function createTopLevelCollectionTrigger(collectionName) {
         documentId: context.params.documentId,
         operation,
         changedFields,
-        beforeSnapshot,
-        afterSnapshot,
         actorUserId: actor.actorUserId,
-        actorEmail: actor.actorEmail,
         roomName: entityContext.roomName,
         consultationSessionId: entityContext.consultationSessionId,
         doctorUserId: entityContext.doctorUserId,
@@ -512,10 +503,7 @@ function createConsultationEventTrigger() {
           documentId: context.params.eventId,
           operation,
           changedFields,
-          beforeSnapshot,
-          afterSnapshot,
           actorUserId: actor.actorUserId,
-          actorEmail: actor.actorEmail,
           roomName: entityContext.roomName,
           consultationSessionId:
             entityContext.consultationSessionId || context.params.consultationSessionId || null,

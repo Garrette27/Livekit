@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-type SpeechStatus = 'idle' | 'listening' | 'error' | 'permission-required';
+export type SpeechStatus =
+  | 'idle'
+  | 'listening'
+  | 'error'
+  | 'permission-required'
+  | 'unsupported';
 
 interface SpeechCaptureArgs {
   roomName: string;
@@ -14,70 +19,104 @@ interface SpeechCaptureArgs {
 interface SpeechCaptureState {
   speechStatus: SpeechStatus;
   captureError: string | null;
+  startCapture: (patientConsentConfirmed: boolean) => Promise<void>;
+  stopCapture: () => void;
 }
 
+/**
+ * Provide an explicit, consent-gated browser speech-note capture session.
+ *
+ * The recognizer listens only after `startCapture(true)` and never restarts
+ * after the clinician stops it. Stored lines identify their browser-STT
+ * provenance so downstream summaries cannot present them as a full recording.
+ */
 export function useSpeechCapture({ roomName, token }: SpeechCaptureArgs): SpeechCaptureState {
   const [speechStatus, setSpeechStatus] = useState<SpeechStatus>('idle');
   const [captureError, setCaptureError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
   const transcriptsRef = useRef<string[]>([]);
-  const userInteractedRef = useRef(false);
-  const hasStartedRef = useRef(false);
+  const captureRequestedRef = useRef(false);
 
-  const storeTranscription = useCallback(async (transcription: string[]) => {
-    if (!db || !roomName) return;
-    const firestoreDb = db; // Store in const so TypeScript knows it's defined
-    const callRef = doc(firestoreDb, 'calls', roomName);
-    try {
+  const storeCaptureState = useCallback(
+    async (active: boolean, consentConfirmed: boolean) => {
+      if (!db || !roomName) return;
       await setDoc(
-        callRef,
+        doc(db, 'calls', roomName),
         {
-          roomName,
-          transcription,
+          transcriptionCapture: {
+            active,
+            consentConfirmed,
+            source: 'doctor-device-browser-speech-recognition',
+            updatedAt: new Date(),
+            ...(active ? { startedAt: new Date() } : { stoppedAt: new Date() }),
+          },
           lastUpdated: new Date(),
-          status: 'active'
         },
         { merge: true }
       );
-    } catch (error) {
-      console.error('Error storing transcription:', error);
-    }
-  }, [roomName]);
+    },
+    [roomName]
+  );
+
+  const storeTranscription = useCallback(
+    async (transcription: string[]) => {
+      if (!db || !roomName) return;
+      try {
+        await setDoc(
+          doc(db, 'calls', roomName),
+          {
+            roomName,
+            transcription,
+            transcriptionProvenance: 'doctor-device-browser-speech-recognition',
+            lastUpdated: new Date(),
+            status: 'active',
+          },
+          { merge: true }
+        );
+      } catch (error) {
+        console.error('Error storing transcription:', error);
+      }
+    },
+    [roomName]
+  );
 
   useEffect(() => {
     if (!token || !roomName) return;
 
-    const SpeechRecognition = typeof window !== 'undefined'
-      ? (window.SpeechRecognition || window.webkitSpeechRecognition)
-      : null;
+    const SpeechRecognition =
+      typeof window !== 'undefined'
+        ? window.SpeechRecognition || window.webkitSpeechRecognition
+        : null;
 
     if (!SpeechRecognition) {
-      console.warn('Speech recognition not supported in this browser');
+      setSpeechStatus('unsupported');
       return;
     }
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.interimResults = false;
     recognition.lang = 'en-US';
 
     recognition.onstart = () => {
+      setCaptureError(null);
       setSpeechStatus('listening');
-      hasStartedRef.current = true;
     };
 
     recognition.onresult = (event: any) => {
-      for (let i = 0; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          const transcript = result[0].transcript.trim();
-          if (transcript) {
-            const timestamp = new Date().toISOString();
-            const next = [...transcriptsRef.current, `${timestamp}: ${transcript}`];
-            transcriptsRef.current = next;
-            storeTranscription(next);
-          }
-        }
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        if (!result.isFinal) continue;
+
+        const transcript = result[0].transcript.trim();
+        if (!transcript) continue;
+
+        const next = [
+          ...transcriptsRef.current,
+          `[doctor-device-stt] ${new Date().toISOString()}: ${transcript}`,
+        ];
+        transcriptsRef.current = next;
+        void storeTranscription(next);
       }
     };
 
@@ -86,78 +125,79 @@ export function useSpeechCapture({ roomName, token }: SpeechCaptureArgs): Speech
         setSpeechStatus('idle');
         return;
       }
-
       if (event.error === 'not-allowed') {
-        // Only log as warning, don't show error to user - they can enable manually
-        console.warn('Microphone permission not granted for speech recognition. Users can enable it manually in browser settings.');
+        captureRequestedRef.current = false;
         setSpeechStatus('permission-required');
-        // Don't set error message - this is expected behavior if user hasn't granted permission
-        // setCaptureError('Microphone permission is required to capture speech.');
+        setCaptureError('Speech-note capture needs browser microphone permission.');
         return;
       }
-
       if (event.error === 'no-speech') {
-        setTimeout(() => {
-          if (hasStartedRef.current && recognitionRef.current) {
-            try {
-              recognitionRef.current.start();
-            } catch (e) {
-              console.log('Error restarting recognition:', e);
-            }
-          }
-        }, 1000);
         return;
       }
 
+      captureRequestedRef.current = false;
       setSpeechStatus('error');
-      setCaptureError(event.error || 'Speech recognition error');
+      setCaptureError('Speech-note capture stopped because the browser reported an error.');
     };
 
     recognition.onend = () => {
-      setSpeechStatus('idle');
-      if (token && hasStartedRef.current) {
-        setTimeout(() => {
-          try {
-            recognition.start();
-          } catch (e) {
-            console.log('Error restarting recognition:', e);
-          }
-        }, 500);
+      if (!captureRequestedRef.current) {
+        setSpeechStatus('idle');
+        return;
+      }
+
+      // Browsers may end a continuous recognizer after silence. Restart only
+      // while the clinician's explicit capture session remains active.
+      try {
+        recognition.start();
+      } catch {
+        captureRequestedRef.current = false;
+        setSpeechStatus('error');
+        setCaptureError('Speech-note capture could not continue.');
       }
     };
 
     recognitionRef.current = recognition;
-
-    const startRecognition = () => {
-      if (!userInteractedRef.current && recognitionRef.current) {
-        userInteractedRef.current = true;
-        try {
-          recognitionRef.current.start();
-        } catch (error) {
-          console.error('Error starting speech recognition:', error);
-        }
-      }
-    };
-
-    const handleUserInteraction = () => {
-      startRecognition();
-    };
-
-    document.addEventListener('click', handleUserInteraction);
-    document.addEventListener('keydown', handleUserInteraction);
-    document.addEventListener('touchstart', handleUserInteraction);
-
     return () => {
-      document.removeEventListener('click', handleUserInteraction);
-      document.removeEventListener('keydown', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
+      captureRequestedRef.current = false;
+      recognition.abort();
+      recognitionRef.current = null;
     };
-  }, [roomName, token, storeTranscription]);
+  }, [roomName, storeTranscription, token]);
 
-  return { speechStatus, captureError };
+  const startCapture = useCallback(
+    async (patientConsentConfirmed: boolean) => {
+      if (!patientConsentConfirmed) {
+        setCaptureError('Confirm the patient has consented before starting speech notes.');
+        return;
+      }
+      if (!recognitionRef.current) {
+        setCaptureError('Speech recognition is not supported in this browser.');
+        return;
+      }
+
+      setCaptureError(null);
+      captureRequestedRef.current = true;
+      try {
+        recognitionRef.current.start();
+        await storeCaptureState(true, true);
+      } catch {
+        captureRequestedRef.current = false;
+        setSpeechStatus('error');
+        setCaptureError('Speech-note capture could not start.');
+      }
+    },
+    [storeCaptureState]
+  );
+
+  const stopCapture = useCallback(() => {
+    captureRequestedRef.current = false;
+    recognitionRef.current?.stop();
+    setSpeechStatus('idle');
+    void storeCaptureState(false, true).catch((error) => {
+      console.error('Error storing transcription stop state:', error);
+    });
+  }, [storeCaptureState]);
+
+  return { speechStatus, captureError, startCapture, stopCapture };
 }
-
-

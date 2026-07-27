@@ -10,6 +10,15 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  {
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "coverage/**",
+      "playwright-report/**",
+      "test-results/**",
+    ],
+  },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: {
@@ -22,6 +31,12 @@ const eslintConfig = [
       "@typescript-eslint/no-unsafe-call": "off",
       "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-unsafe-return": "off",
+    },
+  },
+  {
+    files: ["scripts/**/*.js", "verify-setup.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
     },
   },
 ];

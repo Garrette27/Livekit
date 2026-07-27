@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAllowedClinicalAttachment() {
+      return request.resource != null
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType in [
+          'image/jpeg',
+          'image/png',
+          'image/gif',
+          'image/webp',
+          'application/pdf'
+        ];
+    }
+
+    // Doctor note attachments are private to their authenticated owner.
+    match /notes/{doctorUserId}/{roomName}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == doctorUserId;
+      allow create, update: if request.auth != null
+        && request.auth.uid == doctorUserId
+        && isAllowedClinicalAttachment()
+        && (
+          request.resource.contentType != 'application/pdf'
+          || request.resource.size <= 5 * 1024 * 1024
+        );
+      allow delete: if request.auth != null && request.auth.uid == doctorUserId;
+    }
+
+    // No other client-side object access is enabled. Session attachments need
+    // a server-issued upload flow before this namespace can be opened safely.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

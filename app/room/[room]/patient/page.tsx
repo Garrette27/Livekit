@@ -243,7 +243,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
 
   if (!token) {
     return (
-      <div
+      <main
         style={{
           minHeight: '100vh',
           backgroundColor: '#F9FAFB',
@@ -372,7 +372,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
             </Link>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 

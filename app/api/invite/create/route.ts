@@ -6,7 +6,7 @@ import { serviceResultToResponse } from '@/lib/services/shared/http';
 import { DoctorRoomAccess } from '@/lib/services/room-access';
 import { UserRepository } from '../../../../lib/repositories/user-repository';
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
-import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
+import { enforceRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import { validateEmail, validateRoomName, sanitizeInput } from '../../../../lib/validation';
 import { signInvitationToken } from '../../../../lib/invitations/token-utils';
 import { buildInviteUrl } from '../../../../lib/invitations/utils';
@@ -20,7 +20,7 @@ import {
 async function handlePOST(req: NextRequest) {
   try {
     // Apply rate limiting
-    const rateLimitResponse = withRateLimit(RateLimitConfigs.TOKEN_GENERATION)(req);
+    const rateLimitResponse = await enforceRateLimit(req, RateLimitConfigs.TOKEN_GENERATION);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }

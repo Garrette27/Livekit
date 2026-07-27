@@ -127,27 +127,6 @@ export interface InvitationToken {
   oneUse: boolean;
 }
 
-export interface DeviceFingerprint {
-  userAgent: string;
-  language: string;
-  platform: string;
-  screenResolution: string;
-  timezone: string;
-  cookieEnabled: boolean;
-  doNotTrack: string;
-  hash: string;
-}
-
-export interface GeolocationData {
-  ip: string;
-  country: string;
-  countryCode: string;
-  region: string;
-  city: string;
-  timezone: string;
-  isp: string;
-}
-
 // API request/response types
 export interface CreateInvitationRequest {
   roomName: string;
@@ -179,8 +158,6 @@ export interface CreateInvitationResponse {
 
 export interface ValidateInvitationRequest {
   token: string;
-  deviceFingerprint?: DeviceFingerprint;
-  geolocation?: GeolocationData;
   userEmail?: string; // Email from registration if user just registered
 }
 
@@ -223,8 +200,11 @@ export interface WaitingPatient {
   rejectedAt?: Timestamp | Date | any;
   metadata?: {
     deviceFingerprint?: string;
+    deviceFingerprintHash?: string;
     ip?: string;
     userAgent?: string;
+    networkHash?: string;
+    userAgentHash?: string;
     lastAccessed?: Timestamp | Date | any;
     isAnonymous?: boolean;
     admissionMode?: 'doctor-manual' | 'auto-email-match';
@@ -295,8 +275,6 @@ export interface RegisterUserRequest {
   email: string;
   phone?: string;
   consentGiven: boolean;
-  deviceFingerprint: DeviceFingerprint;
-  geolocation?: GeolocationData;
 }
 
 export interface RegisterUserResponse {

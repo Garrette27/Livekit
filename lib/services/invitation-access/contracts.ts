@@ -5,16 +5,6 @@ export interface ValidateInviteContext {
   userEmail?: string;
   clientIP: string;
   userAgent: string;
-  deviceFingerprint?: {
-    userAgent: string;
-    language: string;
-    platform: string;
-    screenResolution: string;
-    timezone: string;
-    cookieEnabled: boolean;
-    doNotTrack: string;
-    hash: string;
-  };
 }
 
 export interface ValidateInviteResult {

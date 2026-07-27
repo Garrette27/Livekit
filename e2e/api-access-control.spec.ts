@@ -4,6 +4,7 @@ const protectedRequests = [
   { method: 'get', path: '/api/doctor/history' },
   { method: 'get', path: '/api/patient/consultations' },
   { method: 'get', path: '/api/patient/pending-waiting-room' },
+  { method: 'get', path: '/api/summary/process-queue' },
   { method: 'get', path: '/api/invite/get-link?roomName=security-test' },
   { method: 'get', path: '/api/waiting-room/list' },
   { method: 'post', path: '/api/doctor-access', data: {} },
@@ -46,4 +47,29 @@ test.describe('API access control', () => {
       await expect(response.json()).resolves.toMatchObject({ success: false });
     });
   }
+
+  test('password reset response does not disclose account details', async ({ request }) => {
+    const response = await request.post('/api/password-reset', {
+      data: { email: 'privacy-test-account@example.com' },
+    });
+
+    expect(response.status()).toBe(202);
+    const body = await response.json();
+    expect(body).toEqual({
+      success: true,
+      message: 'If an eligible account exists for that email, password reset instructions will be sent.',
+    });
+  });
+
+  test('password reset does not expose a user-status GET endpoint', async ({ request }) => {
+    const response = await request.get('/api/password-reset?email=privacy-test-account@example.com');
+    expect(response.status()).toBe(405);
+  });
+
+  test('unsigned LiveKit webhooks fail closed', async ({ request }) => {
+    const response = await request.post('/api/webhook', {
+      data: { event: 'room_finished', room: { name: 'security-test' } },
+    });
+    expect(response.status()).toBe(401);
+  });
 });

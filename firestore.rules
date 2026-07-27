@@ -117,6 +117,22 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.token.admin == true;
       allow write: if false; // Only server-side writes
     }
+
+    // Reserved for future thesis-review assignments. No client route or UI is
+    // enabled; a server endpoint must enforce permission + exact assignment.
+    match /reviewAssignments/{assignmentId} {
+      allow read, write: if false;
+    }
+
+    // Distributed API abuse counters are server-only.
+    match /securityRateLimits/{counterId} {
+      allow read, write: if false;
+    }
+
+    // Durable summary retries are operational server state.
+    match /summaryJobs/{jobId} {
+      allow read, write: if false;
+    }
     
     // Sessions - users can only access their own sessions
     match /sessions/{sessionId} {

@@ -1,25 +1,24 @@
 import { getFirebaseAdmin } from '../firebase-admin';
 import {
   AccessAttempt,
-  DeviceFingerprint,
   Invitation,
   InvitationToken,
   SecurityViolation,
   ValidateInvitationResponse,
   WaitingPatient,
 } from '../types';
-import { getGeolocationFromIP } from './geolocation-utils';
 import { signLiveKitRoomToken, verifyInvitationToken } from './token-utils';
-import { detectBrowser, generateDeviceFingerprintHash, toDate } from './utils';
+import { toDate } from './utils';
 import { buildWaitingPatientIdentity } from './waiting-patient-identity';
 import { EVENT_DOMAINS, EVENT_SCHEMA_VERSION } from '../events/event-schema';
 import { getInvitationEmailAllowlist, isEmailAllowedByInvitation } from './email-allowlist';
 import { finalizeConsultationForRoom } from '../services/consultation-finalization';
 import { UserRepository } from '../repositories/user-repository';
+import { reserveInvitationUse } from './invitation-use-reservation';
+import { hashSecuritySignal } from '../security/security-signal';
 
 export interface ValidateInvitationContext {
   token: string;
-  deviceFingerprint?: DeviceFingerprint;
   userEmail?: string;
   clientIP: string;
   userAgent: string;
@@ -53,9 +52,7 @@ function normalizeEmail(email?: string): string | undefined {
 
 function buildAccessAttempt(
   clientIP: string,
-  userAgent: string,
-  country?: string,
-  deviceFingerprint?: DeviceFingerprint
+  userAgent: string
 ): AccessAttempt {
   const occurredAt = new Date() as any;
   return {
@@ -69,10 +66,8 @@ function buildAccessAttempt(
       source: 'invitation-access-core.validateInvite',
     },
     timestamp: occurredAt,
-    ip: clientIP,
-    userAgent,
-    country,
-    deviceFingerprint: deviceFingerprint ? generateDeviceFingerprintHash(deviceFingerprint) : undefined,
+    ip: hashSecuritySignal('ip', clientIP),
+    userAgent: hashSecuritySignal('user-agent', userAgent),
     success: false,
     reason: undefined,
   };
@@ -92,8 +87,6 @@ function toAccessAttemptData(accessAttempt: AccessAttempt): Record<string, any> 
     userAgent: accessAttempt.userAgent,
     success: accessAttempt.success,
     reason: accessAttempt.reason,
-    ...(accessAttempt.country && { country: accessAttempt.country }),
-    ...(accessAttempt.deviceFingerprint && { deviceFingerprint: accessAttempt.deviceFingerprint }),
   };
 }
 
@@ -119,8 +112,8 @@ function buildSecurityViolation(input: {
     timestamp,
     type: input.type,
     details: input.details,
-    ip: input.clientIP,
-    userAgent: input.userAgent,
+    ip: hashSecuritySignal('ip', input.clientIP),
+    userAgent: hashSecuritySignal('user-agent', input.userAgent),
   };
 }
 
@@ -144,10 +137,6 @@ function buildParticipantDisplayName(lookup: UserLookupContext): string {
     || lookup.userEmailToCheck
     || 'Anonymous Patient'
   );
-}
-
-function createWaitingPatientId(invitationId: string): string {
-  return `waiting_${invitationId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
 function isAutoAdmissionCandidate(invitation: Invitation, lookup: UserLookupContext): boolean {
@@ -192,19 +181,6 @@ async function lookupRegisteredAdmissionHistory(
   return { hasLeft, latestAdmitted };
 }
 
-async function appendInvitationAccessAudit(
-  db: any,
-  invitationId: string,
-  invitation: Invitation,
-  accessAttemptData: Record<string, any>
-): Promise<void> {
-  await db.collection('invitations').doc(invitationId).update({
-    currentUses: (invitation.currentUses || 0) + 1,
-    'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
-    'audit.lastAccessed': new Date(),
-  });
-}
-
 async function persistWaitingPatient(
   db: any,
   input: {
@@ -215,11 +191,10 @@ async function persistWaitingPatient(
     status: WaitingPatient['status'];
     clientIP: string;
     userAgent: string;
-    deviceFingerprint?: DeviceFingerprint;
     admissionMode?: 'doctor-manual' | 'auto-email-match';
   }
 ): Promise<string> {
-  const waitingPatientId = createWaitingPatientId(input.invitationId);
+  const waitingPatientId = db.collection('waitingPatients').doc().id;
   const now = new Date();
 
   const waitingPatient: any = {
@@ -233,9 +208,8 @@ async function persistWaitingPatient(
     joinedAt: now,
     status: input.status,
     metadata: {
-      ...(input.deviceFingerprint && { deviceFingerprint: JSON.stringify(input.deviceFingerprint) }),
-      ip: input.clientIP,
-      userAgent: input.userAgent,
+      networkHash: hashSecuritySignal('ip', input.clientIP),
+      userAgentHash: hashSecuritySignal('user-agent', input.userAgent),
       lastAccessed: now,
       ...(input.admissionMode && { admissionMode: input.admissionMode }),
       isAnonymous: input.identity.isAnonymous,
@@ -315,96 +289,24 @@ async function resolveUserContext(
   return { lookup };
 }
 
-async function collectSecurityViolations(
-  db: any,
-  lookup: UserLookupContext,
-  deviceFingerprint: DeviceFingerprint | undefined,
-  isWaitingRoomEnabled: boolean,
-  geolocation: any,
-  detectedBrowser: string,
-  clientIP: string,
-  userAgent: string,
-  violations: SecurityViolation[]
-): Promise<void> {
-  if (!lookup.userProfile) {
-    return;
-  }
-
-  if (deviceFingerprint && lookup.userProfile.deviceInfo && !isWaitingRoomEnabled) {
-    const currentDeviceHash = generateDeviceFingerprintHash(deviceFingerprint);
-    if (lookup.userProfile.deviceInfo.deviceFingerprintHash !== currentDeviceHash) {
-      violations.push(
-        buildSecurityViolation({
-          type: 'wrong_device',
-          details: 'Device fingerprint does not match registered device',
-          clientIP,
-          userAgent,
-          actorType: 'patient',
-          actorId: lookup.userDocId || null,
-        })
-      );
-    }
-  } else if (deviceFingerprint && !lookup.userProfile.deviceInfo && lookup.userDocId) {
-    const deviceHash = generateDeviceFingerprintHash(deviceFingerprint);
-    await new UserRepository(db).update(lookup.userDocId, {
-      'deviceInfo.deviceFingerprintHash': deviceHash,
-      'deviceInfo.userAgent': deviceFingerprint.userAgent,
-      'deviceInfo.platform': deviceFingerprint.platform,
-      'deviceInfo.screenResolution': deviceFingerprint.screenResolution,
-      'deviceInfo.timezone': deviceFingerprint.timezone,
-      'browserInfo.name': detectedBrowser,
-    });
-  }
-
-  if (geolocation && lookup.userProfile.locationInfo) {
-    if (
-      lookup.userProfile.locationInfo.country !== geolocation.country &&
-      lookup.userProfile.locationInfo.countryCode !== geolocation.countryCode
-    ) {
-      violations.push(
-        buildSecurityViolation({
-          type: 'wrong_country',
-          details:
-            `Expected: ${lookup.userProfile.locationInfo.country} ` +
-            `(${lookup.userProfile.locationInfo.countryCode}), Got: ${geolocation.country} (${geolocation.countryCode})`,
-          clientIP,
-          userAgent,
-          actorType: 'patient',
-          actorId: lookup.userDocId || null,
-        })
-      );
-    }
-  }
-
-  if (lookup.userProfile.browserInfo && lookup.userProfile.browserInfo.name !== detectedBrowser) {
-    violations.push(
-      buildSecurityViolation({
-        type: 'wrong_browser',
-        details: `Expected: ${lookup.userProfile.browserInfo.name}, Got: ${detectedBrowser}`,
-        clientIP,
-        userAgent,
-        actorType: 'patient',
-        actorId: lookup.userDocId || null,
-      })
-    );
-  }
-}
-
 async function denyWithViolations(
   db: any,
   invitationId: string,
-  invitation: Invitation,
+  _invitation: Invitation,
   accessAttempt: AccessAttempt,
   violations: SecurityViolation[]
 ): Promise<ValidateInvitationResult> {
   accessAttempt.reason = `Violations: ${violations.map((violation) => violation.type).join(', ')}`;
   const accessAttemptData = toAccessAttemptData(accessAttempt);
 
-  await db.collection('invitations').doc(invitationId).update({
-    'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
-    'audit.violations': [...(invitation.audit?.violations || []), ...violations],
-    'audit.lastAccessed': new Date(),
-  });
+  const invitationRef = db.collection('invitations').doc(invitationId);
+  const batch = db.batch();
+  batch.update(invitationRef, { 'audit.lastAccessed': new Date() });
+  batch.set(invitationRef.collection('accessAttempts').doc(), accessAttemptData);
+  for (const violation of violations) {
+    batch.set(invitationRef.collection('securityViolations').doc(), violation);
+  }
+  await batch.commit();
 
   return result(403, {
     success: false,
@@ -460,7 +362,6 @@ async function findExistingWaitingPatient(
   db: any,
   invitationId: string,
   identity: WaitingPatientIdentity,
-  deviceFingerprint: DeviceFingerprint | undefined,
   clientIP: string,
   userAgent: string
 ): Promise<WaitingPatient | null> {
@@ -514,23 +415,20 @@ async function findExistingWaitingPatient(
     }
 
     const sameNetworkIdentity =
-      patient.metadata?.ip === clientIP &&
-      patient.metadata?.userAgent === userAgent;
+      (
+        patient.metadata?.networkHash === hashSecuritySignal('ip', clientIP) &&
+        patient.metadata?.userAgentHash === hashSecuritySignal('user-agent', userAgent)
+      ) ||
+      (
+        // Compatibility for entries created before signal hashing shipped.
+        patient.metadata?.ip === clientIP &&
+        patient.metadata?.userAgent === userAgent
+      );
     if (!sameNetworkIdentity) {
       return false;
     }
 
-    if (!deviceFingerprint) {
-      return true;
-    }
-
-    const incomingFingerprint = JSON.stringify(deviceFingerprint);
-    const storedFingerprint = patient.metadata?.deviceFingerprint;
-    if (!storedFingerprint || typeof storedFingerprint !== 'string') {
-      return true;
-    }
-
-    return storedFingerprint === incomingFingerprint;
+    return true;
   });
 
   return anonymousCandidate || null;
@@ -542,12 +440,10 @@ async function handleWaitingRoomAccess(params: {
   invitation: Invitation;
   lookup: UserLookupContext;
   explicitUserEmail?: string;
-  accessAttemptData: Record<string, any>;
   participantDisplayName: string;
   waitingRoomName: string;
   clientIP: string;
   userAgent: string;
-  deviceFingerprint?: DeviceFingerprint;
 }): Promise<ValidateInvitationResult> {
   const {
     db,
@@ -555,12 +451,10 @@ async function handleWaitingRoomAccess(params: {
     invitation,
     lookup,
     explicitUserEmail,
-    accessAttemptData,
     participantDisplayName,
     waitingRoomName,
     clientIP,
     userAgent,
-    deviceFingerprint,
   } = params;
 
   const doctorUserId = invitation.createdBy;
@@ -592,8 +486,6 @@ async function handleWaitingRoomAccess(params: {
 
     if (!admissionHistory.hasLeft) {
       if (admissionHistory.latestAdmitted) {
-        await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
-
         const admittedToken = signLiveKitRoomToken({
           subject: `patient_${tokenPayload.invitationId}_${admissionHistory.latestAdmitted.id}`,
           roomName: tokenPayload.roomName,
@@ -620,11 +512,8 @@ async function handleWaitingRoomAccess(params: {
         status: 'admitted',
         clientIP,
         userAgent,
-        deviceFingerprint,
         admissionMode: 'auto-email-match',
       });
-
-      await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
 
       const admittedToken = signLiveKitRoomToken({
         subject: `patient_${tokenPayload.invitationId}_${admittedWaitingPatientId}`,
@@ -649,7 +538,6 @@ async function handleWaitingRoomAccess(params: {
     db,
     tokenPayload.invitationId,
     identity,
-    deviceFingerprint,
     clientIP,
     userAgent
   );
@@ -700,11 +588,8 @@ async function handleWaitingRoomAccess(params: {
     status: 'waiting',
     clientIP,
     userAgent,
-    deviceFingerprint,
     admissionMode: 'doctor-manual',
   });
-
-  await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
 
   return result(200, {
     success: true,
@@ -777,14 +662,7 @@ export async function validateInvitationAndIssueToken(
       return result(403, { success: false, error: 'Invitation has been cancelled or revoked' });
     }
 
-    const geolocation = await getGeolocationFromIP(context.clientIP);
-    const detectedBrowser = detectBrowser(context.userAgent);
-    const accessAttempt = buildAccessAttempt(
-      context.clientIP,
-      context.userAgent,
-      geolocation?.country,
-      context.deviceFingerprint
-    );
+    const accessAttempt = buildAccessAttempt(context.clientIP, context.userAgent);
     const violations: SecurityViolation[] = [];
 
     const userResolution = await resolveUserContext(
@@ -814,31 +692,6 @@ export async function validateInvitationAndIssueToken(
       ? `${tokenPayload.roomName}-waiting`
       : tokenPayload.roomName;
 
-    await collectSecurityViolations(
-      db,
-      userResolution.lookup,
-      context.deviceFingerprint,
-      isWaitingRoomEnabled,
-      geolocation,
-      detectedBrowser,
-      context.clientIP,
-      context.userAgent,
-      violations
-    );
-
-    console.log('Validation debug info:', {
-      invitationId: tokenPayload.invitationId,
-      userEmail: userResolution.lookup.userEmailToCheck || 'none (open invitation)',
-      userRegistered: Boolean(userResolution.lookup.userProfile),
-      consentGiven: userResolution.lookup.userProfile?.consentGiven || false,
-      clientIP: context.clientIP,
-      geolocation: geolocation
-        ? { country: geolocation.country, countryCode: geolocation.countryCode }
-        : null,
-      detectedBrowser,
-      userAgent: context.userAgent,
-    });
-
     if (violations.length > 0) {
       return await denyWithViolations(db, tokenPayload.invitationId, invitation, accessAttempt, violations);
     }
@@ -854,11 +707,23 @@ export async function validateInvitationAndIssueToken(
       return usageError;
     }
 
-    const participantDisplayName = buildParticipantDisplayName(userResolution.lookup);
-
     accessAttempt.success = true;
     accessAttempt.reason = 'Access granted successfully';
     const accessAttemptData = toAccessAttemptData(accessAttempt);
+
+    const invitationUseReserved = await reserveInvitationUse(
+      db,
+      tokenPayload.invitationId,
+      accessAttemptData
+    );
+    if (!invitationUseReserved) {
+      return result(403, {
+        success: false,
+        error: 'This invitation has reached its usage limit.',
+      });
+    }
+
+    const participantDisplayName = buildParticipantDisplayName(userResolution.lookup);
 
     if (isWaitingRoomEnabled) {
       return await handleWaitingRoomAccess({
@@ -867,12 +732,10 @@ export async function validateInvitationAndIssueToken(
         invitation,
         lookup: userResolution.lookup,
         explicitUserEmail: context.userEmail,
-        accessAttemptData,
         participantDisplayName,
         waitingRoomName,
         clientIP: context.clientIP,
         userAgent: context.userAgent,
-        deviceFingerprint: context.deviceFingerprint,
       });
     }
 
@@ -886,8 +749,7 @@ export async function validateInvitationAndIssueToken(
     await db.collection('invitations').doc(tokenPayload.invitationId).update({
       status: 'used',
       usedAt: new Date(),
-      usedBy: context.clientIP,
-      'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
+      usedBy: hashSecuritySignal('ip', context.clientIP),
       'audit.lastAccessed': new Date(),
     });
 

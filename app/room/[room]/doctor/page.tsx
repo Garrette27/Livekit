@@ -36,7 +36,10 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
     clearTokenError,
   } = useDoctorToken({ roomName, doctorName, user });
 
-  const { captureError } = useSpeechCapture({ roomName, token });
+  const { speechStatus, captureError, startCapture, stopCapture } = useSpeechCapture({
+    roomName,
+    token,
+  });
   const { consultationSessionId } = useRoomLifecycle({ token, user, roomName, doctorName });
 
   const { pageError, setPageError } = useErrorHandler(authError, tokenError, captureError);
@@ -56,6 +59,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
   }, [isAuthenticated, user, doctorName, token, isJoining, generateDoctorToken]);
 
   const handleLeave = () => {
+    stopCapture();
     if (user?.uid) {
       void trackDoctorPresenceEvent(
         {
@@ -197,6 +201,10 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
           user={user!}
           doctorName={doctorName}
           onLeave={handleLeave}
+          speechStatus={speechStatus}
+          speechCaptureError={captureError}
+          onStartSpeechCapture={startCapture}
+          onStopSpeechCapture={stopCapture}
         />
 
         <LiveKitShell

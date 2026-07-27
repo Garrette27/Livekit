@@ -7,17 +7,27 @@ import { serviceResultToResponse } from '@/lib/services/shared/http';
 
 interface CreateAttachmentBody {
   consultationSessionId: string;
-  uploaderId: string;
-  uploaderName: string;
   name: string;
   mimeType: string;
   size: number;
-  storagePath?: string;
-  downloadUrl?: string;
-  extractedText?: string;
-  extractionStatus?: 'pending' | 'ready' | 'failed';
 }
 
+const ATTACHMENT_LIMITS = new Map<string, number>([
+  ['image/jpeg', 10 * 1024 * 1024],
+  ['image/png', 10 * 1024 * 1024],
+  ['image/gif', 10 * 1024 * 1024],
+  ['image/webp', 10 * 1024 * 1024],
+  ['application/pdf', 5 * 1024 * 1024],
+]);
+
+function normalizedFileName(value: string): string {
+  return value.trim().replace(/[^a-zA-Z0-9._ -]/g, '_').slice(0, 180);
+}
+
+/**
+ * Create server-owned attachment metadata. Upload locations, download URLs,
+ * extraction text, and extraction status are never accepted from the browser.
+ */
 async function handlePOST(req: NextRequest) {
   try {
     const body = (await req.json()) as CreateAttachmentBody;
@@ -26,15 +36,20 @@ async function handlePOST(req: NextRequest) {
       name,
       mimeType,
       size,
-      storagePath,
-      downloadUrl,
-      extractedText,
-      extractionStatus = extractedText ? 'ready' : 'pending',
     } = body;
 
-    if (!consultationSessionId || !name || !mimeType || !Number.isFinite(size) || size <= 0) {
+    const safeName = typeof name === 'string' ? normalizedFileName(name) : '';
+    const maximumSize = ATTACHMENT_LIMITS.get(mimeType);
+    if (
+      !consultationSessionId ||
+      !safeName ||
+      !maximumSize ||
+      !Number.isFinite(size) ||
+      size <= 0 ||
+      size > maximumSize
+    ) {
       return NextResponse.json(
-        { success: false, error: 'Missing required attachment fields' },
+        { success: false, error: 'Attachment type or size is not allowed' },
         { status: 400 }
       );
     }
@@ -56,13 +71,13 @@ async function handlePOST(req: NextRequest) {
       consultationSessionId,
       uploaderId: participant.data.identity,
       uploaderName: participant.data.participantName,
-      name,
+      name: safeName,
       mimeType,
       size,
-      storagePath: storagePath || null,
-      downloadUrl: downloadUrl || null,
-      extractedText: extractedText || null,
-      extractionStatus,
+      storagePath: null,
+      downloadUrl: null,
+      extractedText: null,
+      extractionStatus: 'pending',
     });
 
     return NextResponse.json({

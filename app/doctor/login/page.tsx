@@ -230,50 +230,40 @@ export default function DoctorLoginPage() {
     }
 
     try {
-      // First, check user status via API to get better error messages
-      const statusResponse = await fetch(`/api/password-reset?email=${encodeURIComponent(email.trim())}`);
-      const statusData = await statusResponse.json();
-
-      if (!statusData.exists) {
-        setError('No account found with this email address. Please sign up first.');
-        setResetLoading(false);
-        return;
-      }
-
-      if (!statusData.hasPasswordProvider) {
-        setError('This account was created with Google Sign-In. Please use Google Sign-In to access your account.');
-        setResetLoading(false);
-        return;
-      }
-
-      // If user exists and has password provider, send reset email
-      console.log('Sending password reset email to:', email.trim());
-      await sendPasswordResetEmail(auth, email.trim(), {
-        url: `${window.location.origin}/doctor/login?mode=resetPassword&oobCode=`,
-        handleCodeInApp: false,
+      const preflightResponse = await fetch('/api/password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
       });
-      
-      console.log('Password reset email sent successfully');
+      const preflight = await preflightResponse.json();
+      if (!preflightResponse.ok) {
+        setError(preflight.error || 'Unable to process that request. Please try again.');
+        return;
+      }
+
+      try {
+        await sendPasswordResetEmail(auth, email.trim(), {
+          url: `${window.location.origin}/doctor/login?mode=resetPassword&oobCode=`,
+          handleCodeInApp: false,
+        });
+      } catch (sendError: any) {
+        // Account existence and sign-in provider are private. Firebase may
+        // reject an ineligible account, but the UI must remain indistinguishable.
+        if (!['auth/user-not-found', 'auth/invalid-credential'].includes(sendError.code)) {
+          throw sendError;
+        }
+      }
+
       setResetEmailSent(true);
     } catch (err: any) {
-      console.error('Password reset error:', {
-        code: err.code,
-        message: err.message,
-        email: email.trim()
-      });
-      
-      if (err.code === 'auth/user-not-found') {
-        setError('No account found with this email address. Please sign up first.');
-      } else if (err.code === 'auth/invalid-email') {
+      if (err.code === 'auth/invalid-email') {
         setError('Invalid email address. Please check and try again.');
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setError('Password reset is not enabled. Please contact support or use Google Sign-In.');
       } else if (err.code === 'auth/too-many-requests') {
         setError('Too many password reset requests. Please wait a few minutes and try again.');
       } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
         setError('Network error. Please check your connection and try again.');
       } else {
-        setError(err.message || 'Failed to send password reset email. Please try again or contact support.');
+        setError('Unable to process that request. Please try again later.');
       }
     } finally {
       setResetLoading(false);

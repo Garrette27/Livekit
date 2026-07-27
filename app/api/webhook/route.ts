@@ -2,7 +2,7 @@ import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { WebhookReceiver } from 'livekit-server-sdk';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
-import { withRateLimit, RateLimitConfigs } from '../../../lib/rate-limit';
+import { enforceRateLimit, RateLimitConfigs } from '../../../lib/rate-limit';
 import { isRoomEndEvent } from '../../../lib/webhooks/room-end-processor';
 import { verifyWebhookSignature } from '../../../lib/webhooks/signature-utils';
 import { processWebhookFinalizationFallback } from '../../../lib/webhooks/webhook-finalization-fallback';
@@ -44,13 +44,13 @@ async function verifyWebhookRequest(body: string, req: NextRequest): Promise<{ o
     return { ok: false, reason: 'missing_credentials' };
   }
 
-  console.warn('No webhook verification material configured - accepting unverified webhook');
-  return { ok: true, reason: 'verification_disabled' };
+  console.error('LiveKit webhook verification is not configured');
+  return { ok: false, reason: 'verification_not_configured' };
 }
 
 async function handlePOST(req: NextRequest) {
   try {
-    const rateLimitResponse = withRateLimit(RateLimitConfigs.WEBHOOK)(req);
+    const rateLimitResponse = await enforceRateLimit(req, RateLimitConfigs.WEBHOOK);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
@@ -61,16 +61,24 @@ async function handlePOST(req: NextRequest) {
       console.error('Rejected webhook request:', verification.reason);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    console.log('Webhook verified via:', verification.reason);
-
     let event: any;
     try {
       event = JSON.parse(body);
-      console.log('Webhook received:', JSON.stringify(event, null, 2));
     } catch (error) {
       console.error('Invalid JSON in webhook body:', error);
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
+
+    console.log(
+      JSON.stringify({
+        level: 'info',
+        msg: 'livekit_webhook_verified',
+        verification: verification.reason,
+        eventType: typeof event?.event === 'string' ? event.event : 'unknown',
+        roomName: typeof event?.room?.name === 'string' ? event.room.name : undefined,
+        eventId: typeof event?.id === 'string' ? event.id : undefined,
+      })
+    );
 
     if (isRoomEndEvent(event)) {
       const db = getFirebaseAdmin();

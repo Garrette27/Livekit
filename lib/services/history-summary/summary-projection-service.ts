@@ -108,6 +108,11 @@ function mergeHistoryRecords(existing: HistoryRecord, incoming: HistoryRecord): 
       Array.isArray(incoming.followUpActions) && incoming.followUpActions.length > 0
         ? incoming.followUpActions
         : existing.followUpActions,
+    summaryStatus: incoming.summaryStatus || existing.summaryStatus,
+    requiresClinicianReview:
+      incoming.requiresClinicianReview ?? existing.requiresClinicianReview,
+    isEdited: incoming.isEdited ?? existing.isEdited,
+    lastEditedAt: incoming.lastEditedAt || existing.lastEditedAt || null,
     waitingRoomHistory: mergedWaitingRoomHistory,
     chatHistory: mergedChatHistory,
   };
@@ -567,6 +572,13 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
         followUpActions: Array.isArray(summaryData.followUpActions)
           ? (summaryData.followUpActions as string[])
           : undefined,
+        summaryStatus:
+          summaryMetadata.isEdited === true
+            ? 'reviewed'
+            : ((summaryMetadata.summaryStatus as HistoryRecord['summaryStatus']) || undefined),
+        requiresClinicianReview: summaryMetadata.requiresClinicianReview === true,
+        isEdited: summaryMetadata.isEdited === true,
+        lastEditedAt: toIsoString(summaryMetadata.lastEditedAt),
         waitingRoomHistory,
         chatHistory,
       };

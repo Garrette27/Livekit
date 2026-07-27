@@ -1,42 +1,16 @@
-import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { verifyInvitationToken } from '@/lib/invitations/token-utils';
 import { InvitationRepository } from '@/lib/repositories/invitation-repository';
 import { UserRepository } from '@/lib/repositories/user-repository';
-import { RateLimitConfigs, withRateLimit } from '@/lib/rate-limit';
+import { enforceRateLimit, RateLimitConfigs } from '@/lib/rate-limit';
+import { hashSecuritySignal } from '@/lib/security/security-signal';
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import type {
-  DeviceFingerprint,
   RegisterUserRequest,
   RegisterUserResponse,
 } from '@/lib/types';
 import { sanitizeInput, validateEmail } from '@/lib/validation';
-
-function hashValue(value: string): string {
-  return crypto.createHash('sha256').update(value).digest('hex');
-}
-
-function fingerprintHash(device: DeviceFingerprint): string {
-  return hashValue([
-    device.userAgent,
-    device.language,
-    device.platform,
-    device.screenResolution,
-    device.timezone,
-    String(device.cookieEnabled),
-    device.doNotTrack,
-  ].join('|'));
-}
-
-function detectBrowser(userAgent: string): string {
-  if (userAgent.includes('Edg/')) return 'Edge';
-  if (userAgent.includes('OPR/')) return 'Opera';
-  if (userAgent.includes('Chrome')) return 'Chrome';
-  if (userAgent.includes('Firefox')) return 'Firefox';
-  if (userAgent.includes('Safari')) return 'Safari';
-  return 'Unknown';
-}
 
 function expirationDate(value: unknown): Date | null {
   if (value instanceof Date) {
@@ -72,17 +46,17 @@ function allowedInvitationEmails(invitation: Record<string, unknown>): string[] 
  * its persisted state. Existing non-patient profiles are never rewritten.
  */
 async function handlePOST(req: NextRequest) {
-  const rateLimitResponse = withRateLimit(RateLimitConfigs.TOKEN_GENERATION)(req);
+  const rateLimitResponse = await enforceRateLimit(req, RateLimitConfigs.TOKEN_GENERATION);
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
 
   try {
     const body = (await req.json()) as RegisterUserRequest;
-    const { invitationToken, email, phone, consentGiven, deviceFingerprint } = body;
-    if (!invitationToken || !email || !consentGiven || !deviceFingerprint) {
+    const { invitationToken, email, phone, consentGiven } = body;
+    if (!invitationToken || !email || !consentGiven) {
       return NextResponse.json(
-        { success: false, error: 'Invitation, email, consent, and device information are required' },
+        { success: false, error: 'Invitation, email, and consent are required' },
         { status: 400 }
       );
     }
@@ -140,19 +114,15 @@ async function handlePOST(req: NextRequest) {
       || req.headers.get('x-real-ip')
       || 'unknown'
     ).trim();
+    const userAgent = req.headers.get('user-agent') || 'unknown';
     const profileFields: Record<string, unknown> = {
       email: sanitizedEmail,
       consentGiven: true,
       consentGivenAt: new Date(),
-      deviceInfo: {
-        deviceFingerprintHash: fingerprintHash(deviceFingerprint),
-        userAgent: deviceFingerprint.userAgent,
-        platform: deviceFingerprint.platform,
-        screenResolution: deviceFingerprint.screenResolution,
-        timezone: deviceFingerprint.timezone,
+      securityInfo: {
+        networkHash: hashSecuritySignal('ip', clientIp),
+        userAgentHash: hashSecuritySignal('user-agent', userAgent),
       },
-      browserInfo: { name: detectBrowser(deviceFingerprint.userAgent) },
-      securityInfo: { ipHash: hashValue(clientIp) },
       lastLoginAt: new Date(),
     };
     if (phone?.trim()) {
