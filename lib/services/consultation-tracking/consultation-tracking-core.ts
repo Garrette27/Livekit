@@ -194,6 +194,8 @@ export class FirestoreConsultationTrackingCore implements ConsultationTrackingSe
       sessionStartedAt: session.sessionStartedAt,
       consultationSessionId: session.sessionId,
       status: 'active',
+      // This encounter now has its patient, so a later arrival starts a new one.
+      awaitingPatient: false,
       isRealConsultation: true,
       createdBy: doctorUserId,
       metadata: {

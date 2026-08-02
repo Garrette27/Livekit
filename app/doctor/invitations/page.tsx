@@ -13,6 +13,10 @@ import { useToast } from '@/components/ui/feedback/ToastProvider';
 import { getDoctorHistoryRoute } from '@/lib/routes/doctor-routes';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 import { compactInvitationUrl } from '@/lib/invitations/invitation-link-display';
+import {
+  formatExpiryCountdown,
+  resolveInvitationStatusPresentation,
+} from '@/lib/invitations/invitation-presentation';
 
 export default function DoctorInvitationsPage() {
   const { showToast } = useToast();
@@ -29,6 +33,9 @@ export default function DoctorInvitationsPage() {
   const [waitingPatientsCounts, setWaitingPatientsCounts] = useState<Record<string, number>>({});
   const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null);
   const [pendingRevokeId, setPendingRevokeId] = useState<string | null>(null);
+  // Defaults to the invitations a doctor can still act on; expired and revoked
+  // links are history and would otherwise bury the usable ones.
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const requestedInvitationLinksRef = useRef<Set<string>>(new Set());
   const router = useRouter();
 
@@ -246,26 +253,6 @@ export default function DoctorInvitationsPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return '#059669';
-      case 'used': return '#2563eb';
-      case 'expired': return '#dc2626';
-      case 'revoked': return '#6b7280';
-      default: return '#6b7280';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active': return 'A';
-      case 'used': return 'U';
-      case 'expired': return 'E';
-      case 'revoked': return 'R';
-      default: return '?';
-    }
-  };
-
   const getInvitationEmails = (invitation: Invitation): string[] => {
     const metadataEmails = Array.isArray((invitation as any)?.metadata?.constraints?.emails)
       ? (invitation as any).metadata.constraints.emails
@@ -306,6 +293,18 @@ export default function DoctorInvitationsPage() {
     
     return invitation.status;
   };
+
+  const activeInvitationCount = invitations.filter(
+    (invitation) => getEffectiveStatus(invitation) === 'active'
+  ).length;
+
+  const visibleInvitations = invitations.filter((invitation) => {
+    if (statusFilter === 'all') {
+      return true;
+    }
+    const isActive = getEffectiveStatus(invitation) === 'active';
+    return statusFilter === 'active' ? isActive : !isActive;
+  });
 
   if (authLoading || !isAuthenticated || !isAuthorized) {
     return (
@@ -396,22 +395,24 @@ export default function DoctorInvitationsPage() {
             Create a secure invitation for a specific room
           </p>
           
-          <div style={{
+          {/* Collapsed by default: this is onboarding guidance, and a doctor who
+              already knows the flow should not have to read past it every visit. */}
+          <details style={{
             backgroundColor: '#f0f9ff',
             border: '1px solid #bae6fd',
             borderRadius: '0.5rem',
-            padding: '1rem',
+            padding: '0.75rem 1rem',
             marginBottom: '1.5rem'
           }}>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1e40af', marginBottom: '0.75rem' }}>
-              How it works:
-            </h3>
-            <ul style={{ fontSize: '0.875rem', color: '#1e40af', margin: 0, paddingLeft: '1.25rem', lineHeight: '1.75' }}>
+            <summary style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1e40af', cursor: 'pointer' }}>
+              How invitations work
+            </summary>
+            <ul style={{ fontSize: '0.875rem', color: '#1e40af', margin: '0.75rem 0 0', paddingLeft: '1.25rem', lineHeight: '1.75' }}>
               <li><strong>Patient:</strong> Uses the invitation link to join and register (if first time)</li>
               <li><strong>Doctor:</strong> Uses the &apos;Join as Doctor&apos; button (no invitation needed)</li>
               <li><strong>Security:</strong> System automatically verifies patient&apos;s device, location, and browser after registration with consent</li>
             </ul>
-          </div>
+          </details>
           
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
@@ -457,9 +458,35 @@ export default function DoctorInvitationsPage() {
             <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>
               Your Invitations
             </h2>
-            <p style={{ color: '#6B7280', marginBottom: '1.5rem' }}>
-              Manage your created invitations
-            </p>
+
+            <div style={{ display: 'flex', gap: '0.375rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+              {([
+                { value: 'active' as const, label: `Active (${activeInvitationCount})` },
+                { value: 'inactive' as const, label: `Expired & revoked (${invitations.length - activeInvitationCount})` },
+                { value: 'all' as const, label: `All (${invitations.length})` },
+              ]).map((filter) => {
+                const isActive = statusFilter === filter.value;
+                return (
+                  <button
+                    key={filter.value}
+                    onClick={() => setStatusFilter(filter.value)}
+                    aria-pressed={isActive}
+                    style={{
+                      padding: '0.375rem 0.75rem',
+                      borderRadius: '0.375rem',
+                      border: `1px solid ${isActive ? '#2563eb' : '#d1d5db'}`,
+                      backgroundColor: isActive ? '#eff6ff' : '#ffffff',
+                      color: isActive ? '#1d4ed8' : '#4b5563',
+                      fontSize: '0.8125rem',
+                      fontWeight: isActive ? 600 : 500,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {filter.label}
+                  </button>
+                );
+              })}
+            </div>
 
             {loading ? (
               <div style={{ textAlign: 'center', padding: '2rem' }}>
@@ -474,16 +501,26 @@ export default function DoctorInvitationsPage() {
                 }}></div>
                 <p style={{ color: '#6B7280' }}>Loading invitations...</p>
               </div>
-            ) : invitations.length === 0 ? (
+            ) : visibleInvitations.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>
-                <p>No invitations created yet.</p>
-                <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                  Create your first invitation using the form above.
-                </p>
+                {invitations.length === 0 ? (
+                  <>
+                    <p>No invitations created yet.</p>
+                    <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                      Create your first invitation using the form above.
+                    </p>
+                  </>
+                ) : (
+                  <p>
+                    {statusFilter === 'active'
+                      ? 'No active invitations. Create one above to invite a patient.'
+                      : 'No invitations in this category.'}
+                  </p>
+                )}
               </div>
             ) : (
               <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-                {invitations.map((invitation) => (
+                {visibleInvitations.map((invitation) => (
                   <div
                     key={invitation.id}
                     id={`invitation-${invitation.id}`}
@@ -527,43 +564,40 @@ export default function DoctorInvitationsPage() {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         {(() => {
-                          const effectiveStatus = getEffectiveStatus(invitation);
+                          const presentation = resolveInvitationStatusPresentation(
+                            getEffectiveStatus(invitation)
+                          );
                           return (
-                            <>
-                              <span style={{ fontSize: '1.25rem' }}>
-                                {getStatusIcon(effectiveStatus)}
-                              </span>
-                              <span style={{
-                                fontSize: '0.75rem',
-                                fontWeight: '500',
-                                color: getStatusColor(effectiveStatus),
-                                textTransform: 'uppercase'
-                              }}>
-                                {effectiveStatus}
-                              </span>
-                            </>
+                            <span style={{
+                              padding: '0.125rem 0.625rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              color: presentation.color,
+                              backgroundColor: presentation.background,
+                              whiteSpace: 'nowrap',
+                            }}>
+                              {presentation.label}
+                            </span>
                           );
                         })()}
                       </div>
                     </div>
 
                     <div style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '0.75rem' }}>
-                      <p><strong>Created:</strong> {invitation.createdAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
-                      <p><strong>Expires:</strong> {invitation.expiresAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
-                      {invitation.waitingRoomEnabled ? (
-                        <p><strong>Uses:</strong> {invitation.currentUses || 0} / {invitation.maxUses || 'Unlimited'}</p>
-                      ) : (
-                        <p><strong>Uses:</strong> {invitation.usedAt ? 1 : 0} / {invitation.maxUses || 1}</p>
-                      )}
-                      {getInvitationEmails(invitation).length > 0 ? (
-                        <p><strong>Emails:</strong> {getInvitationEmails(invitation).join(', ')}</p>
-                      ) : (
-                        <p><strong>Type:</strong> <span style={{ color: '#059669', fontWeight: '600' }}>Open Invitation</span> (No email required)</p>
-                      )}
+                      {/* Validity is the decision the doctor is making, so it leads
+                          and is phrased as remaining time rather than a timestamp. */}
+                      <p style={{ margin: '0 0 0.25rem', fontWeight: 600, color: '#374151' }}>
+                        {formatExpiryCountdown(invitation.expiresAt?.toDate?.() || null) || 'Expiry unknown'}
+                        {' · '}
+                        {invitation.waitingRoomEnabled
+                          ? `${invitation.currentUses || 0} of ${invitation.maxUses || 'unlimited'} uses`
+                          : `${invitation.usedAt ? 1 : 0} of ${invitation.maxUses || 1} uses`}
+                      </p>
                       {invitation.phoneAllowed && (
-                        <p><strong>Phone:</strong> {invitation.phoneAllowed}</p>
+                        <p style={{ margin: '0 0 0.25rem' }}>Phone: {invitation.phoneAllowed}</p>
                       )}
-                      
+
                       {/* Invitation Link Section */}
                       {getEffectiveStatus(invitation) === 'active' && (
                         <div style={{ 

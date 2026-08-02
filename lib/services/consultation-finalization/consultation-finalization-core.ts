@@ -375,6 +375,7 @@ async function runFinalization(
     leftAt: effectiveSessionEndedAt,
     duration: finalDurationMinutes,
     status: 'completed',
+    awaitingPatient: false,
     patientUserId: sessionPatientUserId,
     ...(consultationPatientEmail ? { patientEmail: consultationPatientEmail } : {}),
     metadata: {

@@ -1,5 +1,9 @@
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
-import { appendPresenceEvent } from '@/lib/consultations/consultation-session-store';
+import {
+  appendPresenceEvent,
+  createConsultationSessionId,
+  upsertSessionSnapshot,
+} from '@/lib/consultations/consultation-session-store';
 import { ConsultationRepository } from '@/lib/repositories/consultation-repository';
 import { ConsultationSessionRepository } from '@/lib/repositories/consultation-session-repository';
 import { RoomDoctorPresenceRepository } from '@/lib/repositories/room-doctor-presence-repository';
@@ -56,6 +60,99 @@ export class FirestoreDoctorPresenceCore implements DoctorPresenceService {
 
     const sessionId = (consultationDoc.data() as Record<string, unknown>)?.consultationSessionId;
     return typeof sessionId === 'string' && sessionId.trim() ? sessionId.trim() : null;
+  }
+
+  /**
+   * The session id for a still-running encounter in this room, or null when the
+   * most recent one has already been completed. Completed encounters are
+   * immutable history, so re-entering a room must never reopen them.
+   */
+  private async findActiveConsultationSessionId(
+    roomName: string,
+    preferredSessionId?: string | null
+  ): Promise<string | null> {
+    const candidateSessionId = await this.resolveConsultationSessionId(roomName, preferredSessionId);
+    if (!candidateSessionId) {
+      return null;
+    }
+
+    const sessionDoc = await this.sessionRepo.getById(candidateSessionId);
+    if (!sessionDoc.exists) {
+      return null;
+    }
+
+    const sessionData = sessionDoc.data() as Record<string, unknown>;
+    const belongsToRoom = sessionData.roomName === roomName;
+    return belongsToRoom && sessionData.status === 'active' ? candidateSessionId : null;
+  }
+
+  /**
+   * The consultation session the doctor is entering, opening a new one when no
+   * encounter is running. Treating the doctor's arrival as the start of the
+   * encounter is what lets a consultation be recorded at all when no patient
+   * ever joins — previously nothing existed until a patient arrived, so those
+   * consultations left no trace in history.
+   */
+  private async openConsultationSession(input: {
+    roomName: string;
+    doctorUserId: string;
+    doctorName: string | null;
+    doctorEmail: string | null;
+    preferredSessionId: string | null;
+    now: Date;
+  }): Promise<string> {
+    const activeSessionId = await this.findActiveConsultationSessionId(
+      input.roomName,
+      input.preferredSessionId
+    );
+    if (activeSessionId) {
+      return activeSessionId;
+    }
+
+    const consultationSessionId = createConsultationSessionId(input.roomName, input.now);
+    await upsertSessionSnapshot(this.db, {
+      consultationSessionId,
+      roomName: input.roomName,
+      doctorUserId: input.doctorUserId,
+      patientUserId: null,
+      status: 'active',
+      sessionStartedAt: input.now,
+      metadata: {
+        source: 'doctor-presence-core.openConsultationSession',
+        doctorName: input.doctorName,
+        doctorEmail: input.doctorEmail,
+        openedByDoctorAt: input.now.toISOString(),
+      },
+    });
+
+    // Patient fields are cleared explicitly: this room document is shared across
+    // encounters, and leftover identity from the previous one would otherwise be
+    // attributed to this new consultation.
+    await this.consultationRepo.mergeFields(input.roomName, {
+      roomName: input.roomName,
+      consultationSessionId,
+      sessionStartedAt: input.now,
+      leftAt: null,
+      duration: 0,
+      status: 'active',
+      awaitingPatient: true,
+      isRealConsultation: true,
+      createdBy: input.doctorUserId,
+      patientName: null,
+      patientUserId: null,
+      patientEmail: null,
+      metadata: {
+        source: 'doctor_open',
+        trackedAt: input.now,
+        createdBy: input.doctorUserId,
+        doctorUserId: input.doctorUserId,
+        consultationSessionId,
+        patientUserId: null,
+        patientEmail: null,
+      },
+    });
+
+    return consultationSessionId;
   }
 
   private async applyDoctorDurationToSession(input: {
@@ -119,22 +216,27 @@ export class FirestoreDoctorPresenceCore implements DoctorPresenceService {
         });
       }
 
-      const consultationSessionId = await this.resolveConsultationSessionId(roomName, preferredSessionId);
+      const consultationSessionId = await this.openConsultationSession({
+        roomName,
+        doctorUserId,
+        doctorName,
+        doctorEmail,
+        preferredSessionId,
+        now,
+      });
       activeDoctors[doctorUserId] = { joinedAt: now, doctorName, doctorEmail, consultationSessionId };
 
       await this.presenceRepo.mergeFields(roomName, { roomName, activeDoctors, updatedAt: now });
 
-      if (consultationSessionId) {
-        await appendPresenceEvent(this.db, {
-          consultationSessionId,
-          roomName,
-          doctorUserId,
-          actorType: 'doctor',
-          eventType: 'joined',
-          eventAt: now,
-          metadata: { doctorName, doctorEmail, source: 'doctor-presence-tracker' },
-        });
-      }
+      await appendPresenceEvent(this.db, {
+        consultationSessionId,
+        roomName,
+        doctorUserId,
+        actorType: 'doctor',
+        eventType: 'joined',
+        eventAt: now,
+        metadata: { doctorName, doctorEmail, source: 'doctor-presence-tracker' },
+      });
 
       return serviceOk({ message: 'Doctor join tracked', consultationSessionId });
     }
@@ -157,37 +259,40 @@ export class FirestoreDoctorPresenceCore implements DoctorPresenceService {
       lastLeftAtByDoctor,
     });
 
+    // The session recorded when this doctor joined is authoritative; a client
+    // may report a stale id that belongs to a different encounter.
     const consultationSessionId = await this.resolveConsultationSessionId(
       roomName,
-      preferredSessionId ||
-        (typeof activeDoctor?.consultationSessionId === 'string' ? activeDoctor.consultationSessionId : null)
+      (typeof activeDoctor?.consultationSessionId === 'string' ? activeDoctor.consultationSessionId : null)
+        || preferredSessionId
     );
 
-    if (!consultationSessionId) {
-      return serviceOk({ message: 'Doctor leave tracked (no active consultation session to update)' });
+    let doctorDurationMinutes = 0;
+    if (consultationSessionId) {
+      doctorDurationMinutes = await this.applyDoctorDurationToSession({
+        consultationSessionId,
+        roomName,
+        doctorUserId,
+        segmentDurationMs,
+        doctorName,
+        doctorEmail,
+      });
+
+      await appendPresenceEvent(this.db, {
+        consultationSessionId,
+        roomName,
+        doctorUserId,
+        actorType: 'doctor',
+        eventType: 'left',
+        eventAt: now,
+        metadata: { doctorName, doctorEmail, segmentDurationMs, doctorDurationMinutes, source: 'doctor-presence-tracker' },
+      });
     }
-
-    const doctorDurationMinutes = await this.applyDoctorDurationToSession({
-      consultationSessionId,
-      roomName,
-      doctorUserId,
-      segmentDurationMs,
-      doctorName,
-      doctorEmail,
-    });
-
-    await appendPresenceEvent(this.db, {
-      consultationSessionId,
-      roomName,
-      doctorUserId,
-      actorType: 'doctor',
-      eventType: 'left',
-      eventAt: now,
-      metadata: { doctorName, doctorEmail, segmentDurationMs, doctorDurationMinutes, source: 'doctor-presence-tracker' },
-    });
 
     // Last-doctor leave is the canonical consultation-ending command. Summary
     // finalization is idempotent, while webhook/revoke paths remain backstops.
+    // It runs even when no session id resolved here, because finalization can
+    // still find the room's session and would otherwise leave it open forever.
     if (Object.keys(activeDoctors).length === 0) {
       try {
         await finalizeConsultationForRoom(this.db, {
@@ -206,7 +311,7 @@ export class FirestoreDoctorPresenceCore implements DoctorPresenceService {
 
     return serviceOk({
       message: 'Doctor leave tracked',
-      consultationSessionId,
+      consultationSessionId: consultationSessionId || undefined,
       doctorDurationMinutes,
       finalDurationMinutes: doctorDurationMinutes,
     });

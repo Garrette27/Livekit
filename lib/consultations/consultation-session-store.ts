@@ -77,7 +77,11 @@ interface ResolveJoinSessionResult {
 
 /**
  * Resolve whether to reuse an active session or create a new encounter session.
- * Reuse is only allowed for short reconnects for the same known patient.
+ *
+ * Reuse is allowed in two cases: a short reconnect by the same known patient,
+ * and a session the doctor already opened that no patient has joined yet
+ * (`awaitingPatient`). The second case keeps a consultation to one encounter
+ * when the doctor enters the room first, which is the normal order of events.
  */
 export function resolveJoinSession({
   roomName,
@@ -134,6 +138,24 @@ export function resolveJoinSession({
       consultationSessionId: existingSessionId as string,
       sessionStartedAt: existingSessionStartedAt as Date,
       eventType: 'rejoined',
+      reusedExistingSession: true,
+    };
+  }
+
+  // The doctor opened this encounter and is still waiting; the first patient to
+  // arrive joins that encounter rather than starting a competing one.
+  const canAdoptDoctorOpenedSession =
+    Boolean(existingSessionId) &&
+    existingData?.awaitingPatient === true &&
+    existingStatus === 'active' &&
+    !existingLeftAt &&
+    Boolean(existingSessionStartedAt);
+
+  if (canAdoptDoctorOpenedSession) {
+    return {
+      consultationSessionId: existingSessionId as string,
+      sessionStartedAt: existingSessionStartedAt as Date,
+      eventType: 'joined',
       reusedExistingSession: true,
     };
   }
