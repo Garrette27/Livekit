@@ -8,6 +8,7 @@ import {
   resolveConsultationStatus,
   resolveRiskPresentation,
 } from '@/lib/consultations/history-presentation';
+import { SUMMARY_RETENTION_DAYS } from '@/lib/consultations/retention-policy';
 
 export interface ConsultationCardRecord {
   id: string;
@@ -141,7 +142,7 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
           <span style={{ ...chipStyle, color: status.color, backgroundColor: status.background }}>
             {status.label}
           </span>
-          {status.status === 'awaiting-summary' ? (
+          {status.status === 'awaiting-summary' && (
             <button
               onClick={() => onGenerate(record)}
               disabled={isGenerating}
@@ -158,7 +159,8 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
             >
               {isGenerating ? 'Generating…' : 'Generate summary'}
             </button>
-          ) : (
+          )}
+          {record.hasGeneratedSummary && (
             <button
               onClick={() => onEdit(record)}
               style={{
@@ -187,7 +189,11 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
           fontSize: '0.9375rem',
         }}
       >
-        {record.summary}
+        {record.hasGeneratedSummary
+          ? record.summary
+          : status.status === 'summary-expired'
+            ? `The AI summary for this consultation was permanently deleted under the ${SUMMARY_RETENTION_DAYS}-day retention policy. The consultation record itself is kept.`
+            : 'No summary has been generated for this consultation yet.'}
       </p>
 
       {hasDetail && (

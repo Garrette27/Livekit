@@ -7,7 +7,9 @@
  * view components stay declarative and the rules live in one testable place.
  */
 
-export type ConsultationStatus = 'summarized' | 'awaiting-summary' | 'no-show';
+import { isBeyondSummaryRetention, SUMMARY_RETENTION_DAYS } from './retention-policy';
+
+export type ConsultationStatus = 'summarized' | 'awaiting-summary' | 'summary-expired' | 'no-show';
 
 export interface ConsultationStatusPresentation {
   status: ConsultationStatus;
@@ -20,18 +22,31 @@ export interface ConsultationStatusPresentation {
 const STATUS_PRESENTATION: Record<ConsultationStatus, Omit<ConsultationStatusPresentation, 'status'>> = {
   summarized: { label: 'Summarized', color: '#065f46', background: '#d1fae5' },
   'awaiting-summary': { label: 'Awaiting summary', color: '#92400e', background: '#fef3c7' },
+  'summary-expired': { label: `Summary deleted after ${SUMMARY_RETENTION_DAYS} days`, color: '#4b5563', background: '#f3f4f6' },
   'no-show': { label: 'No patient joined', color: '#4b5563', background: '#f3f4f6' },
 };
 
-export function resolveConsultationStatus(record: {
-  hasGeneratedSummary: boolean;
-  category?: string;
-}): ConsultationStatusPresentation {
+/**
+ * A consultation past the retention window has no summary because the
+ * retention job deleted it, not because one is pending — presenting that as
+ * "awaiting summary" would invite the doctor to regenerate records the policy
+ * deliberately removed.
+ */
+export function resolveConsultationStatus(
+  record: {
+    hasGeneratedSummary: boolean;
+    category?: string;
+    startedAt?: Date | null;
+  },
+  now: Date = new Date()
+): ConsultationStatusPresentation {
   const status: ConsultationStatus = record.category === 'No-Show'
     ? 'no-show'
     : record.hasGeneratedSummary
       ? 'summarized'
-      : 'awaiting-summary';
+      : isBeyondSummaryRetention(record.startedAt ?? null, now)
+        ? 'summary-expired'
+        : 'awaiting-summary';
 
   return { status, ...STATUS_PRESENTATION[status] };
 }
@@ -82,9 +97,10 @@ export function resolveRiskPresentation(riskLevel: string | undefined): { color:
 }
 
 /**
- * Bucket label for a consultation date, relative to today. Doctors recall
- * encounters by recency, so recent days get their own headings and older ones
- * collapse into month groups.
+ * Heading for the day a consultation happened. Groups are per-day rather than
+ * per-month so the date is always visible: a month heading would leave every
+ * card showing only a time of day, with no way to tell the 3rd from the 27th.
+ * Recent days get relative names, which is how a doctor refers to them.
  */
 export function resolveDateGroupLabel(date: Date | null, now: Date = new Date()): string {
   if (!date || Number.isNaN(date.getTime()) || date.getTime() <= 0) {
@@ -94,13 +110,16 @@ export function resolveDateGroupLabel(date: Date | null, now: Date = new Date())
   const startOfDay = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
   const daysApart = Math.round((startOfDay(now) - startOfDay(date)) / 86_400_000);
 
-  if (daysApart <= 0) return 'Today';
-  if (daysApart === 1) return 'Yesterday';
-  if (daysApart < 7) return 'Earlier this week';
-  if (date.getFullYear() === now.getFullYear()) {
-    return date.toLocaleDateString(undefined, { month: 'long' });
-  }
-  return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const fullDate = date.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+  });
+
+  if (daysApart === 0) return `Today · ${fullDate}`;
+  if (daysApart === 1) return `Yesterday · ${fullDate}`;
+  return fullDate;
 }
 
 /** Groups records into ordered date buckets, preserving the incoming order. */

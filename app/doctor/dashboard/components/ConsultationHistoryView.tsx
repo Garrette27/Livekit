@@ -8,6 +8,7 @@ import {
   resolveConsultationStatus,
   type ConsultationStatus,
 } from '@/lib/consultations/history-presentation';
+import { SUMMARY_RETENTION_DAYS } from '@/lib/consultations/retention-policy';
 
 type StatusFilter = 'all' | ConsultationStatus;
 
@@ -15,6 +16,7 @@ const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'summarized', label: 'Summarized' },
   { value: 'awaiting-summary', label: 'Awaiting summary' },
+  { value: 'summary-expired', label: 'Summary expired' },
   { value: 'no-show', label: 'No-shows' },
 ];
 
@@ -47,11 +49,12 @@ export default function ConsultationHistoryView({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const counts = useMemo(() => {
-    const tally = { total: records.length, summarized: 0, awaiting: 0, noShow: 0 };
+    const tally = { total: records.length, summarized: 0, awaiting: 0, expired: 0, noShow: 0 };
     for (const record of records) {
       const { status } = resolveConsultationStatus(record);
       if (status === 'summarized') tally.summarized += 1;
       else if (status === 'awaiting-summary') tally.awaiting += 1;
+      else if (status === 'summary-expired') tally.expired += 1;
       else tally.noShow += 1;
     }
     return tally;
@@ -119,6 +122,11 @@ export default function ConsultationHistoryView({
         <StatTile label="Consultations" value={counts.total} />
         <StatTile label="Summarized" value={counts.summarized} accent="#059669" />
         <StatTile label="Awaiting summary" value={counts.awaiting} accent="#b45309" />
+        <StatTile
+          label={`Summary expired (${SUMMARY_RETENTION_DAYS}d)`}
+          value={counts.expired}
+          accent="#6b7280"
+        />
         <StatTile label="No-shows" value={counts.noShow} accent="#6b7280" />
       </div>
 
