@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, Suspense, Dispatch, SetStateAction } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { sendEmailVerification } from 'firebase/auth';
 import PatientLiveKitRoom from './components/PatientLiveKitRoom';
 import PatientRegistration from '@/components/PatientRegistration';
 import { useAuthSession } from '@/hooks/useAuthSession';
@@ -142,6 +143,22 @@ function InvitePageContent() {
   const [deviceFingerprint, setDeviceFingerprint] = useState<DeviceFingerprint | null>(null);
   const [requiresRegistration, setRequiresRegistration] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
+  const [verificationEmailState, setVerificationEmailState] = useState<'idle' | 'sending' | 'sent'>('idle');
+
+  const handleResendVerification = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+
+    setVerificationEmailState('sending');
+    try {
+      await sendEmailVerification(user);
+      setVerificationEmailState('sent');
+    } catch (verificationError) {
+      console.error('Could not resend the verification email:', verificationError);
+      setVerificationEmailState('idle');
+    }
+  }, [user]);
   const [allowLiveKitMount, setAllowLiveKitMount] = useState(false);
   const [activeConsultationSessionId, setActiveConsultationSessionId] = useState<string | null>(null);
   const trackedJoinKeyRef = useRef<string | null>(null);
@@ -195,7 +212,17 @@ function InvitePageContent() {
         // Sent only when the visitor is signed in. The server verifies it and
         // uses it to decide whether they may skip the waiting room; a visitor
         // without an account is queued rather than blocked.
-        const visitorIdToken = user ? await user.getIdToken().catch(() => null) : null;
+        //
+        // Forced refresh: Firebase caches email_verified in the ID token for up
+        // to an hour, so a patient who has just clicked their verification link
+        // would otherwise keep presenting a token that still says unverified and
+        // stay stuck in the queue with no way to fix it.
+        const visitorIdToken = user
+          ? await user
+              .reload()
+              .then(() => user.getIdToken(true))
+              .catch(() => null)
+          : null;
 
         const response = await fetch('/api/invite/validate', {
           method: 'POST',
@@ -232,7 +259,9 @@ function InvitePageContent() {
     };
 
     validateInvitation();
-  }, [authLoading, deviceFingerprint, token, user?.email]);
+    // `user` is the Firebase user object, stable for a signed-in session, and
+    // is needed whole here to refresh its token before validating.
+  }, [authLoading, deviceFingerprint, token, user, user?.email]);
 
   useEffect(() => {
     if (
@@ -655,6 +684,47 @@ function InvitePageContent() {
                 <strong>Tip:</strong> Keep this page open. You&apos;ll automatically join the consultation when the doctor admits you.
               </p>
             </div>
+
+            {/* Waiting is normal, but a signed-in patient with an unconfirmed
+                email is waiting for a reason they can act on — and they cannot
+                see it unless it is said here. */}
+            {user && !user.emailVerified && (
+              <div style={{
+                backgroundColor: '#fffbeb',
+                border: '1px solid #fde68a',
+                borderRadius: '0.5rem',
+                padding: '1rem',
+                marginBottom: '2rem',
+                textAlign: 'left',
+              }}>
+                <p style={{ fontSize: '0.875rem', color: '#92400e', margin: 0, lineHeight: 1.6 }}>
+                  <strong>Confirm your email to skip this queue next time.</strong> We sent a link to{' '}
+                  {user.email}. Until you open it we can&apos;t confirm the address belongs to you, so
+                  your doctor admits you by hand.
+                </p>
+                <button
+                  onClick={handleResendVerification}
+                  disabled={verificationEmailState === 'sending'}
+                  style={{
+                    marginTop: '0.75rem',
+                    padding: '0.4375rem 0.875rem',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #d97706',
+                    backgroundColor: verificationEmailState === 'sent' ? '#d97706' : '#ffffff',
+                    color: verificationEmailState === 'sent' ? '#ffffff' : '#92400e',
+                    fontSize: '0.8125rem',
+                    fontWeight: 500,
+                    cursor: verificationEmailState === 'sending' ? 'wait' : 'pointer',
+                  }}
+                >
+                  {verificationEmailState === 'sending'
+                    ? 'Sending…'
+                    : verificationEmailState === 'sent'
+                      ? 'Sent — check your inbox'
+                      : 'Resend the link'}
+                </button>
+              </div>
+            )}
 
             <div style={{
               display: 'inline-block',
