@@ -17,6 +17,7 @@ const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'summarized', label: 'Summarized' },
   { value: 'awaiting-summary', label: 'Awaiting summary' },
   { value: 'summary-expired', label: 'Summary expired' },
+  { value: 'not-admitted', label: 'Not admitted' },
   { value: 'no-show', label: 'No-shows' },
 ];
 
@@ -49,12 +50,13 @@ export default function ConsultationHistoryView({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const counts = useMemo(() => {
-    const tally = { total: records.length, summarized: 0, awaiting: 0, expired: 0, noShow: 0 };
+    const tally = { total: records.length, summarized: 0, awaiting: 0, expired: 0, notAdmitted: 0, noShow: 0 };
     for (const record of records) {
       const { status } = resolveConsultationStatus(record);
       if (status === 'summarized') tally.summarized += 1;
       else if (status === 'awaiting-summary') tally.awaiting += 1;
       else if (status === 'summary-expired') tally.expired += 1;
+      else if (status === 'not-admitted') tally.notAdmitted += 1;
       else tally.noShow += 1;
     }
     return tally;
@@ -127,6 +129,7 @@ export default function ConsultationHistoryView({
           value={counts.expired}
           accent="#6b7280"
         />
+        <StatTile label="Patient not admitted" value={counts.notAdmitted} accent="#b45309" />
         <StatTile label="No-shows" value={counts.noShow} accent="#6b7280" />
       </div>
 

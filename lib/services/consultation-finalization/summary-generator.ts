@@ -1,5 +1,9 @@
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { isKnownUserId } from '@/lib/consultations/identity-utils';
+import {
+  buildUnattendedSummaryContent,
+  classifyConsultationOutcome,
+} from '@/lib/consultations/consultation-outcome';
 import { resolveAiEntitlement } from '@/lib/ai/ai-entitlement-policy';
 import { CallSummaryRepository } from '@/lib/repositories/call-summary-repository';
 import { CallRepository } from '@/lib/repositories/call-repository';
@@ -505,26 +509,6 @@ function attachPatientFields(
   }
 }
 
-/**
- * True when nothing clinical happened: no patient identity, no patient
- * presence transition, and no transcript. Asking a language model to summarize
- * an encounter it has no evidence of invites invention, so these sessions get a
- * factual record instead of a generated one.
- */
-function hadNoPatientParticipation(input: {
-  patientUserId: string | null;
-  patientEmail: string | null;
-  presenceTimeline: PresenceTimeline | null;
-  transcription: string[] | null;
-}): boolean {
-  return (
-    !isKnownUserId(input.patientUserId)
-    && !input.patientEmail
-    && !input.presenceTimeline
-    && (!input.transcription || input.transcription.length === 0)
-  );
-}
-
 export async function generateAndStoreConsultationSummary({
   roomName,
   patientName,
@@ -534,6 +518,7 @@ export async function generateAndStoreConsultationSummary({
   transcriptionData = null,
   patientUserId = null,
   patientEmail = null,
+  waitingRoom = null,
 }: GenerateConsultationSummaryParams): Promise<void> {
   const db = getFirebaseAdmin();
   if (!db) {
@@ -573,23 +558,31 @@ export async function generateAndStoreConsultationSummary({
       ? ` ${presenceTimeline.narrative}`
       : '';
 
-    if (
-      hadNoPatientParticipation({
-        patientUserId,
-        patientEmail,
-        presenceTimeline,
-        transcription: resolvedTranscription,
-      })
-    ) {
+    const outcome = classifyConsultationOutcome({
+      patientUserId,
+      patientEmail,
+      hasPatientPresence: Boolean(presenceTimeline),
+      transcriptLineCount: resolvedTranscription?.length || 0,
+      waitingRoomParticipantCount: waitingRoom?.participantCount || 0,
+      longestWaitMinutes: waitingRoom?.longestWaitMinutes ?? null,
+    });
+
+    if (outcome !== 'attended') {
+      const content = buildUnattendedSummaryContent(outcome, {
+        durationMinutes,
+        waitingRoomParticipantCount: waitingRoom?.participantCount || 0,
+        longestWaitMinutes: waitingRoom?.longestWaitMinutes ?? null,
+      });
+
       const summaryData: Record<string, any> = {
         roomName,
         consultationSessionId,
-        summary: `No patient joined this consultation. The room was open for ${durationMinutes} minute${durationMinutes === 1 ? '' : 's'} with the doctor present.`,
-        keyPoints: ['Room opened by doctor', 'No patient joined', 'No consultation content to summarize'],
-        recommendations: ['Follow up with the patient to reschedule if this was a missed appointment'],
-        followUpActions: ['Confirm the patient received a working invitation link'],
+        summary: content.summary,
+        keyPoints: content.keyPoints,
+        recommendations: content.recommendations,
+        followUpActions: content.followUpActions,
         riskLevel: 'Unknown',
-        category: 'No-Show',
+        category: content.category,
         participants: [],
         duration: durationMinutes,
         presenceTimeline: serializedPresenceTimeline,
@@ -599,16 +592,17 @@ export async function generateAndStoreConsultationSummary({
           ...defaultMetadata(userId, resolvedTranscription, consultationSessionId),
           ...presenceTimelineMetadata,
           aiSummaryEnabled: false,
-          aiSummarySkippedReason: 'no_patient_participation',
-          // A factual record of an empty room is final; there is nothing for a
-          // later regeneration to improve on.
+          aiSummarySkippedReason: outcome === 'no-show' ? 'no_patient_participation' : 'patient_never_admitted',
+          // A factual record of an unattended consultation is final; there is
+          // nothing for a later regeneration to improve on.
           aiSummaryGenerated: true,
           patientAttended: false,
+          consultationOutcome: outcome,
         },
       };
 
       await summaryRepo.overwrite(summaryDocumentId, summaryData);
-      console.log('Stored no-patient-participation summary for session:', summaryDocumentId);
+      console.log(`Stored ${outcome} summary for session:`, summaryDocumentId);
       return;
     }
 

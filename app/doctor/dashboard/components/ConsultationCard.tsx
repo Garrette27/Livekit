@@ -97,6 +97,9 @@ function parseIso(value: string | null): Date | null {
 export default function ConsultationCard({ record, isGenerating, onEdit, onGenerate }: ConsultationCardProps) {
   const status = resolveConsultationStatus(record);
   const risk = status.status === 'summarized' ? resolveRiskPresentation(record.riskLevel) : null;
+  // An unattended consultation has a factual record, not a clinical one, so
+  // there is nothing for the doctor to edit.
+  const isUnattended = status.status === 'no-show' || status.status === 'not-admitted';
   const attendee = resolveAttendeeLabel(record);
   const hasDetail =
     record.keyPoints.length > 0 ||
@@ -160,7 +163,7 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
               {isGenerating ? 'Generating…' : 'Generate summary'}
             </button>
           )}
-          {record.hasGeneratedSummary && (
+          {record.hasGeneratedSummary && !isUnattended && (
             <button
               onClick={() => onEdit(record)}
               style={{

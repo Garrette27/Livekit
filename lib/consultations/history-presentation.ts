@@ -9,7 +9,12 @@
 
 import { isBeyondSummaryRetention, SUMMARY_RETENTION_DAYS } from './retention-policy';
 
-export type ConsultationStatus = 'summarized' | 'awaiting-summary' | 'summary-expired' | 'no-show';
+export type ConsultationStatus =
+  | 'summarized'
+  | 'awaiting-summary'
+  | 'summary-expired'
+  | 'not-admitted'
+  | 'no-show';
 
 export interface ConsultationStatusPresentation {
   status: ConsultationStatus;
@@ -23,6 +28,9 @@ const STATUS_PRESENTATION: Record<ConsultationStatus, Omit<ConsultationStatusPre
   summarized: { label: 'Summarized', color: '#065f46', background: '#d1fae5' },
   'awaiting-summary': { label: 'Awaiting summary', color: '#92400e', background: '#fef3c7' },
   'summary-expired': { label: `Summary deleted after ${SUMMARY_RETENTION_DAYS} days`, color: '#4b5563', background: '#f3f4f6' },
+  // Amber, not grey: a patient who waited and was never let in is an action for
+  // the practice, unlike a patient who simply never arrived.
+  'not-admitted': { label: 'Patient not admitted', color: '#b45309', background: '#fef3c7' },
   'no-show': { label: 'No patient joined', color: '#4b5563', background: '#f3f4f6' },
 };
 
@@ -40,13 +48,15 @@ export function resolveConsultationStatus(
   },
   now: Date = new Date()
 ): ConsultationStatusPresentation {
-  const status: ConsultationStatus = record.category === 'No-Show'
-    ? 'no-show'
-    : record.hasGeneratedSummary
-      ? 'summarized'
-      : isBeyondSummaryRetention(record.startedAt ?? null, now)
-        ? 'summary-expired'
-        : 'awaiting-summary';
+  const status: ConsultationStatus = record.category === 'Not Admitted'
+    ? 'not-admitted'
+    : record.category === 'No-Show'
+      ? 'no-show'
+      : record.hasGeneratedSummary
+        ? 'summarized'
+        : isBeyondSummaryRetention(record.startedAt ?? null, now)
+          ? 'summary-expired'
+          : 'awaiting-summary';
 
   return { status, ...STATUS_PRESENTATION[status] };
 }
@@ -62,6 +72,10 @@ export function resolveAttendeeLabel(record: {
 }): string {
   if (record.category === 'No-Show') {
     return 'No patient joined';
+  }
+
+  if (record.category === 'Not Admitted') {
+    return record.waitingRoomHistory?.participantEmails?.[0] || 'Patient left the waiting room';
   }
 
   if (record.patientEmail) {
