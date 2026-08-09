@@ -152,21 +152,30 @@ function createWaitingPatientId(invitationId: string): string {
   return `waiting_${invitationId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+/**
+ * Prior waiting-room entries for this patient on this invitation.
+ *
+ * `hasEndedVisit` means a visit has already finished — it exists to stop a
+ * finished entry being handed back as if the patient were still in the room.
+ * It is deliberately not a judgement about whether they may return: patients
+ * close tabs constantly, and treating that as permanent would revoke the
+ * doctor's skip-the-queue decision after one visit.
+ */
 async function lookupRegisteredAdmissionHistory(
   db: any,
   invitationId: string,
   patientEmail: string
-): Promise<{ hasLeft: boolean; latestAdmitted: WaitingPatient | null }> {
+): Promise<{ hasEndedVisit: boolean; latestAdmitted: WaitingPatient | null }> {
   const existingPatientsQuery = await db.collection('waitingPatients')
     .where('invitationId', '==', invitationId)
     .where('patientEmail', '==', patientEmail)
     .get();
 
   if (existingPatientsQuery.empty) {
-    return { hasLeft: false, latestAdmitted: null };
+    return { hasEndedVisit: false, latestAdmitted: null };
   }
 
-  let hasLeft = false;
+  let hasEndedVisit = false;
   let latestAdmitted: WaitingPatient | null = null;
   let latestAdmittedTime = 0;
 
@@ -174,7 +183,7 @@ async function lookupRegisteredAdmissionHistory(
     const data = { id: doc.id, ...doc.data() } as WaitingPatient;
 
     if (data.status === 'left' || data.status === 'rejected') {
-      hasLeft = true;
+      hasEndedVisit = true;
       return;
     }
 
@@ -187,7 +196,7 @@ async function lookupRegisteredAdmissionHistory(
     }
   });
 
-  return { hasLeft, latestAdmitted };
+  return { hasEndedVisit, latestAdmitted };
 }
 
 async function appendInvitationAccessAudit(
@@ -615,44 +624,14 @@ async function handleWaitingRoomAccess(params: {
       identity.patientEmail
     );
 
-    if (!admissionHistory.hasLeft) {
-      if (admissionHistory.latestAdmitted) {
-        await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
-
-        const admittedToken = signLiveKitRoomToken({
-          subject: `patient_${tokenPayload.invitationId}_${admissionHistory.latestAdmitted.id}`,
-          roomName: tokenPayload.roomName,
-          participantName: participantDisplayName,
-          expiresIn: '2h',
-        });
-
-        return result(200, {
-          success: true,
-          liveKitToken: admittedToken,
-          roomName: tokenPayload.roomName,
-          waitingRoomToken: false,
-          waitingRoomEnabled: false,
-          invitationId: tokenPayload.invitationId,
-          waitingPatientId: admissionHistory.latestAdmitted.id,
-        });
-      }
-
-      const admittedWaitingPatientId = await persistWaitingPatient(db, {
-        invitationId: tokenPayload.invitationId,
-        roomName: tokenPayload.roomName,
-        doctorUserId,
-        identity,
-        status: 'admitted',
-        clientIP,
-        userAgent,
-        deviceFingerprint,
-        admissionMode: 'auto-email-match',
-      });
-
+    // Rejoin an admission that is still open, so a refresh or a dropped
+    // connection returns to the same encounter instead of starting a second
+    // one. Once that visit has ended its entry is history and is not reused.
+    if (admissionHistory.latestAdmitted && !admissionHistory.hasEndedVisit) {
       await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
 
       const admittedToken = signLiveKitRoomToken({
-        subject: `patient_${tokenPayload.invitationId}_${admittedWaitingPatientId}`,
+        subject: `patient_${tokenPayload.invitationId}_${admissionHistory.latestAdmitted.id}`,
         roomName: tokenPayload.roomName,
         participantName: participantDisplayName,
         expiresIn: '2h',
@@ -665,9 +644,45 @@ async function handleWaitingRoomAccess(params: {
         waitingRoomToken: false,
         waitingRoomEnabled: false,
         invitationId: tokenPayload.invitationId,
-        waitingPatientId: admittedWaitingPatientId,
+        waitingPatientId: admissionHistory.latestAdmitted.id,
       });
     }
+
+    // Otherwise admit afresh. A visit that already ended must not disqualify
+    // this one: closing the tab is something patients do constantly, and
+    // treating it as permanent would silently revoke the doctor's own
+    // skip-the-queue decision after a single visit.
+    const admittedWaitingPatientId = await persistWaitingPatient(db, {
+      invitationId: tokenPayload.invitationId,
+      roomName: tokenPayload.roomName,
+      doctorUserId,
+      identity,
+      status: 'admitted',
+      clientIP,
+      userAgent,
+      deviceFingerprint,
+      admissionMode: 'auto-email-match',
+      riskSignals,
+    });
+
+    await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
+
+    const admittedToken = signLiveKitRoomToken({
+      subject: `patient_${tokenPayload.invitationId}_${admittedWaitingPatientId}`,
+      roomName: tokenPayload.roomName,
+      participantName: participantDisplayName,
+      expiresIn: '2h',
+    });
+
+    return result(200, {
+      success: true,
+      liveKitToken: admittedToken,
+      roomName: tokenPayload.roomName,
+      waitingRoomToken: false,
+      waitingRoomEnabled: false,
+      invitationId: tokenPayload.invitationId,
+      waitingPatientId: admittedWaitingPatientId,
+    });
   }
 
   const existingWaitingPatient = await findExistingWaitingPatient(
