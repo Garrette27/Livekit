@@ -185,11 +185,15 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
 
       <p
         style={{
-          color: record.hasGeneratedSummary ? '#374151' : '#9ca3af',
+          color: record.hasGeneratedSummary ? '#374151' : '#6b7280',
           fontStyle: record.hasGeneratedSummary ? 'normal' : 'italic',
           lineHeight: 1.6,
           margin: '0.75rem 0 0',
           fontSize: '0.9375rem',
+          // Caps the measure at roughly 75 characters. On a wide monitor an
+          // unbounded paragraph runs the full window, and the eye loses the
+          // start of the next line on every return sweep.
+          maxWidth: '68ch',
         }}
       >
         {record.hasGeneratedSummary
@@ -236,7 +240,7 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
                 {participant.waitingDurationMinutes !== null && participant.waitingDurationMinutes > 0 && (
                   <> after waiting {participant.waitingDurationMinutes} min</>
                 )}
-                <div style={{ color: '#9ca3af', marginTop: '0.125rem' }}>
+                <div style={{ color: '#6b7280', marginTop: '0.125rem' }}>
                   Joined {formatDateTime(parseIso(participant.joinedAt))}
                   {participant.admittedAt && <> · Admitted {formatDateTime(parseIso(participant.admittedAt))}</>}
                 </div>
@@ -277,7 +281,7 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
                     wordBreak: 'break-word',
                   }}
                 >
-                  {message.text || <em style={{ color: '#9ca3af' }}>(empty message)</em>}
+                  {message.text || <em style={{ color: '#6b7280' }}>(empty message)</em>}
                 </p>
               </div>
             ))}
@@ -298,7 +302,7 @@ function DetailList({ title, items }: { title: string; items: string[] }) {
       <h4 style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6b7280', margin: '0 0 0.25rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
         {title}
       </h4>
-      <ul style={{ fontSize: '0.875rem', color: '#374151', margin: 0, paddingLeft: '1.125rem' }}>
+      <ul style={{ fontSize: '0.875rem', color: '#374151', margin: 0, paddingLeft: '1.125rem', maxWidth: '72ch' }}>
         {items.map((item, index) => (
           <li key={index} style={{ marginBottom: '0.1875rem', lineHeight: 1.5 }}>
             {item}

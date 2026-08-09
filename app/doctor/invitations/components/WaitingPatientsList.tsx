@@ -224,7 +224,7 @@ export default function WaitingPatientsList({
           Waiting Queue ({waitingOnly.length})
         </p>
         {waitingOnly.length === 0 ? (
-          <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>No one waiting right now.</p>
+          <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280' }}>No one waiting right now.</p>
         ) : (
           waitingOnly.map((patient) => {
             const joinedAt = toDate(patient.joinedAt);
@@ -278,7 +278,7 @@ export default function WaitingPatientsList({
                       ? 'waiting time unavailable'
                       : `waiting ${waitTime} minute${waitTime !== 1 ? 's' : ''}`}
                   </p>
-                  <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0.125rem 0 0' }}>
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0.125rem 0 0' }}>
                     Joined {joinedAt ? joinedAt.toLocaleString() : 'unknown time'}
                   </p>
                 </div>
@@ -372,7 +372,7 @@ export default function WaitingPatientsList({
           In Consultation Room ({admittedOnly.length})
         </p>
         {admittedOnly.length === 0 ? (
-          <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>No admitted patient currently in room.</p>
+          <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280' }}>No admitted patient currently in room.</p>
         ) : (
           admittedOnly.map((patient) => {
             const admittedAt = toDate(patient.admittedAt || patient.joinedAt);

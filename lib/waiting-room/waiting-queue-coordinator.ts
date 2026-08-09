@@ -12,7 +12,58 @@
  * see the registry.
  */
 
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { WaitingPatient } from '@/lib/types';
+
 type Unsubscribe = () => void;
+
+/**
+ * Streams the doctor's waiting patients from Firestore instead of asking the
+ * server on a timer. Firestore pushes changes, so a patient appears in the
+ * queue as soon as they arrive rather than up to one poll interval later, and
+ * an idle consultation costs nothing.
+ *
+ * `onUnavailable` is the important part of this interface: security rules,
+ * offline state, or a missing client can all make the stream impossible, and in
+ * every one of those cases the caller must be able to fall back to polling
+ * rather than show an empty queue. Returns null when no listener could be
+ * started at all.
+ */
+export function subscribeToDoctorWaitingPatients(input: {
+  doctorUserId: string;
+  onPatients: (waitingPatients: WaitingPatient[]) => void;
+  onUnavailable: (reason: unknown) => void;
+}): Unsubscribe | null {
+  if (!db || !input.doctorUserId) {
+    return null;
+  }
+
+  try {
+    const waitingQuery = query(
+      collection(db, 'waitingPatients'),
+      where('doctorUserId', '==', input.doctorUserId)
+    );
+
+    return onSnapshot(
+      waitingQuery,
+      (snapshot) => {
+        input.onPatients(
+          snapshot.docs.map((waitingDoc) => ({
+            id: waitingDoc.id,
+            ...(waitingDoc.data() as Omit<WaitingPatient, 'id'>),
+          }))
+        );
+      },
+      (streamError) => {
+        input.onUnavailable(streamError);
+      }
+    );
+  } catch (subscribeError) {
+    input.onUnavailable(subscribeError);
+    return null;
+  }
+}
 
 /** In-flight request per scope, so simultaneous callers share one round trip. */
 const inFlightByScope = new Map<string, Promise<void>>();
