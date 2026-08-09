@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { auth, db, provider } from "@/lib/firebase";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithPopup } from "firebase/auth";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signInWithPopup } from "firebase/auth";
 import { useSearchParams } from "next/navigation";
 import { collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { checkRoleConflictByEmail } from "@/lib/auth/role-conflict";
@@ -70,6 +70,18 @@ function PatientLoginContent() {
         }
         
         const user = userCredential.user;
+
+        // Google-signed-in patients arrive already verified; a password account
+        // only becomes verified when the holder opens this link. Without it the
+        // account can never reach a verified state, so an allowlisted patient
+        // would queue in the waiting room forever.
+        try {
+          await sendEmailVerification(user);
+        } catch (verificationError) {
+          // Registration has already succeeded and the patient can still join
+          // through the waiting room, so this must not fail the sign-up.
+          console.warn('Could not send the verification email:', verificationError);
+        }
 
         // Now that user is authenticated, create user document in Firestore
         try {

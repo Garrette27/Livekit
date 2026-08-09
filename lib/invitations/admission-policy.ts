@@ -44,6 +44,22 @@ function normalizeEmail(email?: string | null): string | null {
 }
 
 /**
+ * Signals worth interrupting a patient for.
+ *
+ * Browser and device fingerprints change whenever someone opens a private
+ * window, updates their browser, or picks up a different phone — they fire
+ * constantly on honest traffic while an attacker can match them at will, so
+ * gating on them costs far more than they protect. They are still recorded and
+ * shown to the doctor as context. A country change is rare enough to be worth
+ * a human check.
+ */
+const STEP_UP_SIGNALS = new Set(['wrong_country']);
+
+function requiresStepUp(riskSignals?: string[]): string[] {
+  return (riskSignals || []).filter((signal) => STEP_UP_SIGNALS.has(signal));
+}
+
+/**
  * The strongest claim the system can make about this visitor. `verified`
  * requires a signed-in, non-anonymous account whose email the identity provider
  * confirmed — the only tier where an address is evidence of ownership.
@@ -83,15 +99,14 @@ export function decideAdmission(input: {
 }): AdmissionDecision {
   const assurance = resolveIdentityAssurance(input.visitor);
 
-  // A device or location that does not match the last visit is exactly the
-  // case for a human check, not a closed door: fingerprints are trivial for an
-  // attacker to change and impossible for an honest patient on a new phone to
-  // reproduce. Sending them to the waiting room is the step-up.
-  if (input.riskSignals && input.riskSignals.length > 0) {
+  // A location that does not match the last visit is a case for a human check,
+  // not a closed door: sending the patient to the waiting room is the step-up.
+  const stepUpSignals = requiresStepUp(input.riskSignals);
+  if (stepUpSignals.length > 0) {
     return {
       admit: 'waiting-room',
       assurance,
-      reason: `Unrecognised sign-in context (${input.riskSignals.join(', ')}), so the doctor confirms this patient`,
+      reason: `Unrecognised sign-in context (${stepUpSignals.join(', ')}), so the doctor confirms this patient`,
     };
   }
   const allowlist = input.allowlist.map((email) => normalizeEmail(email)).filter((email): email is string => Boolean(email));

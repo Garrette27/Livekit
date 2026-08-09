@@ -50,7 +50,10 @@ function describeIdentityTrust(patient: { patientEmail?: string; metadata?: Reco
   if (identitySource === 'registered-profile') {
     return {
       label: 'Registered account',
-      explanation: 'Email matches a registered patient account on this system.',
+      explanation:
+        'Email matches a registered patient account. They are waiting here rather than joining '
+        + 'directly because their email address has not been confirmed yet, or they are not on this '
+        + 'invitation’s skip-the-queue list.',
       color: '#065f46',
       background: '#d1fae5',
     };
@@ -309,8 +312,8 @@ export default function WaitingPatientsList({
                       return null;
                     }
                     return (
-                      <p style={{ fontSize: '0.75rem', color: '#b45309', margin: '0.375rem 0 0' }}>
-                        Signing in from {signals.join(' and ')}. Confirm who they are before admitting.
+                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0.375rem 0 0' }}>
+                        Signing in from {signals.join(' and ')}.
                       </p>
                     );
                   })()}
