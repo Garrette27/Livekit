@@ -14,15 +14,22 @@ import { detectBrowser, generateDeviceFingerprintHash, toDate } from './utils';
 import { buildWaitingPatientIdentity } from './waiting-patient-identity';
 import { EVENT_DOMAINS, EVENT_SCHEMA_VERSION } from '../events/event-schema';
 import { getInvitationEmailAllowlist, isEmailAllowedByInvitation } from './email-allowlist';
+import { decideAdmission, type VisitorIdentity } from './admission-policy';
 import { finalizeConsultationForRoom } from '../services/consultation-finalization';
 import { UserRepository } from '../repositories/user-repository';
 
 export interface ValidateInvitationContext {
   token: string;
   deviceFingerprint?: DeviceFingerprint;
+  /** Email the visitor typed. Self-asserted, so it never grants admission. */
   userEmail?: string;
   clientIP: string;
   userAgent: string;
+  /**
+   * Identity taken from a verified Firebase token, when the visitor sent one.
+   * Only this can qualify someone to skip the waiting room.
+   */
+  authenticatedVisitor?: VisitorIdentity;
 }
 
 export interface ValidateInvitationResult {
@@ -540,6 +547,7 @@ async function handleWaitingRoomAccess(params: {
   invitation: Invitation;
   lookup: UserLookupContext;
   explicitUserEmail?: string;
+  authenticatedVisitor?: VisitorIdentity;
   accessAttemptData: Record<string, any>;
   participantDisplayName: string;
   waitingRoomName: string;
@@ -553,6 +561,7 @@ async function handleWaitingRoomAccess(params: {
     invitation,
     lookup,
     explicitUserEmail,
+    authenticatedVisitor,
     accessAttemptData,
     participantDisplayName,
     waitingRoomName,
@@ -581,7 +590,18 @@ async function handleWaitingRoomAccess(params: {
     userDocId: lookup.userDocId,
   });
 
-  if (isAutoAdmissionCandidate(invitation, lookup) && identity.patientEmail) {
+  // Skipping the waiting room requires a verified identity, never a typed
+  // address. Everyone else — including anonymous guests — is queued for the
+  // doctor rather than turned away.
+  const admission = decideAdmission({
+    visitor: {
+      ...(authenticatedVisitor || {}),
+      declaredEmail: identity.patientEmail || explicitUserEmail,
+    },
+    allowlist: getInvitationEmailAllowlist(invitation),
+  });
+
+  if (admission.admit === 'directly' && identity.patientEmail) {
     const admissionHistory = await lookupRegisteredAdmissionHistory(
       db,
       tokenPayload.invitationId,
@@ -865,6 +885,7 @@ export async function validateInvitationAndIssueToken(
         invitation,
         lookup: userResolution.lookup,
         explicitUserEmail: context.userEmail,
+        authenticatedVisitor: context.authenticatedVisitor,
         accessAttemptData,
         participantDisplayName,
         waitingRoomName,

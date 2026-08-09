@@ -5,6 +5,8 @@ export interface ValidateInviteContext {
   userEmail?: string;
   clientIP: string;
   userAgent: string;
+  /** Identity from a verified Firebase token; absent for visitors with no account. */
+  authenticatedVisitor?: import('@/lib/invitations/admission-policy').VisitorIdentity;
   deviceFingerprint?: {
     userAgent: string;
     language: string;

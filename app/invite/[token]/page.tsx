@@ -192,10 +192,16 @@ function InvitePageContent() {
           ...(user?.email ? { userEmail: user.email.toLowerCase() } : {}),
         };
 
+        // Sent only when the visitor is signed in. The server verifies it and
+        // uses it to decide whether they may skip the waiting room; a visitor
+        // without an account is queued rather than blocked.
+        const visitorIdToken = user ? await user.getIdToken().catch(() => null) : null;
+
         const response = await fetch('/api/invite/validate', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...(visitorIdToken ? { Authorization: `Bearer ${visitorIdToken}` } : {}),
           },
           body: JSON.stringify(request),
         });

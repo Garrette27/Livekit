@@ -60,18 +60,55 @@ A waiting-room token grants access to `{room}-waiting`, never the consultation
 room. Admission mints a new token for the consultation room. This is why an
 un-admitted visitor cannot reach the call by manipulating the client.
 
-## Known gap
+## Admission assurance tiers
 
-Auto-admit currently matches on an email address that the visitor may supply
-themselves. A holder of the link who types an allowlisted address and has a
-registered account under it will be auto-admitted. The registered-account
-requirement limits this, but it is **not** proof of ownership of the mailbox.
+Skipping the waiting room is decided by **how strongly identity is established**,
+not by an address the visitor can type. `lib/invitations/admission-policy.ts`
+resolves one of four tiers and fails closed:
 
-To close it, require a signed-in Firebase session whose `email_verified` claim
-is true before treating an address as auto-admittable, and downgrade every other
-visitor to the waiting room. That change makes the allowlist a genuine identity
-control rather than a convenience, at the cost of requiring patients to sign in
-before their first consultation.
+| Tier | Meaning | Skips the queue? |
+| --- | --- | --- |
+| `verified` | Signed in, non-anonymous, `email_verified` is true | **Only if also on the allowlist** |
+| `authenticated` | Signed in, email not verified by the provider | No |
+| `self-declared` | Typed an address this session | No |
+| `anonymous` | No account, or a Firebase anonymous session | No |
+
+This separation of *identity proofing* from *authentication* follows
+[NIST SP 800-63](https://pages.nist.gov/800-63-3/sp800-63-3.html), where IAL
+(proofing) and AAL (authentication) are deliberately independent: possessing a
+link is neither.
+
+**Being queued is not a rejection.** An anonymous patient loses nothing except
+one click of the doctor's — which is exactly the guest/host model mainstream
+video products use, and the reason the waiting room exists.
+
+Verified behaviour, with `erika@gmail.com` allowlisted:
+
+- signed in + verified + allowlisted → joins directly
+- signed in but email unverified → waiting room
+- verified but not allowlisted → waiting room
+- **link holder types `erika@gmail.com` with no account → waiting room**
+- **anonymous account asserting `erika@gmail.com` → waiting room**
+- invitation with an empty allowlist → everyone waits
+
+## Anonymous patients and account upgrade
+
+Patients are never forced to register before a consultation. The intended
+progression, which is the standard Firebase guest pattern
+([best practices for anonymous authentication](https://firebase.blog/posts/2023/07/best-practices-for-anonymous-authentication/)),
+is:
+
+1. A guest opens the link and is queued as an unidentified visitor.
+2. If they choose to register, `linkWithCredential` upgrades the anonymous
+   account to a permanent one **keeping the same uid**, so the consultation
+   history they already accumulated stays attached to them.
+3. On their next invitation, that account is `verified` and an allowlist match
+   lets them skip the queue.
+
+Step 2 is why an anonymous Firebase session is worth creating for guests at all:
+it gives every visit a stable identifier that a later account can inherit. Note
+that linking an anonymous account means it is no longer auto-deleted by
+Identity Platform's anonymous-account cleanup.
 
 ## Design rules to preserve
 
