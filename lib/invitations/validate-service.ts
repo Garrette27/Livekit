@@ -152,10 +152,6 @@ function createWaitingPatientId(invitationId: string): string {
   return `waiting_${invitationId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-function isAutoAdmissionCandidate(invitation: Invitation, lookup: UserLookupContext): boolean {
-  return Boolean(isEmailAllowedByInvitation(invitation, lookup.userEmailToCheck) && lookup.userDocId);
-}
-
 async function lookupRegisteredAdmissionHistory(
   db: any,
   invitationId: string,
@@ -219,6 +215,7 @@ async function persistWaitingPatient(
     userAgent: string;
     deviceFingerprint?: DeviceFingerprint;
     admissionMode?: 'doctor-manual' | 'auto-email-match';
+    riskSignals?: string[];
   }
 ): Promise<string> {
   const waitingPatientId = createWaitingPatientId(input.invitationId);
@@ -244,6 +241,9 @@ async function persistWaitingPatient(
       // Recorded so the doctor's queue can show how the visitor's email was
       // established rather than presenting every address with equal weight.
       identitySource: input.identity.identitySource,
+      ...(input.riskSignals && input.riskSignals.length > 0
+        ? { riskSignals: input.riskSignals }
+        : {}),
     },
   };
 
@@ -395,27 +395,31 @@ async function collectSecurityViolations(
   }
 }
 
-async function denyWithViolations(
+/**
+ * Audits an access attempt made from an unfamiliar context. The visit
+ * continues — the signals are carried into the admission decision so the
+ * patient is queued for the doctor rather than turned away.
+ */
+async function recordAccessRisk(
   db: any,
   invitationId: string,
   invitation: Invitation,
   accessAttempt: AccessAttempt,
   violations: SecurityViolation[]
-): Promise<ValidateInvitationResult> {
-  accessAttempt.reason = `Violations: ${violations.map((violation) => violation.type).join(', ')}`;
+): Promise<void> {
+  accessAttempt.reason = `Risk signals: ${violations.map((violation) => violation.type).join(', ')}`;
   const accessAttemptData = toAccessAttemptData(accessAttempt);
 
-  await db.collection('invitations').doc(invitationId).update({
-    'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
-    'audit.violations': [...(invitation.audit?.violations || []), ...violations],
-    'audit.lastAccessed': new Date(),
-  });
-
-  return result(403, {
-    success: false,
-    error: 'Access denied due to security violations',
-    violations,
-  });
+  try {
+    await db.collection('invitations').doc(invitationId).update({
+      'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
+      'audit.violations': [...(invitation.audit?.violations || []), ...violations],
+      'audit.lastAccessed': new Date(),
+    });
+  } catch (auditError) {
+    // Auditing must not decide whether a patient can reach their appointment.
+    console.error('Failed to record invitation access risk:', auditError);
+  }
 }
 
 async function validateUsageLimits(
@@ -548,6 +552,7 @@ async function handleWaitingRoomAccess(params: {
   lookup: UserLookupContext;
   explicitUserEmail?: string;
   authenticatedVisitor?: VisitorIdentity;
+  riskSignals?: string[];
   accessAttemptData: Record<string, any>;
   participantDisplayName: string;
   waitingRoomName: string;
@@ -562,6 +567,7 @@ async function handleWaitingRoomAccess(params: {
     lookup,
     explicitUserEmail,
     authenticatedVisitor,
+    riskSignals,
     accessAttemptData,
     participantDisplayName,
     waitingRoomName,
@@ -599,6 +605,7 @@ async function handleWaitingRoomAccess(params: {
       declaredEmail: identity.patientEmail || explicitUserEmail,
     },
     allowlist: getInvitationEmailAllowlist(invitation),
+    riskSignals,
   });
 
   if (admission.admit === 'directly' && identity.patientEmail) {
@@ -720,6 +727,7 @@ async function handleWaitingRoomAccess(params: {
     userAgent,
     deviceFingerprint,
     admissionMode: 'doctor-manual',
+    riskSignals,
   });
 
   await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
@@ -857,8 +865,13 @@ export async function validateInvitationAndIssueToken(
       userAgent: context.userAgent,
     });
 
+    // An unfamiliar device, browser, or country is a reason to have the doctor
+    // confirm the patient, not to refuse them. These used to return 403 "access
+    // denied", which locked out anyone opening their link on a second browser,
+    // in a private window, or on mobile data. The attempt is still audited; it
+    // now steps up to the waiting room instead of ending the visit.
     if (violations.length > 0) {
-      return await denyWithViolations(db, tokenPayload.invitationId, invitation, accessAttempt, violations);
+      await recordAccessRisk(db, tokenPayload.invitationId, invitation, accessAttempt, violations);
     }
 
     const usageError = await validateUsageLimits(
@@ -886,6 +899,7 @@ export async function validateInvitationAndIssueToken(
         lookup: userResolution.lookup,
         explicitUserEmail: context.userEmail,
         authenticatedVisitor: context.authenticatedVisitor,
+        riskSignals: violations.map((violation) => violation.type),
         accessAttemptData,
         participantDisplayName,
         waitingRoomName,

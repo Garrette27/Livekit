@@ -74,8 +74,26 @@ export function decideAdmission(input: {
   visitor: VisitorIdentity;
   /** Emails the doctor marked as allowed to skip the waiting room. */
   allowlist: string[];
+  /**
+   * Unusual-context signals such as an unrecognised device or a different
+   * country. These lower confidence but never deny access on their own — see
+   * the note on step-up below.
+   */
+  riskSignals?: string[];
 }): AdmissionDecision {
   const assurance = resolveIdentityAssurance(input.visitor);
+
+  // A device or location that does not match the last visit is exactly the
+  // case for a human check, not a closed door: fingerprints are trivial for an
+  // attacker to change and impossible for an honest patient on a new phone to
+  // reproduce. Sending them to the waiting room is the step-up.
+  if (input.riskSignals && input.riskSignals.length > 0) {
+    return {
+      admit: 'waiting-room',
+      assurance,
+      reason: `Unrecognised sign-in context (${input.riskSignals.join(', ')}), so the doctor confirms this patient`,
+    };
+  }
   const allowlist = input.allowlist.map((email) => normalizeEmail(email)).filter((email): email is string => Boolean(email));
 
   if (allowlist.length === 0) {

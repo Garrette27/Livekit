@@ -82,6 +82,28 @@ function describeIdentityTrust(patient: { patientEmail?: string; metadata?: Reco
   };
 }
 
+/**
+ * Unusual-context signals in plain language. These never block a patient, so
+ * the doctor is the one who decides what they mean — which requires saying what
+ * was unusual rather than showing a raw violation code.
+ */
+function describeRiskSignals(patient: { metadata?: Record<string, unknown> }): string[] {
+  const signals = patient.metadata?.riskSignals;
+  if (!Array.isArray(signals)) {
+    return [];
+  }
+
+  const wording: Record<string, string> = {
+    wrong_device: 'an unrecognised device',
+    wrong_browser: 'a different browser',
+    wrong_country: 'a different country',
+  };
+
+  return signals
+    .map((signal) => wording[String(signal)])
+    .filter((description): description is string => Boolean(description));
+}
+
 function isActiveInvitation(invitation: Invitation, nowMs: number): boolean {
   if (invitation.status !== 'active') {
     return false;
@@ -281,6 +303,17 @@ export default function WaitingPatientsList({
                   <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0.125rem 0 0' }}>
                     Joined {joinedAt ? joinedAt.toLocaleString() : 'unknown time'}
                   </p>
+                  {(() => {
+                    const signals = describeRiskSignals(patient);
+                    if (signals.length === 0) {
+                      return null;
+                    }
+                    return (
+                      <p style={{ fontSize: '0.75rem', color: '#b45309', margin: '0.375rem 0 0' }}>
+                        Signing in from {signals.join(' and ')}. Confirm who they are before admitting.
+                      </p>
+                    );
+                  })()}
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

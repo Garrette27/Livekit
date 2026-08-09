@@ -38,7 +38,7 @@ async function resolveAuthenticatedVisitor(req: NextRequest): Promise<VisitorIde
 }
 
 async function handlePOST(req: NextRequest) {
-  const rateLimitResponse = withRateLimit(RateLimitConfigs.TOKEN_GENERATION)(req);
+  const rateLimitResponse = withRateLimit(RateLimitConfigs.INVITATION_VALIDATION)(req);
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
