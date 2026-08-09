@@ -33,6 +33,55 @@ function toDate(value: unknown): Date | null {
   return parsed;
 }
 
+/**
+ * How much weight the doctor should give the displayed identity. Admitting the
+ * wrong person is the costly mistake here, so an address the system merely
+ * accepted from the visitor is labelled differently from one backed by a
+ * registered account.
+ */
+function describeIdentityTrust(patient: { patientEmail?: string; metadata?: Record<string, unknown> }): {
+  label: string;
+  explanation: string;
+  color: string;
+  background: string;
+} {
+  const identitySource = patient.metadata?.identitySource;
+
+  if (identitySource === 'registered-profile') {
+    return {
+      label: 'Registered account',
+      explanation: 'Email matches a registered patient account on this system.',
+      color: '#065f46',
+      background: '#d1fae5',
+    };
+  }
+
+  if (identitySource === 'invitation-token') {
+    return {
+      label: 'From invitation link',
+      explanation: 'Email comes from the signed invitation you issued, but the visitor has not signed in.',
+      color: '#1d4ed8',
+      background: '#dbeafe',
+    };
+  }
+
+  if (identitySource === 'self-declared' || patient.patientEmail) {
+    return {
+      label: 'Unverified',
+      explanation: 'The visitor typed this email; it has not been verified against an account.',
+      color: '#b45309',
+      background: '#fef3c7',
+    };
+  }
+
+  return {
+    label: 'Unidentified guest',
+    explanation: 'Anyone holding the invitation link. Confirm who they are before admitting.',
+    color: '#b91c1c',
+    background: '#fee2e2',
+  };
+}
+
 function isActiveInvitation(invitation: Invitation, nowMs: number): boolean {
   if (invitation.status !== 'active') {
     return false;
@@ -196,23 +245,41 @@ export default function WaitingPatientsList({
                   backgroundColor: '#F9FAFB',
                 }}
               >
+                {/* Admitting someone is an identity decision, so who they are
+                    leads and how that identity was established sits beside it. */}
                 <div style={{ marginBottom: '0.75rem' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                    Room: {patient.roomName}
-                  </h3>
-                  <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '0.25rem' }}>
-                    <strong>Email:</strong> {patient.patientEmail || 'Unknown'}
-                  </p>
-                  <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '0.25rem' }}>
-                    <strong>Name:</strong> {displayName}
-                  </p>
-                  <p style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '0.25rem' }}>
-                    <strong>Joined:</strong> {joinedAt ? joinedAt.toLocaleString() : 'Unknown'}
-                  </p>
-                  <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', margin: 0 }}>
+                      {displayName}
+                    </h3>
+                    {(() => {
+                      const trust = describeIdentityTrust(patient);
+                      return (
+                        <span
+                          title={trust.explanation}
+                          style={{
+                            padding: '0.125rem 0.5rem',
+                            borderRadius: '9999px',
+                            fontSize: '0.6875rem',
+                            fontWeight: 600,
+                            color: trust.color,
+                            backgroundColor: trust.background,
+                          }}
+                        >
+                          {trust.label}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  <p style={{ fontSize: '0.8125rem', color: '#6B7280', margin: '0.25rem 0 0' }}>
+                    Room {patient.roomName}
+                    {' · '}
                     {waitTime === null
-                      ? 'Waiting time unavailable'
-                      : `Waiting for ${waitTime} minute${waitTime !== 1 ? 's' : ''}`}
+                      ? 'waiting time unavailable'
+                      : `waiting ${waitTime} minute${waitTime !== 1 ? 's' : ''}`}
+                  </p>
+                  <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0.125rem 0 0' }}>
+                    Joined {joinedAt ? joinedAt.toLocaleString() : 'unknown time'}
                   </p>
                 </div>
 

@@ -36,12 +36,7 @@ interface UserLookupContext {
   userProfile?: any;
 }
 
-interface WaitingPatientIdentity {
-  patientId: string;
-  patientName: string;
-  patientEmail?: string;
-  isAnonymous: boolean;
-}
+type WaitingPatientIdentity = ReturnType<typeof buildWaitingPatientIdentity>;
 
 function result(status: number, body: ValidateInvitationResponse): ValidateInvitationResult {
   return { status, body };
@@ -239,6 +234,9 @@ async function persistWaitingPatient(
       lastAccessed: now,
       ...(input.admissionMode && { admissionMode: input.admissionMode }),
       isAnonymous: input.identity.isAnonymous,
+      // Recorded so the doctor's queue can show how the visitor's email was
+      // established rather than presenting every address with equal weight.
+      identitySource: input.identity.identitySource,
     },
   };
 
