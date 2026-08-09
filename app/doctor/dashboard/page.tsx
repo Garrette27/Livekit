@@ -424,10 +424,10 @@ export default function DoctorDashboard() {
       <header style={{
         backgroundColor: 'white',
         borderBottom: '1px solid #e5e7eb',
-        padding: '1rem 2rem',
+        padding: 'var(--header-padding)',
         boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
       }}>
-        <div style={{ maxWidth: '80rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="app-header-bar" style={{ maxWidth: '80rem', margin: '0 auto' }}>
           <div>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
               Doctor Dashboard
@@ -459,7 +459,7 @@ export default function DoctorDashboard() {
       </header>
 
       {/* Main Content */}
-      <main style={{ maxWidth: '80rem', margin: '0 auto', padding: '2rem' }}>
+      <main style={{ maxWidth: '80rem', margin: '0 auto', padding: 'var(--page-padding)' }}>
         <div style={{
           backgroundColor: 'white',
           borderRadius: '0.75rem',

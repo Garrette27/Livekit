@@ -115,28 +115,28 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
         backgroundColor: '#ffffff',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
-        <div style={{ minWidth: 0 }}>
+      {/* Wraps rather than compressing: on a phone the status chips and action
+          would otherwise squeeze the patient's name to a few characters. */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0, flex: '1 1 12rem' }}>
           <h3
+            className="app-wrap-anywhere"
             style={{
               fontSize: '1rem',
               fontWeight: 600,
               color: '#111827',
               margin: 0,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
             }}
           >
             {attendee}
           </h3>
-          <p style={{ fontSize: '0.8125rem', color: '#6b7280', margin: '0.25rem 0 0' }}>
+          <p className="app-wrap-anywhere" style={{ fontSize: '0.8125rem', color: '#6b7280', margin: '0.25rem 0 0' }}>
             {formatTimeOfDay(record.startedAt)} · {formatDuration(record.duration)} · Room {record.roomName}
             {record.isEdited && <span style={{ color: '#059669' }}> · Edited</span>}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           {risk && (
             <span style={{ ...chipStyle, color: risk.color, backgroundColor: risk.background }}>
               {record.riskLevel} risk

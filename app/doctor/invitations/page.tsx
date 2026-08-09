@@ -341,11 +341,11 @@ export default function DoctorInvitationsPage() {
       <div style={{ 
         backgroundColor: 'white', 
         borderBottom: '1px solid #E5E7EB', 
-        padding: '1rem 2rem',
+        padding: 'var(--header-padding)',
         marginBottom: '2rem',
         borderRadius: '0.75rem'
       }}>
-        <div style={{ maxWidth: '80rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="app-header-bar" style={{ maxWidth: '80rem', margin: '0 auto' }}>
           <div>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>Invitation Management</h1>
             <p style={{ color: '#4B5563' }}>Create and manage secure patient invitations</p>
@@ -387,7 +387,7 @@ export default function DoctorInvitationsPage() {
 
       <div style={{ maxWidth: '80rem', margin: '0 auto' }}>
         {/* Create New Invitation - Full Width */}
-        <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: '2rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)', marginBottom: '2rem' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: 'var(--card-padding)', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)', marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>
             Create New Invitation
           </h2>
@@ -454,7 +454,7 @@ export default function DoctorInvitationsPage() {
         {/* Two Column Layout: Created Invitations and Waiting Queue */}
         <div className="invitation-columns">
           {/* Created Invitations List */}
-          <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: '2rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: 'var(--card-padding)', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>
               Your Invitations
             </h2>
@@ -754,7 +754,7 @@ export default function DoctorInvitationsPage() {
           </div>
 
           {/* Waiting Queue Room / Invitation Details */}
-          <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: '2rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: 'var(--card-padding)', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
             {selectedInvitationId ? (
               <>
                 {(() => {

@@ -116,7 +116,9 @@ export default function ConsultationHistoryView({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(9rem, 1fr))',
+          // Tiles reflow from one row on a laptop down to two columns on a
+          // phone without needing a breakpoint of their own.
+          gridTemplateColumns: 'repeat(auto-fit, minmax(7.5rem, 1fr))',
           gap: '0.75rem',
           marginBottom: '1.5rem',
         }}

@@ -547,12 +547,12 @@ function InvitePageContent() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '2rem'
+        padding: 'var(--page-padding)'
       }}>
         <div style={{
           backgroundColor: 'white',
           borderRadius: '1rem',
-          padding: '3rem',
+          padding: 'var(--card-padding)',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           maxWidth: '32rem',
           width: '100%',
@@ -931,12 +931,12 @@ function InvitePageContent() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '2rem'
+      padding: 'var(--page-padding)'
     }}>
       <div style={{
         backgroundColor: 'white',
         borderRadius: '1rem',
-        padding: '3rem',
+        padding: 'var(--card-padding)',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
         maxWidth: '32rem',
         width: '100%',
