@@ -440,9 +440,6 @@ export default function DoctorDashboard() {
             <Link href="/doctor/invitations" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: '500' }}>
               Invitations
             </Link>
-            <Link href="/" style={{ color: '#059669', textDecoration: 'none', fontWeight: '500' }}>
-              Create Room
-            </Link>
             <button
               onClick={() => auth && auth.signOut()}
               style={{

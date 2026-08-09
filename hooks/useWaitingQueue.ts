@@ -9,6 +9,10 @@ import {
 } from '@/lib/waiting-room/waiting-queue-client';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setWaitingQueueSnapshot } from '@/store/slices/waiting-queue-slice';
+import {
+  fetchWaitingQueueOnce,
+  subscribeToWaitingQueuePoll,
+} from '@/lib/waiting-room/waiting-queue-coordinator';
 
 interface UseWaitingQueueOptions {
   roomName?: string;
@@ -78,7 +82,6 @@ export function useWaitingQueue({
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [scopeInitialized, setScopeInitialized] = useState(false);
   const dispatch = useAppDispatch();
-  const isFetchingRef = useRef(false);
 
   const invitationIdsSet = useMemo(() => {
     if (typeof invitationIds === 'undefined') {
@@ -129,16 +132,14 @@ export function useWaitingQueue({
 
   const refresh = useCallback(
     async (showLoading = false) => {
-      if (isFetchingRef.current) {
-        return;
-      }
-
-      isFetchingRef.current = true;
       if (showLoading) {
         setLoading(true);
       }
       setError(null);
 
+      // Shared across every component watching this scope, so panels rendered
+      // side by side produce one request rather than one each.
+      return fetchWaitingQueueOnce(scopeKey, async () => {
       try {
         if (invitationIdsSet && invitationIdsSet.size === 0) {
           dispatch(
@@ -192,11 +193,11 @@ export function useWaitingQueue({
         setError('Failed to load waiting queue');
       } finally {
         setScopeInitialized(true);
-        isFetchingRef.current = false;
         if (showLoading) {
           setLoading(false);
         }
       }
+      });
     },
     [
       dispatch,
@@ -274,14 +275,11 @@ export function useWaitingQueue({
       return;
     }
 
-    const interval = window.setInterval(() => {
+    // One timer per scope regardless of how many panels are mounted.
+    return subscribeToWaitingQueuePoll(scopeKey, pollIntervalMs, () => {
       void refresh(false);
-    }, pollIntervalMs);
-
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [autoRefresh, pollIntervalMs, refresh]);
+    });
+  }, [autoRefresh, pollIntervalMs, refresh, scopeKey]);
 
   return useMemo(
     () => ({
