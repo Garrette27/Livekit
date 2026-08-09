@@ -144,6 +144,25 @@ function InvitePageContent() {
   const [requiresRegistration, setRequiresRegistration] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
   const [verificationEmailState, setVerificationEmailState] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [verificationEmailError, setVerificationEmailError] = useState<string | null>(null);
+
+  /**
+   * Why the verification email could not be sent, in terms of what the patient
+   * can do next. Silently returning the button to its resting state — as this
+   * did before — leaves them clicking a control that appears to do nothing.
+   */
+  const describeVerificationFailure = (code: string): string => {
+    if (code === 'auth/too-many-requests') {
+      return 'Too many requests just now. Wait a few minutes, then try again — and check your spam folder in the meantime.';
+    }
+    if (code === 'auth/user-token-expired' || code === 'auth/invalid-user-token' || code === 'auth/user-disabled') {
+      return 'Your sign-in has expired. Sign in again, then request the link.';
+    }
+    if (code === 'auth/network-request-failed') {
+      return 'No connection. Check your network and try again.';
+    }
+    return 'We could not send the link just now. Your doctor can still admit you from the waiting room.';
+  };
 
   const handleResendVerification = useCallback(async () => {
     if (!user) {
@@ -151,11 +170,17 @@ function InvitePageContent() {
     }
 
     setVerificationEmailState('sending');
+    setVerificationEmailError(null);
     try {
+      // A stale session is the common cause of a rejected send, and reloading
+      // surfaces that as a clear error instead of an opaque failure.
+      await user.reload();
       await sendEmailVerification(user);
       setVerificationEmailState('sent');
     } catch (verificationError) {
-      console.error('Could not resend the verification email:', verificationError);
+      const code = (verificationError as { code?: string })?.code || '';
+      console.error('Could not resend the verification email:', code, verificationError);
+      setVerificationEmailError(describeVerificationFailure(code));
       setVerificationEmailState('idle');
     }
   }, [user]);
@@ -723,6 +748,11 @@ function InvitePageContent() {
                       ? 'Sent — check your inbox'
                       : 'Resend the link'}
                 </button>
+                {verificationEmailError && (
+                  <p role="alert" style={{ fontSize: '0.8125rem', color: '#b91c1c', margin: '0.5rem 0 0' }}>
+                    {verificationEmailError}
+                  </p>
+                )}
               </div>
             )}
 
