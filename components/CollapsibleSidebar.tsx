@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useIsCompactViewport } from '@/hooks/useIsCompactViewport';
 
 const SIDEBAR_Z_INDEX = 10020;
 
@@ -16,6 +17,16 @@ interface CollapsibleSidebarProps {
   style?: React.CSSProperties;
 }
 
+/**
+ * A room side panel that changes arrangement with the viewport.
+ *
+ * On a laptop it docks beside the video and collapses to a rail. On a phone
+ * that arrangement fails outright — a 350px panel covers a 375px screen, and
+ * two of them leave no video at all — so it becomes a bottom sheet instead:
+ * closed by default, opened from a labelled button, and dismissed by the close
+ * control or by tapping the video behind it. That is the arrangement video
+ * products converge on for handsets, and it keeps the call itself primary.
+ */
 export default function CollapsibleSidebar({
   children,
   title,
@@ -27,278 +38,203 @@ export default function CollapsibleSidebar({
   className = '',
   style = {}
 }: CollapsibleSidebarProps) {
+  const isCompact = useIsCompactViewport();
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
-  const [isHovered, setIsHovered] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  // Handle swipe gestures for mobile
+  // A sheet covering the video is never the right thing to restore on rotation
+  // or when a phone becomes the active layout, so entering compact mode closes
+  // it and hands the screen back to the call.
   useEffect(() => {
-    let startX = 0;
-    let startY = 0;
-    let isSwipe = false;
-
-    const handleTouchStart = (e: TouchEvent) => {
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      isSwipe = false;
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!startX || !startY) return;
-      
-      const currentX = e.touches[0].clientX;
-      const currentY = e.touches[0].clientY;
-      const diffX = Math.abs(currentX - startX);
-      const diffY = Math.abs(currentY - startY);
-      
-      // Check if it's a horizontal swipe
-      if (diffX > diffY && diffX > 50) {
-        isSwipe = true;
-        e.preventDefault();
-      }
-    };
-
-    const handleTouchEnd = (e: TouchEvent) => {
-      if (!isSwipe || !startX) return;
-      
-      const currentX = e.changedTouches[0].clientX;
-      const diffX = currentX - startX;
-      
-      // Swipe threshold
-      if (Math.abs(diffX) > 50) {
-        if (position === 'left' && diffX > 0) {
-          // Swipe right to expand left sidebar
-          setIsCollapsed(false);
-        } else if (position === 'left' && diffX < 0) {
-          // Swipe left to collapse left sidebar
-          setIsCollapsed(true);
-        } else if (position === 'right' && diffX < 0) {
-          // Swipe left to expand right sidebar
-          setIsCollapsed(false);
-        } else if (position === 'right' && diffX > 0) {
-          // Swipe right to collapse right sidebar
-          setIsCollapsed(true);
-        }
-      }
-    };
-
-    document.addEventListener('touchstart', handleTouchStart, { passive: false });
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleTouchEnd, { passive: false });
-
-    return () => {
-      document.removeEventListener('touchstart', handleTouchStart);
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [position]);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // Only handle drag on the header, not on interactive elements
-    const target = e.target as HTMLElement;
-    // Don't start dragging if clicking on input, button, or other interactive elements
-    if (target.tagName === 'INPUT' || 
-        target.tagName === 'TEXTAREA' || 
-        target.tagName === 'BUTTON' || 
-        target.closest('input, textarea, button, a, select')) {
-      return;
+    if (isCompact) {
+      setIsCollapsed(true);
     }
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX,
-      y: e.clientY
-    });
-  };
+  }, [isCompact]);
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (isDragging) {
-      const diffX = e.clientX - dragStart.x;
-      const diffY = e.clientY - dragStart.y;
-      
-      // Only handle horizontal dragging
-      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
-        if (position === 'left' && diffX > 0) {
-          setIsCollapsed(false);
-        } else if (position === 'left' && diffX < 0) {
-          setIsCollapsed(true);
-        } else if (position === 'right' && diffX < 0) {
-          setIsCollapsed(false);
-        } else if (position === 'right' && diffX > 0) {
-          setIsCollapsed(true);
-        }
-      }
-    }
-  }, [dragStart, isDragging, position]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [handleMouseMove, handleMouseUp, isDragging]);
-
-  const sidebarStyle: React.CSSProperties = {
-    position: 'fixed',
-    top: style.top || '20px',
-    [position]: '20px',
-    width: isCollapsed ? collapsedWidth : width,
-    height: 'calc(100vh - 40px)',
-    backgroundColor: '#ffffff',
-    border: `2px solid ${position === 'left' ? '#059669' : '#3b82f6'}`,
-    borderRadius: '0.75rem',
-    // Keep room sidebars below LiveKit chat panel so chat remains visible when toggled.
-    zIndex: SIDEBAR_Z_INDEX,
-    boxShadow: '0 8px 25px rgba(0, 0, 0, 0.12)',
-    backdropFilter: 'blur(10px)',
-    transition: 'all 0.3s ease',
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-    ...style
-  };
+  const accentColor = position === 'left' ? '#059669' : '#3b82f6';
 
   const headerStyle: React.CSSProperties = {
-    backgroundColor: position === 'left' ? '#059669' : '#3b82f6',
+    backgroundColor: accentColor,
     color: 'white',
-    padding: '1rem',
+    padding: '0.875rem 1rem',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    cursor: isCollapsed ? 'pointer' : 'default',
+    gap: '0.75rem',
     userSelect: 'none',
-    minHeight: '60px',
-    borderBottom: isCollapsed ? 'none' : '1px solid rgba(255, 255, 255, 0.2)'
+    minHeight: '3.25rem',
   };
 
-  const contentStyle: React.CSSProperties = {
-    flex: 1,
-    overflowY: 'auto',
-    padding: isCollapsed ? '0' : '1rem',
-    display: isCollapsed ? 'none' : 'block'
-  };
-
-  const toggleButtonStyle: React.CSSProperties = {
+  const closeButtonStyle: React.CSSProperties = {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     border: 'none',
     borderRadius: '0.375rem',
     color: 'white',
-    padding: '0.5rem',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'all 0.2s ease',
-    minWidth: '32px',
-    minHeight: '32px'
+    minWidth: '2.75rem',
+    minHeight: '2.75rem',
+    fontSize: '1rem',
+    flexShrink: 0,
   };
 
+  if (isCompact) {
+    // Closed: a labelled button, not a rail of sideways text. The label says
+    // what it opens, and the target is big enough to hit with a thumb.
+    if (isCollapsed) {
+      return (
+        <button
+          className={className}
+          onClick={() => setIsCollapsed(false)}
+          aria-expanded={false}
+          style={{
+            position: 'fixed',
+            bottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))',
+            [position]: '0.75rem',
+            zIndex: SIDEBAR_Z_INDEX,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.375rem',
+            padding: '0.625rem 0.875rem',
+            minHeight: '2.75rem',
+            borderRadius: '9999px',
+            border: 'none',
+            backgroundColor: accentColor,
+            color: '#ffffff',
+            fontSize: '0.8125rem',
+            fontWeight: 600,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.28)',
+            cursor: 'pointer',
+          }}
+        >
+          <span aria-hidden="true">{icon}</span>
+          {title}
+        </button>
+      );
+    }
+
+    return (
+      <>
+        {/* Tapping the video dismisses the sheet, the expected way out. */}
+        <div
+          onClick={() => setIsCollapsed(true)}
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.45)',
+            zIndex: SIDEBAR_Z_INDEX,
+          }}
+        />
+        <section
+          className={className}
+          aria-label={title}
+          style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            maxHeight: '78vh',
+            zIndex: SIDEBAR_Z_INDEX + 1,
+            backgroundColor: '#ffffff',
+            borderTopLeftRadius: '1rem',
+            borderTopRightRadius: '1rem',
+            boxShadow: '0 -8px 28px rgba(0, 0, 0, 0.28)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          }}
+        >
+          <div style={headerStyle}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
+              <span aria-hidden="true">{icon}</span>
+              {title}
+            </span>
+            <button onClick={() => setIsCollapsed(true)} style={closeButtonStyle} aria-label={`Close ${title}`}>
+              ✕
+            </button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', WebkitOverflowScrolling: 'touch' }}>
+            {children}
+          </div>
+        </section>
+      </>
+    );
+  }
+
+  // Laptop and larger: docked beside the video, collapsing to a rail.
   return (
     <div
       className={`collapsible-sidebar ${className}`}
-      style={sidebarStyle}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        position: 'fixed',
+        top: style.top || '20px',
+        [position]: '20px',
+        width: isCollapsed ? collapsedWidth : width,
+        height: 'calc(100vh - 40px)',
+        backgroundColor: '#ffffff',
+        border: `2px solid ${accentColor}`,
+        borderRadius: '0.75rem',
+        zIndex: SIDEBAR_Z_INDEX,
+        boxShadow: '0 8px 25px rgba(0, 0, 0, 0.12)',
+        transition: 'width 0.25s ease',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        ...style
+      }}
     >
-      {/* Header */}
       <div
-        style={headerStyle}
+        style={{ ...headerStyle, cursor: isCollapsed ? 'pointer' : 'default' }}
         onClick={() => isCollapsed && setIsCollapsed(false)}
-        onMouseDown={handleMouseDown}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: '1.2rem' }}>{icon}</span>
-          {!isCollapsed && (
-            <span style={{ fontSize: '1rem', fontWeight: '600' }}>
-              {title}
-            </span>
-          )}
+          <span style={{ fontSize: '1.2rem' }} aria-hidden="true">{icon}</span>
+          {!isCollapsed && <span style={{ fontSize: '1rem', fontWeight: 600 }}>{title}</span>}
         </div>
-        
+
         {!isCollapsed && (
           <button
-            onClick={(e) => {
-              e.stopPropagation();
+            onClick={(event) => {
+              event.stopPropagation();
               setIsCollapsed(true);
             }}
-            style={toggleButtonStyle}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-            }}
+            style={{ ...closeButtonStyle, minWidth: '2rem', minHeight: '2rem' }}
             title={`Collapse ${title}`}
+            aria-label={`Collapse ${title}`}
           >
             {position === 'left' ? '◀' : '▶'}
           </button>
         )}
       </div>
 
-      {/* Content */}
-      <div 
-        style={contentStyle}
-        onMouseDown={(e) => {
-          // Stop drag handling when clicking in content area (except on the header)
-          const target = e.target as HTMLElement;
-          if (target.tagName === 'INPUT' || 
-              target.tagName === 'TEXTAREA' || 
-              target.tagName === 'BUTTON' || 
-              target.closest('input, textarea, button, a, select')) {
-            e.stopPropagation();
-          }
-        }}
-      >
+      <div style={{ flex: 1, overflowY: 'auto', padding: isCollapsed ? 0 : '1rem', display: isCollapsed ? 'none' : 'block' }}>
         {children}
       </div>
 
-      {/* Collapsed state indicator */}
       {isCollapsed && (
-        <div
+        <button
+          onClick={() => setIsCollapsed(false)}
+          aria-label={`Expand ${title}`}
           style={{
             position: 'absolute',
-            top: '50%',
-            left: position === 'left' ? '50%' : '50%',
-            transform: 'translate(-50%, -50%) rotate(-90deg)',
-            color: position === 'left' ? '#059669' : '#3b82f6',
-            fontSize: '0.75rem',
-            fontWeight: '600',
-            whiteSpace: 'nowrap',
+            inset: '3.25rem 0 0 0',
+            background: 'none',
+            border: 'none',
             cursor: 'pointer',
-            userSelect: 'none'
+            color: accentColor,
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            writingMode: 'vertical-rl',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
-          onClick={() => setIsCollapsed(false)}
         >
           {title}
-        </div>
-      )}
-
-      {/* Drag handle for collapsed state */}
-      {isCollapsed && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            [position]: '0',
-            transform: 'translateY(-50%)',
-            width: '4px',
-            height: '60px',
-            backgroundColor: position === 'left' ? '#059669' : '#3b82f6',
-            cursor: 'ew-resize',
-            borderRadius: position === 'left' ? '0 2px 2px 0' : '2px 0 0 2px',
-            opacity: isHovered ? 1 : 0.6,
-            transition: 'opacity 0.2s ease'
-          }}
-          onMouseDown={handleMouseDown}
-        />
+        </button>
       )}
     </div>
   );
