@@ -16,6 +16,7 @@ import { useErrorHandler } from './hooks/useErrorHandler';
 import { trackDoctorPresenceEvent } from '@/lib/consultations/doctor-presence-client';
 
 function DoctorRoomClient({ roomName }: { roomName: string }) {
+  const [speechLanguage, setSpeechLanguage] = useState('fil-PH');
   const {
     user,
     isAuthenticated,
@@ -36,7 +37,11 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
     clearTokenError,
   } = useDoctorToken({ roomName, doctorName, user });
 
-  const { captureError } = useSpeechCapture({ roomName, token });
+  const { speechStatus, captureError } = useSpeechCapture({
+    roomName,
+    token,
+    language: speechLanguage,
+  });
   const { consultationSessionId } = useRoomLifecycle({ token, user, roomName, doctorName });
 
   const { pageError, setPageError } = useErrorHandler(authError, tokenError, captureError);
@@ -196,6 +201,9 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
           roomName={roomName}
           user={user!}
           doctorName={doctorName}
+          speechLanguage={speechLanguage}
+          speechStatus={speechStatus}
+          onSpeechLanguageChange={setSpeechLanguage}
           onLeave={handleLeave}
         />
 

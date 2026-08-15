@@ -11,6 +11,9 @@ interface DoctorSessionPanelProps {
   roomName: string;
   user: User;
   doctorName: string;
+  speechLanguage: string;
+  speechStatus: 'idle' | 'listening' | 'error' | 'permission-required';
+  onSpeechLanguageChange: (language: string) => void;
   onLeave: () => void;
 }
 
@@ -18,6 +21,9 @@ export default function DoctorSessionPanel({
   roomName,
   user,
   doctorName,
+  speechLanguage,
+  speechStatus,
+  onSpeechLanguageChange,
   onLeave,
 }: DoctorSessionPanelProps) {
   const policy = getRoomSessionPolicy('doctor');
@@ -58,6 +64,9 @@ export default function DoctorSessionPanel({
           <DoctorControlsPanel
             doctorName={doctorName || user.displayName || user.email || 'Doctor'}
             roomName={roomName}
+            speechLanguage={speechLanguage}
+            speechStatus={speechStatus}
+            onSpeechLanguageChange={onSpeechLanguageChange}
             onLeave={onLeave}
             showCopyInvitationLinkControl={policy.panels.doctorSession.showCopyInvitationLinkControl}
             showRefreshInvitationLinkControl={policy.panels.doctorSession.showRefreshInvitationLinkControl}
