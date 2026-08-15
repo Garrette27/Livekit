@@ -81,7 +81,10 @@ export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLife
           createdBy: user.uid,
           createdAt: new Date(),
           status: 'active',
+          consultationSessionId: null,
           transcription: [],
+          transcriptionCount: 0,
+          hasTranscriptionData: false,
           manualNotes: [],
           lastUpdated: new Date()
         },
@@ -121,6 +124,22 @@ export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLife
           consultationSessionIdRef.current = normalizedConsultationSessionId;
           setConsultationSessionId(normalizedConsultationSessionId);
         }
+
+        // Associate the room-level transcript buffer with the immutable
+        // session that owns it. Summary rebuilds can then reject text from a
+        // later consultation that happened to reuse the same room name.
+        if (normalizedConsultationSessionId) {
+          try {
+            const callRef = doc(firestoreDb, 'calls', roomName);
+            await setDoc(
+              callRef,
+              { consultationSessionId: normalizedConsultationSessionId },
+              { merge: true }
+            );
+          } catch (transcriptTagError) {
+            console.warn('Could not associate transcript buffer with consultation session:', transcriptTagError);
+          }
+        }
       } catch (error) {
         console.error(
           'Failed to track doctor presence; this consultation will not appear in history.',
@@ -154,5 +173,3 @@ export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLife
     consultationSessionId,
   };
 }
-
-

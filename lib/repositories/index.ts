@@ -1,6 +1,7 @@
 export { CallSummaryRepository } from './call-summary-repository';
 export { ConsultationRepository } from './consultation-repository';
 export { ConsultationSessionRepository } from './consultation-session-repository';
+export { ConsultationTranscriptRepository } from './consultation-transcript-repository';
 export { RoomRepository } from './room-repository';
 export { RoomDoctorPresenceRepository } from './room-doctor-presence-repository';
 export { CallRepository } from './call-repository';

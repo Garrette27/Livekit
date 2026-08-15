@@ -9,6 +9,9 @@ import { useToast } from '@/components/ui/feedback/ToastProvider';
 interface DoctorControlsPanelProps {
   doctorName: string;
   roomName: string;
+  speechLanguage: string;
+  speechStatus: 'idle' | 'listening' | 'error' | 'permission-required';
+  onSpeechLanguageChange: (language: string) => void;
   onLeave: () => void;
   showCopyInvitationLinkControl?: boolean;
   showRefreshInvitationLinkControl?: boolean;
@@ -24,6 +27,9 @@ interface InvitationLinkResponse {
 export default function DoctorControlsPanel({
   doctorName,
   roomName,
+  speechLanguage,
+  speechStatus,
+  onSpeechLanguageChange,
   onLeave,
   showCopyInvitationLinkControl = true,
   showRefreshInvitationLinkControl = false,
@@ -102,6 +108,50 @@ export default function DoctorControlsPanel({
           }}
         >
           Room: {roomName}
+        </p>
+      </div>
+
+      <div
+        style={{
+          border: '1px solid #dbeafe',
+          borderRadius: '0.5rem',
+          padding: '0.75rem',
+          marginBottom: '0.75rem',
+          backgroundColor: '#eff6ff',
+        }}
+      >
+        <label
+          htmlFor="consultation-language"
+          style={{ display: 'block', color: '#1e3a8a', fontSize: '0.75rem', fontWeight: 600 }}
+        >
+          Spoken language for transcript
+        </label>
+        <select
+          id="consultation-language"
+          value={speechLanguage}
+          onChange={(event) => onSpeechLanguageChange(event.target.value)}
+          style={{
+            width: '100%',
+            marginTop: '0.375rem',
+            padding: '0.5rem',
+            border: '1px solid #93c5fd',
+            borderRadius: '0.375rem',
+            backgroundColor: '#ffffff',
+            color: '#1f2937',
+            fontSize: '0.75rem',
+          }}
+        >
+          <option value="fil-PH">Filipino / Tagalog (Taglish)</option>
+          <option value="en-US">English (US)</option>
+        </select>
+        <p style={{ margin: '0.375rem 0 0', color: '#475569', fontSize: '0.6875rem', lineHeight: 1.4 }}>
+          {speechStatus === 'listening'
+            ? 'Transcript capture is listening.'
+            : speechStatus === 'permission-required'
+              ? 'Microphone permission is needed for transcript capture.'
+              : speechStatus === 'error'
+                ? 'Transcript capture is unavailable.'
+                : 'Transcript capture starts after you interact with the page.'}
         </p>
       </div>
 

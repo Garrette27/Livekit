@@ -9,6 +9,8 @@ type SpeechStatus = 'idle' | 'listening' | 'error' | 'permission-required';
 interface SpeechCaptureArgs {
   roomName: string;
   token: string | null;
+  /** BCP 47 language used by browser speech recognition for this session. */
+  language: string;
 }
 
 interface SpeechCaptureState {
@@ -16,7 +18,14 @@ interface SpeechCaptureState {
   captureError: string | null;
 }
 
-export function useSpeechCapture({ roomName, token }: SpeechCaptureArgs): SpeechCaptureState {
+const MAX_STORED_TRANSCRIPT_LINES = 1_000;
+
+/**
+ * Captures finalized browser speech-recognition results once and persists a
+ * bounded transcript for later summarization. Changing the language restarts
+ * recognition without discarding text already captured in the consultation.
+ */
+export function useSpeechCapture({ roomName, token, language }: SpeechCaptureArgs): SpeechCaptureState {
   const [speechStatus, setSpeechStatus] = useState<SpeechStatus>('idle');
   const [captureError, setCaptureError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
@@ -34,6 +43,10 @@ export function useSpeechCapture({ roomName, token }: SpeechCaptureArgs): Speech
         {
           roomName,
           transcription,
+          transcriptionCount: transcription.length,
+          hasTranscriptionData: transcription.length > 0,
+          recognitionLanguage: language,
+          transcriptSource: 'browser_speech_recognition',
           lastUpdated: new Date(),
           status: 'active'
         },
@@ -42,7 +55,7 @@ export function useSpeechCapture({ roomName, token }: SpeechCaptureArgs): Speech
     } catch (error) {
       console.error('Error storing transcription:', error);
     }
-  }, [roomName]);
+  }, [roomName, language]);
 
   useEffect(() => {
     if (!token || !roomName) return;
@@ -58,24 +71,52 @@ export function useSpeechCapture({ roomName, token }: SpeechCaptureArgs): Speech
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.lang = language;
+    recognition.maxAlternatives = 1;
+    let shouldListen = true;
+    let restartTimer: number | null = null;
+
+    const scheduleRestart = (delayMs: number) => {
+      if (!shouldListen || restartTimer !== null) {
+        return;
+      }
+
+      restartTimer = window.setTimeout(() => {
+        restartTimer = null;
+        if (!shouldListen || !recognitionRef.current) {
+          return;
+        }
+        try {
+          recognition.start();
+        } catch (error) {
+          console.log('Error restarting recognition:', error);
+        }
+      }, delayMs);
+    };
 
     recognition.onstart = () => {
+      setCaptureError(null);
       setSpeechStatus('listening');
       hasStartedRef.current = true;
     };
 
     recognition.onresult = (event: any) => {
-      for (let i = 0; i < event.results.length; i++) {
+      // SpeechRecognitionEvent.results is cumulative. Starting at resultIndex
+      // prevents every earlier utterance from being appended again.
+      const firstChangedResult = Number.isInteger(event.resultIndex) ? event.resultIndex : 0;
+      for (let i = firstChangedResult; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
           const transcript = result[0].transcript.trim();
           if (transcript) {
             const timestamp = new Date().toISOString();
-            const next = [...transcriptsRef.current, `${timestamp}: ${transcript}`];
+            const next = [
+              ...transcriptsRef.current,
+              `${timestamp}: ${transcript}`,
+            ].slice(-MAX_STORED_TRANSCRIPT_LINES);
             transcriptsRef.current = next;
-            storeTranscription(next);
+            void storeTranscription(next);
           }
         }
       }
@@ -97,15 +138,7 @@ export function useSpeechCapture({ roomName, token }: SpeechCaptureArgs): Speech
       }
 
       if (event.error === 'no-speech') {
-        setTimeout(() => {
-          if (hasStartedRef.current && recognitionRef.current) {
-            try {
-              recognitionRef.current.start();
-            } catch (e) {
-              console.log('Error restarting recognition:', e);
-            }
-          }
-        }, 1000);
+        scheduleRestart(1_000);
         return;
       }
 
@@ -115,27 +148,23 @@ export function useSpeechCapture({ roomName, token }: SpeechCaptureArgs): Speech
 
     recognition.onend = () => {
       setSpeechStatus('idle');
-      if (token && hasStartedRef.current) {
-        setTimeout(() => {
-          try {
-            recognition.start();
-          } catch (e) {
-            console.log('Error restarting recognition:', e);
-          }
-        }, 500);
+      if (token && hasStartedRef.current && shouldListen) {
+        scheduleRestart(500);
       }
     };
 
     recognitionRef.current = recognition;
 
     const startRecognition = () => {
-      if (!userInteractedRef.current && recognitionRef.current) {
-        userInteractedRef.current = true;
-        try {
-          recognitionRef.current.start();
-        } catch (error) {
-          console.error('Error starting speech recognition:', error);
-        }
+      if (!recognitionRef.current || hasStartedRef.current) {
+        return;
+      }
+
+      userInteractedRef.current = true;
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('Error starting speech recognition:', error);
       }
     };
 
@@ -147,15 +176,26 @@ export function useSpeechCapture({ roomName, token }: SpeechCaptureArgs): Speech
     document.addEventListener('keydown', handleUserInteraction);
     document.addEventListener('touchstart', handleUserInteraction);
 
+    if (userInteractedRef.current) {
+      startRecognition();
+    }
+
     return () => {
+      shouldListen = false;
+      hasStartedRef.current = false;
+      if (restartTimer !== null) {
+        window.clearTimeout(restartTimer);
+      }
       document.removeEventListener('click', handleUserInteraction);
       document.removeEventListener('keydown', handleUserInteraction);
       document.removeEventListener('touchstart', handleUserInteraction);
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        recognitionRef.current.onend = null;
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
       }
     };
-  }, [roomName, token, storeTranscription]);
+  }, [roomName, token, language, storeTranscription]);
 
   return { speechStatus, captureError };
 }
