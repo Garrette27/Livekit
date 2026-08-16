@@ -5,32 +5,13 @@ import { User } from 'firebase/auth';
 import { Invitation } from '@/lib/types';
 import { useWaitingQueue } from '@/hooks/useWaitingQueue';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
+import { dateValueToDate } from '@/lib/time/date-value';
 
 interface WaitingPatientsListProps {
   user: User;
   invitations: Invitation[];
   selectedInvitationId: string | null;
   onCountUpdate?: (invitationId: string, count: number) => void;
-}
-
-function toDate(value: unknown): Date | null {
-  if (!value) {
-    return null;
-  }
-
-  if (typeof value === 'object' && value !== null) {
-    const maybeTimestamp = value as { toDate?: () => Date };
-    if (typeof maybeTimestamp.toDate === 'function') {
-      return maybeTimestamp.toDate();
-    }
-  }
-
-  const parsed = new Date(value as string | number | Date);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return parsed;
 }
 
 /**
@@ -112,7 +93,7 @@ function isActiveInvitation(invitation: Invitation, nowMs: number): boolean {
     return false;
   }
 
-  const expiresAtDate = toDate(invitation.expiresAt);
+  const expiresAtDate = dateValueToDate(invitation.expiresAt);
   if (!expiresAtDate) {
     return true;
   }
@@ -156,7 +137,7 @@ export default function WaitingPatientsList({
     selectedInvitationId,
     statuses: ['waiting', 'admitted'],
     autoRefresh: true,
-    pollIntervalMs: 5000,
+    pollIntervalMs: 15_000,
   });
 
   const waitingOnly = useMemo(
@@ -252,7 +233,7 @@ export default function WaitingPatientsList({
           <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280' }}>No one waiting right now.</p>
         ) : (
           waitingOnly.map((patient) => {
-            const joinedAt = toDate(patient.joinedAt);
+            const joinedAt = dateValueToDate(patient.joinedAt);
             const waitTime = joinedAt ? Math.floor((Date.now() - joinedAt.getTime()) / 1000 / 60) : null;
             const displayName =
               patient.patientName && patient.patientName !== 'Anonymous Patient'
@@ -411,7 +392,7 @@ export default function WaitingPatientsList({
           <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280' }}>No admitted patient currently in room.</p>
         ) : (
           admittedOnly.map((patient) => {
-            const admittedAt = toDate(patient.admittedAt || patient.joinedAt);
+            const admittedAt = dateValueToDate(patient.admittedAt || patient.joinedAt);
             const admittedMinutes = admittedAt
               ? Math.max(0, Math.floor((Date.now() - admittedAt.getTime()) / 1000 / 60))
               : null;
@@ -436,13 +417,14 @@ export default function WaitingPatientsList({
                     Room: {patient.roomName}
                   </h3>
                   <p style={{ fontSize: '0.875rem', color: '#047857', marginBottom: '0.25rem' }}>
-                    <strong>Email:</strong> {patient.patientEmail || 'Unknown'}
+                    <strong>Identity:</strong>{' '}
+                    {patient.patientEmail || 'Unidentified guest — verify verbally'}
                   </p>
                   <p style={{ fontSize: '0.875rem', color: '#047857', marginBottom: '0.25rem' }}>
                     <strong>Name:</strong> {displayName}
                   </p>
                   <p style={{ fontSize: '0.75rem', color: '#047857', marginBottom: '0.25rem' }}>
-                    <strong>Admitted:</strong> {admittedAt ? admittedAt.toLocaleString() : 'Unknown'}
+                    <strong>Admitted:</strong> {admittedAt ? admittedAt.toLocaleString() : 'Time unavailable'}
                   </p>
                   <p style={{ fontSize: '0.75rem', color: '#059669', marginTop: '0.5rem' }}>
                     {admittedMinutes === null

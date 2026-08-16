@@ -176,7 +176,6 @@ async function handleGET(req: NextRequest) {
     const tokenPayload: InvitationToken = {
       invitationId: invitationDoc.id,
       roomName: invitation.roomName,
-      ...(invitation.emailAllowed && { email: invitation.emailAllowed }),
       exp: Math.floor(expiresAtDate.getTime() / 1000),
       iat: Math.floor(Date.now() / 1000),
       oneUse: !invitation.waitingRoomEnabled, // Not single use if waiting room enabled

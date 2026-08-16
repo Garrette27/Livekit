@@ -110,6 +110,10 @@ export function useWaitingQueue({
       `${roomName || 'all-rooms'}::${doctorUserId || 'all-doctors'}::${selectedInvitationId || 'all'}::${invitationScope}::${statusScope}`,
     [doctorUserId, invitationScope, roomName, selectedInvitationId, statusScope]
   );
+  const requestKey = useMemo(
+    () => `${roomName || 'all-rooms'}::${doctorUserId || 'current-doctor'}::${statusScope}::active`,
+    [doctorUserId, roomName, statusScope]
+  );
 
   const snapshot = useAppSelector((state) => state.waitingQueue.byScopeKey[scopeKey]);
   const previousScopeKeyRef = useRef(scopeKey);
@@ -166,9 +170,6 @@ export function useWaitingQueue({
       }
       setError(null);
 
-      // Shared across every component watching this scope, so panels rendered
-      // side by side produce one request rather than one each.
-      return fetchWaitingQueueOnce(scopeKey, async () => {
       try {
         if (invitationIdsSet && invitationIdsSet.size === 0) {
           dispatch(
@@ -182,11 +183,16 @@ export function useWaitingQueue({
           return;
         }
 
-        const result = await listWaitingPatients({
-          roomName,
-          doctorUserId,
-          statuses: normalizedStatuses,
-        });
+        // UI selection is applied after the response. Components that ask the
+        // server the same question therefore share one request even when each
+        // renders a different invitation subset.
+        const result = await fetchWaitingQueueOnce(requestKey, () =>
+          listWaitingPatients({
+            roomName,
+            doctorUserId,
+            statuses: normalizedStatuses,
+          })
+        );
         if (!result.success) {
           dispatch(
             setWaitingQueueSnapshot({
@@ -210,7 +216,6 @@ export function useWaitingQueue({
           setLoading(false);
         }
       }
-      });
     },
     [
       dispatch,
@@ -218,6 +223,7 @@ export function useWaitingQueue({
       invitationIdsSet,
       normalizedStatuses,
       publishPatients,
+      requestKey,
       roomName,
       scopeKey,
     ]
@@ -328,10 +334,10 @@ export function useWaitingQueue({
     }
 
     // One timer per scope regardless of how many panels are mounted.
-    return subscribeToWaitingQueuePoll(scopeKey, pollIntervalMs, () => {
+    return subscribeToWaitingQueuePoll(requestKey, pollIntervalMs, () => {
       void refresh(false);
     });
-  }, [autoRefresh, isStreaming, pollIntervalMs, refresh, scopeKey]);
+  }, [autoRefresh, isStreaming, pollIntervalMs, refresh, requestKey]);
 
   return useMemo(
     () => ({

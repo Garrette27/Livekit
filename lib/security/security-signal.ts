@@ -1,18 +1,45 @@
 import { createHmac } from 'node:crypto';
 
+const SECURITY_SIGNAL_KEY_CONTEXT = 'livekit/security-signal-hmac/v1';
+
 /**
- * Convert an ephemeral request signal into a keyed correlation value. Callers
- * can compare abuse/reuse events without persisting the original network or
- * browser value; production deployments must set SECURITY_SIGNAL_HASH_SECRET.
+ * Return a key used only for privacy-preserving request correlation. A
+ * dedicated key is preferred so it can be rotated independently. Deployments
+ * created before that key existed derive a domain-separated subkey from the
+ * already-required LiveKit signing secret, keeping invitation access available
+ * without reusing the signing key as the correlation key itself.
  */
-export function hashSecuritySignal(label: 'ip' | 'user-agent', value: string): string {
+function resolveSecuritySignalKey(): string | Buffer {
   const configuredSecret =
     process.env.SECURITY_SIGNAL_HASH_SECRET ||
     process.env.INVITATION_TOKEN_SECRET;
-  if (!configuredSecret && process.env.NODE_ENV === 'production') {
-    throw new Error('SECURITY_SIGNAL_HASH_SECRET is required in production');
+  if (configuredSecret) {
+    return configuredSecret;
   }
 
-  const secret = configuredSecret || 'livekit-local-signal-hash';
-  return createHmac('sha256', secret).update(`${label}:${value}`).digest('hex');
+  const liveKitSecret = process.env.LIVEKIT_API_SECRET;
+  if (liveKitSecret) {
+    return createHmac('sha256', liveKitSecret)
+      .update(SECURITY_SIGNAL_KEY_CONTEXT)
+      .digest();
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'SECURITY_SIGNAL_HASH_SECRET or LIVEKIT_API_SECRET is required in production'
+    );
+  }
+
+  return 'livekit-local-signal-hash';
+}
+
+/**
+ * Convert an ephemeral request signal into a keyed correlation value. Callers
+ * can compare abuse/reuse events without persisting the original network or
+ * browser value. The raw signal never leaves this module.
+ */
+export function hashSecuritySignal(label: 'ip' | 'user-agent' | 'email', value: string): string {
+  return createHmac('sha256', resolveSecuritySignalKey())
+    .update(`${label}:${value}`)
+    .digest('hex');
 }

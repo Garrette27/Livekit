@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useWaitingQueue } from '@/hooks/useWaitingQueue';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
 import type { WaitingPatient } from '@/lib/types';
+import { dateValueToDate } from '@/lib/time/date-value';
 
 interface WaitingRoomPanelProps {
   roomName: string;
@@ -14,26 +15,6 @@ interface WaitingRoomPanelProps {
   showAdmitControl?: boolean;
   showRejectControl?: boolean;
   showRemoveControl?: boolean;
-}
-
-function toDate(value: unknown): Date | null {
-  if (!value) {
-    return null;
-  }
-
-  if (typeof value === 'object' && value !== null) {
-    const maybeTimestamp = value as { toDate?: () => Date };
-    if (typeof maybeTimestamp.toDate === 'function') {
-      return maybeTimestamp.toDate();
-    }
-  }
-
-  const parsed = new Date(value as string | number | Date);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return parsed;
 }
 
 function getDisplayName(patient: WaitingPatient): string {
@@ -197,7 +178,7 @@ export default function WaitingRoomPanel({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {waitingOnly.map((patient) => {
-                  const joinedAt = toDate(patient.joinedAt);
+                  const joinedAt = dateValueToDate(patient.joinedAt);
                   const waitTimeMinutes = joinedAt
                     ? Math.floor((Date.now() - joinedAt.getTime()) / 1000 / 60)
                     : null;
@@ -345,7 +326,7 @@ export default function WaitingRoomPanel({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {admittedOnly.map((patient) => {
-                  const admittedAt = toDate(patient.admittedAt || patient.joinedAt);
+                  const admittedAt = dateValueToDate(patient.admittedAt || patient.joinedAt);
                   const admittedMinutes = admittedAt
                     ? Math.max(0, Math.floor((Date.now() - admittedAt.getTime()) / 1000 / 60))
                     : null;

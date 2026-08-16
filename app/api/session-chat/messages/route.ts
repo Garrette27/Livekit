@@ -5,6 +5,8 @@ import type { SessionChatVisibilityPolicy } from '@/lib/chat/session-chat-model'
 import { FirestoreChatMessageStore } from '@/lib/services/video-chat';
 import { authorizeSessionParticipant } from '@/lib/services/shared/session-participant-auth';
 import { serviceResultToResponse } from '@/lib/services/shared/http';
+import { isConsultationCapabilityEnabled } from '@/lib/consultations/consultation-capabilities';
+import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
 
 function toDate(value: unknown): Date | null {
   if (!value) {
@@ -62,7 +64,16 @@ async function handleGET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      messages,
+      messages: messages.map((message) => ({
+        id: message.id,
+        consultationSessionId,
+        senderId: message.senderId,
+        senderName: message.senderName,
+        senderType: message.senderType,
+        text: message.message,
+        attachments: message.attachments || [],
+        createdAt: message.sentAt.toISOString(),
+      })),
       visibilityPolicy,
     });
   } catch (error) {
@@ -80,7 +91,21 @@ async function handlePOST(req: NextRequest) {
     const consultationSessionId =
       typeof body.consultationSessionId === 'string' ? body.consultationSessionId.trim() : '';
     const text = typeof body.text === 'string' ? body.text : '';
-    const attachments = Array.isArray(body.attachments) ? body.attachments : [];
+    if (Array.isArray(body.attachments) && body.attachments.length > 0) {
+      return NextResponse.json(
+        { success: false, error: 'Attachment metadata must be resolved by the server' },
+        { status: 400 }
+      );
+    }
+    const attachmentIds: string[] = Array.isArray(body.attachmentIds)
+      ? Array.from(
+          new Set<string>(
+            body.attachmentIds.filter((value: unknown): value is string =>
+              typeof value === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(value)
+            )
+          )
+        ).slice(0, 10)
+      : [];
     const messageId = typeof body.messageId === 'string' ? body.messageId.trim() : undefined;
 
     if (!consultationSessionId) {
@@ -102,6 +127,20 @@ async function handlePOST(req: NextRequest) {
     if (!participant.ok) {
       return serviceResultToResponse(participant);
     }
+
+    if (attachmentIds.length > 0 && !isConsultationCapabilityEnabled('file-attachments')) {
+      return NextResponse.json(
+        { success: false, error: 'File attachments are not enabled' },
+        { status: 404 }
+      );
+    }
+    const attachments = attachmentIds.length > 0
+      ? await new AttachmentRepository(db).resolveMessageReferences(
+          consultationSessionId,
+          attachmentIds,
+          participant.data.identity
+        )
+      : [];
 
     const chatStore = new FirestoreChatMessageStore(db);
     const result = await chatStore.appendMessage({

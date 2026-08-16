@@ -36,15 +36,37 @@ function normalizeMessageDoc(input: {
   id: string;
   data: Record<string, unknown>;
 }): NormalizedChatMessage {
+  const attachments: NonNullable<NormalizedChatMessage['attachments']> = Array.isArray(input.data.attachments)
+    ? input.data.attachments
+        .filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === 'object')
+        .map((attachment) => {
+          const rawExtractionStatus = attachment.extractionStatus;
+          const extractionStatus: 'pending' | 'ready' | 'failed' | null =
+            rawExtractionStatus === 'pending'
+            || rawExtractionStatus === 'ready'
+            || rawExtractionStatus === 'failed'
+              ? rawExtractionStatus
+              : null;
+          return {
+            id: String(attachment.id || ''),
+            name: String(attachment.name || 'Attachment'),
+            mimeType: String(attachment.mimeType || 'application/octet-stream'),
+            size: Number(attachment.size || 0),
+            extractionStatus,
+          };
+        })
+        .filter((attachment) => attachment.id.length > 0)
+    : [];
+
   return {
     id: input.id,
     senderId: String(input.data.senderId || ''),
     senderName: String(input.data.senderName || ''),
     senderType: (input.data.senderType as NormalizedChatMessage['senderType']) || 'system',
     message: String(input.data.text || ''),
-    attachments: Array.isArray(input.data.attachments)
-      ? (input.data.attachments as NormalizedChatMessage['attachments'])
-      : [],
+    // Public paths and extracted clinical text from any legacy message shape
+    // are deliberately not projected across the API boundary.
+    attachments,
     sentAt: toDate(input.data.createdAt || input.data.createdAtIso),
   };
 }

@@ -12,7 +12,10 @@ import {
 import { CallSummaryRepository } from '@/lib/repositories/call-summary-repository';
 import { CallRepository } from '@/lib/repositories/call-repository';
 import { ConsultationTranscriptRepository } from '@/lib/repositories/consultation-transcript-repository';
-import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
+import {
+  AttachmentRepository,
+  type ReadyAttachmentEvidence,
+} from '@/lib/repositories/attachment-repository';
 import { SummaryJobRepository } from '@/lib/repositories/summary-job-repository';
 import { isConsultationCapabilityEnabled } from '@/lib/consultations/consultation-capabilities';
 import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
@@ -538,15 +541,14 @@ async function buildAttachmentContext(
     }
 
     const sections = attachmentDocs
-      .map((doc: QueryDocumentSnapshot, index: number) => {
-        const data = doc.data() as { name?: string; extractedText?: string | null };
-        const extractedText = (data.extractedText || '').trim();
+      .map((attachment: ReadyAttachmentEvidence, index: number) => {
+        const extractedText = attachment.extractedText.trim();
         if (!extractedText) {
           return null;
         }
 
         const safeText = extractedText.slice(0, 3000);
-        const attachmentName = data.name || `Attachment ${index + 1}`;
+        const attachmentName = attachment.name || `Attachment ${index + 1}`;
         return `- ${attachmentName}:\n${safeText}`;
       })
       .filter((section: string | null): section is string => Boolean(section));

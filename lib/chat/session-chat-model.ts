@@ -6,9 +6,6 @@ export interface SessionChatAttachment {
   name: string;
   mimeType: string;
   size: number;
-  downloadUrl?: string | null;
-  storagePath?: string | null;
-  extractedText?: string | null;
   extractionStatus?: 'pending' | 'ready' | 'failed' | null;
 }
 

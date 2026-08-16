@@ -41,9 +41,17 @@ async function handlePOST(req: NextRequest) {
       errorMessage = null,
     } = body;
 
-    if (!consultationSessionId || !attachmentId || !extractionStatus) {
+    const normalizedText = typeof extractedText === 'string' ? extractedText.trim() : '';
+    const normalizedError = typeof errorMessage === 'string' ? errorMessage.trim().slice(0, 500) : null;
+    if (
+      !consultationSessionId
+      || !attachmentId
+      || !['pending', 'ready', 'failed'].includes(extractionStatus)
+      || normalizedText.length > 100_000
+      || (extractionStatus === 'ready' && !normalizedText)
+    ) {
       return NextResponse.json(
-        { success: false, error: 'Missing required extraction fields' },
+        { success: false, error: 'Invalid attachment extraction result' },
         { status: 400 }
       );
     }
@@ -58,8 +66,8 @@ async function handlePOST(req: NextRequest) {
 
     await new AttachmentRepository(db).updateExtraction(consultationSessionId, attachmentId, {
       extractionStatus,
-      extractedText,
-      errorMessage,
+      extractedText: normalizedText || null,
+      errorMessage: normalizedError,
     });
 
     return NextResponse.json({ success: true });

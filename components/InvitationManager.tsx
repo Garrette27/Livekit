@@ -90,8 +90,6 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
           audit: {
             created: now,
             lastAccessed: undefined,
-            accessAttempts: [],
-            violations: [],
           },
         };
 

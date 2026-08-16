@@ -76,15 +76,12 @@ async function handlePOST(req: NextRequest) {
     }
 
     const attachmentId = await new AttachmentRepository(db).create(consultationSessionId, {
-      consultationSessionId,
       uploaderId: participant.data.identity,
-      uploaderName: participant.data.participantName,
       name: safeName,
       mimeType,
       size,
+      uploadStatus: 'pending',
       storagePath: null,
-      downloadUrl: null,
-      extractedText: null,
       extractionStatus: 'pending',
     });
 

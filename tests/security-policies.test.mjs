@@ -84,11 +84,21 @@ test('concurrent invitation reservations cannot exceed maxUses', async () => {
 
   const invitationRef = {
     collection() {
-      return {
+      const auditCollection = {
         doc() {
           return { kind: 'audit' };
         },
+        orderBy() {
+          return auditCollection;
+        },
+        offset() {
+          return auditCollection;
+        },
+        limit() {
+          return { kind: 'audit-query' };
+        },
       };
+      return auditCollection;
     },
   };
   const db = {
@@ -102,7 +112,10 @@ test('concurrent invitation reservations cannot exceed maxUses', async () => {
     runTransaction(callback) {
       const run = transactionQueue.then(() =>
         callback({
-          async get() {
+          async get(reference) {
+            if (reference?.kind === 'audit-query') {
+              return { docs: [] };
+            }
             return { exists: true, data: () => ({ ...state }) };
           },
           update(_ref, patch) {
@@ -113,6 +126,7 @@ test('concurrent invitation reservations cannot exceed maxUses', async () => {
           set(_ref, event) {
             auditEvents.push(event);
           },
+          delete() {},
         })
       );
       transactionQueue = run.catch(() => undefined);
@@ -187,6 +201,43 @@ test('consultation history sort values describe the resulting order', async () =
   );
 });
 
+test('waiting-room timestamp transport understands Firestore JSON shapes', async () => {
+  const dates = await importTypeScriptModule('lib/time/date-value.ts');
+  assert.equal(
+    dates.dateValueToDate({ _seconds: 1_786_909_740, _nanoseconds: 500_000_000 }).toISOString(),
+    '2026-08-16T19:49:00.500Z'
+  );
+  assert.equal(
+    dates.dateValueToDate({ seconds: 1_786_909_740, nanoseconds: 0 }).toISOString(),
+    '2026-08-16T19:49:00.000Z'
+  );
+  assert.equal(dates.dateValueToDate('not-a-date'), null);
+});
+
+test('invitation presentation counts hashed identities without exposing addresses', async () => {
+  const presentation = await importTypeScriptModule(
+    'lib/invitations/invitation-presentation.ts'
+  );
+  assert.equal(
+    presentation.countDirectAdmissionIdentities({
+      metadata: {
+        constraints: {
+          allowlistCount: 2,
+          emailHashes: ['hash-a', 'hash-b'],
+        },
+      },
+    }),
+    2
+  );
+  assert.equal(
+    presentation.countDirectAdmissionIdentities({
+      emailAllowed: 'legacy@example.com',
+      metadata: { constraints: { emails: ['legacy@example.com', 'second@example.com'] } },
+    }),
+    2
+  );
+});
+
 test('prepared consultation capabilities default to disabled', async () => {
   const capabilities = await importTypeScriptModule(
     'lib/consultations/consultation-capabilities.ts'
@@ -199,4 +250,100 @@ test('prepared consultation capabilities default to disabled', async () => {
     }),
     true
   );
+});
+
+test('only a verified allowlisted identity skips the waiting room', async () => {
+  const policy = await importTypeScriptModule('lib/invitations/admission-policy.ts');
+  const verifiedVisitor = {
+    userId: 'patient-1',
+    authenticatedEmail: 'patient@example.com',
+    emailVerified: true,
+    isAnonymousAccount: false,
+  };
+
+  assert.equal(
+    policy.decideAdmission({
+      visitor: verifiedVisitor,
+      allowlistConfigured: true,
+      verifiedEmailAllowed: true,
+    }).admit,
+    'directly'
+  );
+  assert.equal(
+    policy.decideAdmission({
+      visitor: verifiedVisitor,
+      allowlistConfigured: true,
+      verifiedEmailAllowed: false,
+    }).admit,
+    'waiting-room'
+  );
+  assert.equal(
+    policy.decideAdmission({
+      visitor: { declaredEmail: 'patient@example.com' },
+      allowlistConfigured: true,
+      verifiedEmailAllowed: true,
+    }).admit,
+    'waiting-room',
+    'typed email never grants direct admission'
+  );
+  assert.equal(
+    policy.decideAdmission({
+      visitor: verifiedVisitor,
+      allowlistConfigured: false,
+      verifiedEmailAllowed: false,
+    }).admit,
+    'waiting-room'
+  );
+});
+
+test('security-signal hashing keeps production invitation validation available', async () => {
+  const previousEnvironment = {
+    NODE_ENV: process.env.NODE_ENV,
+    SECURITY_SIGNAL_HASH_SECRET: process.env.SECURITY_SIGNAL_HASH_SECRET,
+    INVITATION_TOKEN_SECRET: process.env.INVITATION_TOKEN_SECRET,
+    LIVEKIT_API_SECRET: process.env.LIVEKIT_API_SECRET,
+  };
+
+  try {
+    process.env.NODE_ENV = 'production';
+    delete process.env.SECURITY_SIGNAL_HASH_SECRET;
+    delete process.env.INVITATION_TOKEN_SECRET;
+    process.env.LIVEKIT_API_SECRET = 'test-livekit-signing-secret';
+
+    const securitySignals = await importTypeScriptModule(
+      'lib/security/security-signal.ts'
+    );
+    const networkHash = securitySignals.hashSecuritySignal('ip', '203.0.113.8');
+    const repeatedNetworkHash = securitySignals.hashSecuritySignal('ip', '203.0.113.8');
+    const browserHash = securitySignals.hashSecuritySignal('user-agent', '203.0.113.8');
+    const emailHash = securitySignals.hashSecuritySignal('email', 'patient@example.com');
+
+    assert.match(networkHash, /^[a-f0-9]{64}$/);
+    assert.equal(networkHash, repeatedNetworkHash);
+    assert.notEqual(networkHash, browserHash, 'signal labels separate correlation domains');
+    assert.notEqual(networkHash, emailHash, 'email allowlists use a separate correlation domain');
+
+    process.env.SECURITY_SIGNAL_HASH_SECRET = 'dedicated-correlation-secret';
+    assert.notEqual(
+      securitySignals.hashSecuritySignal('ip', '203.0.113.8'),
+      networkHash,
+      'a dedicated secret takes precedence over the compatibility subkey'
+    );
+
+    delete process.env.SECURITY_SIGNAL_HASH_SECRET;
+    delete process.env.LIVEKIT_API_SECRET;
+    assert.throws(
+      () => securitySignals.hashSecuritySignal('ip', '203.0.113.8'),
+      /required in production/,
+      'production still fails closed when no protected key material exists'
+    );
+  } finally {
+    for (const [name, value] of Object.entries(previousEnvironment)) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+  }
 });

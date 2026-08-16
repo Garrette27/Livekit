@@ -133,6 +133,24 @@ service cloud.firestore {
     match /summaryJobs/{jobId} {
       allow read, write: if false;
     }
+
+    // Prepared capability namespaces remain server-only and have no UI. Their
+    // release gates are documented in docs/data-model-readiness.md.
+    match /consultationSessions/{sessionId}/attachments/{attachmentId} {
+      allow read, write: if false;
+
+      match /{attachmentChildCollection}/{childId} {
+        allow read, write: if false;
+      }
+    }
+
+    match /appointments/{appointmentId} {
+      allow read, write: if false;
+
+      match /{appointmentChildCollection}/{childId} {
+        allow read, write: if false;
+      }
+    }
     
     // Sessions - users can only access their own sessions
     match /sessions/{sessionId} {

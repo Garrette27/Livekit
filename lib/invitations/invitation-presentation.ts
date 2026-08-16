@@ -92,3 +92,49 @@ export function describeInvitationAudience(emailCount: number): string {
     ? `${emailCount} verified email${emailCount === 1 ? '' : 's'} can join directly; everyone else waits for admission.`
     : 'Every visitor waits for doctor admission. Forwarding the link does not bypass the queue.';
 }
+
+/**
+ * Counts direct-admission identities without requiring their addresses in the
+ * browser. New documents store only a count and keyed hashes; the plaintext
+ * branches keep legacy records presentable until they expire.
+ */
+export function countDirectAdmissionIdentities(invitation: {
+  emailAllowed?: unknown;
+  metadata?: {
+    constraints?: {
+      email?: unknown;
+      emails?: unknown;
+      emailHashes?: unknown;
+      allowlistCount?: unknown;
+    };
+  };
+}): number {
+  const constraints = invitation.metadata?.constraints;
+  const storedCount = constraints?.allowlistCount;
+  if (typeof storedCount === 'number' && Number.isFinite(storedCount) && storedCount >= 0) {
+    return Math.floor(storedCount);
+  }
+
+  if (Array.isArray(constraints?.emailHashes)) {
+    const hashes = new Set(
+      constraints.emailHashes.filter((value): value is string =>
+        typeof value === 'string' && value.length > 0
+      )
+    );
+    if (hashes.size > 0) {
+      return hashes.size;
+    }
+  }
+
+  const legacyEmails = [
+    invitation.emailAllowed,
+    constraints?.email,
+    ...(Array.isArray(constraints?.emails) ? constraints.emails : []),
+  ];
+  return new Set(
+    legacyEmails
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.toLowerCase().trim())
+      .filter(Boolean)
+  ).size;
+}

@@ -1,5 +1,26 @@
 import type { Invitation } from '@/lib/types';
 
+const MAX_ACCESS_EVENTS_PER_INVITATION = 100;
+const MAX_ACCESS_EVENTS_PRUNED_PER_WRITE = 25;
+
+/**
+ * Keeps the invitation audit useful without turning a reusable link into an
+ * indefinitely growing document tree. The newest event is written after old
+ * overflow rows have been selected inside the same transaction.
+ */
+async function pruneOldAccessEvents(
+  transaction: any,
+  invitationRef: any
+): Promise<any[]> {
+  const overflowQuery = invitationRef
+    .collection('accessAttempts')
+    .orderBy('timestamp', 'desc')
+    .offset(MAX_ACCESS_EVENTS_PER_INVITATION - 1)
+    .limit(MAX_ACCESS_EVENTS_PRUNED_PER_WRITE);
+  const overflow = await transaction.get(overflowQuery);
+  return overflow.docs;
+}
+
 function invitationIsActive(invitation: Invitation): boolean {
   const expiresAt = invitation.expiresAt?.toDate?.()
     || (invitation.expiresAt instanceof Date ? invitation.expiresAt : null);
@@ -49,6 +70,8 @@ export async function reserveInvitationUse(
       return false;
     }
 
+    const overflowEvents = await pruneOldAccessEvents(transaction, invitationRef);
+
     transaction.update(invitationRef, {
       currentUses: currentUses + 1,
       'audit.lastAccessed': new Date(),
@@ -60,6 +83,7 @@ export async function reserveInvitationUse(
           }
         : {}),
     });
+    overflowEvents.forEach((eventDocument) => transaction.delete(eventDocument.ref));
     transaction.set(auditRef, accessAttemptData);
     if (waitingPatientRef && options.waitingPatient) {
       transaction.set(waitingPatientRef, options.waitingPatient.data);
@@ -92,7 +116,10 @@ export async function recordExistingInvitationAccess(
       return false;
     }
 
+    const overflowEvents = await pruneOldAccessEvents(transaction, invitationRef);
+
     transaction.update(invitationRef, { 'audit.lastAccessed': new Date() });
+    overflowEvents.forEach((eventDocument) => transaction.delete(eventDocument.ref));
     transaction.set(auditRef, accessAttemptData);
     return true;
   });

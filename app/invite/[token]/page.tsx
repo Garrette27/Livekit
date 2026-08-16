@@ -139,6 +139,8 @@ function InvitePageContent() {
   const [isValidating, setIsValidating] = useState(true);
   const [validationResult, setValidationResult] = useState<ValidateInvitationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [validationFailureKind, setValidationFailureKind] = useState<'access' | 'service' | null>(null);
+  const [validationAttempt, setValidationAttempt] = useState(0);
   const [requiresRegistration, setRequiresRegistration] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
   const [verificationEmailState, setVerificationEmailState] = useState<'idle' | 'sending' | 'sent'>('idle');
@@ -208,6 +210,7 @@ function InvitePageContent() {
       try {
         setIsValidating(true);
         setError(null);
+        setValidationFailureKind(null);
 
         const request: ValidateInvitationRequest = {
           token,
@@ -240,7 +243,10 @@ function InvitePageContent() {
 
         const result: ValidateInvitationResponse = await response.json();
 
-        if (result.success) {
+        if (response.status >= 500) {
+          setValidationFailureKind('service');
+          setError('We could not verify this invitation right now. Your link has not been rejected. Please try again.');
+        } else if (result.success) {
           if (user?.email) {
             setInvitationEmail(user.email.toLowerCase());
           }
@@ -250,13 +256,12 @@ function InvitePageContent() {
           setRequiresRegistration(true);
           setInvitationEmail(result.registeredEmail || '');
         } else {
+          setValidationFailureKind('access');
           setError(result.error || 'Validation failed');
-          if (result.violations && result.violations.length > 0) {
-            console.error('Security violations:', result.violations);
-          }
         }
       } catch (err) {
-        setError('Network error. Please try again.');
+        setValidationFailureKind('service');
+        setError('We could not reach the invitation service. Check your connection, then try again.');
         console.error('Error validating invitation:', err);
       } finally {
         setIsValidating(false);
@@ -266,7 +271,7 @@ function InvitePageContent() {
     validateInvitation();
     // `user` is the Firebase user object, stable for a signed-in session, and
     // is needed whole here to refresh its token before validating.
-  }, [authLoading, token, user, user?.email]);
+  }, [authLoading, token, user, user?.email, validationAttempt]);
 
   useEffect(() => {
     if (
@@ -483,6 +488,7 @@ function InvitePageContent() {
             setIsValidating(true);
             setRequiresRegistration(false);
             setError(null);
+            setValidationFailureKind(null);
 
             const request: ValidateInvitationRequest = {
               token,
@@ -499,13 +505,18 @@ function InvitePageContent() {
 
             const result: ValidateInvitationResponse = await response.json();
 
-            if (result.success) {
+            if (response.status >= 500) {
+              setValidationFailureKind('service');
+              setError('We could not verify this invitation right now. Your link has not been rejected. Please try again.');
+            } else if (result.success) {
               setValidationResult(result);
             } else {
+              setValidationFailureKind('access');
               setError(result.error || 'Validation failed after registration');
             }
           } catch (err) {
-            setError('Network error. Please try again.');
+            setValidationFailureKind('service');
+            setError('We could not reach the invitation service. Check your connection, then try again.');
             console.error('Error validating invitation after registration:', err);
           } finally {
             setIsValidating(false);
@@ -517,10 +528,11 @@ function InvitePageContent() {
 
   // Handle validation errors
   if (error) {
+    const isServiceFailure = validationFailureKind === 'service';
     return (
       <div style={{
         minHeight: '100vh',
-        backgroundColor: '#fef2f2',
+        backgroundColor: isServiceFailure ? '#eff6ff' : '#fef2f2',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -538,23 +550,25 @@ function InvitePageContent() {
           <div style={{
             width: '5rem',
             height: '5rem',
-            backgroundColor: '#fecaca',
+            backgroundColor: isServiceFailure ? '#dbeafe' : '#fecaca',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 2rem'
           }}>
-              <span style={{ fontSize: '2.5rem', color: '#dc2626' }}>X</span>
+              <span style={{ fontSize: '2.5rem', color: isServiceFailure ? '#2563eb' : '#dc2626' }}>
+                {isServiceFailure ? '!' : 'X'}
+              </span>
           </div>
 
           <h1 style={{
             fontSize: '1.875rem',
             fontWeight: 'bold',
-            color: '#dc2626',
+            color: isServiceFailure ? '#1e40af' : '#dc2626',
             marginBottom: '1rem'
           }}>
-            Access Denied
+            {isServiceFailure ? 'Unable to Verify Invitation' : 'Access Denied'}
           </h1>
 
           <p style={{
@@ -567,7 +581,14 @@ function InvitePageContent() {
           </p>
 
           <button
-            onClick={() => router.push('/')}
+            onClick={() => {
+              if (isServiceFailure) {
+                setError(null);
+                setValidationAttempt((attempt) => attempt + 1);
+              } else {
+                router.push('/');
+              }
+            }}
             style={{
               backgroundColor: '#2563eb',
               color: 'white',
@@ -579,8 +600,25 @@ function InvitePageContent() {
               fontSize: '1rem'
             }}
           >
-            Return to Home
+            {isServiceFailure ? 'Try Again' : 'Return to Home'}
           </button>
+          {isServiceFailure && (
+            <button
+              onClick={() => router.push('/')}
+              style={{
+                display: 'block',
+                margin: '0.75rem auto 0',
+                backgroundColor: 'transparent',
+                color: '#6b7280',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                textDecoration: 'underline'
+              }}
+            >
+              Return to Home
+            </button>
+          )}
         </div>
       </div>
     );
@@ -987,4 +1025,3 @@ export default function InvitePage() {
     </Suspense>
   );
 }
-

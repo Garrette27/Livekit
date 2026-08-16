@@ -48,7 +48,8 @@ export interface Consultation {
 export interface Invitation {
   id: string;
   roomName: string;
-  emailAllowed?: string; // Optional email - invitation can be created without email
+  /** Legacy plaintext allowlist field. New writes use keyed email hashes. */
+  emailAllowed?: string;
   phoneAllowed?: string; // Optional phone number
   expiresAt: Timestamp;
   maxUses: number;
@@ -66,8 +67,12 @@ export interface Invitation {
     doctorEmail: string;
     roomName: string;
         constraints: {
-          email?: string; // Optional email constraint
-          emails?: string[]; // Future multi-email allowlist constraint
+          /** Legacy plaintext fields retained only while old documents remain readable. */
+          email?: string;
+          emails?: string[];
+          /** Keyed hashes support equality checks without persisting addresses. */
+          emailHashes?: string[];
+          allowlistCount?: number;
           phone?: string;
         };
     security: {
@@ -82,8 +87,6 @@ export interface Invitation {
     eventVersion?: number;
     created: Timestamp;
     lastAccessed?: Timestamp;
-    accessAttempts: AccessAttempt[];
-    violations: SecurityViolation[];
   };
 }
 
@@ -96,10 +99,8 @@ export interface AccessAttempt {
   actorId?: string | null;
   metadata?: Record<string, unknown>;
   timestamp: Timestamp;
-  ip: string;
-  userAgent: string;
-  country?: string;
-  deviceFingerprint?: string;
+  networkHash: string;
+  userAgentHash: string;
   success: boolean;
   reason?: string;
 }
@@ -115,14 +116,15 @@ export interface SecurityViolation {
   timestamp: Timestamp;
   type: 'wrong_email' | 'wrong_country' | 'wrong_browser' | 'wrong_device' | 'wrong_ip' | 'expired' | 'already_used' | 'not_registered' | 'consent_not_given';
   details: string;
-  ip: string;
-  userAgent: string;
+  networkHash: string;
+  userAgentHash: string;
 }
 
 export interface InvitationToken {
   invitationId: string;
   roomName: string;
-  email?: string; // Optional email - invitation can work without email
+  /** Legacy claim accepted while old links expire. New tokens omit identity data. */
+  email?: string;
   exp: number;
   iat: number;
   oneUse: boolean;
@@ -170,7 +172,6 @@ export interface ValidateInvitationResponse {
   invitationId?: string; // Invitation ID for checking admission status
   waitingPatientId?: string; // Stable waiting-patient reference for admission polling
   error?: string;
-  violations?: SecurityViolation[];
   requiresRegistration?: boolean; // If true, user needs to register first
   registeredEmail?: string; // Email that should be used for registration
   waitingRoomEnabled?: boolean; // Whether patient is in waiting room
@@ -189,6 +190,7 @@ export interface InvitationFormData {
 // Waiting room types
 export interface WaitingPatient {
   id: string;
+  doctorUserId?: string;
   patientId: string;
   patientName?: string;
   patientEmail?: string;

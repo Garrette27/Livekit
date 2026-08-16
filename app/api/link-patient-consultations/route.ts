@@ -7,6 +7,7 @@ import { ConsultationSessionRepository } from '@/lib/repositories/consultation-s
 import { InvitationRepository } from '@/lib/repositories/invitation-repository';
 import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
 import { serviceResultToResponse } from '@/lib/services/shared/http';
+import { hashSecuritySignal } from '@/lib/security/security-signal';
 
 interface LinkConsultationsRequest {
   userId?: string;
@@ -241,7 +242,18 @@ async function handlePOST(req: Request) {
       }
     }
 
-    const invitationDocsByEmail = await invitationRepo.findByEmailAllowed(userEmail, 200);
+    const [legacyInvitationDocs, hashedInvitationDocs] = await Promise.all([
+      invitationRepo.findByEmailAllowed(userEmail, 200),
+      invitationRepo.findByEmailAllowedHash(hashSecuritySignal('email', userEmail), 200),
+    ]);
+    const invitationDocsByEmail = Array.from(
+      new Map(
+        [...legacyInvitationDocs, ...hashedInvitationDocs].map((invitationDoc) => [
+          invitationDoc.id,
+          invitationDoc,
+        ])
+      ).values()
+    );
 
     const roomNamesFromInvitations = Array.from(
       new Set(
