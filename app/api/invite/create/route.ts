@@ -1,4 +1,5 @@
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
+import { randomUUID } from 'node:crypto';
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
@@ -6,7 +7,7 @@ import { serviceResultToResponse } from '@/lib/services/shared/http';
 import { DoctorRoomAccess } from '@/lib/services/room-access';
 import { UserRepository } from '../../../../lib/repositories/user-repository';
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
-import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
+import { enforceRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import { validateEmail, validateRoomName, sanitizeInput } from '../../../../lib/validation';
 import { signInvitationToken } from '../../../../lib/invitations/token-utils';
 import { buildInviteUrl } from '../../../../lib/invitations/utils';
@@ -20,7 +21,7 @@ import {
 async function handlePOST(req: NextRequest) {
   try {
     // Apply rate limiting
-    const rateLimitResponse = withRateLimit(RateLimitConfigs.TOKEN_GENERATION)(req);
+    const rateLimitResponse = await enforceRateLimit(req, RateLimitConfigs.TOKEN_GENERATION);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
@@ -131,7 +132,9 @@ async function handlePOST(req: NextRequest) {
     }
 
     // Generate unique invitation ID
-    const invitationId = `invite_${sanitizedRoomName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Keep identifiers opaque: the signed token carries the room binding, so
+    // putting a room name and timestamp in the document id only leaks context.
+    const invitationId = `invite_${randomUUID()}`;
 
     // Determine waiting room settings
     const isWaitingRoomEnabled = waitingRoomEnabled === true;
@@ -170,7 +173,10 @@ async function handlePOST(req: NextRequest) {
         security: {
           singleUse: !isWaitingRoomEnabled, // Not single use if waiting room enabled
           timeLimited: true,
-          // Removed: geoRestricted, deviceRestricted - now handled via user profile verification
+          usagePolicy: isWaitingRoomEnabled ? 'reusable-until-expiry' : 'single-use',
+          admissionPolicy: sanitizedEmailAllowlist.length > 0
+            ? 'verified-allowlist-or-doctor-admit'
+            : 'doctor-admit',
         },
       },
       audit: {

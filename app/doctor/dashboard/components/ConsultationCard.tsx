@@ -25,6 +25,8 @@ export interface ConsultationCardRecord {
   endedAt: Date | null;
   duration: number;
   isEdited?: boolean;
+  summaryStatus?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable' | 'reviewed';
+  requiresClinicianReview?: boolean;
   waitingRoomHistory?: {
     totalParticipants: number;
     registeredParticipantCount: number;
@@ -140,6 +142,16 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
           {risk && (
             <span style={{ ...chipStyle, color: risk.color, backgroundColor: risk.background }}>
               {record.riskLevel} risk
+            </span>
+          )}
+          {record.hasGeneratedSummary && record.requiresClinicianReview && !record.isEdited && (
+            <span style={{ ...chipStyle, color: '#92400e', backgroundColor: '#fef3c7' }}>
+              AI draft · review required
+            </span>
+          )}
+          {record.isEdited && (
+            <span style={{ ...chipStyle, color: '#065f46', backgroundColor: '#d1fae5' }}>
+              Clinician reviewed
             </span>
           )}
           <span style={{ ...chipStyle, color: status.color, backgroundColor: status.background }}>

@@ -1,198 +1,99 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const functions = require('firebase-functions/v1');
-const { AccessToken } = require('livekit-server-sdk');
-const fetch = require('node-fetch');
 const admin = require('firebase-admin');
 const activityLogPipeline = require('./activity-log-pipeline');
 const { logInfo, logWarn, logError } = require('./structured-logger');
 
 admin.initializeApp();
 
-exports.getJoinToken = functions.https.onRequest((req, res) => {
-  const identity = typeof req.body?.identity === 'string' ? req.body.identity.trim() : '';
-  const roomName = typeof req.body?.roomName === 'string' ? req.body.roomName.trim() : '';
-  const consultationSessionId =
-    typeof req.body?.consultationSessionId === 'string'
-      ? req.body.consultationSessionId.trim()
-      : null;
-  const invitationId =
-    typeof req.body?.invitationId === 'string' ? req.body.invitationId.trim() : null;
+const DEFAULT_SUMMARY_RETENTION_DAYS = 30;
+const MAX_RETENTION_BATCH_SIZE = 400;
 
-  if (!identity || !roomName) {
-    logWarn({
-      message: 'Join token request rejected due to invalid payload.',
-      correlation: {
-        eventDomain: 'rtc.transport',
-        eventType: 'join_token_request_invalid',
-        consultationSessionId,
-        roomName,
-        invitationId,
-      },
-      metadata: {
-        hasIdentity: Boolean(identity),
-        hasRoomName: Boolean(roomName),
-      },
-    });
+/**
+ * Resolve the deployment's explicit summary-retention policy. Destructive
+ * cleanup stays disabled until the operator opts in with an environment flag.
+ */
+function summaryRetentionPolicy() {
+  const configuredDays = Number.parseInt(process.env.SUMMARY_RETENTION_DAYS || '', 10);
+  return {
+    enabled: process.env.RETENTION_ENFORCEMENT_ENABLED === 'true',
+    days:
+      Number.isFinite(configuredDays) && configuredDays >= 1 && configuredDays <= 3650
+        ? configuredDays
+        : DEFAULT_SUMMARY_RETENTION_DAYS,
+  };
+}
 
-    res.status(400).json({ error: 'identity and roomName are required' });
-    return;
+/**
+ * Delete one bounded page of expired summaries. A bounded batch prevents the
+ * daily job from exceeding Firestore's write limit and lets later runs resume.
+ */
+async function deleteExpiredSummaryPage(db, cutoff) {
+  const snapshot = await db
+    .collection('call-summaries')
+    .where('createdAt', '<', cutoff)
+    .limit(MAX_RETENTION_BATCH_SIZE)
+    .get();
+
+  if (snapshot.empty) {
+    return { deletedCount: 0, remainingMayExist: false };
   }
 
-  const accessToken = new AccessToken(
-    functions.config().livekit.key,
-    functions.config().livekit.secret,
-    { identity }
-  );
-  accessToken.addGrant({ room: roomName, roomJoin: true });
-
-  logInfo({
-    message: 'Join token issued.',
-    correlation: {
-      eventDomain: 'rtc.transport',
-      eventType: 'join_token_issued',
-      consultationSessionId,
-      roomName,
-      invitationId,
-    },
-    metadata: {
-      identity,
-    },
-  });
-
-  res.json({ token: accessToken.toJwt() });
-});
-
-exports.onRoomEnd = functions.https.onRequest(async (req, res) => {
-  const roomName =
-    typeof req.body?.room?.name === 'string' ? req.body.room.name.trim() : null;
-
-  try {
-    const summary = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${functions.config().openai.key}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'system', content: `Summarize the call in ${roomName}` }],
-      }),
-    }).then((response) => response.json());
-
-    logInfo({
-      message: 'Room end summary generation completed.',
-      correlation: {
-        eventDomain: 'history.summary',
-        eventType: 'room_end_summary_generated',
-        roomName,
-      },
-      metadata: {
-        hasSummary: Boolean(summary),
-      },
-    });
-
-    // TODO: Delete the call record from Firestore.
-    res.sendStatus(200);
-  } catch (error) {
-    logError({
-      message: 'Room end summary generation failed.',
-      correlation: {
-        eventDomain: 'history.summary',
-        eventType: 'room_end_summary_failed',
-        roomName,
-      },
-      error,
-    });
-
-    res.status(500).json({ error: 'Failed to process room end webhook' });
+  const batch = db.batch();
+  for (const document of snapshot.docs) {
+    batch.delete(document.ref);
+    batch.delete(db.collection('scheduled-deletions').doc(document.id));
   }
-});
+  await batch.commit();
 
-// Cloud Function to automatically delete call summaries after 30 days.
+  return {
+    deletedCount: snapshot.size,
+    remainingMayExist: snapshot.size === MAX_RETENTION_BATCH_SIZE,
+  };
+}
+
+/**
+ * Enforce the configured call-summary retention period once per day.
+ *
+ * Set RETENTION_ENFORCEMENT_ENABLED=true only after the thesis team has
+ * approved its retention policy; SUMMARY_RETENTION_DAYS defaults to 30.
+ */
 exports.autoDeleteSummaries = functions.pubsub.schedule('every 24 hours').onRun(async () => {
+  const policy = summaryRetentionPolicy();
+  if (!policy.enabled) {
+    logWarn({
+      message: 'Summary retention is configured in dry-run mode.',
+      correlation: {
+        eventDomain: 'history.retention',
+        eventType: 'retention_disabled',
+      },
+      metadata: { retentionDays: policy.days },
+    });
+    return { deletedCount: 0, disabled: true };
+  }
+
   try {
-    const db = admin.firestore();
-
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const thirtyDaysAgoTimestamp = admin.firestore.Timestamp.fromDate(thirtyDaysAgo);
-
-    const snapshot = await db
-      .collection('call-summaries')
-      .where('createdAt', '<', thirtyDaysAgoTimestamp)
-      .get();
-
-    if (snapshot.empty) {
-      logInfo({
-        message: 'No call summaries eligible for auto deletion.',
-        correlation: {
-          eventDomain: 'history.retention',
-          eventType: 'auto_delete_noop',
-        },
-      });
-      return null;
-    }
-
-    const deleteResults = await Promise.all(
-      snapshot.docs.map(async (doc) => {
-        try {
-          await doc.ref.delete();
-          await db.collection('scheduled-deletions').doc(doc.id).delete();
-
-          logInfo({
-            message: 'Call summary deleted by retention job.',
-            correlation: {
-              eventDomain: 'history.retention',
-              eventType: 'summary_deleted',
-            },
-            metadata: {
-              summaryId: doc.id,
-            },
-          });
-
-          return { id: doc.id, status: 'deleted' };
-        } catch (error) {
-          logError({
-            message: 'Call summary deletion failed in retention job.',
-            correlation: {
-              eventDomain: 'history.retention',
-              eventType: 'summary_delete_failed',
-            },
-            metadata: {
-              summaryId: doc.id,
-            },
-            error,
-          });
-
-          return { id: doc.id, status: 'error' };
-        }
-      })
-    );
-
-    const deletedCount = deleteResults.filter((result) => result.status === 'deleted').length;
-    const errorCount = deleteResults.filter((result) => result.status === 'error').length;
+    const cutoffDate = new Date();
+    cutoffDate.setUTCDate(cutoffDate.getUTCDate() - policy.days);
+    const cutoff = admin.firestore.Timestamp.fromDate(cutoffDate);
+    const result = await deleteExpiredSummaryPage(admin.firestore(), cutoff);
 
     logInfo({
-      message: 'Auto-delete summaries job completed.',
+      message: 'Summary retention job completed.',
       correlation: {
         eventDomain: 'history.retention',
         eventType: 'auto_delete_completed',
       },
       metadata: {
-        deletedCount,
-        errorCount,
-        totalProcessed: deleteResults.length,
+        retentionDays: policy.days,
+        cutoff: cutoffDate.toISOString(),
+        ...result,
       },
     });
-
-    return {
-      deletedCount,
-      errorCount,
-      totalProcessed: deleteResults.length,
-    };
+    return result;
   } catch (error) {
     logError({
-      message: 'Auto-delete summaries job failed.',
+      message: 'Summary retention job failed.',
       correlation: {
         eventDomain: 'history.retention',
         eventType: 'auto_delete_failed',
@@ -203,111 +104,8 @@ exports.autoDeleteSummaries = functions.pubsub.schedule('every 24 hours').onRun(
   }
 });
 
-// Cloud Function to manually delete a summary (for admin use).
-exports.manualDeleteSummary = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
-  }
-
-  try {
-    const summaryId = typeof data?.summaryId === 'string' ? data.summaryId.trim() : '';
-    if (!summaryId) {
-      throw new functions.https.HttpsError('invalid-argument', 'Summary ID is required');
-    }
-
-    const db = admin.firestore();
-    await db.collection('call-summaries').doc(summaryId).delete();
-    await db.collection('scheduled-deletions').doc(summaryId).delete();
-
-    logInfo({
-      message: 'Summary manually deleted.',
-      correlation: {
-        eventDomain: 'history.retention',
-        eventType: 'summary_manual_delete',
-      },
-      metadata: {
-        summaryId,
-        actorId: context.auth.uid,
-      },
-    });
-
-    return {
-      success: true,
-      message: `Summary ${summaryId} deleted successfully`,
-    };
-  } catch (error) {
-    logError({
-      message: 'Manual summary deletion failed.',
-      correlation: {
-        eventDomain: 'history.retention',
-        eventType: 'summary_manual_delete_failed',
-      },
-      metadata: {
-        actorId: context.auth?.uid || null,
-      },
-      error,
-    });
-    throw new functions.https.HttpsError('internal', 'Failed to delete summary');
-  }
-});
-
-// Cloud Function to get deletion statistics.
-exports.getDeletionStats = functions.https.onCall(async (_data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
-  }
-
-  try {
-    const db = admin.firestore();
-
-    const summariesSnapshot = await db.collection('call-summaries').get();
-    const scheduledSnapshot = await db.collection('scheduled-deletions').get();
-
-    const sevenDaysFromNow = new Date();
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-    const sevenDaysFromNowTimestamp = admin.firestore.Timestamp.fromDate(sevenDaysFromNow);
-    const upcomingDeletionsSnapshot = await db
-      .collection('scheduled-deletions')
-      .where('scheduledFor', '<=', sevenDaysFromNowTimestamp)
-      .get();
-
-    const result = {
-      totalSummaries: summariesSnapshot.size,
-      scheduledDeletions: scheduledSnapshot.size,
-      upcomingDeletions: upcomingDeletionsSnapshot.size,
-      lastUpdated: new Date().toISOString(),
-    };
-
-    logInfo({
-      message: 'Deletion statistics requested.',
-      correlation: {
-        eventDomain: 'history.retention',
-        eventType: 'deletion_stats_requested',
-      },
-      metadata: {
-        actorId: context.auth.uid,
-        ...result,
-      },
-    });
-
-    return result;
-  } catch (error) {
-    logError({
-      message: 'Deletion statistics request failed.',
-      correlation: {
-        eventDomain: 'history.retention',
-        eventType: 'deletion_stats_request_failed',
-      },
-      metadata: {
-        actorId: context.auth?.uid || null,
-      },
-      error,
-    });
-    throw new functions.https.HttpsError('internal', 'Failed to get deletion statistics');
-  }
-});
-
-// Firestore onWrite audit trail + admin activity feed pipeline.
+// Server-owned Firestore audit triggers. No callable administrative or token
+// minting functions are exported from this deployment.
 exports.auditConsultationDocuments = activityLogPipeline.auditConsultationDocuments;
 exports.auditConsultationSessions = activityLogPipeline.auditConsultationSessions;
 exports.auditConsultationSessionEvents = activityLogPipeline.auditConsultationSessionEvents;

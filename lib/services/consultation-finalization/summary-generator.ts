@@ -13,6 +13,8 @@ import { CallSummaryRepository } from '@/lib/repositories/call-summary-repositor
 import { CallRepository } from '@/lib/repositories/call-repository';
 import { ConsultationTranscriptRepository } from '@/lib/repositories/consultation-transcript-repository';
 import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
+import { SummaryJobRepository } from '@/lib/repositories/summary-job-repository';
+import { isConsultationCapabilityEnabled } from '@/lib/consultations/consultation-capabilities';
 import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import type { GenerateConsultationSummaryParams } from './contracts';
 
@@ -521,7 +523,10 @@ async function buildAttachmentContext(
   db: any,
   consultationSessionId: string | null | undefined
 ): Promise<string | null> {
-  if (!consultationSessionId) {
+  if (
+    !consultationSessionId
+    || !isConsultationCapabilityEnabled('file-attachments')
+  ) {
     return null;
   }
 
@@ -629,6 +634,32 @@ export async function generateAndStoreConsultationSummary({
 
   const summaryRepo = new CallSummaryRepository(db);
   const summaryDocumentId = consultationSessionId || roomName;
+  const summaryJobRepo = consultationSessionId ? new SummaryJobRepository(db) : null;
+
+  /** Queue bookkeeping must never hide an otherwise valid consultation record. */
+  const updateSummaryJob = async (
+    action: 'processing' | 'ready' | 'unavailable' | 'failed',
+    failureCode = 'generation_failed'
+  ) => {
+    if (!summaryJobRepo || !consultationSessionId) {
+      return;
+    }
+    try {
+      if (action === 'processing') {
+        await summaryJobRepo.markProcessing({
+          summaryId: summaryDocumentId,
+          consultationSessionId,
+          doctorUserId: userId,
+        });
+      } else if (action === 'failed') {
+        await summaryJobRepo.markFailed(summaryDocumentId, failureCode);
+      } else {
+        await summaryJobRepo.markCompleted(summaryDocumentId, action);
+      }
+    } catch (queueError) {
+      console.error('Could not update summary retry state:', queueError);
+    }
+  };
 
   // Session-scoped, separately captured speaker tracks are authoritative. A
   // caller-provided transcript and the legacy room buffer remain fallbacks for
@@ -659,8 +690,11 @@ export async function generateAndStoreConsultationSummary({
       'Skipping summary regeneration; preserved existing finalized summary:',
       summaryDocumentId
     );
+    await updateSummaryJob('ready');
     return;
   }
+
+  await updateSummaryJob('processing');
 
   const transcriptEvidence = prepareTranscriptEvidence(resolvedTranscription);
 
@@ -722,12 +756,15 @@ export async function generateAndStoreConsultationSummary({
           // A factual record of an unattended consultation is final; there is
           // nothing for a later regeneration to improve on.
           aiSummaryGenerated: true,
+          summaryStatus: 'ready',
+          requiresClinicianReview: false,
           patientAttended: false,
           consultationOutcome: outcome,
         },
       };
 
       await summaryRepo.overwriteGenerated(summaryDocumentId, summaryData, transcriptRevision);
+      await updateSummaryJob('ready');
       console.log(`Stored ${outcome} summary for session:`, summaryDocumentId);
       return;
     }
@@ -763,11 +800,14 @@ export async function generateAndStoreConsultationSummary({
           ...presenceTimelineMetadata,
           aiSummaryEnabled: false,
           aiSummaryDisabledReason: entitlement.reason,
+          summaryStatus: 'unavailable',
+          requiresClinicianReview: true,
         },
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail);
       await summaryRepo.overwriteGenerated(summaryDocumentId, summaryData, transcriptRevision);
+      await updateSummaryJob('unavailable');
       return;
     }
 
@@ -802,12 +842,15 @@ export async function generateAndStoreConsultationSummary({
           ...presenceTimelineMetadata,
           aiSummaryEnabled: false,
           aiSummaryDisabledReason: 'OPENAI_API_KEY not configured',
+          summaryStatus: 'unavailable',
+          requiresClinicianReview: true,
         },
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail);
 
       await summaryRepo.overwriteGenerated(summaryDocumentId, summaryData, transcriptRevision);
+      await updateSummaryJob('unavailable');
       console.log('Fallback summary stored successfully with user ID:', userId);
       return;
     }
@@ -844,11 +887,14 @@ export async function generateAndStoreConsultationSummary({
           aiSummaryGenerated: true,
           aiSummarySkippedReason: transcriptEvidence.reason,
           clinicalEvidenceInsufficient: true,
+          summaryStatus: 'ready',
+          requiresClinicianReview: false,
         },
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail);
       await summaryRepo.overwriteGenerated(summaryDocumentId, summaryData, transcriptRevision);
+      await updateSummaryJob('ready');
       console.log('Stored evidence-insufficient consultation summary:', summaryDocumentId);
       return;
     }
@@ -929,12 +975,15 @@ export async function generateAndStoreConsultationSummary({
           // Marks this document as a real, successful AI generation so that
           // shouldSkipSummaryRegeneration preserves it on webhook replays.
           aiSummaryGenerated: true,
+          summaryStatus: 'ready',
+          requiresClinicianReview: true,
         },
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail);
 
       await summaryRepo.overwriteGenerated(summaryDocumentId, summaryData, transcriptRevision);
+      await updateSummaryJob('ready');
       console.log('AI summary stored successfully in Firestore with user ID:', userId);
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError);
@@ -967,11 +1016,14 @@ export async function generateAndStoreConsultationSummary({
           ...presenceTimelineMetadata,
           aiSummaryValidationFailed: true,
           validationError: parseError instanceof Error ? parseError.message : 'Unknown validation error',
+          summaryStatus: 'failed',
+          requiresClinicianReview: true,
         },
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail);
       await summaryRepo.overwriteGenerated(summaryDocumentId, summaryData, transcriptRevision);
+      await updateSummaryJob('failed', 'invalid_model_response');
       console.log('Parse error fallback summary stored successfully with user ID:', userId);
     }
   } catch (error) {
@@ -1002,14 +1054,18 @@ export async function generateAndStoreConsultationSummary({
           ),
           ...presenceTimelineMetadata,
           error: error instanceof Error ? error.message : 'Unknown error',
+          summaryStatus: 'failed',
+          requiresClinicianReview: true,
         },
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail);
       await summaryRepo.overwriteGenerated(summaryDocumentId, summaryData, transcriptRevision);
+      await updateSummaryJob('failed');
       console.log('Error summary stored successfully with user ID:', userId);
     } catch (storeError) {
       console.error('Error storing error summary:', storeError);
+      await updateSummaryJob('failed', 'summary_persistence_failed');
     }
   }
 }

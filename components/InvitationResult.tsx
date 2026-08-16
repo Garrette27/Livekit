@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import { Invitation } from '@/lib/types';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
 import { compactInvitationUrl } from '@/lib/invitations/invitation-link-display';
+import {
+  describeInvitationAudience,
+  formatInvitationUsage,
+} from '@/lib/invitations/invitation-presentation';
 
 interface InvitationResultProps {
   invitation: Invitation;
@@ -113,7 +117,7 @@ export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: 
       padding: '1rem',
       marginBottom: '1rem',
     }}>
-      <h4 style={{ 
+      <h4 role="status" style={{
         margin: '0 0 0.5rem 0', 
         color: '#166534' 
       }}>
@@ -124,7 +128,7 @@ export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: 
         Room: {invitation.roomName}
       </p>
       <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>
-        Email: {invitationEmails.length > 0 ? invitationEmails.join(', ') : 'Open Invitation (No email required)'}
+        Admission: {describeInvitationAudience(invitationEmails.length)}
       </p>
       
       <div style={{ 
@@ -199,11 +203,23 @@ export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: 
       </p>
       {invitation.waitingRoomEnabled ? (
         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-          <strong>Uses:</strong> {invitation.currentUses || 0} / {invitation.maxUses || 'Unlimited'}
+          <strong>Usage:</strong> {formatInvitationUsage({
+            currentUses: invitation.currentUses,
+            maxUses: invitation.maxUses,
+            waitingRoomEnabled: invitation.waitingRoomEnabled,
+            usedAt: invitation.usedAt,
+            usagePolicy: invitation.metadata?.security?.usagePolicy,
+          })}
         </p>
       ) : (
         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-          <strong>Uses:</strong> {invitation.usedAt ? 1 : 0} / {invitation.maxUses || 1}
+          <strong>Usage:</strong> {formatInvitationUsage({
+            currentUses: invitation.currentUses,
+            maxUses: invitation.maxUses,
+            waitingRoomEnabled: invitation.waitingRoomEnabled,
+            usedAt: invitation.usedAt,
+            usagePolicy: invitation.metadata?.security?.usagePolicy,
+          })}
         </p>
       )}
       {invitationEmails.length > 0 ? (
@@ -212,7 +228,7 @@ export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: 
         </p>
       ) : (
         <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-          <strong>Type:</strong> <span style={{ color: '#059669', fontWeight: '600' }}>Open Invitation</span> (No email required)
+          <strong>Type:</strong> <span style={{ color: '#059669', fontWeight: '600' }}>Doctor-admitted link</span>
         </p>
       )}
       {invitation.phoneAllowed && (

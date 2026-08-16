@@ -3,10 +3,14 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
   LiveKitRoom,
+  PreJoin,
+  ConnectionStateToast,
   useChat,
+  useConnectionState,
   useLocalParticipant,
   useParticipants,
   VideoConference,
+  type LocalUserChoices,
 } from '@livekit/components-react';
 import LiveKitStyles from './LiveKitStyles';
 import SessionTranscriptionBridge from './SessionTranscriptionBridge';
@@ -45,6 +49,34 @@ function ParticipantCountBridge({ onCountChange }: { onCountChange: (count: numb
   }, [onCountChange, participants.length]);
 
   return null;
+}
+
+function ConnectionStatusBanner() {
+  const connectionState = useConnectionState();
+  const connected = connectionState === 'connected';
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: 'fixed',
+        top: '0.75rem',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 40,
+        padding: '0.4rem 0.75rem',
+        borderRadius: '9999px',
+        backgroundColor: connected ? 'rgba(6, 95, 70, 0.92)' : 'rgba(146, 64, 14, 0.94)',
+        color: '#fff',
+        fontSize: '0.75rem',
+        fontWeight: 600,
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+      }}
+    >
+      {connected ? 'Connected' : `Connection: ${connectionState}`}
+    </div>
+  );
 }
 
 function isChatPanelVisible(): boolean {
@@ -356,6 +388,8 @@ export default function RoomShell({
 }: RoomShellProps) {
   const roomScopeRef = useRef<HTMLDivElement | null>(null);
   const [participantCount, setParticipantCount] = useState(1);
+  const [userChoices, setUserChoices] = useState<LocalUserChoices | null>(null);
+  const [transcriptionConsent, setTranscriptionConsent] = useState(false);
   const chatEnabled = chatPolicy.enabled;
   const chatDefaultOpen = chatPolicy.defaultOpen;
   const chatAutoOpenOnIncomingMessage = chatPolicy.autoOpenOnIncomingMessage;
@@ -363,19 +397,87 @@ export default function RoomShell({
     setParticipantCount((previous) => (previous === count ? previous : count));
   }, []);
 
+  if (!userChoices) {
+    return (
+      <main
+        data-lk-theme="default"
+        style={{
+          minHeight: '100vh',
+          display: 'grid',
+          placeItems: 'center',
+          padding: '1rem',
+          background: '#0f172a',
+        }}
+      >
+        <div style={{ width: 'min(100%, 52rem)' }}>
+          <p
+            style={{
+              color: '#dbeafe',
+              textAlign: 'center',
+              margin: '0 0 0.75rem',
+              fontSize: '0.875rem',
+            }}
+          >
+            Check your microphone and camera. You can continue audio-only if video is unavailable.
+          </p>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.625rem',
+              margin: '0 auto 0.875rem',
+              padding: '0.75rem',
+              maxWidth: '38rem',
+              border: '1px solid #334155',
+              borderRadius: '0.5rem',
+              backgroundColor: '#1e293b',
+              color: '#e2e8f0',
+              fontSize: '0.8125rem',
+              lineHeight: 1.45,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={transcriptionConsent}
+              onChange={(event) => setTranscriptionConsent(event.target.checked)}
+              style={{ marginTop: '0.15rem' }}
+            />
+            <span>
+              Allow my microphone audio to be transcribed for the AI consultation summary.
+              This is optional; the call still works when it is off, and audio is discarded after transcription.
+            </span>
+          </label>
+          <PreJoin
+            defaults={{
+              username: 'Participant',
+              audioEnabled: true,
+              videoEnabled: true,
+            }}
+            joinLabel="Join consultation"
+            persistUserChoices
+            onSubmit={setUserChoices}
+            onError={onError}
+          />
+        </div>
+      </main>
+    );
+  }
+
   return (
     <div ref={roomScopeRef} style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       <LiveKitRoom
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
         connect={true}
-        audio
-        video
+        audio={userChoices.audioEnabled ? { deviceId: userChoices.audioDeviceId } : false}
+        video={userChoices.videoEnabled ? { deviceId: userChoices.videoDeviceId } : false}
         style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}
         onDisconnected={(reason) => onDisconnected(reason)}
         onError={onError}
       >
         <ParticipantCountBridge onCountChange={handleParticipantCountChange} />
+        <ConnectionStatusBanner />
+        <ConnectionStateToast />
         <ChatBehaviorBridge
           enabled={chatEnabled}
           defaultOpen={chatDefaultOpen}
@@ -389,6 +491,7 @@ export default function RoomShell({
         <SessionTranscriptionBridge
           consultationSessionId={consultationSessionId}
           accessToken={token}
+          consentConfirmed={transcriptionConsent}
         />
         <VideoConference />
       </LiveKitRoom>

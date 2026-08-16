@@ -7,6 +7,7 @@ import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { Firestore } from 'firebase/firestore';
 import { FirebaseStorage } from 'firebase/storage';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
+import { auth } from '@/lib/firebase';
 
 type Attachment = { url: string; name: string; type: string; size: number };
 type ManualNote = { text: string; timestamp: string; attachments?: Attachment[] };
@@ -103,13 +104,25 @@ export default function NotesPanel({ roomName, db, storage }: NotesPanelProps) {
 
   const uploadFile = async (file: File, index: number): Promise<Attachment> => {
     if (!storage || !roomName) throw new Error('Storage not available');
+    const doctorUserId = auth?.currentUser?.uid;
+    if (!doctorUserId) throw new Error('Authentication is required to upload attachments');
 
-    const timestamp = Date.now();
-    const fileName = `${timestamp}-${file.name}`;
-    const storageRef = ref(storage, `notes/${roomName}/${fileName}`);
+    const safeRoomName = roomName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-160);
+    const objectId = crypto.randomUUID();
+    const storageRef = ref(
+      storage,
+      `notes/${doctorUserId}/${safeRoomName}/${objectId}-${safeFileName}`
+    );
 
     return new Promise((resolve, reject) => {
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      const uploadTask = uploadBytesResumable(storageRef, file, {
+        contentType: file.type,
+        customMetadata: {
+          ownerUserId: doctorUserId,
+          roomName: safeRoomName,
+        },
+      });
 
       uploadTask.on(
         'state_changed',

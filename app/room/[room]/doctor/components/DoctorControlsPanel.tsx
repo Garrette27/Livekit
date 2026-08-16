@@ -5,17 +5,21 @@ import Link from 'next/link';
 import { copyTextToClipboard, fetchInvitationLink } from '@/lib/invitations/invitation-link-client';
 import { compactInvitationUrl } from '@/lib/invitations/invitation-link-display';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
+import type { SpeechStatus } from '../hooks/useSpeechCapture';
 
 interface DoctorControlsPanelProps {
   doctorName: string;
   roomName: string;
   speechLanguage: string;
-  speechStatus: 'idle' | 'listening' | 'error' | 'permission-required';
   onSpeechLanguageChange: (language: string) => void;
   onLeave: () => void;
   showCopyInvitationLinkControl?: boolean;
   showRefreshInvitationLinkControl?: boolean;
   showLeaveCallControl?: boolean;
+  speechStatus: SpeechStatus;
+  speechCaptureError: string | null;
+  onStartSpeechCapture: (patientConsentConfirmed: boolean) => Promise<void>;
+  onStopSpeechCapture: () => void;
 }
 
 interface InvitationLinkResponse {
@@ -28,18 +32,22 @@ export default function DoctorControlsPanel({
   doctorName,
   roomName,
   speechLanguage,
-  speechStatus,
   onSpeechLanguageChange,
   onLeave,
   showCopyInvitationLinkControl = true,
   showRefreshInvitationLinkControl = false,
   showLeaveCallControl = true,
+  speechStatus,
+  speechCaptureError,
+  onStartSpeechCapture,
+  onStopSpeechCapture,
 }: DoctorControlsPanelProps) {
   const { showToast } = useToast();
   const [invitationLink, setInvitationLink] = useState<string | null>(null);
   const [loadingLink, setLoadingLink] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [patientConsentConfirmed, setPatientConsentConfirmed] = useState(false);
 
   const loadInvitationLink = useCallback(
     async (forceRefresh = false) => {
@@ -111,6 +119,74 @@ export default function DoctorControlsPanel({
         </p>
       </div>
 
+      <section
+        aria-labelledby="speech-notes-heading"
+        style={{
+          border: '1px solid #bfdbfe',
+          borderRadius: '0.5rem',
+          padding: '0.75rem',
+          marginBottom: '0.75rem',
+          backgroundColor: '#eff6ff',
+        }}
+      >
+        <h4 id="speech-notes-heading" style={{ margin: '0 0 0.4rem', fontSize: '0.875rem' }}>
+          Optional speech notes
+        </h4>
+        <p style={{ margin: '0 0 0.6rem', color: '#374151', fontSize: '0.7rem', lineHeight: 1.4 }}>
+          Browser speech recognition on this device is not a recording or a complete transcript.
+          Tell the patient before starting.
+        </p>
+        <label style={{ display: 'flex', gap: '0.45rem', alignItems: 'flex-start', fontSize: '0.7rem' }}>
+          <input
+            type="checkbox"
+            checked={patientConsentConfirmed}
+            disabled={speechStatus === 'listening'}
+            onChange={(event) => setPatientConsentConfirmed(event.target.checked)}
+          />
+          The patient has verbally consented to browser-generated speech notes.
+        </label>
+        <p aria-live="polite" role="status" style={{ margin: '0.55rem 0', fontSize: '0.7rem' }}>
+          Status: {speechStatus === 'listening' ? 'Listening' : speechStatus.replace('-', ' ')}
+        </p>
+        {speechCaptureError && (
+          <p role="alert" style={{ margin: '0 0 0.55rem', color: '#b91c1c', fontSize: '0.7rem' }}>
+            {speechCaptureError}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() =>
+            speechStatus === 'listening'
+              ? onStopSpeechCapture()
+              : void onStartSpeechCapture(patientConsentConfirmed)
+          }
+          disabled={
+            speechStatus === 'unsupported' ||
+            (speechStatus !== 'listening' && !patientConsentConfirmed)
+          }
+          style={{
+            width: '100%',
+            padding: '0.5rem',
+            border: 'none',
+            borderRadius: '0.4rem',
+            color: '#fff',
+            backgroundColor: speechStatus === 'listening' ? '#b91c1c' : '#1d4ed8',
+            cursor:
+              speechStatus === 'unsupported' ||
+              (speechStatus !== 'listening' && !patientConsentConfirmed)
+                ? 'not-allowed'
+                : 'pointer',
+            opacity:
+              speechStatus === 'unsupported' ||
+              (speechStatus !== 'listening' && !patientConsentConfirmed)
+                ? 0.55
+                : 1,
+          }}
+        >
+          {speechStatus === 'listening' ? 'Stop speech notes' : 'Start speech notes'}
+        </button>
+      </section>
+
       <div
         style={{
           border: '1px solid #dbeafe',
@@ -151,7 +227,9 @@ export default function DoctorControlsPanel({
               ? 'Microphone permission is needed for transcript capture.'
               : speechStatus === 'error'
                 ? 'Transcript capture is unavailable.'
-                : 'Transcript capture starts after you interact with the page.'}
+                : speechStatus === 'unsupported'
+                  ? 'Browser speech notes are not supported here; session audio evidence remains separate.'
+                  : 'Speech notes are off until consent is confirmed and you start them.'}
         </p>
       </div>
 

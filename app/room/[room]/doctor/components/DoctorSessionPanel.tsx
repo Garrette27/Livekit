@@ -6,15 +6,19 @@ import DoctorControlsPanel from './DoctorControlsPanel';
 import WaitingRoomPanel from './WaitingRoomPanel';
 import SidebarPortal from '../../components/shared/SidebarPortal';
 import { getRoomSessionPolicy } from '../../components/shared/room-session-policy';
+import type { SpeechStatus } from '../hooks/useSpeechCapture';
 
 interface DoctorSessionPanelProps {
   roomName: string;
   user: User;
   doctorName: string;
   speechLanguage: string;
-  speechStatus: 'idle' | 'listening' | 'error' | 'permission-required';
   onSpeechLanguageChange: (language: string) => void;
   onLeave: () => void;
+  speechStatus: SpeechStatus;
+  speechCaptureError: string | null;
+  onStartSpeechCapture: (patientConsentConfirmed: boolean) => Promise<void>;
+  onStopSpeechCapture: () => void;
 }
 
 export default function DoctorSessionPanel({
@@ -22,9 +26,12 @@ export default function DoctorSessionPanel({
   user,
   doctorName,
   speechLanguage,
-  speechStatus,
   onSpeechLanguageChange,
   onLeave,
+  speechStatus,
+  speechCaptureError,
+  onStartSpeechCapture,
+  onStopSpeechCapture,
 }: DoctorSessionPanelProps) {
   const policy = getRoomSessionPolicy('doctor');
 
@@ -65,12 +72,15 @@ export default function DoctorSessionPanel({
             doctorName={doctorName || user.displayName || user.email || 'Doctor'}
             roomName={roomName}
             speechLanguage={speechLanguage}
-            speechStatus={speechStatus}
             onSpeechLanguageChange={onSpeechLanguageChange}
             onLeave={onLeave}
             showCopyInvitationLinkControl={policy.panels.doctorSession.showCopyInvitationLinkControl}
             showRefreshInvitationLinkControl={policy.panels.doctorSession.showRefreshInvitationLinkControl}
             showLeaveCallControl={policy.panels.doctorSession.showLeaveCallControl}
+            speechStatus={speechStatus}
+            speechCaptureError={speechCaptureError}
+            onStartSpeechCapture={onStartSpeechCapture}
+            onStopSpeechCapture={onStopSpeechCapture}
           />
         </SidebarPortal>
       )}

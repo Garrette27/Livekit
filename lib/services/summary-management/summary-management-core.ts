@@ -73,6 +73,8 @@ export class FirestoreSummaryManagementCore implements SummaryManagementService 
       lastEditedAt: new Date(),
       lastEditedBy: editorUserId,
       isEdited: true,
+      summaryStatus: 'reviewed',
+      requiresClinicianReview: false,
     };
 
     await this.summaryRepo.update(summaryId, updateData);

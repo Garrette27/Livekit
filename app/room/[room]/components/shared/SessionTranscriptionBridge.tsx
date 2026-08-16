@@ -36,9 +36,11 @@ function selectRecorderMimeType(): string | null {
 export default function SessionTranscriptionBridge({
   consultationSessionId,
   accessToken,
+  consentConfirmed,
 }: {
   consultationSessionId?: string | null;
   accessToken: string;
+  consentConfirmed: boolean;
 }) {
   const microphoneTracks = useTracks([Track.Source.Microphone], { onlySubscribed: false });
   const localMicrophone = microphoneTracks.find((reference) => reference.participant.isLocal);
@@ -53,6 +55,7 @@ export default function SessionTranscriptionBridge({
     const mimeType = selectRecorderMimeType();
     if (
       !normalizedSessionId
+      || !consentConfirmed
       || !mediaStreamTrack
       || mediaStreamTrack.readyState !== 'live'
       || isMuted
@@ -78,6 +81,7 @@ export default function SessionTranscriptionBridge({
       form.set('captureId', captureIdRef.current);
       form.set('sequence', String(sequence));
       form.set('durationMs', String(Math.max(250, Math.min(durationMs, CHUNK_DURATION_MS + 1_000))));
+      form.set('consentConfirmed', 'true');
       form.set('audio', audio, `microphone-${sequence}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`);
 
       void fetch('/api/session-transcription/chunks', {
@@ -159,7 +163,7 @@ export default function SessionTranscriptionBridge({
         recorder.stop();
       }
     };
-  }, [accessToken, consultationSessionId, isMuted, mediaStreamTrack]);
+  }, [accessToken, consentConfirmed, consultationSessionId, isMuted, mediaStreamTrack]);
 
   return null;
 }

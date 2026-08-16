@@ -286,8 +286,6 @@ function PatientLoginContent() {
     }
 
     try {
-      // Use POST endpoint to validate user and trigger password reset email from server
-      console.log('Requesting password reset for:', email.trim());
       const resetResponse = await fetch('/api/password-reset', {
         method: 'POST',
         headers: {
@@ -299,45 +297,25 @@ function PatientLoginContent() {
       const resetData = await resetResponse.json();
 
       if (!resetResponse.ok) {
-        // Server returned an error
-        console.error('Password reset API error:', resetData);
-        setError(resetData.error || resetData.details || 'Failed to send password reset email. Please try again.');
-        if (resetData.code === 'NO_PASSWORD_PROVIDER') {
-          setShowForgotPassword(false);
+        setError(resetData.error || 'Unable to process that request. Please try again.');
+        return;
+      }
+
+      try {
+        await sendPasswordResetEmail(auth, email.trim(), {
+          url: `${window.location.origin}/patient/login?mode=resetPassword&oobCode=`,
+          handleCodeInApp: false,
+        });
+      } catch (sendError: any) {
+        // Keep ineligible/nonexistent accounts indistinguishable.
+        if (!['auth/user-not-found', 'auth/invalid-credential'].includes(sendError.code)) {
+          throw sendError;
         }
-        setResetLoading(false);
-        return;
       }
 
-      if (!resetData.success) {
-        console.error('Password reset failed:', resetData);
-        setError(resetData.error || resetData.details || 'Failed to send password reset email.');
-        setResetLoading(false);
-        return;
-      }
-
-      // Server validated user successfully, now send the password reset email using client SDK
-      // This is what actually triggers Firebase to send the email
-      console.log('Server validated user, sending password reset email via Firebase client SDK...');
-      
-      await sendPasswordResetEmail(auth, email.trim(), {
-        url: `${window.location.origin}/patient/login?mode=resetPassword&oobCode=`,
-        handleCodeInApp: false,
-      });
-      
-      console.log('Password reset email sent successfully');
       setResetEmailSent(true);
     } catch (err: any) {
-      console.error('Password reset error:', {
-        code: err.code,
-        message: err.message,
-        email: email.trim(),
-        error: err
-      });
-      
-      if (err.code === 'auth/user-not-found') {
-        setError('No account found with this email address. Please sign up first.');
-      } else if (err.code === 'auth/invalid-email') {
+      if (err.code === 'auth/invalid-email') {
         setError('Invalid email address. Please check and try again.');
       } else if (err.code === 'auth/operation-not-allowed') {
         setError('Password reset is not enabled. The email template may not be configured in Firebase Console. Please go to Firebase Console → Authentication → Templates → Password reset and ensure a sender email is configured. Contact support if you need assistance.');
@@ -346,7 +324,7 @@ function PatientLoginContent() {
       } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
         setError('Network error. Please check your connection and try again.');
       } else {
-        setError(err.message || 'Failed to send password reset email. Please check your email inbox (including spam folder) or contact support.');
+        setError('Unable to process that request. Please try again later.');
       }
     } finally {
       setResetLoading(false);

@@ -63,6 +63,8 @@ interface CallSummary {
     totalParticipants: number;
     createdBy?: string;
     isEdited?: boolean;
+    summaryStatus?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable' | 'reviewed';
+    requiresClinicianReview?: boolean;
     lastEditedAt?: Timestamp;
     lastEditedBy?: string;
     editHistory?: Array<{
@@ -93,6 +95,9 @@ interface DoctorHistoryResponseItem {
   keyPoints?: string[];
   recommendations?: string[];
   followUpActions?: string[];
+  summaryStatus?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable' | 'reviewed';
+  requiresClinicianReview?: boolean;
+  isEdited?: boolean;
   waitingRoomHistory?: {
     totalParticipants: number;
     registeredParticipantCount: number;
@@ -143,9 +148,12 @@ function toTimestamp(value?: string | null): Timestamp {
 
 function mapHistoryRecordToSummary(record: DoctorHistoryResponseItem): CallSummary {
   const generatedSummary = typeof record.summary === 'string' ? record.summary.trim() : '';
+  const hasUsableSummary = record.summaryStatus === 'failed' || record.summaryStatus === 'unavailable'
+    ? false
+    : generatedSummary.length > 0;
   return {
     id: record.id,
-    hasGeneratedSummary: generatedSummary.length > 0,
+    hasGeneratedSummary: hasUsableSummary,
     roomName: record.roomName || 'Unknown Room',
     summary: generatedSummary || 'This completed consultation does not have a summary yet.',
     keyPoints: Array.isArray(record.keyPoints) ? record.keyPoints : [],
@@ -163,6 +171,9 @@ function mapHistoryRecordToSummary(record: DoctorHistoryResponseItem): CallSumma
     patientEmail: record.patientEmail || null,
     metadata: {
       totalParticipants: 1,
+      isEdited: record.isEdited,
+      summaryStatus: record.summaryStatus,
+      requiresClinicianReview: record.requiresClinicianReview,
     },
   };
 }
@@ -189,6 +200,8 @@ function toCardRecord(summary: CallSummary): ConsultationCardRecord {
     endedAt: toDateOrNull(summary.endedAt),
     duration: summary.duration,
     isEdited: summary.metadata?.isEdited,
+    summaryStatus: summary.metadata?.summaryStatus,
+    requiresClinicianReview: summary.metadata?.requiresClinicianReview,
     waitingRoomHistory: summary.waitingRoomHistory,
     chatHistory: summary.chatHistory,
   };
@@ -249,20 +262,14 @@ export default function DoctorDashboard() {
       }
 
       const records = Array.isArray(data.summaries) ? (data.summaries as DoctorHistoryResponseItem[]) : [];
-      const mappedSummaries = records.map(mapHistoryRecordToSummary);
-      mappedSummaries.sort((left, right) => {
-        const leftMs = left.createdAt?.toDate?.().getTime() || 0;
-        const rightMs = right.createdAt?.toDate?.().getTime() || 0;
-        return sortOrder === 'desc' ? rightMs - leftMs : leftMs - rightMs;
-      });
-      setSummaries(mappedSummaries);
+      setSummaries(records.map(mapHistoryRecordToSummary));
     } catch (error) {
       console.error('Error fetching summaries:', error);
       setSummaries([]);
     } finally {
       setLoading(false);
     }
-  }, [isAuthorized, sortOrder, user]);
+  }, [isAuthorized, user]);
 
   useEffect(() => {
     void loadSummaries();
@@ -490,7 +497,7 @@ export default function DoctorDashboard() {
             records={cardRecords}
             loading={loading}
             sortOrder={sortOrder}
-            onToggleSortOrder={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+            onSortOrderChange={setSortOrder}
             generatingSummaryId={generatingSummaryId}
             onEdit={handleEditCard}
             onGenerate={handleGenerateCard}
@@ -719,4 +726,3 @@ export default function DoctorDashboard() {
     </div>
   );
 }
-

@@ -49,15 +49,9 @@ function handleInvitationAccess(request: NextRequest) {
 }
 
 function handlePatientRoomAccess(request: NextRequest) {
-  // Check if this is a direct patient room access (not through invitation)
-  const referer = request.headers.get('referer');
-  
-  if (!referer || !referer.includes('/invite/')) {
-    // Direct access to patient room without invitation - redirect to access denied
-    return NextResponse.redirect(new URL('/access-denied?reason=direct-access', request.url));
-  }
-
-  // Add security headers
+  // Referer is optional and spoofable, so it is never an authorization
+  // boundary. The page requires the signed, room-scoped token established by
+  // invitation validation and otherwise renders its secure-invitation state.
   const response = NextResponse.next();
   addSecurityHeaders(response, request);
   
@@ -98,11 +92,11 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest) {
   // Content Security Policy for invitation pages
   const cspDirectives = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.google.com https://apis.google.com",
+    `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''} https://www.gstatic.com https://www.google.com https://apis.google.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: https:",
     "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self' https://api.openai.com https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com http://ip-api.com https://ip-api.com",
+    "connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com",
     "media-src 'self' https://*.livekit.cloud",
     "frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app",
     "object-src 'none'",

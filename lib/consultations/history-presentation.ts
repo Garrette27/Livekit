@@ -16,6 +16,34 @@ export type ConsultationStatus =
   | 'not-admitted'
   | 'no-show';
 
+export type ConsultationSortOrder = 'desc' | 'asc';
+
+/**
+ * Return consultation records in the explicitly selected chronological order.
+ * Undated legacy records always stay last, and the id tie-breaker makes the
+ * result stable across refreshes.
+ */
+export function sortConsultationRecords<
+  T extends { id: string; startedAt?: Date | null }
+>(records: T[], order: ConsultationSortOrder): T[] {
+  return [...records].sort((left, right) => {
+    const leftTime = left.startedAt?.getTime();
+    const rightTime = right.startedAt?.getTime();
+    const leftIsDated = Number.isFinite(leftTime);
+    const rightIsDated = Number.isFinite(rightTime);
+
+    if (leftIsDated !== rightIsDated) {
+      return leftIsDated ? -1 : 1;
+    }
+    if (leftIsDated && rightIsDated && leftTime !== rightTime) {
+      return order === 'desc'
+        ? (rightTime as number) - (leftTime as number)
+        : (leftTime as number) - (rightTime as number);
+    }
+    return left.id.localeCompare(right.id);
+  });
+}
+
 export interface ConsultationStatusPresentation {
   status: ConsultationStatus;
   label: string;

@@ -1,6 +1,6 @@
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
-import { withRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
+import { enforceRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import { getClientIP } from '../../../../lib/invitations/utils';
 import { ValidateInvitationRequest } from '../../../../lib/types';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
@@ -38,7 +38,7 @@ async function resolveAuthenticatedVisitor(req: NextRequest): Promise<VisitorIde
 }
 
 async function handlePOST(req: NextRequest) {
-  const rateLimitResponse = withRateLimit(RateLimitConfigs.INVITATION_VALIDATION)(req);
+  const rateLimitResponse = await enforceRateLimit(req, RateLimitConfigs.INVITATION_VALIDATION);
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
@@ -67,7 +67,6 @@ async function handlePOST(req: NextRequest) {
   const invitationAccess = new FirestoreInvitationAccessCore(db);
   const result = await invitationAccess.validateInvite({
     token: body.token,
-    deviceFingerprint: body.deviceFingerprint,
     userEmail: body.userEmail,
     clientIP: getClientIP(req),
     userAgent: req.headers.get('user-agent') || '',

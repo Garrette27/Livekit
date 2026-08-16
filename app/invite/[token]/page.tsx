@@ -13,8 +13,7 @@ import {
 import { addPendingConsultationSessionId } from '@/lib/consultations/pending-session-client';
 import { 
   ValidateInvitationRequest, 
-  ValidateInvitationResponse, 
-  DeviceFingerprint 
+  ValidateInvitationResponse
 } from '@/lib/types';
 
 // Component for waiting room with admission polling
@@ -140,7 +139,6 @@ function InvitePageContent() {
   const [isValidating, setIsValidating] = useState(true);
   const [validationResult, setValidationResult] = useState<ValidateInvitationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [deviceFingerprint, setDeviceFingerprint] = useState<DeviceFingerprint | null>(null);
   const [requiresRegistration, setRequiresRegistration] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
   const [verificationEmailState, setVerificationEmailState] = useState<'idle' | 'sending' | 'sent'>('idle');
@@ -202,26 +200,9 @@ function InvitePageContent() {
     return normalizedSessionId;
   }, []);
 
-  // Generate device fingerprint
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const fingerprint: DeviceFingerprint = {
-        userAgent: navigator.userAgent,
-        language: navigator.language,
-        platform: navigator.platform,
-        screenResolution: `${screen.width}x${screen.height}`,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        cookieEnabled: navigator.cookieEnabled,
-        doNotTrack: navigator.doNotTrack || 'unspecified',
-        hash: '', // Will be calculated on server
-      };
-      setDeviceFingerprint(fingerprint);
-    }
-  }, []);
-
   // Validate invitation
   useEffect(() => {
-    if (!token || !deviceFingerprint || authLoading) return;
+    if (!token || authLoading) return;
 
     const validateInvitation = async () => {
       try {
@@ -230,7 +211,6 @@ function InvitePageContent() {
 
         const request: ValidateInvitationRequest = {
           token,
-          deviceFingerprint,
           ...(user?.email ? { userEmail: user.email.toLowerCase() } : {}),
         };
 
@@ -286,7 +266,7 @@ function InvitePageContent() {
     validateInvitation();
     // `user` is the Firebase user object, stable for a signed-in session, and
     // is needed whole here to refresh its token before validating.
-  }, [authLoading, deviceFingerprint, token, user, user?.email]);
+  }, [authLoading, token, user, user?.email]);
 
   useEffect(() => {
     if (
@@ -499,8 +479,6 @@ function InvitePageContent() {
         invitationEmail={invitationEmail}
         onRegistrationComplete={async (registeredEmail: string) => {
           // After registration, re-validate the invitation
-          if (!deviceFingerprint) return;
-          
           try {
             setIsValidating(true);
             setRequiresRegistration(false);
@@ -508,7 +486,6 @@ function InvitePageContent() {
 
             const request: ValidateInvitationRequest = {
               token,
-              deviceFingerprint,
               userEmail: registeredEmail,
             };
 
@@ -1010,5 +987,4 @@ export default function InvitePage() {
     </Suspense>
   );
 }
-
 

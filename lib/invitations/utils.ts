@@ -1,6 +1,4 @@
-import crypto from 'crypto';
 import { NextRequest } from 'next/server';
-import { DeviceFingerprint } from '../types';
 
 export function getClientIP(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
@@ -29,20 +27,6 @@ export function detectBrowser(userAgent: string): string {
   if (userAgent.includes('Edge')) return 'Edge';
   if (userAgent.includes('Opera')) return 'Opera';
   return 'Unknown';
-}
-
-export function generateDeviceFingerprintHash(deviceData: DeviceFingerprint): string {
-  const fingerprintString = [
-    deviceData.userAgent,
-    deviceData.language,
-    deviceData.platform,
-    deviceData.screenResolution,
-    deviceData.timezone,
-    deviceData.cookieEnabled.toString(),
-    deviceData.doNotTrack,
-  ].join('|');
-
-  return crypto.createHash('sha256').update(fingerprintString).digest('hex');
 }
 
 export function toDate(value: any, fallback = new Date()): Date {

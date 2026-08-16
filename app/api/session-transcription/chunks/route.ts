@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
-import { RateLimitConfigs, withRateLimit } from '@/lib/rate-limit';
+import { enforceRateLimit, RateLimitConfigs } from '@/lib/rate-limit';
 import { ConsultationTranscriptRepository } from '@/lib/repositories/consultation-transcript-repository';
 import { FirestoreSummaryProjectionService } from '@/lib/services/history-summary';
 import { authorizeSessionParticipant } from '@/lib/services/shared/session-participant-auth';
@@ -46,7 +46,7 @@ function extensionForMimeType(mimeType: string): string {
  */
 async function handlePOST(req: NextRequest) {
   const requestReceivedAtMs = Date.now();
-  const rateLimitResponse = withRateLimit(RateLimitConfigs.GENERAL)(req);
+  const rateLimitResponse = await enforceRateLimit(req, RateLimitConfigs.GENERAL);
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
@@ -71,6 +71,7 @@ async function handlePOST(req: NextRequest) {
   const sequence = parseInteger(form.get('sequence'));
   const durationMs = parseInteger(form.get('durationMs'));
   const audioValue = form.get('audio');
+  const consentConfirmed = form.get('consentConfirmed') === 'true';
 
   if (
     !consultationSessionId
@@ -82,6 +83,7 @@ async function handlePOST(req: NextRequest) {
     || durationMs < 250
     || durationMs > MAX_CHUNK_DURATION_MS
     || !(audioValue instanceof Blob)
+    || !consentConfirmed
   ) {
     return NextResponse.json({ success: false, error: 'Invalid transcription chunk metadata' }, { status: 400 });
   }
@@ -131,6 +133,7 @@ async function handlePOST(req: NextRequest) {
       durationMs,
       text: transcription.text,
       model: transcription.model,
+      consentConfirmed,
     });
 
     // If an in-flight chunk lands just after finalization, rebuild from the

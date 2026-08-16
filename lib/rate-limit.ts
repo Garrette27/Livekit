@@ -4,6 +4,8 @@
  */
 
 import { NextRequest } from 'next/server';
+import { createHmac } from 'node:crypto';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
 
 interface RateLimitEntry {
   count: number;
@@ -11,11 +13,11 @@ interface RateLimitEntry {
   blocked: boolean;
 }
 
-// In-memory rate limit store (for production, use Redis or similar)
+// Process-local fallback used only when the shared Firestore counter is unavailable.
 const rateLimitMap = new Map<string, RateLimitEntry>();
 
 // Clean up expired entries every 5 minutes
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of rateLimitMap.entries()) {
     if (entry.resetTime < now) {
@@ -23,6 +25,7 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000);
+cleanupTimer.unref();
 
 export interface RateLimitConfig {
   limit: number;        // Number of requests allowed
@@ -139,6 +142,74 @@ function getClientIP(request: NextRequest): string {
   
   // Fallback to connection IP (may not work in all environments)
   return (request as any).ip || 'unknown';
+}
+
+function distributedRateLimitDocumentId(request: NextRequest, windowStartedAt: number): string {
+  const secret =
+    process.env.RATE_LIMIT_HASH_SECRET ||
+    process.env.INVITATION_TOKEN_SECRET ||
+    'livekit-local-rate-limit';
+  const subject = `${request.nextUrl.pathname}:${getClientIP(request)}:${windowStartedAt}`;
+  return createHmac('sha256', secret).update(subject).digest('hex');
+}
+
+/**
+ * Enforce a fixed-window limit in Firestore so independent serverless
+ * instances share one counter. If Firestore is unavailable, the existing
+ * in-process limiter remains a fail-safe instead of silently allowing traffic.
+ */
+export async function enforceRateLimit(
+  request: NextRequest,
+  config: RateLimitConfig
+): Promise<Response | null> {
+  const db = getFirebaseAdmin();
+  if (!db) {
+    return withRateLimit(config)(request);
+  }
+
+  const now = Date.now();
+  const windowStartedAt = Math.floor(now / config.windowMs) * config.windowMs;
+  const resetTime = windowStartedAt + config.windowMs;
+  const documentId = distributedRateLimitDocumentId(request, windowStartedAt);
+  const counterRef = db.collection('securityRateLimits').doc(documentId);
+
+  try {
+    const count = await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(counterRef);
+      const currentCount = snapshot.exists ? Number(snapshot.data()?.count || 0) : 0;
+      const nextCount = currentCount + 1;
+      transaction.set(
+        counterRef,
+        {
+          count: nextCount,
+          route: request.nextUrl.pathname,
+          windowStartedAt: new Date(windowStartedAt),
+          expiresAt: new Date(resetTime + config.windowMs),
+        },
+        { merge: true }
+      );
+      return nextCount;
+    });
+
+    if (count <= config.limit) {
+      return null;
+    }
+
+    const retryAfter = Math.max(1, Math.ceil((resetTime - now) / 1000));
+    return new Response(JSON.stringify({ error: 'Rate limit exceeded', retryAfter }), {
+      status: 429,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': retryAfter.toString(),
+        'X-RateLimit-Limit': config.limit.toString(),
+        'X-RateLimit-Remaining': '0',
+        'X-RateLimit-Reset': new Date(resetTime).toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('Distributed rate-limit check failed; using local fallback:', error);
+    return withRateLimit(config)(request);
+  }
 }
 
 /**

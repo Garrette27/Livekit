@@ -1,11 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { 
-  RegisterUserRequest, 
-  RegisterUserResponse,
-  DeviceFingerprint
-} from '@/lib/types';
+import { useState } from 'react';
+import { RegisterUserRequest, RegisterUserResponse } from '@/lib/types';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 interface PatientRegistrationProps {
@@ -25,26 +21,6 @@ export default function PatientRegistration({
   const [consentGiven, setConsentGiven] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deviceFingerprint, setDeviceFingerprint] = useState<DeviceFingerprint | null>(null);
-
-  // Generate device fingerprint on mount
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const fingerprint: DeviceFingerprint = {
-        userAgent: navigator.userAgent,
-        language: navigator.language,
-        platform: navigator.platform,
-        screenResolution: `${screen.width}x${screen.height}`,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        cookieEnabled: navigator.cookieEnabled,
-        doNotTrack: navigator.doNotTrack || 'unspecified',
-        hash: '', // Will be calculated on server
-      };
-      setDeviceFingerprint(fingerprint);
-
-    }
-  }, []);
-
   const handleRegister = async () => {
     if (!email.trim()) {
       setError('Email is required');
@@ -52,12 +28,7 @@ export default function PatientRegistration({
     }
 
     if (!consentGiven) {
-      setError('You must provide consent to store device information for security purposes');
-      return;
-    }
-
-    if (!deviceFingerprint) {
-      setError('Device information could not be collected. Please refresh the page.');
+      setError('You must provide consent to register and process the security correlation data');
       return;
     }
 
@@ -70,7 +41,6 @@ export default function PatientRegistration({
         email: email.trim(),
         phone: phone.trim() || undefined,
         consentGiven: true,
-        deviceFingerprint,
       };
 
       const response = await fetch('/api/user/register', {
@@ -268,16 +238,19 @@ export default function PatientRegistration({
                   color: '#1e40af',
                   marginBottom: '0.5rem'
                 }}>
-                  Consent to Store Device Information *
+                  Consent to Registration Data Processing *
                 </p>
                 <p style={{
                   fontSize: '0.75rem',
                   color: '#4b5563',
                   lineHeight: '1.5'
                 }}>
-                  I consent to the system storing a protected device fingerprint and browser
-                  information for invitation security. The complete signed invitation is required
-                  to submit this registration.
+                  I consent to this thesis app processing my registration details and keyed,
+                  non-readable network/browser correlation hashes solely to prevent invitation
+                  misuse. Firebase/Google hosts this data. It is retained for the thesis team&apos;s
+                  approved invitation-security period. I may ask the thesis team to access,
+                  correct, or delete my data, or withdraw consent for future processing; required
+                  security and audit records may still be retained for the approved period.
                 </p>
               </div>
             </label>
