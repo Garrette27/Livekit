@@ -28,6 +28,34 @@ export class CallSummaryRepository {
     await this.db.collection(COLLECTION).doc(id).set(data);
   }
 
+  /**
+   * Stores generated content only when it cannot overwrite a clinician edit or
+   * a summary built from a newer transcript revision. This closes the race
+   * between finalization and audio chunks that finish transcription afterward.
+   */
+  async overwriteGenerated(
+    id: string,
+    data: Record<string, unknown>,
+    transcriptRevision: number
+  ): Promise<boolean> {
+    const summaryRef = this.db.collection(COLLECTION).doc(id);
+    return this.db.runTransaction(async (transaction) => {
+      const existing = await transaction.get(summaryRef);
+      if (existing.exists) {
+        const existingData = (existing.data() as Record<string, unknown>) || {};
+        const metadata =
+          (existingData.metadata as Record<string, unknown> | undefined) || {};
+        const existingRevision = Number(metadata.transcriptRevision || 0);
+        if (metadata.isEdited === true || existingRevision > transcriptRevision) {
+          return false;
+        }
+      }
+
+      transaction.set(summaryRef, data);
+      return true;
+    });
+  }
+
   async mergeFields(id: string, data: Record<string, unknown>): Promise<void> {
     await this.db.collection(COLLECTION).doc(id).set(data, { merge: true });
   }

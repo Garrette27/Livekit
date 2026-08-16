@@ -50,6 +50,15 @@ export interface GenerateConsultationSummaryParams {
   transcriptionData?: string[] | null;
   patientUserId?: string | null;
   patientEmail?: string | null;
+  /**
+   * Who reached the waiting room for this consultation. Distinguishes a patient
+   * who arrived but was never admitted from one who never arrived — both leave
+   * the session with no transcript, but they are opposite facts.
+   */
+  waitingRoom?: {
+    participantCount: number;
+    longestWaitMinutes?: number | null;
+  } | null;
 }
 
 /**

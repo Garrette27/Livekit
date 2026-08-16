@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { auth, db, provider } from "@/lib/firebase";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithPopup } from "firebase/auth";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signInWithPopup } from "firebase/auth";
 import { useSearchParams } from "next/navigation";
 import { collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { checkRoleConflictByEmail } from "@/lib/auth/role-conflict";
@@ -59,17 +59,43 @@ function PatientLoginContent() {
           userCredential = await createUserWithEmailAndPassword(auth, email, password);
         } catch (authError: any) {
           if (authError.code === 'auth/email-already-in-use') {
-            setError('This email is already registered. Please sign in instead.');
+            // Switches the form to sign-in so the next click completes the
+            // journey, rather than leaving the person re-reading a dead end.
+            setError('This email already has an account. Sign in below, or use "Forgot password?" if you do not have the password.');
             setIsSignUp(false);
             setLoading(false);
-            // Don't return - try to sign in instead
-            // Fall through to sign-in logic below
+            return;
+          }
+
+          // Every other sign-up failure was previously rethrown into a generic
+          // handler, so a disabled provider or a rejected password surfaced as
+          // the same unexplained error. Name the cause instead.
+          if (authError.code === 'auth/weak-password') {
+            setError('Choose a password of at least 6 characters.');
+            setLoading(false);
+            return;
+          }
+          if (authError.code === 'auth/operation-not-allowed') {
+            setError('Email and password sign-up is turned off for this project. Use "Sign in with Google" instead.');
+            setLoading(false);
             return;
           }
           throw authError;
         }
         
         const user = userCredential.user;
+
+        // Google-signed-in patients arrive already verified; a password account
+        // only becomes verified when the holder opens this link. Without it the
+        // account can never reach a verified state, so an allowlisted patient
+        // would queue in the waiting room forever.
+        try {
+          await sendEmailVerification(user);
+        } catch (verificationError) {
+          // Registration has already succeeded and the patient can still join
+          // through the waiting room, so this must not fail the sign-up.
+          console.warn('Could not send the verification email:', verificationError);
+        }
 
         // Now that user is authenticated, create user document in Firestore
         try {

@@ -1,18 +1,19 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { auth } from '@/lib/firebase';
 import { Timestamp } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthSession } from '@/hooks/useAuthSession';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
+import ConsultationHistoryView from './components/ConsultationHistoryView';
+import type { ConsultationCardRecord } from './components/ConsultationCard';
 
 export const dynamic = 'force-dynamic';
 
 interface CallSummary {
   id: string;
   hasGeneratedSummary: boolean;
-  summaryStatus: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable' | 'reviewed';
   roomName: string;
   summary: string;
   keyPoints: string[];
@@ -64,7 +65,6 @@ interface CallSummary {
     isEdited?: boolean;
     lastEditedAt?: Timestamp;
     lastEditedBy?: string;
-    requiresClinicianReview?: boolean;
     editHistory?: Array<{
       editedAt: Date;
       editedBy: string;
@@ -72,6 +72,7 @@ interface CallSummary {
     }>;
   };
   createdBy?: string;
+  patientEmail?: string | null;
   lastEditedAt?: Timestamp;
   lastEditedBy?: string;
   _logged?: boolean;
@@ -92,10 +93,6 @@ interface DoctorHistoryResponseItem {
   keyPoints?: string[];
   recommendations?: string[];
   followUpActions?: string[];
-  summaryStatus?: CallSummary['summaryStatus'];
-  requiresClinicianReview?: boolean;
-  isEdited?: boolean;
-  lastEditedAt?: string | null;
   waitingRoomHistory?: {
     totalParticipants: number;
     registeredParticipantCount: number;
@@ -146,16 +143,9 @@ function toTimestamp(value?: string | null): Timestamp {
 
 function mapHistoryRecordToSummary(record: DoctorHistoryResponseItem): CallSummary {
   const generatedSummary = typeof record.summary === 'string' ? record.summary.trim() : '';
-  const summaryStatus =
-    record.isEdited === true
-      ? 'reviewed'
-      : record.summaryStatus ||
-        (generatedSummary.length > 0 ? 'ready' : 'pending');
-  const hasGeneratedSummary = summaryStatus === 'ready' || summaryStatus === 'reviewed';
   return {
     id: record.id,
-    hasGeneratedSummary,
-    summaryStatus,
+    hasGeneratedSummary: generatedSummary.length > 0,
     roomName: record.roomName || 'Unknown Room',
     summary: generatedSummary || 'This completed consultation does not have a summary yet.',
     keyPoints: Array.isArray(record.keyPoints) ? record.keyPoints : [],
@@ -170,60 +160,40 @@ function mapHistoryRecordToSummary(record: DoctorHistoryResponseItem): CallSumma
     duration: Math.max(0, Math.round(Number(record.duration || 0))),
     waitingRoomHistory: record.waitingRoomHistory,
     chatHistory: record.chatHistory,
+    patientEmail: record.patientEmail || null,
     metadata: {
       totalParticipants: 1,
-      isEdited: record.isEdited,
-      lastEditedAt: record.lastEditedAt ? toTimestamp(record.lastEditedAt) : undefined,
-      requiresClinicianReview: record.requiresClinicianReview,
     },
   };
 }
 
-function formatTimestamp(value?: Timestamp): string {
-  if (!value) {
-    return 'Unknown';
-  }
-
-  const dateValue = value.toDate?.();
-  if (!dateValue || dateValue.getTime() <= 0) {
-    return 'Unknown';
-  }
-
-  return dateValue.toLocaleString();
+function toDateOrNull(value?: Timestamp): Date | null {
+  const dateValue = value?.toDate?.();
+  return dateValue && dateValue.getTime() > 0 ? dateValue : null;
 }
 
-function summaryStatusPresentation(status: CallSummary['summaryStatus']): {
-  label: string;
-  background: string;
-  color: string;
-} {
-  const presentations = {
-    pending: { label: 'Not generated', background: '#f3f4f6', color: '#4b5563' },
-    processing: { label: 'Generating', background: '#eff6ff', color: '#1d4ed8' },
-    ready: { label: 'AI draft · review required', background: '#fff7ed', color: '#9a3412' },
-    failed: { label: 'Generation failed', background: '#fef2f2', color: '#b91c1c' },
-    unavailable: { label: 'AI unavailable', background: '#f3f4f6', color: '#4b5563' },
-    reviewed: { label: 'Clinician reviewed', background: '#f0fdf4', color: '#047857' },
-  } satisfies Record<CallSummary['summaryStatus'], {
-    label: string;
-    background: string;
-    color: string;
-  }>;
-  return presentations[status];
+/** Adapts the dashboard's summary shape to what the history view renders. */
+function toCardRecord(summary: CallSummary): ConsultationCardRecord {
+  return {
+    id: summary.id,
+    roomName: summary.roomName,
+    hasGeneratedSummary: summary.hasGeneratedSummary,
+    summary: summary.summary,
+    keyPoints: summary.keyPoints,
+    recommendations: summary.recommendations,
+    followUpActions: summary.followUpActions,
+    riskLevel: summary.riskLevel,
+    category: summary.category,
+    patientEmail: summary.patientEmail,
+    startedAt: toDateOrNull(summary.startedAt || summary.createdAt),
+    endedAt: toDateOrNull(summary.endedAt),
+    duration: summary.duration,
+    isEdited: summary.metadata?.isEdited,
+    waitingRoomHistory: summary.waitingRoomHistory,
+    chatHistory: summary.chatHistory,
+  };
 }
 
-function formatIsoTimestamp(value?: string | null): string {
-  if (!value) {
-    return 'N/A';
-  }
-
-  const parsedDate = new Date(value);
-  if (Number.isNaN(parsedDate.getTime()) || parsedDate.getTime() <= 0) {
-    return 'N/A';
-  }
-
-  return parsedDate.toLocaleString();
-}
 
 export default function DoctorDashboard() {
   const { user, isAuthenticated, isAuthorized, isLoading: authLoading } = useAuthSession({
@@ -245,46 +215,7 @@ export default function DoctorDashboard() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [generatingSummaryId, setGeneratingSummaryId] = useState<string | null>(null);
   const [summaryActionError, setSummaryActionError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [worklistFilter, setWorklistFilter] = useState<
-    'all' | 'attention' | 'drafts' | 'reviewed'
-  >('all');
   const router = useRouter();
-
-  const visibleSummaries = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-    return summaries.filter((summary) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        summary.roomName.toLowerCase().includes(normalizedSearch) ||
-        summary.category.toLowerCase().includes(normalizedSearch);
-      if (!matchesSearch) return false;
-
-      if (worklistFilter === 'attention') {
-        return ['pending', 'failed', 'unavailable'].includes(summary.summaryStatus);
-      }
-      if (worklistFilter === 'drafts') {
-        return summary.summaryStatus === 'ready' || summary.summaryStatus === 'processing';
-      }
-      if (worklistFilter === 'reviewed') {
-        return summary.summaryStatus === 'reviewed';
-      }
-      return true;
-    });
-  }, [searchTerm, summaries, worklistFilter]);
-
-  const worklistCounts = useMemo(
-    () => ({
-      attention: summaries.filter((summary) =>
-        ['pending', 'failed', 'unavailable'].includes(summary.summaryStatus)
-      ).length,
-      drafts: summaries.filter((summary) =>
-        ['ready', 'processing'].includes(summary.summaryStatus)
-      ).length,
-      reviewed: summaries.filter((summary) => summary.summaryStatus === 'reviewed').length,
-    }),
-    [summaries]
-  );
 
   // Handle authentication and role check
   useEffect(() => {
@@ -370,6 +301,24 @@ export default function DoctorDashboard() {
       );
     } finally {
       setGeneratingSummaryId(null);
+    }
+  };
+
+  // The history view works in its own record shape; these resolve a card back
+  // to the summary the edit/generate flows operate on.
+  const cardRecords = summaries.map(toCardRecord);
+
+  const handleEditCard = (record: ConsultationCardRecord) => {
+    const summary = summaries.find((candidate) => candidate.id === record.id);
+    if (summary) {
+      handleEdit(summary);
+    }
+  };
+
+  const handleGenerateCard = (record: ConsultationCardRecord) => {
+    const summary = summaries.find((candidate) => candidate.id === record.id);
+    if (summary) {
+      void handleGenerateSummary(summary);
     }
   };
 
@@ -475,10 +424,10 @@ export default function DoctorDashboard() {
       <header style={{
         backgroundColor: 'white',
         borderBottom: '1px solid #e5e7eb',
-        padding: '1rem 2rem',
+        padding: 'var(--header-padding)',
         boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
       }}>
-        <div style={{ maxWidth: '80rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="app-header-bar" style={{ maxWidth: '80rem', margin: '0 auto' }}>
           <div>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
               Doctor Dashboard
@@ -490,9 +439,6 @@ export default function DoctorDashboard() {
           <nav style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
             <Link href="/doctor/invitations" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: '500' }}>
               Invitations
-            </Link>
-            <Link href="/" style={{ color: '#059669', textDecoration: 'none', fontWeight: '500' }}>
-              Create Room
             </Link>
             <button
               onClick={() => auth && auth.signOut()}
@@ -513,86 +459,16 @@ export default function DoctorDashboard() {
       </header>
 
       {/* Main Content */}
-      <main style={{ maxWidth: '80rem', margin: '0 auto', padding: '2rem' }}>
+      <main style={{ maxWidth: '80rem', margin: '0 auto', padding: 'var(--page-padding)' }}>
         <div style={{
           backgroundColor: 'white',
           borderRadius: '0.75rem',
           padding: '2rem',
           boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827' }}>
-              Consultation History
-            </h2>
-            <button
-              onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: '#f3f4f6',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                cursor: 'pointer',
-                fontSize: '0.875rem'
-              }}
-            >
-              Sort: {sortOrder === 'desc' ? 'Newest First' : 'Oldest First'}
-            </button>
-          </div>
-
-          <div
-            aria-label="Consultation worklist filters"
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '0.5rem',
-              marginBottom: '1.5rem',
-              alignItems: 'center',
-            }}
-          >
-            <label style={{ flex: '1 1 16rem' }}>
-              <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }}>
-                Search consultations
-              </span>
-              <input
-                type="search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search room or category"
-                style={{
-                  width: '100%',
-                  minHeight: '2.75rem',
-                  padding: '0.65rem 0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                }}
-              />
-            </label>
-            {([
-              ['all', `All (${summaries.length})`],
-              ['attention', `Needs attention (${worklistCounts.attention})`],
-              ['drafts', `AI drafts (${worklistCounts.drafts})`],
-              ['reviewed', `Reviewed (${worklistCounts.reviewed})`],
-            ] as const).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={worklistFilter === value}
-                onClick={() => setWorklistFilter(value)}
-                style={{
-                  minHeight: '2.75rem',
-                  padding: '0.55rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  border: `1px solid ${worklistFilter === value ? '#2563eb' : '#d1d5db'}`,
-                  color: worklistFilter === value ? '#1d4ed8' : '#374151',
-                  backgroundColor: worklistFilter === value ? '#eff6ff' : '#fff',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1.5rem' }}>
+            Consultation History
+          </h2>
 
           {summaryActionError && (
             <div
@@ -610,288 +486,15 @@ export default function DoctorDashboard() {
             </div>
           )}
 
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '3rem' }}>
-              <div style={{
-                width: '3rem',
-                height: '3rem',
-                border: '2px solid #dbeafe',
-                borderTop: '2px solid #2563eb',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-                margin: '0 auto'
-              }}></div>
-              <p style={{ marginTop: '1rem', color: '#6b7280' }}>Loading consultations...</p>
-            </div>
-          ) : summaries.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-              <p style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>No consultations yet</p>
-              <p>Your consultation summaries will appear here after video calls.</p>
-            </div>
-          ) : visibleSummaries.length === 0 ? (
-            <div role="status" style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-              No consultations match this worklist filter.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {visibleSummaries.map((summary) => (
-                <div
-                  key={summary.id}
-                  style={{
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.5rem',
-                    padding: '1.5rem',
-                    backgroundColor: '#f9fafb'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
-                        Room: {summary.roomName}
-                        {summary.metadata?.isEdited && (
-                          <span style={{
-                            marginLeft: '0.5rem',
-                            fontSize: '0.75rem',
-                            color: '#059669',
-                            fontWeight: 'normal'
-                          }}>
-                            (Edited)
-                          </span>
-                        )}
-                      </h3>
-                      <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                        <strong>Started:</strong> {formatTimestamp(summary.startedAt || summary.createdAt)}
-                        {' | '}
-                        <strong>Ended:</strong> {formatTimestamp(summary.endedAt)}
-                        {' | '}
-                        <strong>Duration:</strong> {summary.duration} minute{summary.duration === 1 ? '' : 's'}
-                        {summary.metadata?.lastEditedAt && (
-                          <span style={{ marginLeft: '0.5rem', fontStyle: 'italic' }}>
-                            | Last edited: {summary.metadata.lastEditedAt?.toDate?.()?.toLocaleString() || 'Unknown'}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <span
-                        title="AI-generated content is a draft until a clinician saves a reviewed version."
-                        style={{
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          backgroundColor: summaryStatusPresentation(summary.summaryStatus).background,
-                          color: summaryStatusPresentation(summary.summaryStatus).color,
-                        }}
-                      >
-                        {summaryStatusPresentation(summary.summaryStatus).label}
-                      </span>
-                      <span style={{
-                        padding: '0.25rem 0.75rem',
-                        borderRadius: '9999px',
-                        fontSize: '0.75rem',
-                        fontWeight: '500',
-                        backgroundColor: summary.riskLevel === 'High' ? '#fef2f2' : summary.riskLevel === 'Medium' ? '#fef3c7' : summary.riskLevel === 'Pending' ? '#f3f4f6' : '#f0fdf4',
-                        color: summary.riskLevel === 'High' ? '#dc2626' : summary.riskLevel === 'Medium' ? '#d97706' : summary.riskLevel === 'Pending' ? '#4b5563' : '#059669'
-                      }}>
-                        AI signal: {summary.riskLevel}
-                      </span>
-                      <button
-                        onClick={() => summary.hasGeneratedSummary
-                          ? handleEdit(summary)
-                          : void handleGenerateSummary(summary)}
-                        disabled={
-                          generatingSummaryId === summary.id ||
-                          summary.summaryStatus === 'processing'
-                        }
-                        style={{
-                          padding: '0.375rem 0.75rem',
-                          backgroundColor: '#2563eb',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '0.375rem',
-                          cursor:
-                            generatingSummaryId === summary.id ||
-                            summary.summaryStatus === 'processing'
-                              ? 'wait'
-                              : 'pointer',
-                          fontSize: '0.875rem',
-                          fontWeight: '500'
-                        }}
-                      >
-                        {summary.hasGeneratedSummary
-                          ? summary.summaryStatus === 'reviewed' ? 'Edit reviewed summary' : 'Review draft'
-                          : generatingSummaryId === summary.id
-                            ? 'Generating...'
-                            : summary.summaryStatus === 'processing'
-                              ? 'Generating...'
-                              : summary.summaryStatus === 'failed'
-                                ? 'Retry summary'
-                                : 'Generate Summary'}
-                      </button>
-                    </div>
-                  </div>
-                  <p style={{
-                    color: summary.hasGeneratedSummary ? '#374151' : '#6b7280',
-                    marginBottom: '1rem',
-                    lineHeight: '1.6',
-                    fontStyle: summary.hasGeneratedSummary ? 'normal' : 'italic',
-                  }}>
-                    {summary.summary}
-                  </p>
-                  {summary.waitingRoomHistory && summary.waitingRoomHistory.totalParticipants > 0 && (
-                    <div
-                      style={{
-                        marginBottom: '1rem',
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #d1fae5',
-                        backgroundColor: '#f0fdf4',
-                      }}
-                    >
-                      <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#065f46', marginBottom: '0.5rem' }}>
-                        Waiting Room Timeline
-                      </p>
-                      <p style={{ fontSize: '0.75rem', color: '#065f46', marginBottom: '0.5rem' }}>
-                        Registered: {summary.waitingRoomHistory.registeredParticipantCount}
-                        {' | '}
-                        Anonymous: {summary.waitingRoomHistory.anonymousParticipantCount}
-                      </p>
-                      {summary.waitingRoomHistory.participantEmails.length > 0 && (
-                        <p style={{ fontSize: '0.75rem', color: '#047857', marginBottom: '0.5rem' }}>
-                          Emails: {summary.waitingRoomHistory.participantEmails.join(', ')}
-                        </p>
-                      )}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {summary.waitingRoomHistory.participants.map((participant) => (
-                          <div
-                            key={participant.waitingPatientId}
-                            style={{
-                              border: '1px solid #bbf7d0',
-                              borderRadius: '0.375rem',
-                              padding: '0.5rem',
-                              backgroundColor: '#ffffff',
-                            }}
-                          >
-                            <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#166534', marginBottom: '0.25rem' }}>
-                              {participant.displayName} ({participant.patientEmail || 'anonymous'})
-                            </p>
-                            <p style={{ fontSize: '0.7rem', color: '#166534', marginBottom: '0.25rem' }}>
-                              Joined: {formatIsoTimestamp(participant.joinedAt)}
-                              {' | '}
-                              Admitted: {formatIsoTimestamp(participant.admittedAt)}
-                            </p>
-                            <p style={{ fontSize: '0.7rem', color: '#166534', marginBottom: '0.25rem' }}>
-                              Left: {formatIsoTimestamp(participant.leftAt)}
-                              {' | '}
-                              Removed: {formatIsoTimestamp(participant.removedAt)}
-                            </p>
-                            <p style={{ fontSize: '0.7rem', color: '#166534' }}>
-                              Waiting duration: {participant.waitingDurationMinutes ?? 'N/A'} minute
-                              {participant.waitingDurationMinutes === 1 ? '' : 's'}
-                              {' | '}
-                              Final status: {participant.status}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {summary.chatHistory && summary.chatHistory.totalMessages > 0 && (
-                    <details
-                      style={{
-                        marginBottom: '1rem',
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #dbeafe',
-                        backgroundColor: '#eff6ff',
-                      }}
-                    >
-                      <summary
-                        style={{
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          color: '#1e3a8a',
-                          cursor: generatingSummaryId === summary.id ? 'wait' : 'pointer',
-                          opacity: generatingSummaryId === summary.id ? 0.7 : 1,
-                        }}
-                      >
-                        Chat Transcript ({summary.chatHistory.totalMessages} message
-                        {summary.chatHistory.totalMessages === 1 ? '' : 's'})
-                      </summary>
-
-                      <div style={{ marginTop: '0.75rem' }}>
-                        <p style={{ fontSize: '0.75rem', color: '#1e40af', marginBottom: '0.5rem' }}>
-                          First message: {formatIsoTimestamp(summary.chatHistory.firstMessageAt)}
-                          {' | '}
-                          Last message: {formatIsoTimestamp(summary.chatHistory.lastMessageAt)}
-                        </p>
-                        {summary.chatHistory.participants.length > 0 && (
-                          <p style={{ fontSize: '0.75rem', color: '#1d4ed8', marginBottom: '0.5rem' }}>
-                            Participants: {summary.chatHistory.participants.join(', ')}
-                          </p>
-                        )}
-                        <div
-                          style={{
-                            maxHeight: '16rem',
-                            overflowY: 'auto',
-                            border: '1px solid #bfdbfe',
-                            borderRadius: '0.375rem',
-                            backgroundColor: '#ffffff',
-                            padding: '0.5rem',
-                          }}
-                        >
-                          {summary.chatHistory.messages.map((message) => (
-                            <div
-                              key={message.id}
-                              style={{
-                                borderBottom: '1px solid #e5e7eb',
-                                padding: '0.375rem 0',
-                              }}
-                            >
-                              <p
-                                style={{
-                                  margin: 0,
-                                  fontSize: '0.7rem',
-                                  fontWeight: 600,
-                                  color: '#1f2937',
-                                }}
-                              >
-                                {message.senderName} ({message.senderType}) - {formatIsoTimestamp(message.createdAt)}
-                              </p>
-                              <p
-                                style={{
-                                  margin: '0.125rem 0 0 0',
-                                  fontSize: '0.75rem',
-                                  color: '#374151',
-                                  whiteSpace: 'pre-wrap',
-                                  wordBreak: 'break-word',
-                                }}
-                              >
-                                {message.text || '(empty message)'}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </details>
-                  )}
-                  {summary.keyPoints && summary.keyPoints.length > 0 && (
-                    <div style={{ marginTop: '1rem' }}>
-                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
-                        Key Points:
-                      </h4>
-                      <ul style={{ fontSize: '0.875rem', color: '#6b7280', paddingLeft: '1.25rem' }}>
-                        {summary.keyPoints.map((point, idx) => (
-                          <li key={idx} style={{ marginBottom: '0.25rem' }}>{point}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          <ConsultationHistoryView
+            records={cardRecords}
+            loading={loading}
+            sortOrder={sortOrder}
+            onToggleSortOrder={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+            generatingSummaryId={generatingSummaryId}
+            onEdit={handleEditCard}
+            onGenerate={handleGenerateCard}
+          />
         </div>
       </main>
 
@@ -910,9 +513,6 @@ export default function DoctorDashboard() {
           zIndex: 1000,
           padding: '2rem'
         }}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="edit-summary-title"
         onClick={handleCancelEdit}
         >
           <div
@@ -929,12 +529,11 @@ export default function DoctorDashboard() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 id="edit-summary-title" style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
                 Edit Summary: {editingSummary.roomName}
               </h2>
               <button
                 onClick={handleCancelEdit}
-                aria-label="Close summary editor"
                 style={{
                   background: 'none',
                   border: 'none',
@@ -949,7 +548,7 @@ export default function DoctorDashboard() {
             </div>
 
             {saveError && (
-              <div role="alert" style={{
+              <div style={{
                 padding: '0.75rem',
                 backgroundColor: '#fef2f2',
                 border: '1px solid #fecaca',

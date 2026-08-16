@@ -13,6 +13,7 @@ import {
   type LocalUserChoices,
 } from '@livekit/components-react';
 import LiveKitStyles from './LiveKitStyles';
+import SessionTranscriptionBridge from './SessionTranscriptionBridge';
 import { RoomControlsPolicy } from './room-controls-policy';
 import { RoomChatPolicy } from './room-chat-policy';
 import { RoomGridPolicy } from './room-grid-policy';
@@ -456,6 +457,10 @@ export default function RoomShell({
         />
         <ChatPersistenceBridge
           enabled={chatEnabled}
+          consultationSessionId={consultationSessionId}
+          accessToken={token}
+        />
+        <SessionTranscriptionBridge
           consultationSessionId={consultationSessionId}
           accessToken={token}
         />

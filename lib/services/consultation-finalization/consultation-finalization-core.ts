@@ -375,6 +375,7 @@ async function runFinalization(
     leftAt: effectiveSessionEndedAt,
     duration: finalDurationMinutes,
     status: 'completed',
+    awaitingPatient: false,
     patientUserId: sessionPatientUserId,
     ...(consultationPatientEmail ? { patientEmail: consultationPatientEmail } : {}),
     metadata: {
@@ -413,6 +414,13 @@ async function runFinalization(
         consultationSessionId,
         patientUserId,
         patientEmail: consultationPatientEmail,
+        waitingRoom: {
+          participantCount: waitingRoomHistory.totalParticipants,
+          longestWaitMinutes: waitingRoomHistory.participants.reduce(
+            (longest, participant) => Math.max(longest, participant.waitingDurationMinutes || 0),
+            0
+          ),
+        },
       });
     }
   }

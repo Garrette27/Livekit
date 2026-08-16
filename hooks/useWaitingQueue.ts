@@ -9,6 +9,11 @@ import {
 } from '@/lib/waiting-room/waiting-queue-client';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setWaitingQueueSnapshot } from '@/store/slices/waiting-queue-slice';
+import {
+  fetchWaitingQueueOnce,
+  subscribeToDoctorWaitingPatients,
+  subscribeToWaitingQueuePoll,
+} from '@/lib/waiting-room/waiting-queue-coordinator';
 
 interface UseWaitingQueueOptions {
   roomName?: string;
@@ -78,7 +83,6 @@ export function useWaitingQueue({
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [scopeInitialized, setScopeInitialized] = useState(false);
   const dispatch = useAppDispatch();
-  const isFetchingRef = useRef(false);
 
   const invitationIdsSet = useMemo(() => {
     if (typeof invitationIds === 'undefined') {
@@ -127,18 +131,44 @@ export function useWaitingQueue({
     }
   }, [scopeKey]);
 
+  /**
+   * Applies this hook's invitation and selection scoping, then stores the
+   * result. Shared by the realtime stream and the polling fallback so both
+   * produce identical state.
+   */
+  const publishPatients = useCallback(
+    (incomingPatients: WaitingPatient[]) => {
+      const scopedPatients = incomingPatients.filter((waitingPatient) =>
+        shouldIncludeInvitation(invitationIdsSet, waitingPatient.invitationId)
+      );
+
+      const counts = countWaitingPatientsByInvitation(scopedPatients);
+      const visiblePatients = selectedInvitationId
+        ? scopedPatients.filter((waitingPatient) => waitingPatient.invitationId === selectedInvitationId)
+        : scopedPatients;
+
+      dispatch(
+        setWaitingQueueSnapshot({
+          scopeKey,
+          waitingPatients: visiblePatients,
+          waitingPatientCounts: counts,
+          lastUpdatedAtMs: Date.now(),
+        })
+      );
+    },
+    [dispatch, invitationIdsSet, scopeKey, selectedInvitationId]
+  );
+
   const refresh = useCallback(
     async (showLoading = false) => {
-      if (isFetchingRef.current) {
-        return;
-      }
-
-      isFetchingRef.current = true;
       if (showLoading) {
         setLoading(true);
       }
       setError(null);
 
+      // Shared across every component watching this scope, so panels rendered
+      // side by side produce one request rather than one each.
+      return fetchWaitingQueueOnce(scopeKey, async () => {
       try {
         if (invitationIdsSet && invitationIdsSet.size === 0) {
           dispatch(
@@ -170,42 +200,26 @@ export function useWaitingQueue({
           return;
         }
 
-        const scopedPatients = (result.waitingPatients || []).filter((waitingPatient) =>
-          shouldIncludeInvitation(invitationIdsSet, waitingPatient.invitationId)
-        );
-
-        const counts = countWaitingPatientsByInvitation(scopedPatients);
-        const visiblePatients = selectedInvitationId
-          ? scopedPatients.filter((waitingPatient) => waitingPatient.invitationId === selectedInvitationId)
-          : scopedPatients;
-
-        dispatch(
-          setWaitingQueueSnapshot({
-            scopeKey,
-            waitingPatients: visiblePatients,
-            waitingPatientCounts: counts,
-            lastUpdatedAtMs: Date.now(),
-          })
-        );
+        publishPatients(result.waitingPatients || []);
       } catch (fetchError) {
         console.error('Failed to fetch waiting queue:', fetchError);
         setError('Failed to load waiting queue');
       } finally {
         setScopeInitialized(true);
-        isFetchingRef.current = false;
         if (showLoading) {
           setLoading(false);
         }
       }
+      });
     },
     [
       dispatch,
       doctorUserId,
       invitationIdsSet,
       normalizedStatuses,
+      publishPatients,
       roomName,
       scopeKey,
-      selectedInvitationId,
     ]
   );
 
@@ -269,19 +283,55 @@ export function useWaitingQueue({
     void refresh(true);
   }, [refresh]);
 
+  // Prefer Firestore's push stream; fall back to timed refreshes only when it
+  // is unavailable, so a rules or connectivity problem degrades to the old
+  // behaviour instead of leaving the doctor with an empty queue.
+  const [isStreaming, setIsStreaming] = useState(false);
+
   useEffect(() => {
-    if (!autoRefresh) {
+    if (!autoRefresh || !doctorUserId) {
+      setIsStreaming(false);
       return;
     }
 
-    const interval = window.setInterval(() => {
-      void refresh(false);
-    }, pollIntervalMs);
+    let cancelled = false;
+    const unsubscribe = subscribeToDoctorWaitingPatients({
+      doctorUserId,
+      onPatients: (waitingPatients) => {
+        if (cancelled) {
+          return;
+        }
+        setIsStreaming(true);
+        setScopeInitialized(true);
+        setLoading(false);
+        publishPatients(waitingPatients.filter((patient) => normalizedStatuses.includes(patient.status)));
+      },
+      onUnavailable: (reason) => {
+        if (cancelled) {
+          return;
+        }
+        console.warn('Waiting queue live updates unavailable; falling back to polling.', reason);
+        setIsStreaming(false);
+      },
+    });
 
     return () => {
-      window.clearInterval(interval);
+      cancelled = true;
+      unsubscribe?.();
+      setIsStreaming(false);
     };
-  }, [autoRefresh, pollIntervalMs, refresh]);
+  }, [autoRefresh, doctorUserId, normalizedStatuses, publishPatients]);
+
+  useEffect(() => {
+    if (!autoRefresh || isStreaming) {
+      return;
+    }
+
+    // One timer per scope regardless of how many panels are mounted.
+    return subscribeToWaitingQueuePoll(scopeKey, pollIntervalMs, () => {
+      void refresh(false);
+    });
+  }, [autoRefresh, isStreaming, pollIntervalMs, refresh, scopeKey]);
 
   return useMemo(
     () => ({

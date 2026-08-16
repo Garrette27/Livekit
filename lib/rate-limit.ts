@@ -222,6 +222,19 @@ export const RateLimitConfigs = {
     windowMs: 60 * 1000, // 1 minute
     blockDurationMs: 5 * 60 * 1000 // Block for 5 minutes
   },
+
+  /**
+   * Opening an invitation link. Deliberately looser than token generation: a
+   * patient legitimately revalidates on every page load, reconnect, and retry,
+   * and a five-minute lockout in front of a booked appointment costs far more
+   * than the abuse it prevents. The invitation itself is already signed,
+   * expiring, and usage-capped.
+   */
+  INVITATION_VALIDATION: {
+    limit: 30,
+    windowMs: 60 * 1000, // 1 minute
+    blockDurationMs: 30 * 1000 // Brief pause, then retry
+  },
   
   // Moderate rate limit for webhook endpoints
   WEBHOOK: {

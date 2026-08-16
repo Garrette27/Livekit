@@ -104,7 +104,7 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
             color: '#374151', 
             marginBottom: '0.5rem' 
           }}>
-            Auto-admit Email Allowlist
+            Skip the waiting room for these patients
           </label>
           <textarea
             value={emailAllowlistInput}
@@ -119,8 +119,13 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
               minHeight: '5.5rem',
             }}
           />
-          <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.72rem', color: '#6b7280' }}>
-            Add one or more emails (comma or new line). These accounts are auto-admitted.
+          {/* States both branches of the rule: a setting whose effect on
+              everyone else is invisible is the one doctors misread. */}
+          <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.72rem', color: '#6b7280', lineHeight: 1.5 }}>
+            One or more emails, separated by commas or new lines. A patient who opens the link
+            with a <strong>registered account matching one of these addresses</strong> joins
+            immediately. <strong>Everyone else — including anyone who forwards this link — waits
+            for you to admit them.</strong> Leave blank to review every patient in the waiting room.
           </p>
         </div>
 

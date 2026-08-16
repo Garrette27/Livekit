@@ -16,6 +16,7 @@ import { useErrorHandler } from './hooks/useErrorHandler';
 import { trackDoctorPresenceEvent } from '@/lib/consultations/doctor-presence-client';
 
 function DoctorRoomClient({ roomName }: { roomName: string }) {
+  const [speechLanguage, setSpeechLanguage] = useState('fil-PH');
   const {
     user,
     isAuthenticated,
@@ -36,9 +37,10 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
     clearTokenError,
   } = useDoctorToken({ roomName, doctorName, user });
 
-  const { speechStatus, captureError, startCapture, stopCapture } = useSpeechCapture({
+  const { speechStatus, captureError } = useSpeechCapture({
     roomName,
     token,
+    language: speechLanguage,
   });
   const { consultationSessionId } = useRoomLifecycle({ token, user, roomName, doctorName });
 
@@ -59,7 +61,6 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
   }, [isAuthenticated, user, doctorName, token, isJoining, generateDoctorToken]);
 
   const handleLeave = () => {
-    stopCapture();
     if (user?.uid) {
       void trackDoctorPresenceEvent(
         {
@@ -200,11 +201,10 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
           roomName={roomName}
           user={user!}
           doctorName={doctorName}
-          onLeave={handleLeave}
+          speechLanguage={speechLanguage}
           speechStatus={speechStatus}
-          speechCaptureError={captureError}
-          onStartSpeechCapture={startCapture}
-          onStopSpeechCapture={stopCapture}
+          onSpeechLanguageChange={setSpeechLanguage}
+          onLeave={handleLeave}
         />
 
         <LiveKitShell

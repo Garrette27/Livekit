@@ -3,6 +3,10 @@
 The application enforces authorization on the server. UI visibility is a
 convenience only and is never the security boundary.
 
+This page covers role-based access for signed-in accounts. Patient entry via an
+invitation link is a separate, capability-based mechanism — see
+[invitation-access-model.md](./invitation-access-model.md).
+
 ## Roles
 
 | Role | Current access |

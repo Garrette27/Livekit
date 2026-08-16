@@ -54,6 +54,87 @@ a {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Responsive layout scale
+   ---------------------------------------------------------------------------
+   Screens are built with inline styles, which cannot carry media queries. So
+   spacing is published here as custom properties and read from those styles:
+   the value changes with the viewport while each component keeps declaring its
+   own layout. Adding a breakpoint is then one edit here rather than an edit in
+   every screen.
+
+   Steps are laptop (default), tablet, and phone.
+--------------------------------------------------------------------------- */
+:root {
+  --page-padding: 2rem;
+  --card-padding: 2rem;
+  --header-padding: 1rem 2rem;
+  --section-gap: 2rem;
+}
+
+/* Tablets, and laptops in a split window. */
+@media (max-width: 1024px) {
+  :root {
+    --page-padding: 1.5rem;
+    --card-padding: 1.5rem;
+    --header-padding: 1rem 1.5rem;
+    --section-gap: 1.5rem;
+  }
+}
+
+/* Phones. Padding shrinks furthest here because horizontal room is the
+   scarcest resource on a small screen. */
+@media (max-width: 640px) {
+  :root {
+    --page-padding: 0.875rem;
+    --card-padding: 1rem;
+    --header-padding: 0.875rem 1rem;
+    --section-gap: 1rem;
+  }
+}
+
+/* A page header: title on one line, actions on the next once they no longer
+   fit beside it, rather than squeezing both. */
+.app-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .app-header-bar {
+    align-items: flex-start;
+  }
+
+  /* Controls become comfortably tappable and share the row evenly. */
+  .app-header-bar nav,
+  .app-header-bar > div:last-child {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* Touch targets. 44px is the smallest reliably hittable control on a phone,
+   so anything interactive keeps that height on small screens. */
+@media (max-width: 640px) {
+  button,
+  input,
+  select,
+  textarea {
+    min-height: 2.75rem;
+    font-size: 1rem; /* stops iOS Safari zooming the page on focus */
+  }
+}
+
+/* Long identifiers — emails, room names, invitation URLs — must wrap instead
+   of forcing the page sideways on a narrow screen. */
+.app-wrap-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 /* LiveKit Dropdown Menu Fixes - Better Visibility */
 .lk-device-menu,
 .lk-dropdown,

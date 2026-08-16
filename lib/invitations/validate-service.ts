@@ -1,27 +1,35 @@
 import { getFirebaseAdmin } from '../firebase-admin';
 import {
   AccessAttempt,
+  DeviceFingerprint,
   Invitation,
   InvitationToken,
   SecurityViolation,
   ValidateInvitationResponse,
   WaitingPatient,
 } from '../types';
+import { getGeolocationFromIP } from './geolocation-utils';
 import { signLiveKitRoomToken, verifyInvitationToken } from './token-utils';
-import { toDate } from './utils';
+import { detectBrowser, generateDeviceFingerprintHash, toDate } from './utils';
 import { buildWaitingPatientIdentity } from './waiting-patient-identity';
 import { EVENT_DOMAINS, EVENT_SCHEMA_VERSION } from '../events/event-schema';
 import { getInvitationEmailAllowlist, isEmailAllowedByInvitation } from './email-allowlist';
+import { decideAdmission, type VisitorIdentity } from './admission-policy';
 import { finalizeConsultationForRoom } from '../services/consultation-finalization';
 import { UserRepository } from '../repositories/user-repository';
-import { reserveInvitationUse } from './invitation-use-reservation';
-import { hashSecuritySignal } from '../security/security-signal';
 
 export interface ValidateInvitationContext {
   token: string;
+  deviceFingerprint?: DeviceFingerprint;
+  /** Email the visitor typed. Self-asserted, so it never grants admission. */
   userEmail?: string;
   clientIP: string;
   userAgent: string;
+  /**
+   * Identity taken from a verified Firebase token, when the visitor sent one.
+   * Only this can qualify someone to skip the waiting room.
+   */
+  authenticatedVisitor?: VisitorIdentity;
 }
 
 export interface ValidateInvitationResult {
@@ -35,12 +43,7 @@ interface UserLookupContext {
   userProfile?: any;
 }
 
-interface WaitingPatientIdentity {
-  patientId: string;
-  patientName: string;
-  patientEmail?: string;
-  isAnonymous: boolean;
-}
+type WaitingPatientIdentity = ReturnType<typeof buildWaitingPatientIdentity>;
 
 function result(status: number, body: ValidateInvitationResponse): ValidateInvitationResult {
   return { status, body };
@@ -52,7 +55,9 @@ function normalizeEmail(email?: string): string | undefined {
 
 function buildAccessAttempt(
   clientIP: string,
-  userAgent: string
+  userAgent: string,
+  country?: string,
+  deviceFingerprint?: DeviceFingerprint
 ): AccessAttempt {
   const occurredAt = new Date() as any;
   return {
@@ -66,8 +71,10 @@ function buildAccessAttempt(
       source: 'invitation-access-core.validateInvite',
     },
     timestamp: occurredAt,
-    ip: hashSecuritySignal('ip', clientIP),
-    userAgent: hashSecuritySignal('user-agent', userAgent),
+    ip: clientIP,
+    userAgent,
+    country,
+    deviceFingerprint: deviceFingerprint ? generateDeviceFingerprintHash(deviceFingerprint) : undefined,
     success: false,
     reason: undefined,
   };
@@ -87,6 +94,8 @@ function toAccessAttemptData(accessAttempt: AccessAttempt): Record<string, any> 
     userAgent: accessAttempt.userAgent,
     success: accessAttempt.success,
     reason: accessAttempt.reason,
+    ...(accessAttempt.country && { country: accessAttempt.country }),
+    ...(accessAttempt.deviceFingerprint && { deviceFingerprint: accessAttempt.deviceFingerprint }),
   };
 }
 
@@ -112,8 +121,8 @@ function buildSecurityViolation(input: {
     timestamp,
     type: input.type,
     details: input.details,
-    ip: hashSecuritySignal('ip', input.clientIP),
-    userAgent: hashSecuritySignal('user-agent', input.userAgent),
+    ip: input.clientIP,
+    userAgent: input.userAgent,
   };
 }
 
@@ -139,25 +148,34 @@ function buildParticipantDisplayName(lookup: UserLookupContext): string {
   );
 }
 
-function isAutoAdmissionCandidate(invitation: Invitation, lookup: UserLookupContext): boolean {
-  return Boolean(isEmailAllowedByInvitation(invitation, lookup.userEmailToCheck) && lookup.userDocId);
+function createWaitingPatientId(invitationId: string): string {
+  return `waiting_${invitationId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+/**
+ * Prior waiting-room entries for this patient on this invitation.
+ *
+ * `hasEndedVisit` means a visit has already finished — it exists to stop a
+ * finished entry being handed back as if the patient were still in the room.
+ * It is deliberately not a judgement about whether they may return: patients
+ * close tabs constantly, and treating that as permanent would revoke the
+ * doctor's skip-the-queue decision after one visit.
+ */
 async function lookupRegisteredAdmissionHistory(
   db: any,
   invitationId: string,
   patientEmail: string
-): Promise<{ hasLeft: boolean; latestAdmitted: WaitingPatient | null }> {
+): Promise<{ hasEndedVisit: boolean; latestAdmitted: WaitingPatient | null }> {
   const existingPatientsQuery = await db.collection('waitingPatients')
     .where('invitationId', '==', invitationId)
     .where('patientEmail', '==', patientEmail)
     .get();
 
   if (existingPatientsQuery.empty) {
-    return { hasLeft: false, latestAdmitted: null };
+    return { hasEndedVisit: false, latestAdmitted: null };
   }
 
-  let hasLeft = false;
+  let hasEndedVisit = false;
   let latestAdmitted: WaitingPatient | null = null;
   let latestAdmittedTime = 0;
 
@@ -165,7 +183,7 @@ async function lookupRegisteredAdmissionHistory(
     const data = { id: doc.id, ...doc.data() } as WaitingPatient;
 
     if (data.status === 'left' || data.status === 'rejected') {
-      hasLeft = true;
+      hasEndedVisit = true;
       return;
     }
 
@@ -178,7 +196,20 @@ async function lookupRegisteredAdmissionHistory(
     }
   });
 
-  return { hasLeft, latestAdmitted };
+  return { hasEndedVisit, latestAdmitted };
+}
+
+async function appendInvitationAccessAudit(
+  db: any,
+  invitationId: string,
+  invitation: Invitation,
+  accessAttemptData: Record<string, any>
+): Promise<void> {
+  await db.collection('invitations').doc(invitationId).update({
+    currentUses: (invitation.currentUses || 0) + 1,
+    'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
+    'audit.lastAccessed': new Date(),
+  });
 }
 
 async function persistWaitingPatient(
@@ -191,10 +222,12 @@ async function persistWaitingPatient(
     status: WaitingPatient['status'];
     clientIP: string;
     userAgent: string;
+    deviceFingerprint?: DeviceFingerprint;
     admissionMode?: 'doctor-manual' | 'auto-email-match';
+    riskSignals?: string[];
   }
 ): Promise<string> {
-  const waitingPatientId = db.collection('waitingPatients').doc().id;
+  const waitingPatientId = createWaitingPatientId(input.invitationId);
   const now = new Date();
 
   const waitingPatient: any = {
@@ -208,11 +241,18 @@ async function persistWaitingPatient(
     joinedAt: now,
     status: input.status,
     metadata: {
-      networkHash: hashSecuritySignal('ip', input.clientIP),
-      userAgentHash: hashSecuritySignal('user-agent', input.userAgent),
+      ...(input.deviceFingerprint && { deviceFingerprint: JSON.stringify(input.deviceFingerprint) }),
+      ip: input.clientIP,
+      userAgent: input.userAgent,
       lastAccessed: now,
       ...(input.admissionMode && { admissionMode: input.admissionMode }),
       isAnonymous: input.identity.isAnonymous,
+      // Recorded so the doctor's queue can show how the visitor's email was
+      // established rather than presenting every address with equal weight.
+      identitySource: input.identity.identitySource,
+      ...(input.riskSignals && input.riskSignals.length > 0
+        ? { riskSignals: input.riskSignals }
+        : {}),
     },
   };
 
@@ -289,30 +329,106 @@ async function resolveUserContext(
   return { lookup };
 }
 
-async function denyWithViolations(
+async function collectSecurityViolations(
+  db: any,
+  lookup: UserLookupContext,
+  deviceFingerprint: DeviceFingerprint | undefined,
+  isWaitingRoomEnabled: boolean,
+  geolocation: any,
+  detectedBrowser: string,
+  clientIP: string,
+  userAgent: string,
+  violations: SecurityViolation[]
+): Promise<void> {
+  if (!lookup.userProfile) {
+    return;
+  }
+
+  if (deviceFingerprint && lookup.userProfile.deviceInfo && !isWaitingRoomEnabled) {
+    const currentDeviceHash = generateDeviceFingerprintHash(deviceFingerprint);
+    if (lookup.userProfile.deviceInfo.deviceFingerprintHash !== currentDeviceHash) {
+      violations.push(
+        buildSecurityViolation({
+          type: 'wrong_device',
+          details: 'Device fingerprint does not match registered device',
+          clientIP,
+          userAgent,
+          actorType: 'patient',
+          actorId: lookup.userDocId || null,
+        })
+      );
+    }
+  } else if (deviceFingerprint && !lookup.userProfile.deviceInfo && lookup.userDocId) {
+    const deviceHash = generateDeviceFingerprintHash(deviceFingerprint);
+    await new UserRepository(db).update(lookup.userDocId, {
+      'deviceInfo.deviceFingerprintHash': deviceHash,
+      'deviceInfo.userAgent': deviceFingerprint.userAgent,
+      'deviceInfo.platform': deviceFingerprint.platform,
+      'deviceInfo.screenResolution': deviceFingerprint.screenResolution,
+      'deviceInfo.timezone': deviceFingerprint.timezone,
+      'browserInfo.name': detectedBrowser,
+    });
+  }
+
+  if (geolocation && lookup.userProfile.locationInfo) {
+    if (
+      lookup.userProfile.locationInfo.country !== geolocation.country &&
+      lookup.userProfile.locationInfo.countryCode !== geolocation.countryCode
+    ) {
+      violations.push(
+        buildSecurityViolation({
+          type: 'wrong_country',
+          details:
+            `Expected: ${lookup.userProfile.locationInfo.country} ` +
+            `(${lookup.userProfile.locationInfo.countryCode}), Got: ${geolocation.country} (${geolocation.countryCode})`,
+          clientIP,
+          userAgent,
+          actorType: 'patient',
+          actorId: lookup.userDocId || null,
+        })
+      );
+    }
+  }
+
+  if (lookup.userProfile.browserInfo && lookup.userProfile.browserInfo.name !== detectedBrowser) {
+    violations.push(
+      buildSecurityViolation({
+        type: 'wrong_browser',
+        details: `Expected: ${lookup.userProfile.browserInfo.name}, Got: ${detectedBrowser}`,
+        clientIP,
+        userAgent,
+        actorType: 'patient',
+        actorId: lookup.userDocId || null,
+      })
+    );
+  }
+}
+
+/**
+ * Audits an access attempt made from an unfamiliar context. The visit
+ * continues — the signals are carried into the admission decision so the
+ * patient is queued for the doctor rather than turned away.
+ */
+async function recordAccessRisk(
   db: any,
   invitationId: string,
-  _invitation: Invitation,
+  invitation: Invitation,
   accessAttempt: AccessAttempt,
   violations: SecurityViolation[]
-): Promise<ValidateInvitationResult> {
-  accessAttempt.reason = `Violations: ${violations.map((violation) => violation.type).join(', ')}`;
+): Promise<void> {
+  accessAttempt.reason = `Risk signals: ${violations.map((violation) => violation.type).join(', ')}`;
   const accessAttemptData = toAccessAttemptData(accessAttempt);
 
-  const invitationRef = db.collection('invitations').doc(invitationId);
-  const batch = db.batch();
-  batch.update(invitationRef, { 'audit.lastAccessed': new Date() });
-  batch.set(invitationRef.collection('accessAttempts').doc(), accessAttemptData);
-  for (const violation of violations) {
-    batch.set(invitationRef.collection('securityViolations').doc(), violation);
+  try {
+    await db.collection('invitations').doc(invitationId).update({
+      'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
+      'audit.violations': [...(invitation.audit?.violations || []), ...violations],
+      'audit.lastAccessed': new Date(),
+    });
+  } catch (auditError) {
+    // Auditing must not decide whether a patient can reach their appointment.
+    console.error('Failed to record invitation access risk:', auditError);
   }
-  await batch.commit();
-
-  return result(403, {
-    success: false,
-    error: 'Access denied due to security violations',
-    violations,
-  });
 }
 
 async function validateUsageLimits(
@@ -362,6 +478,7 @@ async function findExistingWaitingPatient(
   db: any,
   invitationId: string,
   identity: WaitingPatientIdentity,
+  deviceFingerprint: DeviceFingerprint | undefined,
   clientIP: string,
   userAgent: string
 ): Promise<WaitingPatient | null> {
@@ -415,20 +532,23 @@ async function findExistingWaitingPatient(
     }
 
     const sameNetworkIdentity =
-      (
-        patient.metadata?.networkHash === hashSecuritySignal('ip', clientIP) &&
-        patient.metadata?.userAgentHash === hashSecuritySignal('user-agent', userAgent)
-      ) ||
-      (
-        // Compatibility for entries created before signal hashing shipped.
-        patient.metadata?.ip === clientIP &&
-        patient.metadata?.userAgent === userAgent
-      );
+      patient.metadata?.ip === clientIP &&
+      patient.metadata?.userAgent === userAgent;
     if (!sameNetworkIdentity) {
       return false;
     }
 
-    return true;
+    if (!deviceFingerprint) {
+      return true;
+    }
+
+    const incomingFingerprint = JSON.stringify(deviceFingerprint);
+    const storedFingerprint = patient.metadata?.deviceFingerprint;
+    if (!storedFingerprint || typeof storedFingerprint !== 'string') {
+      return true;
+    }
+
+    return storedFingerprint === incomingFingerprint;
   });
 
   return anonymousCandidate || null;
@@ -440,10 +560,14 @@ async function handleWaitingRoomAccess(params: {
   invitation: Invitation;
   lookup: UserLookupContext;
   explicitUserEmail?: string;
+  authenticatedVisitor?: VisitorIdentity;
+  riskSignals?: string[];
+  accessAttemptData: Record<string, any>;
   participantDisplayName: string;
   waitingRoomName: string;
   clientIP: string;
   userAgent: string;
+  deviceFingerprint?: DeviceFingerprint;
 }): Promise<ValidateInvitationResult> {
   const {
     db,
@@ -451,10 +575,14 @@ async function handleWaitingRoomAccess(params: {
     invitation,
     lookup,
     explicitUserEmail,
+    authenticatedVisitor,
+    riskSignals,
+    accessAttemptData,
     participantDisplayName,
     waitingRoomName,
     clientIP,
     userAgent,
+    deviceFingerprint,
   } = params;
 
   const doctorUserId = invitation.createdBy;
@@ -477,46 +605,33 @@ async function handleWaitingRoomAccess(params: {
     userDocId: lookup.userDocId,
   });
 
-  if (isAutoAdmissionCandidate(invitation, lookup) && identity.patientEmail) {
+  // Skipping the waiting room requires a verified identity, never a typed
+  // address. Everyone else — including anonymous guests — is queued for the
+  // doctor rather than turned away.
+  const admission = decideAdmission({
+    visitor: {
+      ...(authenticatedVisitor || {}),
+      declaredEmail: identity.patientEmail || explicitUserEmail,
+    },
+    allowlist: getInvitationEmailAllowlist(invitation),
+    riskSignals,
+  });
+
+  if (admission.admit === 'directly' && identity.patientEmail) {
     const admissionHistory = await lookupRegisteredAdmissionHistory(
       db,
       tokenPayload.invitationId,
       identity.patientEmail
     );
 
-    if (!admissionHistory.hasLeft) {
-      if (admissionHistory.latestAdmitted) {
-        const admittedToken = signLiveKitRoomToken({
-          subject: `patient_${tokenPayload.invitationId}_${admissionHistory.latestAdmitted.id}`,
-          roomName: tokenPayload.roomName,
-          participantName: participantDisplayName,
-          expiresIn: '2h',
-        });
-
-        return result(200, {
-          success: true,
-          liveKitToken: admittedToken,
-          roomName: tokenPayload.roomName,
-          waitingRoomToken: false,
-          waitingRoomEnabled: false,
-          invitationId: tokenPayload.invitationId,
-          waitingPatientId: admissionHistory.latestAdmitted.id,
-        });
-      }
-
-      const admittedWaitingPatientId = await persistWaitingPatient(db, {
-        invitationId: tokenPayload.invitationId,
-        roomName: tokenPayload.roomName,
-        doctorUserId,
-        identity,
-        status: 'admitted',
-        clientIP,
-        userAgent,
-        admissionMode: 'auto-email-match',
-      });
+    // Rejoin an admission that is still open, so a refresh or a dropped
+    // connection returns to the same encounter instead of starting a second
+    // one. Once that visit has ended its entry is history and is not reused.
+    if (admissionHistory.latestAdmitted && !admissionHistory.hasEndedVisit) {
+      await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
 
       const admittedToken = signLiveKitRoomToken({
-        subject: `patient_${tokenPayload.invitationId}_${admittedWaitingPatientId}`,
+        subject: `patient_${tokenPayload.invitationId}_${admissionHistory.latestAdmitted.id}`,
         roomName: tokenPayload.roomName,
         participantName: participantDisplayName,
         expiresIn: '2h',
@@ -529,15 +644,52 @@ async function handleWaitingRoomAccess(params: {
         waitingRoomToken: false,
         waitingRoomEnabled: false,
         invitationId: tokenPayload.invitationId,
-        waitingPatientId: admittedWaitingPatientId,
+        waitingPatientId: admissionHistory.latestAdmitted.id,
       });
     }
+
+    // Otherwise admit afresh. A visit that already ended must not disqualify
+    // this one: closing the tab is something patients do constantly, and
+    // treating it as permanent would silently revoke the doctor's own
+    // skip-the-queue decision after a single visit.
+    const admittedWaitingPatientId = await persistWaitingPatient(db, {
+      invitationId: tokenPayload.invitationId,
+      roomName: tokenPayload.roomName,
+      doctorUserId,
+      identity,
+      status: 'admitted',
+      clientIP,
+      userAgent,
+      deviceFingerprint,
+      admissionMode: 'auto-email-match',
+      riskSignals,
+    });
+
+    await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
+
+    const admittedToken = signLiveKitRoomToken({
+      subject: `patient_${tokenPayload.invitationId}_${admittedWaitingPatientId}`,
+      roomName: tokenPayload.roomName,
+      participantName: participantDisplayName,
+      expiresIn: '2h',
+    });
+
+    return result(200, {
+      success: true,
+      liveKitToken: admittedToken,
+      roomName: tokenPayload.roomName,
+      waitingRoomToken: false,
+      waitingRoomEnabled: false,
+      invitationId: tokenPayload.invitationId,
+      waitingPatientId: admittedWaitingPatientId,
+    });
   }
 
   const existingWaitingPatient = await findExistingWaitingPatient(
     db,
     tokenPayload.invitationId,
     identity,
+    deviceFingerprint,
     clientIP,
     userAgent
   );
@@ -588,8 +740,12 @@ async function handleWaitingRoomAccess(params: {
     status: 'waiting',
     clientIP,
     userAgent,
+    deviceFingerprint,
     admissionMode: 'doctor-manual',
+    riskSignals,
   });
+
+  await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
 
   return result(200, {
     success: true,
@@ -662,7 +818,14 @@ export async function validateInvitationAndIssueToken(
       return result(403, { success: false, error: 'Invitation has been cancelled or revoked' });
     }
 
-    const accessAttempt = buildAccessAttempt(context.clientIP, context.userAgent);
+    const geolocation = await getGeolocationFromIP(context.clientIP);
+    const detectedBrowser = detectBrowser(context.userAgent);
+    const accessAttempt = buildAccessAttempt(
+      context.clientIP,
+      context.userAgent,
+      geolocation?.country,
+      context.deviceFingerprint
+    );
     const violations: SecurityViolation[] = [];
 
     const userResolution = await resolveUserContext(
@@ -692,8 +855,38 @@ export async function validateInvitationAndIssueToken(
       ? `${tokenPayload.roomName}-waiting`
       : tokenPayload.roomName;
 
+    await collectSecurityViolations(
+      db,
+      userResolution.lookup,
+      context.deviceFingerprint,
+      isWaitingRoomEnabled,
+      geolocation,
+      detectedBrowser,
+      context.clientIP,
+      context.userAgent,
+      violations
+    );
+
+    console.log('Validation debug info:', {
+      invitationId: tokenPayload.invitationId,
+      userEmail: userResolution.lookup.userEmailToCheck || 'none (open invitation)',
+      userRegistered: Boolean(userResolution.lookup.userProfile),
+      consentGiven: userResolution.lookup.userProfile?.consentGiven || false,
+      clientIP: context.clientIP,
+      geolocation: geolocation
+        ? { country: geolocation.country, countryCode: geolocation.countryCode }
+        : null,
+      detectedBrowser,
+      userAgent: context.userAgent,
+    });
+
+    // An unfamiliar device, browser, or country is a reason to have the doctor
+    // confirm the patient, not to refuse them. These used to return 403 "access
+    // denied", which locked out anyone opening their link on a second browser,
+    // in a private window, or on mobile data. The attempt is still audited; it
+    // now steps up to the waiting room instead of ending the visit.
     if (violations.length > 0) {
-      return await denyWithViolations(db, tokenPayload.invitationId, invitation, accessAttempt, violations);
+      await recordAccessRisk(db, tokenPayload.invitationId, invitation, accessAttempt, violations);
     }
 
     const usageError = await validateUsageLimits(
@@ -707,23 +900,11 @@ export async function validateInvitationAndIssueToken(
       return usageError;
     }
 
+    const participantDisplayName = buildParticipantDisplayName(userResolution.lookup);
+
     accessAttempt.success = true;
     accessAttempt.reason = 'Access granted successfully';
     const accessAttemptData = toAccessAttemptData(accessAttempt);
-
-    const invitationUseReserved = await reserveInvitationUse(
-      db,
-      tokenPayload.invitationId,
-      accessAttemptData
-    );
-    if (!invitationUseReserved) {
-      return result(403, {
-        success: false,
-        error: 'This invitation has reached its usage limit.',
-      });
-    }
-
-    const participantDisplayName = buildParticipantDisplayName(userResolution.lookup);
 
     if (isWaitingRoomEnabled) {
       return await handleWaitingRoomAccess({
@@ -732,10 +913,14 @@ export async function validateInvitationAndIssueToken(
         invitation,
         lookup: userResolution.lookup,
         explicitUserEmail: context.userEmail,
+        authenticatedVisitor: context.authenticatedVisitor,
+        riskSignals: violations.map((violation) => violation.type),
+        accessAttemptData,
         participantDisplayName,
         waitingRoomName,
         clientIP: context.clientIP,
         userAgent: context.userAgent,
+        deviceFingerprint: context.deviceFingerprint,
       });
     }
 
@@ -749,7 +934,8 @@ export async function validateInvitationAndIssueToken(
     await db.collection('invitations').doc(tokenPayload.invitationId).update({
       status: 'used',
       usedAt: new Date(),
-      usedBy: hashSecuritySignal('ip', context.clientIP),
+      usedBy: context.clientIP,
+      'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
       'audit.lastAccessed': new Date(),
     });
 
