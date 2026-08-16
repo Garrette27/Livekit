@@ -106,7 +106,7 @@ service cloud.firestore {
     
     // Audit logs - read-only for users, write-only for server
     match /audit-logs/{logId} {
-      allow read: if request.auth != null && 
+      allow read: if request.auth != null &&
         (resource.data.userId == request.auth.uid || 
          request.auth.token.admin == true);
       allow write: if false; // Only server-side writes
@@ -146,12 +146,17 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid;
     }
     
-    // Invitations collection - users can only access their own invitations
+    // Doctors may observe their own invitations. All invitation mutations and
+    // nested security events go through server routes so a client cannot mint,
+    // reactivate, or rewrite an invitation outside the domain policy.
     match /invitations/{invitationId} {
-      allow read, write: if request.auth != null && 
+      allow read: if request.auth != null &&
         resource.data.createdBy == request.auth.uid;
-      allow create: if request.auth != null && 
-        request.resource.data.createdBy == request.auth.uid;
+      allow write: if false;
+
+      match /{securityEventCollection}/{eventId} {
+        allow read, write: if false;
+      }
     }
     
     // Waiting patients collection - doctors can read waiting patients for their invitations

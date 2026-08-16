@@ -18,6 +18,7 @@ export interface ConsultationTranscriptSegmentInput {
   durationMs: number;
   text: string;
   model: string;
+  consentConfirmed: boolean;
 }
 
 export interface ConsultationTranscriptAppendResult {
@@ -106,6 +107,7 @@ export class ConsultationTranscriptRepository {
         source: 'participant_audio_track',
         transcriptionProvider: 'openai',
         transcriptionModel: input.model,
+        consentConfirmed: input.consentConfirmed,
         createdAt: new Date(),
       });
       transaction.set(

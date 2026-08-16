@@ -73,7 +73,8 @@ export interface Invitation {
     security: {
       singleUse: boolean;
       timeLimited: boolean;
-      // Removed: geoRestricted, deviceRestricted - now handled via user profile
+      usagePolicy?: 'single-use' | 'reusable-until-expiry';
+      admissionPolicy?: 'doctor-admit' | 'verified-allowlist-or-doctor-admit';
     };
   };
   audit: {

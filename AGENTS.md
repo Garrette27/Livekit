@@ -117,3 +117,130 @@ Follow these principles derived from "A Philosophy of Software Design" (2nd Edit
 - Avoid duplicate data.
 - Avoid storing data that is completely dependent on other data. Instead, compute it on the fly when you need it.
 - Keep your schema as simple as you can. Optimize for a normalized database first. Only denormalize for speed's sake when you start to run into performance problems.
+
+## Livekit thesis product rules
+
+These rules apply to this repository's secure teleconsultation product and take
+priority over unrelated product examples elsewhere in this file. Read
+`docs/thesis-defense-guide.md`, `docs/invitation-flow-design.md`,
+`docs/invitation-access-model.md`, `docs/access-control.md`, and
+`docs/production-readiness.md` before changing invitation, consultation,
+transcription, summary, or access-control behavior.
+
+### Delivery priority
+
+- First make the existing doctor/patient journey work reliably; then harden it;
+  then improve its interaction design. Do not trade a working call for an
+  optional AI, attachment, scheduling, analytics, or reviewer feature.
+- This is a thesis prototype, not a certified medical device or a HIPAA
+  compliance claim. Preserve honest boundaries in UI, documentation, and logs.
+- RBAC and `faculty_reviewer` remain backend-only preparation. Do not add a
+  professor/faculty route, dashboard, navigation item, or broad clinical-data
+  permission until an explicit feature request defines assignment scope and
+  review UX.
+
+### Invitation security contract
+
+- Treat an invitation link as a scoped bearer capability, never as proof of the
+  patient's identity. Possession proves only access to the signed invitation.
+- Every token-issuing request must validate server-side signature, persisted
+  invitation id, room binding, status/revocation, expiry, ownership, use policy,
+  and applicable capacity. UI state is never the security boundary.
+- Only a non-anonymous Firebase identity with a provider-verified email on the
+  invitation allowlist may skip the waiting room. Typed/self-declared email,
+  token email, device/browser fingerprint, IP address, or geolocation must not
+  grant direct admission. Everyone else receives only a waiting-room-scoped
+  token until the owning doctor admits them.
+- Reserve invitation uses transactionally. For a new waiting visitor, the
+  counter update, access audit, and waiting-row creation belong in one atomic
+  operation. Reconnects reuse an active row instead of consuming a new visit.
+- Store access attempts/violations as bounded subcollection events, not growing
+  arrays. Never log or persist raw invitation tokens, raw IP addresses, raw user
+  agents, device fingerprints, email allowlists, transcripts, or clinical text.
+  Correlation signals use keyed HMAC values and are not authentication factors.
+- Keep invitation URLs as first-party HTTPS routes built by the centralized
+  link helper. Do not introduce Firebase Dynamic Links; that service shut down
+  on 2025-08-25. Do not expose the complete token except where the patient must
+  navigate or the doctor explicitly copies it.
+
+### Goal-Directed UI contract
+
+- Follow the About Face-inspired **Goal-Directed, object-centered invitation
+  workbench** documented in `docs/invitation-flow-design.md`: the doctor's goal
+  is getting the intended patient into the intended consultation safely, not
+  managing token internals.
+- Make each invitation's lifecycle and currently available actions visible.
+  Preview the admission effect before creation. Use progressive disclosure for
+  explanation/evidence and modeless inline/toast feedback for copy, loading,
+  retry, revoke, and error states.
+- A control's label must state its current value or its action unambiguously.
+  Sort uses an explicit selected value (`Newest first`/`Oldest first`), never a
+  toggle whose visible label can be read as the opposite action.
+- Avoid nested page scroll traps. Large archives use an explicit bounded page
+  or `Show more`. Do not make a card with nested buttons itself clickable; give
+  it a named keyboard-accessible action such as `View queue`.
+- Security copy must describe the real policy. Never claim automatic device,
+  browser, or location verification. Never display the legacy `999999` reuse
+  sentinel; say `reusable until expiry`.
+- Preserve responsive LiveKit behavior, device preflight, connection status,
+  accessible status messages, and the user's ability to complete a call when
+  optional AI/transcription is unavailable.
+
+### AI summary and consent contract
+
+- Prefer consented, session-scoped, speaker-attributed transcript segments.
+  Audio is temporary and discarded after transcription; persisted text carries
+  provenance. Each participant explicitly opts in, and the call works with
+  transcription off. Browser speech recognition is a labeled fallback started
+  by the clinician only after confirming verbal patient consent.
+- Summaries must be grounded only in transcript or trusted ready attachment
+  evidence. Preserve evidence-quality gates, strict structured output,
+  deterministic no-show/not-admitted/insufficient-evidence outcomes,
+  transcript-revision guards, and clinician edits.
+- Lifecycle vocabulary is `processing -> ready -> reviewed`, with `failed` and
+  `unavailable` branches. `ready` AI output requires clinician review;
+  `reviewed` content must never be overwritten by regeneration. Failed work
+  enters the bounded durable retry queue; AI failure must not break the call.
+- Never infer low risk, symptoms, diagnoses, recommendations, or follow-up from
+  silence, short duration, poor recognition, connection events, or missing
+  evidence. Empty arrays and `Unknown` risk are valid outcomes.
+
+### Current-data reconnaissance
+
+- Before data-dependent schema, migration, retention, compatibility, or UI-count
+  work, use authorized current production data to run a read-only aggregate and
+  schema-shape audit. Inspect counts, lifecycle distributions, missing-field
+  rates, and bounded redacted samples needed for the decision.
+- Never perform a production write or migration merely to “inspect” data. Never
+  print, copy, or place patient names, emails, transcripts, messages, tokens, or
+  other clinical content in prompts, logs, screenshots, fixtures, or reports.
+  Report only aggregates/redacted shapes. If credentials are unavailable, say
+  so and continue from repository contracts rather than inventing data.
+- Maintain backward-compatible projections for observed legacy shapes. Prefer
+  additive fields and lazy normalization over a destructive deadline-week
+  migration. Any approved migration needs a backup, dry-run counts, idempotency,
+  rollback, and post-run verification.
+
+### Prepared but disabled capabilities
+
+- File attachments and consultation scheduling have server capability names but
+  remain disabled by default and have no UI. Keep
+  `ENABLE_FILE_ATTACHMENTS` and `ENABLE_CONSULTATION_SCHEDULING` server-only and
+  unset in ordinary deployments.
+- Before attachments ship: require session ownership, allowlisted type/size,
+  private object storage, malware/content scanning, download authorization,
+  audit events, deletion/retention, and cross-session denial tests. Summary code
+  consumes only trusted `ready` extraction results.
+- Before scheduling ships: add a separate timezone-safe appointment lifecycle,
+  participant ownership, availability/conflict policy, idempotent reminders,
+  reschedule/cancel commands, and invitation issuance. Do not mix scheduling
+  fields directly into invitation documents. FHIR-inspired vocabulary is not a
+  claim of FHIR compliance.
+
+### Completion gate
+
+- For invitation, LiveKit, transcription, history, summary, or access changes,
+  run typecheck, lint, security/regression tests, and production build. Add or
+  update a focused regression for every fixed bug or preserved invariant.
+- Before pushing, review the staged diff for secrets, patient data, generated
+  artifacts, unrelated local changes, and truthful security/compliance wording.

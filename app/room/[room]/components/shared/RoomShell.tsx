@@ -389,6 +389,7 @@ export default function RoomShell({
   const roomScopeRef = useRef<HTMLDivElement | null>(null);
   const [participantCount, setParticipantCount] = useState(1);
   const [userChoices, setUserChoices] = useState<LocalUserChoices | null>(null);
+  const [transcriptionConsent, setTranscriptionConsent] = useState(false);
   const chatEnabled = chatPolicy.enabled;
   const chatDefaultOpen = chatPolicy.defaultOpen;
   const chatAutoOpenOnIncomingMessage = chatPolicy.autoOpenOnIncomingMessage;
@@ -419,6 +420,33 @@ export default function RoomShell({
           >
             Check your microphone and camera. You can continue audio-only if video is unavailable.
           </p>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.625rem',
+              margin: '0 auto 0.875rem',
+              padding: '0.75rem',
+              maxWidth: '38rem',
+              border: '1px solid #334155',
+              borderRadius: '0.5rem',
+              backgroundColor: '#1e293b',
+              color: '#e2e8f0',
+              fontSize: '0.8125rem',
+              lineHeight: 1.45,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={transcriptionConsent}
+              onChange={(event) => setTranscriptionConsent(event.target.checked)}
+              style={{ marginTop: '0.15rem' }}
+            />
+            <span>
+              Allow my microphone audio to be transcribed for the AI consultation summary.
+              This is optional; the call still works when it is off, and audio is discarded after transcription.
+            </span>
+          </label>
           <PreJoin
             defaults={{
               username: 'Participant',
@@ -463,6 +491,7 @@ export default function RoomShell({
         <SessionTranscriptionBridge
           consultationSessionId={consultationSessionId}
           accessToken={token}
+          consentConfirmed={transcriptionConsent}
         />
         <VideoConference />
       </LiveKitRoom>

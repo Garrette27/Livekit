@@ -11,7 +11,6 @@ interface DoctorControlsPanelProps {
   doctorName: string;
   roomName: string;
   speechLanguage: string;
-  speechStatus: 'idle' | 'listening' | 'error' | 'permission-required';
   onSpeechLanguageChange: (language: string) => void;
   onLeave: () => void;
   showCopyInvitationLinkControl?: boolean;
@@ -33,7 +32,6 @@ export default function DoctorControlsPanel({
   doctorName,
   roomName,
   speechLanguage,
-  speechStatus,
   onSpeechLanguageChange,
   onLeave,
   showCopyInvitationLinkControl = true,
@@ -229,7 +227,9 @@ export default function DoctorControlsPanel({
               ? 'Microphone permission is needed for transcript capture.'
               : speechStatus === 'error'
                 ? 'Transcript capture is unavailable.'
-                : 'Transcript capture starts after you interact with the page.'}
+                : speechStatus === 'unsupported'
+                  ? 'Browser speech notes are not supported here; session audio evidence remains separate.'
+                  : 'Speech notes are off until consent is confirmed and you start them.'}
         </p>
       </div>
 

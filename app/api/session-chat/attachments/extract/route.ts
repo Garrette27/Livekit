@@ -4,6 +4,7 @@ import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
 import { authorizeAdminSecret } from '@/lib/services/shared/admin-secret-auth';
 import { serviceResultToResponse } from '@/lib/services/shared/http';
+import { isConsultationCapabilityEnabled } from '@/lib/consultations/consultation-capabilities';
 
 interface ExtractAttachmentBody {
   consultationSessionId: string;
@@ -19,6 +20,13 @@ interface ExtractAttachmentBody {
  */
 async function handlePOST(req: NextRequest) {
   try {
+    if (!isConsultationCapabilityEnabled('file-attachments')) {
+      return NextResponse.json(
+        { success: false, error: 'File attachments are not enabled' },
+        { status: 404 }
+      );
+    }
+
     const authorization = authorizeAdminSecret(req);
     if (!authorization.ok) {
       return serviceResultToResponse(authorization);

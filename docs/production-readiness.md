@@ -23,7 +23,8 @@ must be server-owned, de-identified where possible, and audit logged.
 | Data class | Current control | Retention decision |
 | --- | --- | --- |
 | AI summaries | Server-owned; doctor-only reads | Daily job; opt in with `RETENTION_ENFORCEMENT_ENABLED=true`; `SUMMARY_RETENTION_DAYS` defaults to 30 |
-| Browser speech notes | Explicit clinician start after recorded verbal-consent confirmation | Include in the approved consultation-record retention period before real patient use |
+| Session transcript evidence | Each participant explicitly opts in before LiveKit joins; audio chunks are discarded after transcription | Include text/provenance in the approved consultation-record retention period before real patient use |
+| Browser speech notes | Explicit clinician start after recorded verbal-consent confirmation; labeled as a fallback | Include in the approved consultation-record retention period before real patient use |
 | Chat and manual notes | Bound to a consultation/session | Define and implement the same approved consultation-record period |
 | Attachments | Owner-only Storage rules; allowlisted type/size; client cannot assert extraction results | Add server-side signature/malware scanning and an approved deletion worker before real patient uploads |
 | Invitation security signals | HMAC-hashed network and user-agent correlations; no client fingerprint or IP-geolocation lookup | Delete with the invitation/security investigation period |
@@ -64,6 +65,7 @@ remains idempotent.
 - Configure long random `RATE_LIMIT_HASH_SECRET` and
   `SECURITY_SIGNAL_HASH_SECRET` values in production.
 - Configure `CRON_SECRET` for the summary retry worker.
+- Keep `ENABLE_FILE_ATTACHMENTS` and `ENABLE_CONSULTATION_SCHEDULING` unset until their documented security gates are complete.
 - Deploy Firestore indexes/TTL, Firestore Rules, and Storage Rules with the
   application release.
 - Keep retention enforcement disabled until the thesis team approves the

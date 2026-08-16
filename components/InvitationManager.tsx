@@ -77,8 +77,14 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
               phone: formData.phoneAllowed,
             },
             security: {
-              singleUse: formData.maxUses === 1,
+              singleUse: formData.waitingRoomEnabled !== true,
               timeLimited: (formData.expiresInHours ?? 24) > 0,
+              usagePolicy: formData.waitingRoomEnabled === true
+                ? 'reusable-until-expiry'
+                : 'single-use',
+              admissionPolicy: normalizedAllowlist.length > 0
+                ? 'verified-allowlist-or-doctor-admit'
+                : 'doctor-admit',
             },
           },
           audit: {

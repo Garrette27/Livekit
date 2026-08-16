@@ -6,6 +6,8 @@ import {
   groupByDateBucket,
   matchesSearch,
   resolveConsultationStatus,
+  sortConsultationRecords,
+  type ConsultationSortOrder,
   type ConsultationStatus,
 } from '@/lib/consultations/history-presentation';
 import { SUMMARY_RETENTION_DAYS } from '@/lib/consultations/retention-policy';
@@ -24,8 +26,8 @@ const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
 interface ConsultationHistoryViewProps {
   records: ConsultationCardRecord[];
   loading: boolean;
-  sortOrder: 'desc' | 'asc';
-  onToggleSortOrder: () => void;
+  sortOrder: ConsultationSortOrder;
+  onSortOrderChange: (order: ConsultationSortOrder) => void;
   generatingSummaryId: string | null;
   onEdit: (record: ConsultationCardRecord) => void;
   onGenerate: (record: ConsultationCardRecord) => void;
@@ -41,7 +43,7 @@ export default function ConsultationHistoryView({
   records,
   loading,
   sortOrder,
-  onToggleSortOrder,
+  onSortOrderChange,
   generatingSummaryId,
   onEdit,
   onGenerate,
@@ -64,16 +66,19 @@ export default function ConsultationHistoryView({
 
   const visibleRecords = useMemo(
     () =>
-      records.filter((record) => {
-        if (!matchesSearch(record, searchQuery)) {
-          return false;
-        }
-        if (statusFilter === 'all') {
-          return true;
-        }
-        return resolveConsultationStatus(record).status === statusFilter;
-      }),
-    [records, searchQuery, statusFilter]
+      sortConsultationRecords(
+        records.filter((record) => {
+          if (!matchesSearch(record, searchQuery)) {
+            return false;
+          }
+          if (statusFilter === 'all') {
+            return true;
+          }
+          return resolveConsultationStatus(record).status === statusFilter;
+        }),
+        sortOrder
+      ),
+    [records, searchQuery, sortOrder, statusFilter]
   );
 
   const groups = useMemo(
@@ -184,20 +189,34 @@ export default function ConsultationHistoryView({
             );
           })}
         </div>
-        <button
-          onClick={onToggleSortOrder}
+        <label
           style={{
-            padding: '0.4375rem 0.75rem',
-            backgroundColor: '#ffffff',
-            border: '1px solid #d1d5db',
-            borderRadius: '0.375rem',
-            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
             fontSize: '0.8125rem',
             color: '#4b5563',
           }}
         >
-          {sortOrder === 'desc' ? 'Newest first' : 'Oldest first'}
-        </button>
+          <span>Sort</span>
+          <select
+            aria-label="Sort consultations"
+            value={sortOrder}
+            onChange={(event) => onSortOrderChange(event.target.value as ConsultationSortOrder)}
+            style={{
+              padding: '0.4375rem 2rem 0.4375rem 0.75rem',
+              backgroundColor: '#ffffff',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.375rem',
+              cursor: 'pointer',
+              fontSize: '0.8125rem',
+              color: '#374151',
+            }}
+          >
+            <option value="desc">Newest first</option>
+            <option value="asc">Oldest first</option>
+          </select>
+        </label>
       </div>
 
       {visibleRecords.length === 0 ? (

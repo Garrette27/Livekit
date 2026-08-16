@@ -13,7 +13,6 @@ interface DoctorSessionPanelProps {
   user: User;
   doctorName: string;
   speechLanguage: string;
-  speechStatus: 'idle' | 'listening' | 'error' | 'permission-required';
   onSpeechLanguageChange: (language: string) => void;
   onLeave: () => void;
   speechStatus: SpeechStatus;
@@ -27,7 +26,6 @@ export default function DoctorSessionPanel({
   user,
   doctorName,
   speechLanguage,
-  speechStatus,
   onSpeechLanguageChange,
   onLeave,
   speechStatus,
@@ -74,7 +72,6 @@ export default function DoctorSessionPanel({
             doctorName={doctorName || user.displayName || user.email || 'Doctor'}
             roomName={roomName}
             speechLanguage={speechLanguage}
-            speechStatus={speechStatus}
             onSpeechLanguageChange={onSpeechLanguageChange}
             onLeave={onLeave}
             showCopyInvitationLinkControl={policy.panels.doctorSession.showCopyInvitationLinkControl}

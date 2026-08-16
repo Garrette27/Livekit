@@ -14,9 +14,13 @@ import { getDoctorHistoryRoute } from '@/lib/routes/doctor-routes';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 import { compactInvitationUrl } from '@/lib/invitations/invitation-link-display';
 import {
+  describeInvitationAudience,
   formatExpiryCountdown,
+  formatInvitationUsage,
   resolveInvitationStatusPresentation,
 } from '@/lib/invitations/invitation-presentation';
+
+const INVITATIONS_PER_PAGE = 12;
 
 export default function DoctorInvitationsPage() {
   const { showToast } = useToast();
@@ -36,6 +40,7 @@ export default function DoctorInvitationsPage() {
   // Defaults to the invitations a doctor can still act on; expired and revoked
   // links are history and would otherwise bury the usable ones.
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
+  const [visibleInvitationLimit, setVisibleInvitationLimit] = useState(INVITATIONS_PER_PAGE);
   const requestedInvitationLinksRef = useRef<Set<string>>(new Set());
   const router = useRouter();
 
@@ -60,6 +65,10 @@ export default function DoctorInvitationsPage() {
 
     return () => window.clearTimeout(timer);
   }, [pendingRevokeId]);
+
+  useEffect(() => {
+    setVisibleInvitationLimit(INVITATIONS_PER_PAGE);
+  }, [statusFilter]);
 
   // Persist room name in localStorage
   useEffect(() => {
@@ -298,13 +307,14 @@ export default function DoctorInvitationsPage() {
     (invitation) => getEffectiveStatus(invitation) === 'active'
   ).length;
 
-  const visibleInvitations = invitations.filter((invitation) => {
+  const filteredInvitations = invitations.filter((invitation) => {
     if (statusFilter === 'all') {
       return true;
     }
     const isActive = getEffectiveStatus(invitation) === 'active';
     return statusFilter === 'active' ? isActive : !isActive;
   });
+  const visibleInvitations = filteredInvitations.slice(0, visibleInvitationLimit);
 
   if (authLoading || !isAuthenticated || !isAuthorized) {
     return (
@@ -408,9 +418,10 @@ export default function DoctorInvitationsPage() {
               How invitations work
             </summary>
             <ul style={{ fontSize: '0.875rem', color: '#1e40af', margin: '0.75rem 0 0', paddingLeft: '1.25rem', lineHeight: '1.75' }}>
-              <li><strong>Patient:</strong> Uses the invitation link to join and register (if first time)</li>
-              <li><strong>Doctor:</strong> Uses the &apos;Join as Doctor&apos; button (no invitation needed)</li>
-              <li><strong>Security:</strong> System automatically verifies patient&apos;s device, location, and browser after registration with consent</li>
+              <li><strong>Configure:</strong> Choose the room, expiry, queue capacity, and optional verified-email allowlist.</li>
+              <li><strong>Share:</strong> Send the first-party secure link through a trusted channel.</li>
+              <li><strong>Admit:</strong> Allowlisted, verified accounts may join directly; every other visitor waits for your decision.</li>
+              <li><strong>Control:</strong> Revoke the link at any time. The system validates expiry, status, room binding, and capacity on the server.</li>
             </ul>
           </details>
           
@@ -519,18 +530,11 @@ export default function DoctorInvitationsPage() {
                 )}
               </div>
             ) : (
-              <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+              <div>
                 {visibleInvitations.map((invitation) => (
                   <div
                     key={invitation.id}
                     id={`invitation-${invitation.id}`}
-                    onClick={(e) => {
-                      // Don't trigger if clicking on buttons
-                      if ((e.target as HTMLElement).tagName === 'BUTTON') return;
-                      setSelectedInvitationId(prev => 
-                        prev === invitation.id ? null : invitation.id
-                      );
-                    }}
                     style={{
                       border: selectedInvitationId === invitation.id 
                         ? '2px solid #2563eb' 
@@ -541,7 +545,6 @@ export default function DoctorInvitationsPage() {
                       backgroundColor: selectedInvitationId === invitation.id 
                         ? '#eff6ff' 
                         : '#F9FAFB',
-                      cursor: 'pointer',
                       transition: 'all 0.2s'
                     }}
                   >
@@ -551,10 +554,13 @@ export default function DoctorInvitationsPage() {
                           Room: {invitation.roomName}
                         </h3>
                         <p style={{ fontSize: '0.875rem', color: '#6B7280' }}>
-                          Patient: {(() => {
+                          Direct join: {(() => {
                             const emails = getInvitationEmails(invitation);
-                            return emails.length > 0 ? emails.join(', ') : 'Open Invitation (No email required)';
+                            return emails.length > 0 ? emails.join(', ') : 'None — doctor admits every visitor';
                           })()}
+                        </p>
+                        <p style={{ fontSize: '0.75rem', color: '#4b5563', marginTop: '0.25rem' }}>
+                          {describeInvitationAudience(getInvitationEmails(invitation).length)}
                         </p>
                         {invitation.waitingRoomEnabled && (
                           <p style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '500', marginTop: '0.25rem' }}>
@@ -590,9 +596,13 @@ export default function DoctorInvitationsPage() {
                       <p style={{ margin: '0 0 0.25rem', fontWeight: 600, color: '#374151' }}>
                         {formatExpiryCountdown(invitation.expiresAt?.toDate?.() || null) || 'Expiry unknown'}
                         {' · '}
-                        {invitation.waitingRoomEnabled
-                          ? `${invitation.currentUses || 0} of ${invitation.maxUses || 'unlimited'} uses`
-                          : `${invitation.usedAt ? 1 : 0} of ${invitation.maxUses || 1} uses`}
+                        {formatInvitationUsage({
+                          currentUses: invitation.currentUses,
+                          maxUses: invitation.maxUses,
+                          waitingRoomEnabled: invitation.waitingRoomEnabled,
+                          usedAt: invitation.usedAt,
+                          usagePolicy: invitation.metadata?.security?.usagePolicy,
+                        })}
                       </p>
                       {invitation.phoneAllowed && (
                         <p style={{ margin: '0 0 0.25rem' }}>Phone: {invitation.phoneAllowed}</p>
@@ -699,6 +709,25 @@ export default function DoctorInvitationsPage() {
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedInvitationId((current) => (
+                          current === invitation.id ? null : invitation.id
+                        ))}
+                        aria-expanded={selectedInvitationId === invitation.id}
+                        style={{
+                          backgroundColor: selectedInvitationId === invitation.id ? '#1d4ed8' : '#ffffff',
+                          color: selectedInvitationId === invitation.id ? '#ffffff' : '#1d4ed8',
+                          padding: '0.5rem 1rem',
+                          borderRadius: '0.375rem',
+                          border: '1px solid #2563eb',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {selectedInvitationId === invitation.id ? 'Hide queue' : 'View queue'}
+                      </button>
                       {(() => {
                         const effectiveStatus = getEffectiveStatus(invitation);
                         if (effectiveStatus === 'active') {
@@ -749,6 +778,24 @@ export default function DoctorInvitationsPage() {
                     </div>
                   </div>
                 ))}
+                {visibleInvitations.length < filteredInvitations.length && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleInvitationLimit((current) => current + INVITATIONS_PER_PAGE)}
+                    style={{
+                      width: '100%',
+                      padding: '0.625rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#ffffff',
+                      color: '#374151',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Show {Math.min(INVITATIONS_PER_PAGE, filteredInvitations.length - visibleInvitations.length)} more
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -871,4 +918,3 @@ export default function DoctorInvitationsPage() {
     </div>
   );
 }
-

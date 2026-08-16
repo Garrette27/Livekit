@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { CreateInvitationRequest } from '@/lib/types';
+import { describeInvitationAudience } from '@/lib/invitations/invitation-presentation';
 
 interface InvitationFormProps {
   roomName: string;
@@ -19,6 +20,10 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
   const [emailAllowlistInput, setEmailAllowlistInput] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const allowlistCount = emailAllowlistInput
+    .split(/[\n,]/)
+    .map((email) => email.trim())
+    .filter(Boolean).length;
 
   useEffect(() => {
     setFormData((previous) => ({
@@ -104,12 +109,13 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
             color: '#374151', 
             marginBottom: '0.5rem' 
           }}>
-            Skip the waiting room for these patients
+            Patients who can join directly (optional)
           </label>
           <textarea
             value={emailAllowlistInput}
             onChange={(event) => setEmailAllowlistInput(event.target.value)}
-            placeholder="erika@gmail.com, garrette@gmail.com"
+            placeholder="patient@example.com"
+            aria-describedby="allowlist-help"
             style={{
               width: '100%',
               padding: '0.75rem',
@@ -121,7 +127,7 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
           />
           {/* States both branches of the rule: a setting whose effect on
               everyone else is invisible is the one doctors misread. */}
-          <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.72rem', color: '#6b7280', lineHeight: 1.5 }}>
+          <p id="allowlist-help" style={{ margin: '0.4rem 0 0 0', fontSize: '0.72rem', color: '#6b7280', lineHeight: 1.5 }}>
             One or more emails, separated by commas or new lines. A patient who opens the link
             with a <strong>registered account matching one of these addresses</strong> joins
             immediately. <strong>Everyone else — including anyone who forwards this link — waits
@@ -169,7 +175,7 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
             color: '#374151', 
             marginBottom: '0.5rem' 
           }}>
-            Waiting Room: Maximum patients
+            Maximum patients waiting at once
           </label>
           <input
             type="number"
@@ -189,8 +195,26 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
           />
         </div>
 
+        <div
+          aria-live="polite"
+          style={{
+            marginBottom: '1rem',
+            padding: '0.875rem',
+            border: '1px solid #bfdbfe',
+            borderRadius: '0.5rem',
+            backgroundColor: '#eff6ff',
+            color: '#1e3a8a',
+            fontSize: '0.8125rem',
+            lineHeight: 1.5,
+          }}
+        >
+          <strong>Access preview:</strong> {describeInvitationAudience(allowlistCount)} The link expires
+          after {formData.expiresInHours || 24} hour{formData.expiresInHours === 1 ? '' : 's'} and
+          supports up to {formData.maxPatients || 10} patients waiting at once.
+        </div>
+
         {error && (
-          <div style={{
+          <div role="alert" style={{
             backgroundColor: '#fef2f2',
             border: '1px solid #fecaca',
             borderRadius: '0.5rem',
@@ -218,7 +242,7 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
             cursor: isCreating ? 'not-allowed' : 'pointer',
           }}
         >
-          {isCreating ? 'Creating...' : 'Create Invitation'}
+          {isCreating ? 'Creating secure link…' : 'Create secure invitation link'}
         </button>
       </form>
     </div>

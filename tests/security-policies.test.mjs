@@ -75,7 +75,7 @@ test('review assignment is exact, active, and time bounded', async () => {
 });
 
 test('concurrent invitation reservations cannot exceed maxUses', async () => {
-  const { reserveInvitationUse } = await importTypeScriptModule(
+  const { recordExistingInvitationAccess, reserveInvitationUse } = await importTypeScriptModule(
     'lib/invitations/invitation-use-reservation.ts'
   );
   const state = { currentUses: 0, maxUses: 2 };
@@ -106,7 +106,9 @@ test('concurrent invitation reservations cannot exceed maxUses', async () => {
             return { exists: true, data: () => ({ ...state }) };
           },
           update(_ref, patch) {
-            state.currentUses = patch.currentUses;
+            if (patch.currentUses !== undefined) {
+              state.currentUses = patch.currentUses;
+            }
           },
           set(_ref, event) {
             auditEvents.push(event);
@@ -127,4 +129,74 @@ test('concurrent invitation reservations cannot exceed maxUses', async () => {
   assert.deepEqual(results, [true, true, false]);
   assert.equal(state.currentUses, 2);
   assert.equal(auditEvents.length, 2);
+
+  state.status = 'active';
+  assert.equal(
+    await recordExistingInvitationAccess(db, 'invite-1', { reconnect: true }),
+    true,
+    'an admitted reconnect does not consume another use'
+  );
+  assert.equal(state.currentUses, 2);
+
+  state.status = 'revoked';
+  assert.equal(
+    await recordExistingInvitationAccess(db, 'invite-1', { reconnect: true }),
+    false,
+    'a revoke racing with reconnect prevents token issuance'
+  );
+});
+
+test('consultation history sort values describe the resulting order', async () => {
+  const retentionSource = await readFile(
+    resolve(process.cwd(), 'lib/consultations/retention-policy.ts'),
+    'utf8'
+  );
+  const retentionOutput = ts.transpileModule(retentionSource, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const retentionUrl = `data:text/javascript;base64,${Buffer.from(retentionOutput).toString('base64')}`;
+
+  const presentationSource = await readFile(
+    resolve(process.cwd(), 'lib/consultations/history-presentation.ts'),
+    'utf8'
+  );
+  const presentationOutput = ts.transpileModule(
+    presentationSource.replace("'./retention-policy'", `'${retentionUrl}'`),
+    {
+      compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    }
+  ).outputText;
+  const presentation = await import(
+    `data:text/javascript;base64,${Buffer.from(presentationOutput).toString('base64')}`
+  );
+
+  const records = [
+    { id: 'middle', startedAt: new Date('2026-08-10T10:00:00Z') },
+    { id: 'newest', startedAt: new Date('2026-08-11T10:00:00Z') },
+    { id: 'undated', startedAt: null },
+    { id: 'oldest', startedAt: new Date('2026-08-09T10:00:00Z') },
+  ];
+
+  assert.deepEqual(
+    presentation.sortConsultationRecords(records, 'desc').map((record) => record.id),
+    ['newest', 'middle', 'oldest', 'undated']
+  );
+  assert.deepEqual(
+    presentation.sortConsultationRecords(records, 'asc').map((record) => record.id),
+    ['oldest', 'middle', 'newest', 'undated']
+  );
+});
+
+test('prepared consultation capabilities default to disabled', async () => {
+  const capabilities = await importTypeScriptModule(
+    'lib/consultations/consultation-capabilities.ts'
+  );
+  assert.equal(capabilities.isConsultationCapabilityEnabled('file-attachments', {}), false);
+  assert.equal(capabilities.isConsultationCapabilityEnabled('scheduling', {}), false);
+  assert.equal(
+    capabilities.isConsultationCapabilityEnabled('file-attachments', {
+      ENABLE_FILE_ATTACHMENTS: 'true',
+    }),
+    true
+  );
 });

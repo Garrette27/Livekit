@@ -4,6 +4,7 @@ import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
 import { authorizeSessionParticipant } from '@/lib/services/shared/session-participant-auth';
 import { serviceResultToResponse } from '@/lib/services/shared/http';
+import { isConsultationCapabilityEnabled } from '@/lib/consultations/consultation-capabilities';
 
 interface CreateAttachmentBody {
   consultationSessionId: string;
@@ -30,6 +31,13 @@ function normalizedFileName(value: string): string {
  */
 async function handlePOST(req: NextRequest) {
   try {
+    if (!isConsultationCapabilityEnabled('file-attachments')) {
+      return NextResponse.json(
+        { success: false, error: 'File attachments are not enabled' },
+        { status: 404 }
+      );
+    }
+
     const body = (await req.json()) as CreateAttachmentBody;
     const {
       consultationSessionId,

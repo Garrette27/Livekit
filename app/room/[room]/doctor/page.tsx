@@ -37,7 +37,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
     clearTokenError,
   } = useDoctorToken({ roomName, doctorName, user });
 
-  const { speechStatus, captureError } = useSpeechCapture({
+  const { speechStatus, captureError, startCapture, stopCapture } = useSpeechCapture({
     roomName,
     token,
     language: speechLanguage,
@@ -61,6 +61,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
   }, [isAuthenticated, user, doctorName, token, isJoining, generateDoctorToken]);
 
   const handleLeave = () => {
+    stopCapture();
     if (user?.uid) {
       void trackDoctorPresenceEvent(
         {
@@ -203,7 +204,10 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
           doctorName={doctorName}
           speechLanguage={speechLanguage}
           speechStatus={speechStatus}
+          speechCaptureError={captureError}
           onSpeechLanguageChange={setSpeechLanguage}
+          onStartSpeechCapture={startCapture}
+          onStopSpeechCapture={stopCapture}
           onLeave={handleLeave}
         />
 

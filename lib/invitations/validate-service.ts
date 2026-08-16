@@ -1,26 +1,28 @@
 import { getFirebaseAdmin } from '../firebase-admin';
 import {
   AccessAttempt,
-  DeviceFingerprint,
   Invitation,
   InvitationToken,
   SecurityViolation,
   ValidateInvitationResponse,
   WaitingPatient,
 } from '../types';
-import { getGeolocationFromIP } from './geolocation-utils';
 import { signLiveKitRoomToken, verifyInvitationToken } from './token-utils';
-import { detectBrowser, generateDeviceFingerprintHash, toDate } from './utils';
+import { toDate } from './utils';
 import { buildWaitingPatientIdentity } from './waiting-patient-identity';
 import { EVENT_DOMAINS, EVENT_SCHEMA_VERSION } from '../events/event-schema';
 import { getInvitationEmailAllowlist, isEmailAllowedByInvitation } from './email-allowlist';
 import { decideAdmission, type VisitorIdentity } from './admission-policy';
 import { finalizeConsultationForRoom } from '../services/consultation-finalization';
 import { UserRepository } from '../repositories/user-repository';
+import { hashSecuritySignal } from '../security/security-signal';
+import {
+  recordExistingInvitationAccess,
+  reserveInvitationUse,
+} from './invitation-use-reservation';
 
 export interface ValidateInvitationContext {
   token: string;
-  deviceFingerprint?: DeviceFingerprint;
   /** Email the visitor typed. Self-asserted, so it never grants admission. */
   userEmail?: string;
   clientIP: string;
@@ -55,9 +57,7 @@ function normalizeEmail(email?: string): string | undefined {
 
 function buildAccessAttempt(
   clientIP: string,
-  userAgent: string,
-  country?: string,
-  deviceFingerprint?: DeviceFingerprint
+  userAgent: string
 ): AccessAttempt {
   const occurredAt = new Date() as any;
   return {
@@ -69,12 +69,13 @@ function buildAccessAttempt(
     actorId: null,
     metadata: {
       source: 'invitation-access-core.validateInvite',
+      signalEncoding: 'hmac-sha256',
     },
     timestamp: occurredAt,
-    ip: clientIP,
-    userAgent,
-    country,
-    deviceFingerprint: deviceFingerprint ? generateDeviceFingerprintHash(deviceFingerprint) : undefined,
+    // Keep the legacy field names for stored-data compatibility, but never
+    // persist the raw network address or browser string.
+    ip: hashSecuritySignal('ip', clientIP),
+    userAgent: hashSecuritySignal('user-agent', userAgent),
     success: false,
     reason: undefined,
   };
@@ -94,8 +95,6 @@ function toAccessAttemptData(accessAttempt: AccessAttempt): Record<string, any> 
     userAgent: accessAttempt.userAgent,
     success: accessAttempt.success,
     reason: accessAttempt.reason,
-    ...(accessAttempt.country && { country: accessAttempt.country }),
-    ...(accessAttempt.deviceFingerprint && { deviceFingerprint: accessAttempt.deviceFingerprint }),
   };
 }
 
@@ -121,8 +120,8 @@ function buildSecurityViolation(input: {
     timestamp,
     type: input.type,
     details: input.details,
-    ip: input.clientIP,
-    userAgent: input.userAgent,
+    ip: hashSecuritySignal('ip', input.clientIP),
+    userAgent: hashSecuritySignal('user-agent', input.userAgent),
   };
 }
 
@@ -199,20 +198,7 @@ async function lookupRegisteredAdmissionHistory(
   return { hasEndedVisit, latestAdmitted };
 }
 
-async function appendInvitationAccessAudit(
-  db: any,
-  invitationId: string,
-  invitation: Invitation,
-  accessAttemptData: Record<string, any>
-): Promise<void> {
-  await db.collection('invitations').doc(invitationId).update({
-    currentUses: (invitation.currentUses || 0) + 1,
-    'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
-    'audit.lastAccessed': new Date(),
-  });
-}
-
-async function persistWaitingPatient(
+async function reserveWaitingPatient(
   db: any,
   input: {
     invitationId: string;
@@ -222,11 +208,11 @@ async function persistWaitingPatient(
     status: WaitingPatient['status'];
     clientIP: string;
     userAgent: string;
-    deviceFingerprint?: DeviceFingerprint;
     admissionMode?: 'doctor-manual' | 'auto-email-match';
     riskSignals?: string[];
+    accessAttemptData: Record<string, any>;
   }
-): Promise<string> {
+): Promise<string | null> {
   const waitingPatientId = createWaitingPatientId(input.invitationId);
   const now = new Date();
 
@@ -241,9 +227,8 @@ async function persistWaitingPatient(
     joinedAt: now,
     status: input.status,
     metadata: {
-      ...(input.deviceFingerprint && { deviceFingerprint: JSON.stringify(input.deviceFingerprint) }),
-      ip: input.clientIP,
-      userAgent: input.userAgent,
+      networkHash: hashSecuritySignal('ip', input.clientIP),
+      userAgentHash: hashSecuritySignal('user-agent', input.userAgent),
       lastAccessed: now,
       ...(input.admissionMode && { admissionMode: input.admissionMode }),
       isAnonymous: input.identity.isAnonymous,
@@ -260,8 +245,18 @@ async function persistWaitingPatient(
     waitingPatient.admittedAt = now;
   }
 
-  await db.collection('waitingPatients').doc(waitingPatientId).set(waitingPatient);
-  return waitingPatientId;
+  const reserved = await reserveInvitationUse(
+    db,
+    input.invitationId,
+    input.accessAttemptData,
+    {
+      waitingPatient: {
+        id: waitingPatientId,
+        data: waitingPatient,
+      },
+    }
+  );
+  return reserved ? waitingPatientId : null;
 }
 
 async function resolveUserContext(
@@ -306,7 +301,7 @@ async function resolveUserContext(
       lookup,
       earlyResult: result(403, {
         success: false,
-        error: 'Consent required. Please provide consent to store device information.',
+        error: 'Consent is required before joining this consultation.',
         requiresRegistration: true,
         registeredEmail: defaultInvitationEmail || lookup.userEmailToCheck,
       }),
@@ -317,7 +312,7 @@ async function resolveUserContext(
     violations.push(
       buildSecurityViolation({
         type: 'wrong_email',
-        details: `Expected one of: ${emailAllowlist.join(', ')}, Got: ${lookup.userEmailToCheck}`,
+        details: 'The presented account is not on this invitation allowlist.',
         clientIP,
         userAgent,
         actorType: 'patient',
@@ -329,81 +324,6 @@ async function resolveUserContext(
   return { lookup };
 }
 
-async function collectSecurityViolations(
-  db: any,
-  lookup: UserLookupContext,
-  deviceFingerprint: DeviceFingerprint | undefined,
-  isWaitingRoomEnabled: boolean,
-  geolocation: any,
-  detectedBrowser: string,
-  clientIP: string,
-  userAgent: string,
-  violations: SecurityViolation[]
-): Promise<void> {
-  if (!lookup.userProfile) {
-    return;
-  }
-
-  if (deviceFingerprint && lookup.userProfile.deviceInfo && !isWaitingRoomEnabled) {
-    const currentDeviceHash = generateDeviceFingerprintHash(deviceFingerprint);
-    if (lookup.userProfile.deviceInfo.deviceFingerprintHash !== currentDeviceHash) {
-      violations.push(
-        buildSecurityViolation({
-          type: 'wrong_device',
-          details: 'Device fingerprint does not match registered device',
-          clientIP,
-          userAgent,
-          actorType: 'patient',
-          actorId: lookup.userDocId || null,
-        })
-      );
-    }
-  } else if (deviceFingerprint && !lookup.userProfile.deviceInfo && lookup.userDocId) {
-    const deviceHash = generateDeviceFingerprintHash(deviceFingerprint);
-    await new UserRepository(db).update(lookup.userDocId, {
-      'deviceInfo.deviceFingerprintHash': deviceHash,
-      'deviceInfo.userAgent': deviceFingerprint.userAgent,
-      'deviceInfo.platform': deviceFingerprint.platform,
-      'deviceInfo.screenResolution': deviceFingerprint.screenResolution,
-      'deviceInfo.timezone': deviceFingerprint.timezone,
-      'browserInfo.name': detectedBrowser,
-    });
-  }
-
-  if (geolocation && lookup.userProfile.locationInfo) {
-    if (
-      lookup.userProfile.locationInfo.country !== geolocation.country &&
-      lookup.userProfile.locationInfo.countryCode !== geolocation.countryCode
-    ) {
-      violations.push(
-        buildSecurityViolation({
-          type: 'wrong_country',
-          details:
-            `Expected: ${lookup.userProfile.locationInfo.country} ` +
-            `(${lookup.userProfile.locationInfo.countryCode}), Got: ${geolocation.country} (${geolocation.countryCode})`,
-          clientIP,
-          userAgent,
-          actorType: 'patient',
-          actorId: lookup.userDocId || null,
-        })
-      );
-    }
-  }
-
-  if (lookup.userProfile.browserInfo && lookup.userProfile.browserInfo.name !== detectedBrowser) {
-    violations.push(
-      buildSecurityViolation({
-        type: 'wrong_browser',
-        details: `Expected: ${lookup.userProfile.browserInfo.name}, Got: ${detectedBrowser}`,
-        clientIP,
-        userAgent,
-        actorType: 'patient',
-        actorId: lookup.userDocId || null,
-      })
-    );
-  }
-}
-
 /**
  * Audits an access attempt made from an unfamiliar context. The visit
  * continues — the signals are carried into the admission decision so the
@@ -412,19 +332,19 @@ async function collectSecurityViolations(
 async function recordAccessRisk(
   db: any,
   invitationId: string,
-  invitation: Invitation,
   accessAttempt: AccessAttempt,
   violations: SecurityViolation[]
 ): Promise<void> {
   accessAttempt.reason = `Risk signals: ${violations.map((violation) => violation.type).join(', ')}`;
-  const accessAttemptData = toAccessAttemptData(accessAttempt);
 
   try {
-    await db.collection('invitations').doc(invitationId).update({
-      'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
-      'audit.violations': [...(invitation.audit?.violations || []), ...violations],
-      'audit.lastAccessed': new Date(),
+    const invitationRef = db.collection('invitations').doc(invitationId);
+    const batch = db.batch();
+    batch.update(invitationRef, { 'audit.lastAccessed': new Date() });
+    violations.forEach((violation) => {
+      batch.set(invitationRef.collection('violations').doc(), violation);
     });
+    await batch.commit();
   } catch (auditError) {
     // Auditing must not decide whether a patient can reach their appointment.
     console.error('Failed to record invitation access risk:', auditError);
@@ -478,7 +398,6 @@ async function findExistingWaitingPatient(
   db: any,
   invitationId: string,
   identity: WaitingPatientIdentity,
-  deviceFingerprint: DeviceFingerprint | undefined,
   clientIP: string,
   userAgent: string
 ): Promise<WaitingPatient | null> {
@@ -515,6 +434,8 @@ async function findExistingWaitingPatient(
 
   const nowMs = Date.now();
   const twoMinutesAgo = nowMs - (2 * 60 * 1000);
+  const networkHash = hashSecuritySignal('ip', clientIP);
+  const userAgentHash = hashSecuritySignal('user-agent', userAgent);
   const anonymousCandidate = waitingPatients.find((patient: WaitingPatient) => {
     const joinedTime = toMillis(patient.joinedAt);
     if (joinedTime <= twoMinutesAgo) {
@@ -531,24 +452,14 @@ async function findExistingWaitingPatient(
       return false;
     }
 
-    const sameNetworkIdentity =
-      patient.metadata?.ip === clientIP &&
-      patient.metadata?.userAgent === userAgent;
-    if (!sameNetworkIdentity) {
-      return false;
-    }
+    const matchesHashedSignals =
+      patient.metadata?.networkHash === networkHash
+      && patient.metadata?.userAgentHash === userAgentHash;
+    const matchesLegacySignals =
+      patient.metadata?.ip === clientIP
+      && patient.metadata?.userAgent === userAgent;
 
-    if (!deviceFingerprint) {
-      return true;
-    }
-
-    const incomingFingerprint = JSON.stringify(deviceFingerprint);
-    const storedFingerprint = patient.metadata?.deviceFingerprint;
-    if (!storedFingerprint || typeof storedFingerprint !== 'string') {
-      return true;
-    }
-
-    return storedFingerprint === incomingFingerprint;
+    return matchesHashedSignals || matchesLegacySignals;
   });
 
   return anonymousCandidate || null;
@@ -567,7 +478,6 @@ async function handleWaitingRoomAccess(params: {
   waitingRoomName: string;
   clientIP: string;
   userAgent: string;
-  deviceFingerprint?: DeviceFingerprint;
 }): Promise<ValidateInvitationResult> {
   const {
     db,
@@ -582,7 +492,6 @@ async function handleWaitingRoomAccess(params: {
     waitingRoomName,
     clientIP,
     userAgent,
-    deviceFingerprint,
   } = params;
 
   const doctorUserId = invitation.createdBy;
@@ -628,7 +537,17 @@ async function handleWaitingRoomAccess(params: {
     // connection returns to the same encounter instead of starting a second
     // one. Once that visit has ended its entry is history and is not reused.
     if (admissionHistory.latestAdmitted && !admissionHistory.hasEndedVisit) {
-      await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
+      const accessRecorded = await recordExistingInvitationAccess(
+        db,
+        tokenPayload.invitationId,
+        accessAttemptData
+      );
+      if (!accessRecorded) {
+        return result(409, {
+          success: false,
+          error: 'This invitation is no longer available. Ask the doctor for a new link.',
+        });
+      }
 
       const admittedToken = signLiveKitRoomToken({
         subject: `patient_${tokenPayload.invitationId}_${admissionHistory.latestAdmitted.id}`,
@@ -652,7 +571,7 @@ async function handleWaitingRoomAccess(params: {
     // this one: closing the tab is something patients do constantly, and
     // treating it as permanent would silently revoke the doctor's own
     // skip-the-queue decision after a single visit.
-    const admittedWaitingPatientId = await persistWaitingPatient(db, {
+    const admittedWaitingPatientId = await reserveWaitingPatient(db, {
       invitationId: tokenPayload.invitationId,
       roomName: tokenPayload.roomName,
       doctorUserId,
@@ -660,12 +579,16 @@ async function handleWaitingRoomAccess(params: {
       status: 'admitted',
       clientIP,
       userAgent,
-      deviceFingerprint,
       admissionMode: 'auto-email-match',
       riskSignals,
+      accessAttemptData,
     });
-
-    await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
+    if (!admittedWaitingPatientId) {
+      return result(409, {
+        success: false,
+        error: 'This invitation is no longer available. Ask the doctor for a new link.',
+      });
+    }
 
     const admittedToken = signLiveKitRoomToken({
       subject: `patient_${tokenPayload.invitationId}_${admittedWaitingPatientId}`,
@@ -689,7 +612,6 @@ async function handleWaitingRoomAccess(params: {
     db,
     tokenPayload.invitationId,
     identity,
-    deviceFingerprint,
     clientIP,
     userAgent
   );
@@ -732,7 +654,7 @@ async function handleWaitingRoomAccess(params: {
     });
   }
 
-  const waitingPatientId = await persistWaitingPatient(db, {
+  const waitingPatientId = await reserveWaitingPatient(db, {
     invitationId: tokenPayload.invitationId,
     roomName: tokenPayload.roomName,
     doctorUserId,
@@ -740,12 +662,16 @@ async function handleWaitingRoomAccess(params: {
     status: 'waiting',
     clientIP,
     userAgent,
-    deviceFingerprint,
     admissionMode: 'doctor-manual',
     riskSignals,
+    accessAttemptData,
   });
-
-  await appendInvitationAccessAudit(db, tokenPayload.invitationId, invitation, accessAttemptData);
+  if (!waitingPatientId) {
+    return result(409, {
+      success: false,
+      error: 'This invitation is no longer available. Ask the doctor for a new link.',
+    });
+  }
 
   return result(200, {
     success: true,
@@ -789,6 +715,10 @@ export async function validateInvitationAndIssueToken(
     }
 
     const invitation = invitationDoc.data() as Invitation;
+    if (!invitation.roomName || invitation.roomName !== tokenPayload.roomName) {
+      return result(401, { success: false, error: 'Invalid invitation room binding' });
+    }
+
     const expiresAtDate = toDate(invitation.expiresAt, new Date());
     const expiredByTime = new Date() > expiresAtDate;
     if ((invitation.status === 'active' || !invitation.status) && expiredByTime) {
@@ -818,14 +748,7 @@ export async function validateInvitationAndIssueToken(
       return result(403, { success: false, error: 'Invitation has been cancelled or revoked' });
     }
 
-    const geolocation = await getGeolocationFromIP(context.clientIP);
-    const detectedBrowser = detectBrowser(context.userAgent);
-    const accessAttempt = buildAccessAttempt(
-      context.clientIP,
-      context.userAgent,
-      geolocation?.country,
-      context.deviceFingerprint
-    );
+    const accessAttempt = buildAccessAttempt(context.clientIP, context.userAgent);
     const violations: SecurityViolation[] = [];
 
     const userResolution = await resolveUserContext(
@@ -855,38 +778,12 @@ export async function validateInvitationAndIssueToken(
       ? `${tokenPayload.roomName}-waiting`
       : tokenPayload.roomName;
 
-    await collectSecurityViolations(
-      db,
-      userResolution.lookup,
-      context.deviceFingerprint,
-      isWaitingRoomEnabled,
-      geolocation,
-      detectedBrowser,
-      context.clientIP,
-      context.userAgent,
-      violations
-    );
-
-    console.log('Validation debug info:', {
-      invitationId: tokenPayload.invitationId,
-      userEmail: userResolution.lookup.userEmailToCheck || 'none (open invitation)',
-      userRegistered: Boolean(userResolution.lookup.userProfile),
-      consentGiven: userResolution.lookup.userProfile?.consentGiven || false,
-      clientIP: context.clientIP,
-      geolocation: geolocation
-        ? { country: geolocation.country, countryCode: geolocation.countryCode }
-        : null,
-      detectedBrowser,
-      userAgent: context.userAgent,
-    });
-
-    // An unfamiliar device, browser, or country is a reason to have the doctor
-    // confirm the patient, not to refuse them. These used to return 403 "access
-    // denied", which locked out anyone opening their link on a second browser,
-    // in a private window, or on mobile data. The attempt is still audited; it
-    // now steps up to the waiting room instead of ending the visit.
+    // A declared or signed-in identity outside the allowlist is evidence for a
+    // manual doctor decision, not grounds to lock a patient out of a booked
+    // visit. Raw IP addresses, browser strings, and device fingerprints are not
+    // collected; only keyed correlation hashes enter the audit trail.
     if (violations.length > 0) {
-      await recordAccessRisk(db, tokenPayload.invitationId, invitation, accessAttempt, violations);
+      await recordAccessRisk(db, tokenPayload.invitationId, accessAttempt, violations);
     }
 
     const usageError = await validateUsageLimits(
@@ -920,7 +817,6 @@ export async function validateInvitationAndIssueToken(
         waitingRoomName,
         clientIP: context.clientIP,
         userAgent: context.userAgent,
-        deviceFingerprint: context.deviceFingerprint,
       });
     }
 
@@ -931,13 +827,21 @@ export async function validateInvitationAndIssueToken(
       expiresIn: '1h',
     });
 
-    await db.collection('invitations').doc(tokenPayload.invitationId).update({
-      status: 'used',
-      usedAt: new Date(),
-      usedBy: context.clientIP,
-      'audit.accessAttempts': [...(invitation.audit?.accessAttempts || []), accessAttemptData],
-      'audit.lastAccessed': new Date(),
-    });
+    const reserved = await reserveInvitationUse(
+      db,
+      tokenPayload.invitationId,
+      accessAttemptData,
+      {
+        markUsed: true,
+        usedByHash: hashSecuritySignal('ip', context.clientIP),
+      }
+    );
+    if (!reserved) {
+      return result(409, {
+        success: false,
+        error: 'This invitation is no longer available. Ask the doctor for a new link.',
+      });
+    }
 
     return result(200, {
       success: true,

@@ -59,3 +59,36 @@ export function formatWaitingRoomOccupancy(
   }
   return `${waitingCount} of ${maxPatients || 10} waiting`;
 }
+
+/**
+ * Human-readable use policy. Legacy waiting-room invitations used 999999 as
+ * an internal compatibility sentinel; that implementation detail must never
+ * be presented as a promise to a doctor.
+ */
+export function formatInvitationUsage(input: {
+  currentUses?: number;
+  maxUses?: number;
+  waitingRoomEnabled?: boolean;
+  usedAt?: unknown;
+  usagePolicy?: string;
+}): string {
+  const currentUses = Math.max(0, Number(input.currentUses || 0));
+  const isReusable =
+    input.usagePolicy === 'reusable-until-expiry'
+    || (input.waitingRoomEnabled === true && Number(input.maxUses || 0) >= 999999);
+
+  if (isReusable) {
+    return `${currentUses} join${currentUses === 1 ? '' : 's'} · reusable until expiry`;
+  }
+
+  const maximum = Math.max(1, Number(input.maxUses || 1));
+  const used = input.usedAt ? Math.max(1, currentUses) : currentUses;
+  return `${used} of ${maximum} use${maximum === 1 ? '' : 's'}`;
+}
+
+/** Admission policy in language the doctor can verify before sharing. */
+export function describeInvitationAudience(emailCount: number): string {
+  return emailCount > 0
+    ? `${emailCount} verified email${emailCount === 1 ? '' : 's'} can join directly; everyone else waits for admission.`
+    : 'Every visitor waits for doctor admission. Forwarding the link does not bypass the queue.';
+}
