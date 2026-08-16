@@ -11,6 +11,7 @@ import { enforceRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import { validateEmail, validateRoomName, sanitizeInput } from '../../../../lib/validation';
 import { signInvitationToken } from '../../../../lib/invitations/token-utils';
 import { buildInviteUrl } from '../../../../lib/invitations/utils';
+import { hashSecuritySignal } from '../../../../lib/security/security-signal';
 import { EVENT_DOMAINS, EVENT_SCHEMA_VERSION } from '../../../../lib/events/event-schema';
 import { 
   CreateInvitationRequest, 
@@ -84,6 +85,7 @@ async function handlePOST(req: NextRequest) {
     const sanitizedEmailAllowlist = Array.from(
       new Set(normalizedEmailCandidates.map((email) => sanitizeInput(email)))
     );
+    const emailHashes = sanitizedEmailAllowlist.map((email) => hashSecuritySignal('email', email));
     const sanitizedEmail = sanitizedEmailAllowlist[0];
     const sanitizedPhone = phoneAllowed ? sanitizeInput(phoneAllowed.trim()) : undefined;
 
@@ -166,8 +168,10 @@ async function handlePOST(req: NextRequest) {
         doctorEmail: doctorEmail || 'system@example.com',
         roomName: sanitizedRoomName,
         constraints: {
-          ...(sanitizedEmail && { email: sanitizedEmail }),
-          ...(sanitizedEmailAllowlist.length > 0 && { emails: sanitizedEmailAllowlist }),
+          ...(emailHashes.length > 0 && {
+            emailHashes,
+            allowlistCount: emailHashes.length,
+          }),
           ...(sanitizedPhone && { phone: sanitizedPhone }),
         },
         security: {
@@ -183,15 +187,8 @@ async function handlePOST(req: NextRequest) {
         eventDomain: EVENT_DOMAINS.INVITATION_AUDIT,
         eventVersion: EVENT_SCHEMA_VERSION,
         created: new Date() as any,
-        accessAttempts: [],
-        violations: [],
       },
     };
-
-    // Add email if provided
-    if (sanitizedEmail) {
-      invitation.emailAllowed = sanitizedEmail;
-    }
 
     // Add phone if provided
     if (sanitizedPhone) {
@@ -212,7 +209,6 @@ async function handlePOST(req: NextRequest) {
     const tokenPayload: InvitationToken = {
       invitationId,
       roomName: sanitizedRoomName,
-      ...(sanitizedEmail && { email: sanitizedEmail }), // Only include email if provided
       exp: Math.floor(expiresAt.getTime() / 1000),
       iat: Math.floor(Date.now() / 1000),
       oneUse: !isWaitingRoomEnabled,

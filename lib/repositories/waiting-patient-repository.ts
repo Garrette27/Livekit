@@ -22,16 +22,6 @@ function isMissingIndexError(error: unknown): boolean {
 export class WaitingPatientRepository {
   constructor(private readonly db: Firestore) {}
 
-  /** All waiting-patient documents (used by admin migrations/backfills). */
-  async listAll(): Promise<QueryDocumentSnapshot[]> {
-    const snapshot = await this.db.collection(COLLECTION).get();
-    return snapshot.docs;
-  }
-
-  async setDoctorUserId(waitingPatientId: string, doctorUserId: string): Promise<void> {
-    await this.db.collection(COLLECTION).doc(waitingPatientId).update({ doctorUserId });
-  }
-
   /** Currently-waiting entries for a patient email (status === 'waiting'). */
   async findWaitingByPatientEmail(patientEmail: string): Promise<QueryDocumentSnapshot[]> {
     try {

@@ -88,8 +88,10 @@ export function resolveIdentityAssurance(visitor: VisitorIdentity): IdentityAssu
  */
 export function decideAdmission(input: {
   visitor: VisitorIdentity;
-  /** Emails the doctor marked as allowed to skip the waiting room. */
-  allowlist: string[];
+  /** Whether the invitation has any configured direct-admission identities. */
+  allowlistConfigured: boolean;
+  /** Server-side result of matching the provider-verified email to the keyed allowlist. */
+  verifiedEmailAllowed: boolean;
   /**
    * Unusual-context signals such as an unrecognised device or a different
    * country. These lower confidence but never deny access on their own — see
@@ -109,9 +111,7 @@ export function decideAdmission(input: {
       reason: `Unrecognised sign-in context (${stepUpSignals.join(', ')}), so the doctor confirms this patient`,
     };
   }
-  const allowlist = input.allowlist.map((email) => normalizeEmail(email)).filter((email): email is string => Boolean(email));
-
-  if (allowlist.length === 0) {
+  if (!input.allowlistConfigured) {
     return {
       admit: 'waiting-room',
       assurance,
@@ -130,8 +130,7 @@ export function decideAdmission(input: {
     };
   }
 
-  const authenticatedEmail = normalizeEmail(input.visitor.authenticatedEmail) as string;
-  if (!allowlist.includes(authenticatedEmail)) {
+  if (!input.verifiedEmailAllowed) {
     return {
       admit: 'waiting-room',
       assurance,

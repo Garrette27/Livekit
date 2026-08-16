@@ -1,9 +1,11 @@
 import { AdmitPatientResponse, WaitingPatient } from '@/lib/types';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
+import { dateValueToDate } from '@/lib/time/date-value';
+import type { WaitingPatientTransport } from '@/lib/waiting-room/waiting-patient-transport';
 
 interface WaitingRoomListResponse {
   success: boolean;
-  waitingPatients?: WaitingPatient[];
+  waitingPatients?: WaitingPatientTransport[];
   error?: string;
 }
 
@@ -20,26 +22,7 @@ interface ListWaitingPatientsArgs {
 }
 
 function toTimestampMillis(value: unknown): number {
-  if (!value) {
-    return 0;
-  }
-
-  if (typeof value === 'object' && value !== null) {
-    const maybeTimestamp = value as { toMillis?: () => number; toDate?: () => Date };
-    if (typeof maybeTimestamp.toMillis === 'function') {
-      return maybeTimestamp.toMillis();
-    }
-    if (typeof maybeTimestamp.toDate === 'function') {
-      return maybeTimestamp.toDate().getTime();
-    }
-  }
-
-  const parsed = new Date(value as string | number | Date);
-  if (Number.isNaN(parsed.getTime())) {
-    return 0;
-  }
-
-  return parsed.getTime();
+  return dateValueToDate(value)?.getTime() ?? 0;
 }
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
@@ -76,7 +59,7 @@ export async function listWaitingPatients({
 
   const waitingPatients = [...(result.waitingPatients || [])].sort((a, b) => {
     return toTimestampMillis(a.joinedAt) - toTimestampMillis(b.joinedAt);
-  });
+  }) as WaitingPatient[];
 
   return {
     ...result,

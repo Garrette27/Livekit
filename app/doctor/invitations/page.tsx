@@ -14,6 +14,7 @@ import { getDoctorHistoryRoute } from '@/lib/routes/doctor-routes';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 import { compactInvitationUrl } from '@/lib/invitations/invitation-link-display';
 import {
+  countDirectAdmissionIdentities,
   describeInvitationAudience,
   formatExpiryCountdown,
   formatInvitationUsage,
@@ -260,17 +261,6 @@ export default function DoctorInvitationsPage() {
         message: 'Failed to revoke invitation.',
       });
     }
-  };
-
-  const getInvitationEmails = (invitation: Invitation): string[] => {
-    const metadataEmails = Array.isArray((invitation as any)?.metadata?.constraints?.emails)
-      ? (invitation as any).metadata.constraints.emails
-      : [];
-    const emails = [invitation.emailAllowed, ...metadataEmails]
-      .map((email) => (typeof email === 'string' ? email.toLowerCase().trim() : ''))
-      .filter((email) => email.length > 0);
-
-    return Array.from(new Set(emails));
   };
 
   // Helper function to check if invitation is expired
@@ -555,12 +545,14 @@ export default function DoctorInvitationsPage() {
                         </h3>
                         <p style={{ fontSize: '0.875rem', color: '#6B7280' }}>
                           Direct join: {(() => {
-                            const emails = getInvitationEmails(invitation);
-                            return emails.length > 0 ? emails.join(', ') : 'None — doctor admits every visitor';
+                            const identityCount = countDirectAdmissionIdentities(invitation);
+                            return identityCount > 0
+                              ? `${identityCount} verified account${identityCount === 1 ? '' : 's'}`
+                              : 'None — doctor admits every visitor';
                           })()}
                         </p>
                         <p style={{ fontSize: '0.75rem', color: '#4b5563', marginTop: '0.25rem' }}>
-                          {describeInvitationAudience(getInvitationEmails(invitation).length)}
+                          {describeInvitationAudience(countDirectAdmissionIdentities(invitation))}
                         </p>
                         {invitation.waitingRoomEnabled && (
                           <p style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '500', marginTop: '0.25rem' }}>
@@ -817,8 +809,10 @@ export default function DoctorInvitationsPage() {
                           </h2>
                           <p style={{ color: '#6B7280', fontSize: '0.875rem' }}>
                             {(() => {
-                              const emails = getInvitationEmails(selectedInv);
-                              return emails.length > 0 ? emails.join(', ') : 'Open Invitation';
+                              const identityCount = countDirectAdmissionIdentities(selectedInv);
+                              return identityCount > 0
+                                ? `${identityCount} verified direct-join account${identityCount === 1 ? '' : 's'}`
+                                : 'Doctor-admitted invitation';
                             })()}
                           </p>
                         </div>

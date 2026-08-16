@@ -68,4 +68,14 @@ export class InvitationRepository {
     const snapshot = await this.db.collection(COLLECTION).where('emailAllowed', '==', email).limit(limit).get();
     return snapshot.docs;
   }
+
+  /** New privacy-preserving equivalent of the legacy plaintext lookup. */
+  async findByEmailAllowedHash(emailHash: string, limit = 200): Promise<QueryDocumentSnapshot[]> {
+    const snapshot = await this.db
+      .collection(COLLECTION)
+      .where('metadata.constraints.emailHashes', 'array-contains', emailHash)
+      .limit(limit)
+      .get();
+    return snapshot.docs;
+  }
 }

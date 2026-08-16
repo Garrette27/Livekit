@@ -11,7 +11,10 @@ import { signLiveKitRoomToken, verifyInvitationToken } from './token-utils';
 import { toDate } from './utils';
 import { buildWaitingPatientIdentity } from './waiting-patient-identity';
 import { EVENT_DOMAINS, EVENT_SCHEMA_VERSION } from '../events/event-schema';
-import { getInvitationEmailAllowlist, isEmailAllowedByInvitation } from './email-allowlist';
+import {
+  hasInvitationEmailAllowlist,
+  isEmailAllowedByInvitation,
+} from './email-allowlist';
 import { decideAdmission, type VisitorIdentity } from './admission-policy';
 import { finalizeConsultationForRoom } from '../services/consultation-finalization';
 import { UserRepository } from '../repositories/user-repository';
@@ -72,10 +75,8 @@ function buildAccessAttempt(
       signalEncoding: 'hmac-sha256',
     },
     timestamp: occurredAt,
-    // Keep the legacy field names for stored-data compatibility, but never
-    // persist the raw network address or browser string.
-    ip: hashSecuritySignal('ip', clientIP),
-    userAgent: hashSecuritySignal('user-agent', userAgent),
+    networkHash: hashSecuritySignal('ip', clientIP),
+    userAgentHash: hashSecuritySignal('user-agent', userAgent),
     success: false,
     reason: undefined,
   };
@@ -91,8 +92,8 @@ function toAccessAttemptData(accessAttempt: AccessAttempt): Record<string, any> 
     actorId: typeof accessAttempt.actorId === 'string' ? accessAttempt.actorId : null,
     metadata: accessAttempt.metadata || {},
     timestamp: accessAttempt.timestamp,
-    ip: accessAttempt.ip,
-    userAgent: accessAttempt.userAgent,
+    networkHash: accessAttempt.networkHash,
+    userAgentHash: accessAttempt.userAgentHash,
     success: accessAttempt.success,
     reason: accessAttempt.reason,
   };
@@ -120,8 +121,8 @@ function buildSecurityViolation(input: {
     timestamp,
     type: input.type,
     details: input.details,
-    ip: hashSecuritySignal('ip', input.clientIP),
-    userAgent: hashSecuritySignal('user-agent', input.userAgent),
+    networkHash: hashSecuritySignal('ip', input.clientIP),
+    userAgentHash: hashSecuritySignal('user-agent', input.userAgent),
   };
 }
 
@@ -264,14 +265,15 @@ async function resolveUserContext(
   invitation: Invitation,
   tokenPayload: InvitationToken,
   userEmail: string | undefined,
+  authenticatedEmail: string | undefined,
   clientIP: string,
   userAgent: string,
   violations: SecurityViolation[]
 ): Promise<{ lookup: UserLookupContext; earlyResult?: ValidateInvitationResult }> {
-  const emailAllowlist = getInvitationEmailAllowlist(invitation);
-  const defaultInvitationEmail = emailAllowlist[0];
   const lookup: UserLookupContext = {
-    userEmailToCheck: normalizeEmail(userEmail || tokenPayload.email || defaultInvitationEmail),
+    // The token claim is read only for links issued before allowlists moved out
+    // of JWTs. It remains self-declared and never grants direct admission.
+    userEmailToCheck: normalizeEmail(authenticatedEmail || userEmail || tokenPayload.email),
   };
 
   if (!lookup.userEmailToCheck) {
@@ -288,7 +290,7 @@ async function resolveUserContext(
         success: false,
         error: 'User not registered. Please register first.',
         requiresRegistration: true,
-        registeredEmail: defaultInvitationEmail || lookup.userEmailToCheck,
+        registeredEmail: lookup.userEmailToCheck,
       }),
     };
   }
@@ -303,12 +305,15 @@ async function resolveUserContext(
         success: false,
         error: 'Consent is required before joining this consultation.',
         requiresRegistration: true,
-        registeredEmail: defaultInvitationEmail || lookup.userEmailToCheck,
+        registeredEmail: lookup.userEmailToCheck,
       }),
     };
   }
 
-  if (emailAllowlist.length > 0 && !isEmailAllowedByInvitation(invitation, lookup.userEmailToCheck)) {
+  if (
+    hasInvitationEmailAllowlist(invitation)
+    && !isEmailAllowedByInvitation(invitation, lookup.userEmailToCheck)
+  ) {
     violations.push(
       buildSecurityViolation({
         type: 'wrong_email',
@@ -342,7 +347,9 @@ async function recordAccessRisk(
     const batch = db.batch();
     batch.update(invitationRef, { 'audit.lastAccessed': new Date() });
     violations.forEach((violation) => {
-      batch.set(invitationRef.collection('violations').doc(), violation);
+      // One latest event per violation category gives the clinician useful
+      // context while keeping this subcollection strictly bounded.
+      batch.set(invitationRef.collection('violations').doc(violation.type), violation);
     });
     await batch.commit();
   } catch (auditError) {
@@ -510,7 +517,7 @@ async function handleWaitingRoomAccess(params: {
   const identity = buildWaitingPatientIdentity({
     explicitUserEmail,
     profileEmail: lookup.userProfile?.email,
-    invitationEmail: lookup.userEmailToCheck || getInvitationEmailAllowlist(invitation)[0],
+    invitationEmail: lookup.userEmailToCheck,
     userDocId: lookup.userDocId,
   });
 
@@ -522,7 +529,11 @@ async function handleWaitingRoomAccess(params: {
       ...(authenticatedVisitor || {}),
       declaredEmail: identity.patientEmail || explicitUserEmail,
     },
-    allowlist: getInvitationEmailAllowlist(invitation),
+    allowlistConfigured: hasInvitationEmailAllowlist(invitation),
+    verifiedEmailAllowed: isEmailAllowedByInvitation(
+      invitation,
+      authenticatedVisitor?.authenticatedEmail || undefined
+    ),
     riskSignals,
   });
 
@@ -756,6 +767,7 @@ export async function validateInvitationAndIssueToken(
       invitation,
       tokenPayload,
       context.userEmail,
+      context.authenticatedVisitor?.authenticatedEmail || undefined,
       context.clientIP,
       context.userAgent,
       violations

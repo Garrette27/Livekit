@@ -45,17 +45,30 @@ assert.equal(existsSync(resolve(root, 'lib/device-utils.ts')), false);
 
 const attachmentSource = read('app/api/session-chat/attachments/route.ts');
 assert.doesNotMatch(attachmentSource, /body\.(storagePath|downloadUrl|extractedText|extractionStatus)/);
-assert.match(attachmentSource, /extractedText:\s*null/);
+assert.doesNotMatch(attachmentSource, /extractedText:\s*null|downloadUrl:\s*null/);
+const sessionMessageSource = read('app/api/session-chat/messages/route.ts');
+assert.match(sessionMessageSource, /Attachment metadata must be resolved by the server/);
+assert.match(sessionMessageSource, /resolveMessageReferences/);
+const attachmentRepositorySource = read('lib/repositories/attachment-repository.ts');
+assert.match(attachmentRepositorySource, /collection\('evidence'\)\.doc\('extraction'\)/);
+assert.match(attachmentRepositorySource, /attachment\.uploadStatus !== 'ready'/);
 
 const auditSource = read('functions/activity-log-pipeline.js');
 assert.doesNotMatch(auditSource, /\n\s+(before|after):\s*(beforeSnapshot|afterSnapshot)/);
 
 const storageRules = read('storage.rules');
-assert.match(storageRules, /request\.auth\.uid == doctorUserId/);
 assert.match(storageRules, /allow read, write: if false/);
+assert.doesNotMatch(storageRules, /match \/notes\//);
+
+assert.equal(existsSync(resolve(root, 'app/api/admin/clear-cache/route.ts')), false);
+assert.equal(existsSync(resolve(root, 'app/api/migrate/fix-waiting-patients/route.ts')), false);
+assert.equal(existsSync(resolve(root, 'app/room/[room]/doctor/components/NotesPanel.tsx')), false);
+assert.equal(existsSync(resolve(root, 'scripts/clear-firestore-cache.js')), false);
 
 const firestoreRules = read('firestore.rules');
 assert.match(firestoreRules, /match \/reviewAssignments\/\{assignmentId\}/);
+assert.match(firestoreRules, /match \/consultationSessions\/\{sessionId\}\/attachments\/\{attachmentId\}[\s\S]*allow read, write: if false;/);
+assert.match(firestoreRules, /match \/appointments\/\{appointmentId\}[\s\S]*allow read, write: if false;/);
 assert.match(firestoreRules, /match \/securityRateLimits\/\{counterId\}/);
 assert.match(firestoreRules, /match \/summaryJobs\/\{jobId\}/);
 

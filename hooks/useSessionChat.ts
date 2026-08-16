@@ -121,8 +121,11 @@ export function useSessionChat({
             Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
-            ...input,
             consultationSessionId,
+            text: input.text,
+            ...(input.attachments && input.attachments.length > 0
+              ? { attachmentIds: input.attachments.map((attachment) => attachment.id) }
+              : {}),
           }),
         });
         const result = (await response.json()) as SendSessionChatResponse;

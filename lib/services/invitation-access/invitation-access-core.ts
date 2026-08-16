@@ -173,6 +173,7 @@ function filterByStatus(
 function mapWaitingDocToModel(input: { id: string; data: Record<string, unknown> }): WaitingPatient {
   return {
     id: input.id,
+    doctorUserId: typeof input.data.doctorUserId === 'string' ? input.data.doctorUserId : undefined,
     patientId: String(input.data.patientId || ''),
     patientName: (input.data.patientName as string | undefined) || undefined,
     patientEmail: (input.data.patientEmail as string | undefined) || undefined,
@@ -197,7 +198,7 @@ function assertDoctorScope(waitingPatient: WaitingPatient, doctorUserId?: string
     || (waitingPatient.metadata as { doctorUserId?: string } | undefined)?.doctorUserId
     || null;
 
-  if (ownerDoctorUserId && ownerDoctorUserId !== doctorUserId) {
+  if (ownerDoctorUserId !== doctorUserId) {
     throw new InvitationAccessError(403, 'forbidden', 'Doctor is not authorized to manage this waiting entry');
   }
 }
@@ -499,6 +500,22 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
     });
   }
 
+  /**
+   * Applies the row-level freshness checks after the owning invitation set has
+   * already been validated. This avoids re-reading every invitation document
+   * on the high-frequency doctor queue path.
+   */
+  private filterRecentEntries(waitingPatients: WaitingPatient[], nowMs = Date.now()): WaitingPatient[] {
+    return waitingPatients.filter((waitingPatient) => {
+      if (!hasValidJoinTimestamp(waitingPatient)) {
+        return false;
+      }
+
+      const activityMs = toEntryActivityMillis(waitingPatient);
+      return activityMs > 0 && nowMs - activityMs <= MAX_ACTIVE_ENTRY_AGE_MS;
+    });
+  }
+
   async validateInvite(input: ValidateInviteContext): Promise<ValidateInviteResult> {
     return validateInvitationAndIssueToken(input);
   }
@@ -573,7 +590,7 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
           ? roomScoped.filter((waitingPatient) => activeInvitationIds.has(waitingPatient.invitationId))
           : roomScoped;
       const statusScoped = filterByStatus(invitationScoped, statuses);
-      const activeScoped = activeOnly ? await this.filterActiveEntries(statusScoped) : statusScoped;
+      const activeScoped = activeOnly ? this.filterRecentEntries(statusScoped) : statusScoped;
 
       return sortWaitingByJoinedAt(activeScoped);
     }

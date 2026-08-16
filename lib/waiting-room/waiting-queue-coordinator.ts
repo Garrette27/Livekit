@@ -18,6 +18,19 @@ import type { WaitingPatient } from '@/lib/types';
 
 type Unsubscribe = () => void;
 
+interface StreamSubscriber {
+  onPatients: (waitingPatients: WaitingPatient[]) => void;
+  onUnavailable: (reason: unknown) => void;
+}
+
+interface StreamGroup {
+  subscribers: Set<StreamSubscriber>;
+  unsubscribe: Unsubscribe;
+  latestPatients: WaitingPatient[] | null;
+}
+
+const streamGroupsByDoctor = new Map<string, StreamGroup>();
+
 /**
  * Streams the doctor's waiting patients from Firestore instead of asking the
  * server on a timer. Firestore pushes changes, so a patient appears in the
@@ -39,34 +52,70 @@ export function subscribeToDoctorWaitingPatients(input: {
     return null;
   }
 
-  try {
-    const waitingQuery = query(
-      collection(db, 'waitingPatients'),
-      where('doctorUserId', '==', input.doctorUserId)
-    );
+  const subscriber: StreamSubscriber = {
+    onPatients: input.onPatients,
+    onUnavailable: input.onUnavailable,
+  };
 
-    return onSnapshot(
-      waitingQuery,
-      (snapshot) => {
-        input.onPatients(
-          snapshot.docs.map((waitingDoc) => ({
+  try {
+    let group = streamGroupsByDoctor.get(input.doctorUserId);
+    if (!group) {
+      const subscribers = new Set<StreamSubscriber>();
+      const waitingQuery = query(
+        collection(db, 'waitingPatients'),
+        where('doctorUserId', '==', input.doctorUserId)
+      );
+      const createdGroup: StreamGroup = {
+        subscribers,
+        latestPatients: null,
+        unsubscribe: () => undefined,
+      };
+      createdGroup.unsubscribe = onSnapshot(
+        waitingQuery,
+        (snapshot) => {
+          const patients = snapshot.docs.map((waitingDoc) => ({
             id: waitingDoc.id,
             ...(waitingDoc.data() as Omit<WaitingPatient, 'id'>),
-          }))
-        );
-      },
-      (streamError) => {
-        input.onUnavailable(streamError);
+          }));
+          createdGroup.latestPatients = patients;
+          createdGroup.subscribers.forEach((currentSubscriber) => {
+            currentSubscriber.onPatients(patients);
+          });
+        },
+        (streamError) => {
+          createdGroup.subscribers.forEach((currentSubscriber) => {
+            currentSubscriber.onUnavailable(streamError);
+          });
+          streamGroupsByDoctor.delete(input.doctorUserId);
+        }
+      );
+      group = createdGroup;
+      streamGroupsByDoctor.set(input.doctorUserId, group);
+    }
+
+    group.subscribers.add(subscriber);
+    if (group.latestPatients) {
+      subscriber.onPatients(group.latestPatients);
+    }
+
+    const joinedGroup = group;
+    return () => {
+      joinedGroup.subscribers.delete(subscriber);
+      if (joinedGroup.subscribers.size === 0) {
+        joinedGroup.unsubscribe();
+        if (streamGroupsByDoctor.get(input.doctorUserId) === joinedGroup) {
+          streamGroupsByDoctor.delete(input.doctorUserId);
+        }
       }
-    );
+    };
   } catch (subscribeError) {
     input.onUnavailable(subscribeError);
     return null;
   }
 }
 
-/** In-flight request per scope, so simultaneous callers share one round trip. */
-const inFlightByScope = new Map<string, Promise<void>>();
+/** In-flight request per server query, so simultaneous callers share one round trip. */
+const inFlightByRequest = new Map<string, Promise<unknown>>();
 
 interface PollGroup {
   intervalId: number;
@@ -80,17 +129,17 @@ const pollGroupsByScope = new Map<string, PollGroup>();
  * Resolves when that request settles, so callers can await their own refresh
  * without issuing a duplicate.
  */
-export function fetchWaitingQueueOnce(scopeKey: string, fetcher: () => Promise<void>): Promise<void> {
-  const existing = inFlightByScope.get(scopeKey);
+export function fetchWaitingQueueOnce<T>(requestKey: string, fetcher: () => Promise<T>): Promise<T> {
+  const existing = inFlightByRequest.get(requestKey) as Promise<T> | undefined;
   if (existing) {
     return existing;
   }
 
   const request = fetcher().finally(() => {
-    inFlightByScope.delete(scopeKey);
+    inFlightByRequest.delete(requestKey);
   });
 
-  inFlightByScope.set(scopeKey, request);
+  inFlightByRequest.set(requestKey, request);
   return request;
 }
 

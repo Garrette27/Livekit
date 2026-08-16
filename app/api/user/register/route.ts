@@ -25,25 +25,11 @@ function expirationDate(value: unknown): Date | null {
   return null;
 }
 
-function allowedInvitationEmails(invitation: Record<string, unknown>): string[] {
-  const metadata = (invitation.metadata as Record<string, unknown> | undefined) || {};
-  const constraints = (metadata.constraints as Record<string, unknown> | undefined) || {};
-  const candidates = [
-    invitation.emailAllowed,
-    constraints.email,
-    ...(Array.isArray(constraints.emails) ? constraints.emails : []),
-  ];
-  return Array.from(new Set(
-    candidates
-      .filter((value): value is string => typeof value === 'string')
-      .map((value) => value.trim().toLowerCase())
-      .filter(Boolean)
-  ));
-}
-
 /**
  * Registers an invited patient only after validating the signed invitation and
- * its persisted state. Existing non-patient profiles are never rewritten.
+ * its persisted state. Registration establishes an account; it does not grant
+ * direct admission. The validation service independently sends identities not
+ * on the verified allowlist to the doctor-controlled waiting room.
  */
 async function handlePOST(req: NextRequest) {
   const rateLimitResponse = await enforceRateLimit(req, RateLimitConfigs.TOKEN_GENERATION);
@@ -98,16 +84,6 @@ async function handlePOST(req: NextRequest) {
     }
 
     const sanitizedEmail = sanitizeInput(email.trim().toLowerCase());
-    const allowlist = allowedInvitationEmails(invitation);
-    if (
-      (tokenPayload.email && tokenPayload.email.trim().toLowerCase() !== sanitizedEmail)
-      || (allowlist.length > 0 && !allowlist.includes(sanitizedEmail))
-    ) {
-      return NextResponse.json(
-        { success: false, error: 'Email does not match this invitation' },
-        { status: 403 }
-      );
-    }
 
     const clientIp = (
       req.headers.get('x-forwarded-for')?.split(',')[0]

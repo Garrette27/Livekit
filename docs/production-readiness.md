@@ -26,8 +26,8 @@ must be server-owned, de-identified where possible, and audit logged.
 | Session transcript evidence | Each participant explicitly opts in before LiveKit joins; audio chunks are discarded after transcription | Include text/provenance in the approved consultation-record retention period before real patient use |
 | Browser speech notes | Explicit clinician start after recorded verbal-consent confirmation; labeled as a fallback | Include in the approved consultation-record retention period before real patient use |
 | Chat and manual notes | Bound to a consultation/session | Define and implement the same approved consultation-record period |
-| Attachments | Owner-only Storage rules; allowlisted type/size; client cannot assert extraction results | Add server-side signature/malware scanning and an approved deletion worker before real patient uploads |
-| Invitation security signals | HMAC-hashed network and user-agent correlations; no client fingerprint or IP-geolocation lookup | Delete with the invitation/security investigation period |
+| Attachments | Capability is disabled; all Firebase Storage client paths are denied; metadata/evidence routes are server-owned and chat resolves only session-owned ids | Add session-scoped upload/download authorization, signature/malware scanning, quarantine, and an approved deletion worker before enabling uploads |
+| Invitation security signals | HMAC-hashed allowlist emails plus network/user-agent correlations; no client fingerprint or IP-geolocation lookup | Delete with the invitation/security investigation period |
 | Waiting-room rows | Server-written and doctor-scoped | Define a short operational retention period |
 | Audit events | Metadata-only; no document before/after snapshots | Define a compliance period separately from clinical content |
 | Platform logs and backups | Provider-managed | Configure provider retention and document restoration/deletion limits |
@@ -64,8 +64,24 @@ remains idempotent.
   legacy webhook HMAC secret). Webhooks fail closed if verification is absent.
 - Configure long random `RATE_LIMIT_HASH_SECRET` and
   `SECURITY_SIGNAL_HASH_SECRET` values in production.
+  For backwards-compatible availability, request-signal hashing derives a
+  domain-separated correlation subkey from the already-required
+  `LIVEKIT_API_SECRET` when its dedicated secret is absent. Treat that as a
+  deployment bridge, not the target configuration: a dedicated key supports
+  independent rotation and keeps LiveKit signing-key rotation from changing
+  correlation values.
+- Set `SECURITY_SIGNAL_HASH_SECRET` before issuing hash-only allowlisted links.
+  Changing that key makes existing hash-only allowlist matches fail safely into
+  the waiting room, so rotate it only with an explicit active-link plan.
+- Treat a secret shown in a screenshot, chat, terminal transcript, or public
+  log as compromised. Rotate the affected Firebase service-account key,
+  LiveKit secrets, webhook secret, OpenAI key, and any derived application
+  secrets before using real patient data.
 - Configure `CRON_SECRET` for the summary retry worker.
 - Keep `ENABLE_FILE_ATTACHMENTS` and `ENABLE_CONSULTATION_SCHEDULING` unset until their documented security gates are complete.
+- Do not restore the removed client-side `NotesPanel` uploader or create a public Storage namespace. The future attachment UI must use the session-scoped server flow in `docs/implementation-file-attachments.md`.
+- Keep new attachment and appointment documents on the normalized boundaries
+  in `docs/data-model-readiness.md`; neither feature is room-name-owned.
 - Deploy Firestore indexes/TTL, Firestore Rules, and Storage Rules with the
   application release.
 - Keep retention enforcement disabled until the thesis team approves the

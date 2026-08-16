@@ -5,6 +5,7 @@ import { FirestoreInvitationAccessCore, toInvitationAccessError } from '@/lib/se
 import type { WaitingPatient } from '@/lib/types';
 import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
 import { serviceResultToResponse } from '@/lib/services/shared/http';
+import { toWaitingPatientTransport } from '@/lib/waiting-room/waiting-patient-transport';
 
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -62,7 +63,7 @@ async function handleGET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      waitingPatients,
+      waitingPatients: waitingPatients.map(toWaitingPatientTransport),
       count: waitingPatients.length,
     }, { headers: NO_STORE_HEADERS });
   } catch (error) {
