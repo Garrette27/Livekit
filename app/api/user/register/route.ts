@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirebaseAdmin } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
+import { getFirebaseAdmin, getFirebaseAdminAuth } from '@/lib/firebase-admin';
 import { verifyInvitationToken } from '@/lib/invitations/token-utils';
 import { InvitationRepository } from '@/lib/repositories/invitation-repository';
 import { UserRepository } from '@/lib/repositories/user-repository';
@@ -11,6 +12,26 @@ import type {
   RegisterUserResponse,
 } from '@/lib/types';
 import { sanitizeInput, validateEmail } from '@/lib/validation';
+
+/**
+ * The caller's account id when they are signed in, or null when they are not.
+ * Registration is deliberately open to visitors without an account, so an
+ * absent or unusable token is a normal outcome rather than a failure.
+ */
+async function resolveVerifiedUserId(req: NextRequest): Promise<string | null> {
+  const authHeader = req.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null;
+  }
+
+  try {
+    const decoded = await getFirebaseAdminAuth()?.verifyIdToken(authHeader.slice(7));
+    return decoded?.uid || null;
+  } catch (error) {
+    console.warn('Ignoring unverifiable token during patient registration:', error);
+    return null;
+  }
+}
 
 function expirationDate(value: unknown): Date | null {
   if (value instanceof Date) {
@@ -107,25 +128,41 @@ async function handlePOST(req: NextRequest) {
 
     const users = new UserRepository(db);
     const existingUser = await users.findByEmail(sanitizedEmail);
-    let userId: string;
-    if (existingUser) {
-      if (existingUser.data()?.role !== 'patient') {
-        return NextResponse.json(
-          { success: false, error: 'This email belongs to a non-patient account' },
-          { status: 409 }
-        );
-      }
-      userId = existingUser.id;
-      await users.update(userId, profileFields);
-    } else {
-      userId = await users.create({
+    if (existingUser && existingUser.data()?.role !== 'patient') {
+      return NextResponse.json(
+        { success: false, error: 'This email belongs to a non-patient account' },
+        { status: 409 }
+      );
+    }
+
+    // A profile belongs to an account, so it is written under the caller's
+    // verified uid. Registration is open to visitors who have not signed in
+    // yet, and for them there is no account to attach a profile to — writing
+    // one anyway is what produced profiles under generated ids that no sign-in
+    // could ever match, and a second profile once the patient did sign in.
+    // Their consent is recorded against the invitation instead, and the sign-in
+    // path creates the profile under the right key.
+    const verifiedUserId = await resolveVerifiedUserId(req);
+    const profileUserId = verifiedUserId || (existingUser ? existingUser.id : null);
+
+    if (profileUserId) {
+      await users.upsertById(profileUserId, {
         ...profileFields,
         role: 'patient',
-        registeredAt: new Date(),
+        ...(existingUser ? {} : { registeredAt: new Date() }),
+      });
+    } else {
+      await new InvitationRepository(db).mergeFields(tokenPayload.invitationId, {
+        audit: {
+          consents: FieldValue.arrayUnion({
+            emailHash: hashSecuritySignal('email', sanitizedEmail),
+            consentGivenAt: new Date().toISOString(),
+          }),
+        },
       });
     }
 
-    const response: RegisterUserResponse = { success: true, userId };
+    const response: RegisterUserResponse = { success: true, userId: profileUserId || undefined };
     return NextResponse.json(response);
   } catch (error) {
     console.error('Error registering invited patient:', error);

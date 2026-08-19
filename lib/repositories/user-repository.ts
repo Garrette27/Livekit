@@ -69,8 +69,17 @@ export class UserRepository {
   }
 
   /** Creates a user document with an auto-generated id; returns the new id. */
-  async create(data: Record<string, unknown>): Promise<string> {
-    const ref = await this.db.collection(COLLECTION).add(data);
-    return ref.id;
+  /**
+   * Writes the profile for a known account id.
+   *
+   * A profile is always keyed by its Firebase Auth uid — that is the identity
+   * the rest of the system joins on, from `authorizeBearerRequest` through to
+   * `firestore.rules`. There is deliberately no way to create one under a
+   * generated id: a profile whose key matches no account can never be read
+   * back for the person it describes, and registering again simply produces a
+   * second profile beside it.
+   */
+  async upsertById(userId: string, data: Record<string, unknown>): Promise<void> {
+    await this.db.collection(COLLECTION).doc(userId).set(data, { merge: true });
   }
 }

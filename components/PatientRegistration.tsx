@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { auth } from '@/lib/firebase';
 import { RegisterUserRequest, RegisterUserResponse } from '@/lib/types';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
 
@@ -43,10 +44,15 @@ export default function PatientRegistration({
         consentGiven: true,
       };
 
+      // Sent when the visitor already has an account, so their profile is
+      // written under that account rather than beside it.
+      const idToken = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
+
       const response = await fetch('/api/user/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
         },
         body: JSON.stringify(request),
       });
