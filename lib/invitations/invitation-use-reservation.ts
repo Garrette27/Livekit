@@ -42,7 +42,20 @@ export async function reserveInvitationUse(
   options: {
     markUsed?: boolean;
     usedByHash?: string;
-    waitingPatient?: { id: string; data: Record<string, unknown> };
+    /**
+     * The patient's queue entry, keyed by invitation and patient so a return
+     * visit updates the entry they already have. `onCreate` holds the facts
+     * that belong to their first arrival and must survive later visits;
+     * `onEachVisit` is refreshed every time. Each arrival is also appended to
+     * the entry's `visits` subcollection, which is where the history lives now
+     * that the entry itself is a single current-state record.
+     */
+    waitingPatient?: {
+      id: string;
+      onCreate: Record<string, unknown>;
+      onEachVisit: Record<string, unknown>;
+      visit?: Record<string, unknown>;
+    };
   } = {}
 ): Promise<boolean> {
   const invitationRef = db.collection('invitations').doc(invitationId);
@@ -56,6 +69,10 @@ export async function reserveInvitationUse(
     if (!latestDocument.exists) {
       return false;
     }
+
+    // Read before any write, as Firestore transactions require, so an entry's
+    // first-arrival fields are applied only when it is genuinely new.
+    const existingWaitingPatient = waitingPatientRef ? await transaction.get(waitingPatientRef) : null;
 
     const latest = latestDocument.data() as Invitation;
     if (
@@ -86,7 +103,22 @@ export async function reserveInvitationUse(
     overflowEvents.forEach((eventDocument) => transaction.delete(eventDocument.ref));
     transaction.set(auditRef, accessAttemptData);
     if (waitingPatientRef && options.waitingPatient) {
-      transaction.set(waitingPatientRef, options.waitingPatient.data);
+      const isFirstArrival = !existingWaitingPatient?.exists;
+      transaction.set(
+        waitingPatientRef,
+        {
+          ...(isFirstArrival ? options.waitingPatient.onCreate : {}),
+          ...options.waitingPatient.onEachVisit,
+        },
+        { merge: true }
+      );
+
+      if (options.waitingPatient.visit) {
+        transaction.set(
+          waitingPatientRef.collection('visits').doc(),
+          options.waitingPatient.visit
+        );
+      }
     }
     return true;
   });

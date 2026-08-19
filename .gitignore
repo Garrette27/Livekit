@@ -26,6 +26,11 @@
 .DS_Store
 *.pem
 
+# Data pulled from Firestore for migrations or reconciliation. This repository
+# is public and these files carry patient identifiers; keep them off the
+# machine's repo entirely, not merely out of a commit.
+*-backup-*.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*

@@ -167,6 +167,33 @@ The rule is: production-data inspection for engineering must be read-only,
 aggregate, redacted, and purpose-limited. Never paste clinical records into a
 prompt or log.
 
+### Duplicate identities found on 2026-08-18
+
+A second aggregate pass looked specifically for records describing the same
+thing more than once, and found two:
+
+| Collection | Observation |
+| --- | --- |
+| `users` | 4 email addresses held two profiles each; 5 profiles had no Firebase Auth account |
+| `waitingPatients` | 18 redundant rows across 8 patient/invitation pairs; the worst pair held 8 rows |
+
+Both had one cause: a key that was invented at write time instead of derived
+from what already identified the record. Profiles were created with a
+generated document id while every read path used the Firebase Auth uid, and a
+queue entry was created per arrival rather than per patient per invitation.
+
+This is the answer to give if a panel asks what the audit was *for*. Counting
+documents is not the point; the point is that an orphaned profile still
+answered `findByEmail`, so an invitation could resolve a patient to a stale uid
+and role. A duplicate identity is an access-control problem before it is a
+tidiness problem.
+
+Reconciliation kept history rather than discarding it: 23 references were
+repointed onto the surviving profile before its duplicate was removed, and one
+orphan was deliberately kept because a record still pointed at it and no live
+profile existed to merge into. See
+[identity-and-record-integrity.md](./identity-and-record-integrity.md).
+
 ## Demonstration plan
 
 1. Sign in as the doctor and create an invitation with a short expiry and no
@@ -207,6 +234,30 @@ step for identity uncertainty.
 The successful use is reserved in a Firestore transaction that re-reads current
 status, expiry, and use count. For a new waiting visitor, reservation, audit
 event, and waiting-row creation are one atomic operation.
+
+### “How do you know two records describe the same patient?”
+
+By deriving the key rather than inventing one. A profile is keyed by the
+Firebase Auth uid because the identity provider owns identity; a queue entry is
+keyed by the invitation and the patient because that pair is what it describes.
+The project got this wrong twice and the audit found it: profiles written under
+a generated document id could never be matched by any sign-in, and a queue
+entry created per arrival accumulated eight rows for one patient.
+
+The security consequence matters more than the duplication. An orphaned profile
+still answered a lookup by email, so an invitation could resolve a patient to a
+stale account id and role — an authorization decision taken from a record that
+belonged to nobody.
+
+### “Why not just delete the duplicates?”
+
+Because a duplicate that something still points at is not yet a duplicate. Of
+five orphaned profiles, only two were safe to delete outright. Two were merged
+by repointing 23 consultation and queue references onto the surviving profile,
+so clinical history stayed attached to the patient. One was kept: no live
+profile existed to merge into, and deleting it would have left a record
+pointing at an identity that exists nowhere. Every step was dry-run first and
+backed up.
 
 ### “How do you stop hallucinated summaries?”
 
@@ -263,5 +314,6 @@ mixed into invitation documents or exposed in UI yet.
 - [Invitation research and threat model](./invitation-flow-design.md)
 - [Invitation identity and admission model](./invitation-access-model.md)
 - [Access control and faculty-review preparation](./access-control.md)
+- [Identity and record integrity](./identity-and-record-integrity.md)
 - [Production-readiness boundaries](./production-readiness.md)
 - [Consultation module architecture](./consultation-modular-architecture.md)

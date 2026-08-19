@@ -25,9 +25,11 @@ reconnaissance required by `AGENTS.md`.
 
 | Concern | Current authority | Role |
 | --- | --- | --- |
+| Patient and clinician identity | `users/{firebaseAuthUid}` | Profile, role, and consent, keyed by the identity provider's account id |
 | Invitation lifecycle | `invitations/{invitationId}` | Bearer capability metadata, owner, expiry, use policy, and counters |
 | Invitation evidence | `invitations/{invitationId}/accessAttempts` and `/violations` | Server-only, privacy-preserving security events |
-| Queue projection | `waitingPatients/{waitingPatientId}` | Operational patient state scoped by `doctorUserId` and invitation |
+| Queue entry | `waitingPatients/{invitationId + patientHash}` | One current-state row per patient per invitation |
+| Queue arrivals | `waitingPatients/{id}/visits` | Immutable record of each arrival, admission mode, and risk signals |
 | Encounter lifecycle | `consultationSessions/{consultationSessionId}` | Stable session identity for events, transcript provenance, and summaries |
 | Legacy room projection | `consultations/{roomName}` and historical call records | Compatibility reads; do not use room name as the identity of a new feature |
 | Summary work | `call-summaries` and `summaryJobs` | Doctor-visible output plus a server-only retry queue |
@@ -54,6 +56,45 @@ attachments, appointments, or clinical evidence.
 7. The completed waiting-patient backfill is no longer exposed as a deployed
    write-enabled API. Future migrations must be versioned, dry-run first,
    resumable, auditable, and removed from request traffic after verification.
+8. Patient profiles are keyed by the Firebase Auth uid. The invitation
+   registration route previously wrote them with a generated document id, so
+   an invited patient held a profile no sign-in could match and gained a
+   second one when they did sign in. `UserRepository` no longer offers a way
+   to create a profile under a generated id.
+9. A queue entry is keyed by invitation and patient, so a reload or a return
+   visit updates the entry the patient already holds. Each arrival is appended
+   to a `visits` subcollection instead of creating another top-level row.
+
+## Measured duplication and the reconciliation performed
+
+Direct aggregate reconnaissance was available for this pass, using the
+project's own service account. Counts on 2026-08-18 before the corrections:
+
+| Collection | Observation |
+| --- | --- |
+| `users` | 23 profiles; 4 email addresses held two profiles each; 5 profiles had no Firebase Auth account |
+| `waitingPatients` | 143 rows; 18 redundant rows across 8 patient/invitation pairs; worst single pair held 8 rows |
+| `invitations` | 198 documents; largest in-document audit array held 11 entries |
+
+Both defects had the same shape: a record that should have had one identity
+was written under a fresh key each time, so the duplicate could never be
+recognised as the same thing.
+
+Reconciliation was performed once, with a dry run first and a JSON backup of
+every document touched:
+
+- Two orphaned profiles that nothing referenced were deleted.
+- Two orphaned profiles were merged into the live profile for the same
+  address; 23 references across `consultationSessions`, `consultations`, and
+  `waitingPatients` were repointed before the orphan was removed, so
+  consultation history stayed attached to the patient.
+- One orphan was deliberately kept. It has no live profile to merge into, and
+  a record still points at it; deleting it would leave that record pointing at
+  an identity that exists nowhere. It is listed under legacy gaps.
+
+Historical `waitingPatients` rows created before the key change are left in
+place. They remain readable and correctly scoped; only new arrivals collapse
+onto the natural key.
 
 ## Significant legacy gaps
 

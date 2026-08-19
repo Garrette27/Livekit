@@ -38,7 +38,14 @@ function resolveSecuritySignalKey(): string | Buffer {
  * can compare abuse/reuse events without persisting the original network or
  * browser value. The raw signal never leaves this module.
  */
-export function hashSecuritySignal(label: 'ip' | 'user-agent' | 'email', value: string): string {
+/**
+ * The kind of signal being hashed. It is mixed into the digest so the same
+ * value under two kinds never collides — an email and an account id that
+ * happen to match still produce different correlation values.
+ */
+export type SecuritySignalKind = 'ip' | 'user-agent' | 'email' | 'account' | 'device';
+
+export function hashSecuritySignal(label: SecuritySignalKind, value: string): string {
   return createHmac('sha256', resolveSecuritySignalKey())
     .update(`${label}:${value}`)
     .digest('hex');

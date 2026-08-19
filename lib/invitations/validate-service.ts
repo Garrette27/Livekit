@@ -18,7 +18,9 @@ import {
 import { decideAdmission, type VisitorIdentity } from './admission-policy';
 import { finalizeConsultationForRoom } from '../services/consultation-finalization';
 import { UserRepository } from '../repositories/user-repository';
+import { FieldValue } from 'firebase-admin/firestore';
 import { hashSecuritySignal } from '../security/security-signal';
+import { resolveWaitingPatientId } from './waiting-patient-key';
 import {
   recordExistingInvitationAccess,
   reserveInvitationUse,
@@ -148,10 +150,6 @@ function buildParticipantDisplayName(lookup: UserLookupContext): string {
   );
 }
 
-function createWaitingPatientId(invitationId: string): string {
-  return `waiting_${invitationId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
 /**
  * Prior waiting-room entries for this patient on this invitation.
  *
@@ -214,22 +212,40 @@ async function reserveWaitingPatient(
     accessAttemptData: Record<string, any>;
   }
 ): Promise<string | null> {
-  const waitingPatientId = createWaitingPatientId(input.invitationId);
   const now = new Date();
+  const networkHash = hashSecuritySignal('ip', input.clientIP);
+  const userAgentHash = hashSecuritySignal('user-agent', input.userAgent);
 
-  const waitingPatient: any = {
+  // Keyed by invitation and patient, so returning to the same invitation
+  // updates the entry the patient already has rather than adding another.
+  const waitingPatientId = resolveWaitingPatientId({
+    invitationId: input.invitationId,
+    patientEmail: input.identity.patientEmail,
+    patientId: input.identity.patientId,
+    networkHash,
+    userAgentHash,
+  });
+
+  // Facts about the patient's first arrival. Keeping joinedAt stable is what
+  // makes "waiting for 11 minutes" mean the wait, not the last page load.
+  const onCreate: Record<string, unknown> = {
     id: waitingPatientId,
+    invitationId: input.invitationId,
+    joinedAt: now,
+  };
+
+  const onEachVisit: Record<string, unknown> = {
     patientId: input.identity.patientId,
     patientName: input.identity.patientName,
     ...(input.identity.patientEmail && { patientEmail: input.identity.patientEmail }),
     roomName: input.roomName,
-    invitationId: input.invitationId,
     doctorUserId: input.doctorUserId,
-    joinedAt: now,
     status: input.status,
+    lastSeenAt: now,
+    visitCount: FieldValue.increment(1),
     metadata: {
-      networkHash: hashSecuritySignal('ip', input.clientIP),
-      userAgentHash: hashSecuritySignal('user-agent', input.userAgent),
+      networkHash,
+      userAgentHash,
       lastAccessed: now,
       ...(input.admissionMode && { admissionMode: input.admissionMode }),
       isAnonymous: input.identity.isAnonymous,
@@ -243,7 +259,7 @@ async function reserveWaitingPatient(
   };
 
   if (input.status === 'admitted') {
-    waitingPatient.admittedAt = now;
+    onEachVisit.admittedAt = now;
   }
 
   const reserved = await reserveInvitationUse(
@@ -253,7 +269,19 @@ async function reserveWaitingPatient(
     {
       waitingPatient: {
         id: waitingPatientId,
-        data: waitingPatient,
+        onCreate,
+        onEachVisit,
+        // Each arrival is kept as its own immutable record, so the entry can be
+        // a single current state without losing the history it used to encode
+        // by existing many times over.
+        visit: {
+          arrivedAt: now,
+          status: input.status,
+          networkHash,
+          userAgentHash,
+          ...(input.admissionMode && { admissionMode: input.admissionMode }),
+          ...(input.riskSignals && input.riskSignals.length > 0 ? { riskSignals: input.riskSignals } : {}),
+        },
       },
     }
   );
