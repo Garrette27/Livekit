@@ -596,9 +596,6 @@ export default function DoctorInvitationsPage() {
                           usagePolicy: invitation.metadata?.security?.usagePolicy,
                         })}
                       </p>
-                      {invitation.phoneAllowed && (
-                        <p style={{ margin: '0 0 0.25rem' }}>Phone: {invitation.phoneAllowed}</p>
-                      )}
 
                       {/* Invitation Link Section */}
                       {getEffectiveStatus(invitation) === 'active' && (

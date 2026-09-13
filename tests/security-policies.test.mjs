@@ -347,3 +347,90 @@ test('security-signal hashing keeps production invitation validation available',
     }
   }
 });
+
+/** Like importTypeScriptModule, with the named relative imports resolved to other transpiled modules. */
+async function importTypeScriptModuleWithDependencies(relativePath, dependencies) {
+  const transpileToUrl = (source) =>
+    `data:text/javascript;base64,${Buffer.from(
+      ts.transpileModule(source, {
+        compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+      }).outputText
+    ).toString('base64')}`;
+
+  let source = await readFile(resolve(process.cwd(), relativePath), 'utf8');
+  for (const [specifier, dependencyPath] of Object.entries(dependencies)) {
+    const dependencySource = await readFile(resolve(process.cwd(), dependencyPath), 'utf8');
+    source = source.replace(`'${specifier}'`, `'${transpileToUrl(dependencySource)}'`);
+  }
+  return import(transpileToUrl(source));
+}
+
+test('Google and password accounts with a confirmed email are the same evidence', async () => {
+  const policy = await importTypeScriptModule('lib/invitations/admission-policy.ts');
+  const admitFromClaims = (claims) =>
+    policy.decideAdmission({
+      visitor: policy.visitorIdentityFromClaims(claims),
+      allowlistConfigured: true,
+      verifiedEmailAllowed: true,
+    }).admit;
+
+  assert.equal(
+    admitFromClaims({
+      uid: 'google-patient',
+      email: 'patient@example.com',
+      email_verified: true,
+      firebase: { sign_in_provider: 'google.com' },
+    }),
+    'directly'
+  );
+  assert.equal(
+    admitFromClaims({
+      uid: 'password-patient',
+      email: 'patient@example.com',
+      email_verified: true,
+      firebase: { sign_in_provider: 'password' },
+    }),
+    'directly'
+  );
+  assert.equal(
+    admitFromClaims({
+      uid: 'password-patient',
+      email: 'patient@example.com',
+      email_verified: false,
+      firebase: { sign_in_provider: 'password' },
+    }),
+    'waiting-room',
+    'a password account waits until its verification link is opened'
+  );
+  assert.equal(
+    admitFromClaims({ uid: 'guest', firebase: { sign_in_provider: 'anonymous' } }),
+    'waiting-room'
+  );
+});
+
+test('consent is a versioned record, and the old registration flag is not it', async () => {
+  const consent = await importTypeScriptModuleWithDependencies('lib/consent/telehealth-consent.ts', {
+    '../consultations/retention-policy': 'lib/consultations/retention-policy.ts',
+  });
+
+  const recorded = consent.telehealthConsentRecord(new Date('2026-09-13T00:00:00Z'));
+  assert.equal(consent.hasTelehealthConsent(recorded), true);
+  assert.equal(
+    consent.hasTelehealthConsent({ consentGiven: true }),
+    false,
+    'the old registration form agreed to hashing, not to the consultation'
+  );
+  assert.equal(
+    consent.hasTelehealthConsent({
+      consentGiven: false,
+      consentVersion: consent.TELEHEALTH_CONSENT.version,
+    }),
+    false
+  );
+  assert.equal(consent.hasTelehealthConsent(undefined), false);
+  assert.doesNotMatch(
+    JSON.stringify(consent.TELEHEALTH_CONSENT),
+    /phone|device|browser|network/i,
+    'the statement asks for nothing the consultation does not use'
+  );
+});

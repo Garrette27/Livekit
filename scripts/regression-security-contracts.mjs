@@ -28,15 +28,22 @@ assert.doesNotMatch(invitationSource, /metadata:\s*\{[\s\S]{0,300}\bip:\s*input\
 assert.doesNotMatch(invitationSource, /deviceFingerprint|geolocation|ip-api\.com/);
 
 const patientInvitationSource = read('app/invite/[token]/page.tsx');
-const patientRegistrationSource = read('components/PatientRegistration.tsx');
-const patientRegistrationRouteSource = read('app/api/user/register/route.ts');
+const consentStepSource = read('components/TelehealthConsentStep.tsx');
+const consentRouteSource = read('app/api/patient/consent/route.ts');
 assert.doesNotMatch(patientInvitationSource, /screenResolution|deviceFingerprint/);
-assert.doesNotMatch(patientRegistrationSource, /screenResolution|deviceFingerprint/);
+// The account is the registration: consent asks for nothing the consultation
+// does not use, and stores nothing about the device it was given from.
+assert.doesNotMatch(consentStepSource, /type="tel"|type="email"|screenResolution|deviceFingerprint/);
 assert.doesNotMatch(
-  patientRegistrationRouteSource,
-  /deviceInfo|browserInfo|screenResolution|deviceFingerprint/
+  consentRouteSource,
+  /\.phone|phone:|securityInfo|deviceInfo|browserInfo|hashSecuritySignal|findByEmail/
 );
-assert.match(patientRegistrationRouteSource, /hashSecuritySignal/);
+assert.match(consentRouteSource, /verifyVisitorIdentity/);
+assert.match(consentRouteSource, /TELEHEALTH_CONSENT\.version/);
+// Regression: a second validation request that forgot the ID token sent an
+// allowlisted, verified patient to the waiting room. There is one path now.
+assert.equal(patientInvitationSource.match(/\/api\/invite\/validate/g)?.length, 1);
+assert.match(patientInvitationSource, /Authorization: `Bearer \$\{visitorIdToken\}`/);
 
 assert.doesNotMatch(read('middleware.ts'), /ip-api\.com/);
 assert.doesNotMatch(read('vercel.json'), /ip-api\.com/);

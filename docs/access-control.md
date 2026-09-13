@@ -46,8 +46,10 @@ verified Firebase tokens plus the server-side user profile.
   revoke another doctor's room or invitation.
 - Waiting-room actions ignore caller-supplied doctor IDs and use the verified
   doctor identity.
-- Patient registration requires the signed invitation and validates its
-  persisted status, expiry, room, and email allowlist.
+- There is no separate patient registration: a signed-in patient is identified
+  by the uid in their verified token. The only patient-side profile write is
+  `/api/patient/consent`, which requires that token, accepts only the current
+  consent-statement version, and refuses non-patient accounts.
 - Persisted chat and attachment requests require the signed LiveKit room token
   and match its room to the consultation session.
 - AI summary generation and edits require ownership of the completed

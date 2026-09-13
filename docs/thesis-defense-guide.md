@@ -73,6 +73,14 @@ If identity is strong enough, the patient may receive a consultation token. If
 not, the patient gets only a waiting-room token. A self-declared email never
 grants direct entry.
 
+A signed-in patient is identified by their account — a Google account, or an
+email-and-password account whose address they have confirmed. The server reads
+the profile for the uid in the verified token and never searches by email. The
+first time, the patient sees one short consent statement and ticks one box.
+There is no registration form and no phone number: the account already is the
+registration. A guest who is queued can sign in from the waiting room and is
+returned to the same link.
+
 ### 3. Doctor admits the patient
 
 The admit route verifies the doctor's Firebase token, permission, invitation
@@ -194,6 +202,22 @@ orphan was deliberately kept because a record still pointed at it and no live
 profile existed to merge into. See
 [identity-and-record-integrity.md](./identity-and-record-integrity.md).
 
+### An allowlisted patient queued (2026-09-13)
+
+A patient on an invitation's allowlist signed in with Google, was shown a
+registration form, completed it, and still waited. The read-only evidence: the
+invitation's access log recorded one successful access with no allowlist
+violation, and the patient already had seven earlier direct admissions, so the
+allowlist entry was correct. The identity was lost in the page's second
+validation request, sent after the form without the ID token, which the server
+rightly treated as a guest's.
+
+The lesson worth giving a panel is structural. The fault was not in the
+security policy but in a second code path that bypassed its only input. The fix
+removed the path — there is now one validation request — and removed the form,
+which asked for data the account already held or that nothing used. See
+[invitation-access-model.md](./invitation-access-model.md#incident-an-allowlisted-patient-was-queued-2026-09-13).
+
 ## Demonstration plan
 
 1. Sign in as the doctor and create an invitation with a short expiry and no
@@ -203,13 +227,18 @@ profile existed to merge into. See
 3. Open it as a guest. Show that a valid link still leads to the waiting room.
 4. Admit the guest as the doctor. Explain the server-issued change from a
    waiting-room token to a consultation-room token.
-5. At PreJoin, leave transcription off and explain that care/video is not
+5. Create a second invitation that allowlists a synthetic patient account and
+   open it signed in as that patient. The consent statement appears once, then
+   the patient joins directly. Repeat with a password account before and after
+   opening its verification link: the provider's verification, not the sign-in
+   method, is what changes the outcome.
+6. At PreJoin, leave transcription off and explain that care/video is not
    blocked by AI consent. Then opt in with synthetic demo dialogue if desired.
-6. Complete the call and open consultation history. Show search, filters,
+7. Complete the call and open consultation history. Show search, filters,
    explicit sort, evidence disclosures, and the AI-draft/review state.
-7. Edit and save the draft. Show that it becomes clinician reviewed and cannot
+8. Edit and save the draft. Show that it becomes clinician reviewed and cannot
    be overwritten by a later AI retry.
-8. Revoke a second invitation and show that its signed link is refused because
+9. Revoke a third invitation and show that its signed link is refused because
    persisted state is authoritative.
 
 Use synthetic identities and scripted non-clinical dialogue in the defense.
@@ -258,6 +287,23 @@ so clinical history stayed attached to the patient. One was kept: no live
 profile existed to merge into, and deleting it would have left a record
 pointing at an identity that exists nowhere. Every step was dry-run first and
 backed up.
+
+### “Why is there no registration form?”
+
+Because the account already is one. Whether the patient uses Google or an email
+and password, the identity provider has established who they are; asking them
+to type their address again only creates a second, unverified copy of it. What
+remains is consent, which is asked at the point of care, once per account, and
+recorded with the version of the statement that was shown. Nothing is collected
+that the consultation does not use — the optional phone number the old form
+stored was never read.
+
+### “Does it matter whether the patient signs in with Google?”
+
+No, and that is designed in. Admission reads only the verified token's email,
+whether the provider verified it, and whether the session is anonymous. Google
+verifies the address at sign-in; a password account is verified when its link is
+opened. After that the two are the same evidence, and a test asserts it.
 
 ### “How do you stop hallucinated summaries?”
 

@@ -231,11 +231,6 @@ export default function InvitationResult({ invitation, inviteUrl, onCopyLink }: 
           <strong>Type:</strong> <span style={{ color: '#059669', fontWeight: '600' }}>Doctor-admitted link</span>
         </p>
       )}
-      {invitation.phoneAllowed && (
-        <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-          <strong>Phone:</strong> {invitation.phoneAllowed}
-        </p>
-      )}
     </div>
   );
 }

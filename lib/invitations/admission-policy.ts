@@ -80,6 +80,29 @@ export function resolveIdentityAssurance(visitor: VisitorIdentity): IdentityAssu
 }
 
 /**
+ * The visitor as a verified Firebase ID token describes them.
+ *
+ * Deliberately indifferent to how they signed in. A Google account and an
+ * email-and-password account with a confirmed address are the same evidence:
+ * the identity provider attests that this person controls this email. Only the
+ * moment it becomes true differs — Google confirms the address at sign-in, a
+ * password account once its verification link is opened.
+ */
+export function visitorIdentityFromClaims(claims: {
+  uid: string;
+  email?: string;
+  email_verified?: boolean;
+  firebase?: { sign_in_provider?: string };
+}): VisitorIdentity {
+  return {
+    userId: claims.uid,
+    authenticatedEmail: claims.email || null,
+    emailVerified: claims.email_verified === true,
+    isAnonymousAccount: claims.firebase?.sign_in_provider === 'anonymous',
+  };
+}
+
+/**
  * Decides whether this visitor joins the consultation directly or waits.
  *
  * Fails closed: anything short of a verified allowlisted identity goes to the

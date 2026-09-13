@@ -36,11 +36,13 @@ invitation could resolve a patient to a stale uid and role — an identity
 decision made from a record that belongs to nobody.
 
 **Now:** `UserRepository` exposes `upsertById` and offers no way to create a
-profile under a generated id. The registration route writes under the verified
-uid when the visitor is signed in, updates the existing profile when they are
-not, and records consent against the invitation rather than inventing a profile
-for someone who has no account yet. The sign-in path already creates the
-profile under the right key.
+profile under a generated id. The registration route itself was removed in
+0.2.0. A profile is written only under a verified uid: by the sign-in screens,
+and by `/api/patient/consent`, which records a signed-in patient's agreement to
+the telehealth statement. Invitation validation reads `users/{uid}` for the uid
+in the visitor's verified token and never resolves a person by email, so a
+stale profile cannot answer for anyone. See
+[invitation-access-model.md](./invitation-access-model.md#consent-at-the-point-of-care-not-registration).
 
 ## Defect 2: a queue entry per visit
 
@@ -92,9 +94,20 @@ The third case is the one worth defending in a viva: deleting that profile
 would have satisfied the request and left a record pointing at an identity that
 exists nowhere. Removing a duplicate is safe only once nothing depends on it.
 
+## Data the removed form left behind
+
+The registration form stored an optional phone number on 2 patient profiles and
+network/browser hashes (`securityInfo`) on 4; separately, 58 of 199 invitations
+carry a phone number from an earlier invitation form. Nothing reads any of it
+any more, and nothing writes it. It is left in place deliberately: removing it
+is a production migration, and it waits for an explicit decision, a backup, and
+a dry run like the reconciliation above.
+
 ## Rules to hold to
 
 - Derive keys, do not invent them. If a record has a natural key, use it.
+- Resolve a person by the identifier their identity provider issued, not by
+  searching for an attribute such as an email address.
 - One collection, one job. A current-state record and an event log are
   different things even when they describe the same subject.
 - Check references before deleting. An orphan that something points at is not

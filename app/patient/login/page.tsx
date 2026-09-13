@@ -9,6 +9,18 @@ import { checkRoleConflictByEmail } from "@/lib/auth/role-conflict";
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Where a patient goes once signed in.
+ *
+ * An invitation sends a signed-out patient here with `next` set to that
+ * invitation, because the allowlist can only recognise someone who is signed
+ * in — bringing them back afterwards is what lets it work. Only invitation
+ * paths are honoured, so the parameter cannot send anyone to another site.
+ */
+function resolvePostSignInPath(next: string | null): string {
+  return next && /^\/invite\/[A-Za-z0-9._-]+$/.test(next) ? next : '/patient/dashboard';
+}
+
 function PatientLoginContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,6 +34,7 @@ function PatientLoginContent() {
   const [loginMethod, setLoginMethod] = useState<'email' | 'google'>('email');
   const [googleLoading, setGoogleLoading] = useState(false);
   const searchParams = useSearchParams();
+  const postSignInPath = resolvePostSignInPath(searchParams.get('next'));
 
   // Check if user just registered
   useEffect(() => {
@@ -153,7 +166,7 @@ function PatientLoginContent() {
         }
 
         // Use window.location for more reliable navigation after sign-up
-        window.location.href = '/patient/dashboard';
+        window.location.href = postSignInPath;
       } else {
         // Sign in
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -179,7 +192,7 @@ function PatientLoginContent() {
               }
 
               // Use window.location for more reliable navigation
-              window.location.href = '/patient/dashboard';
+              window.location.href = postSignInPath;
             } else {
               setError('This account is for doctors. Please use doctor login.');
               if (auth) {
@@ -213,7 +226,7 @@ function PatientLoginContent() {
                 consentGiven: false,
               });
               // Use window.location for more reliable navigation
-              window.location.href = '/patient/dashboard';
+              window.location.href = postSignInPath;
             } catch (firestoreError: any) {
               console.error('Error creating user document during sign-in:', firestoreError);
               setError('Account found but profile setup failed. Please try again or contact support.');
@@ -367,7 +380,7 @@ function PatientLoginContent() {
               }
             }
 
-            window.location.href = '/patient/dashboard';
+            window.location.href = postSignInPath;
           } else {
             setError('This account is for doctors. Please use doctor login.');
             await auth.signOut();
@@ -395,7 +408,7 @@ function PatientLoginContent() {
             lastLoginAt: serverTimestamp(),
             consentGiven: false,
           });
-          window.location.href = '/patient/dashboard';
+          window.location.href = postSignInPath;
         }
       }
     } catch (err: any) {

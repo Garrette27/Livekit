@@ -50,7 +50,6 @@ export interface Invitation {
   roomName: string;
   /** Legacy plaintext allowlist field. New writes use keyed email hashes. */
   emailAllowed?: string;
-  phoneAllowed?: string; // Optional phone number
   expiresAt: Timestamp;
   maxUses: number;
   currentUses?: number; // Track how many times invitation has been used
@@ -73,7 +72,6 @@ export interface Invitation {
           /** Keyed hashes support equality checks without persisting addresses. */
           emailHashes?: string[];
           allowlistCount?: number;
-          phone?: string;
         };
     security: {
       singleUse: boolean;
@@ -135,7 +133,6 @@ export interface CreateInvitationRequest {
   roomName: string;
   emailAllowed?: string; // Optional email - invitation can be created without email
   emailAllowlist?: string[]; // Optional multi-email auto-admit allowlist
-  phoneAllowed?: string; // Optional phone number
   expiresInHours?: number; // Optional expiration (defaults to 24 hours)
   waitingRoomEnabled?: boolean; // Enable waiting room feature
   maxPatients?: number; // Maximum number of patients allowed (defaults to 1 if waiting room disabled, 10 if enabled)
@@ -144,7 +141,6 @@ export interface CreateInvitationRequest {
   doctorEmail?: string; // Doctor's email
   doctorName?: string; // Doctor's name
   // Removed: countryAllowlist, browserAllowlist, deviceBinding, allowedIpAddresses, allowedDeviceIds
-  // System will automatically verify using registered user's device/location/browser info
 }
 
 export interface CreateInvitationResponse {
@@ -161,7 +157,11 @@ export interface CreateInvitationResponse {
 
 export interface ValidateInvitationRequest {
   token: string;
-  userEmail?: string; // Email from registration if user just registered
+  /**
+   * Self-declared, so it only labels a guest for the doctor. A signed-in
+   * visitor is identified by the ID token in the Authorization header instead.
+   */
+  userEmail?: string;
 }
 
 export interface ValidateInvitationResponse {
@@ -172,15 +172,14 @@ export interface ValidateInvitationResponse {
   invitationId?: string; // Invitation ID for checking admission status
   waitingPatientId?: string; // Stable waiting-patient reference for admission polling
   error?: string;
-  requiresRegistration?: boolean; // If true, user needs to register first
-  registeredEmail?: string; // Email that should be used for registration
+  /** The signed-in patient must accept the telehealth consent statement, then validate again. */
+  requiresConsent?: boolean;
   waitingRoomEnabled?: boolean; // Whether patient is in waiting room
 }
 
 // UI component props
 export interface InvitationFormData {
   email: string;
-  phone?: string; // Optional phone number
   expiresInHours: number;
   waitingRoomEnabled?: boolean; // Enable waiting room
   maxPatients?: number; // Max patients in waiting room
@@ -240,49 +239,25 @@ export interface InvitationListItem {
   violations: number;
 }
 
-// User profile types for privacy-compliant registration
+/**
+ * A `users/{uid}` profile, keyed by the Firebase Auth uid.
+ *
+ * It holds only what the account does not: the role, and a patient's
+ * agreement to the telehealth statement. No phone number, device, browser, or
+ * location details are collected.
+ */
 export interface UserProfile {
   id: string;
   email: string;
-  phone?: string;
   role: 'doctor' | 'patient' | 'faculty_reviewer' | 'admin';
-  consentGiven: boolean;
-  consentGivenAt: Timestamp | Date | any; // Flexible for client/server compatibility
-  deviceInfo?: { // Only for patients who gave consent
-    deviceFingerprintHash: string;
-    userAgent: string;
-    platform: string;
-    screenResolution: string;
-    timezone: string;
-  };
-  locationInfo?: { // Only for patients who gave consent
-    country: string;
-    countryCode: string;
-    region: string;
-    city: string;
-    ipHash: string; // Hashed IP for privacy
-  };
-  browserInfo?: { // Only for patients who gave consent
-    name: string;
-    version?: string;
-  };
+  /** See lib/consent/telehealth-consent.ts, which owns these three fields. */
+  consentGiven?: boolean;
+  consentGivenAt?: Timestamp | Date | any;
+  consentVersion?: string;
   registeredAt: Timestamp | Date | any; // Flexible for client/server compatibility
   lastLoginAt: Timestamp | Date | any; // Flexible for client/server compatibility
   // Doctor-specific fields
   doctorName?: string;
   doctorEmail?: string;
 }
-
-export interface RegisterUserRequest {
-  invitationToken: string;
-  email: string;
-  phone?: string;
-  consentGiven: boolean;
-}
-
-export interface RegisterUserResponse {
-  success: boolean;
-  userId?: string;
-  error?: string;
-  requiresConsent?: boolean;
-}
+

@@ -40,7 +40,6 @@ async function handlePOST(req: NextRequest) {
       roomName,
       emailAllowed,
       emailAllowlist,
-      phoneAllowed,
       expiresInHours,
       waitingRoomEnabled,
       maxPatients,
@@ -87,7 +86,6 @@ async function handlePOST(req: NextRequest) {
     );
     const emailHashes = sanitizedEmailAllowlist.map((email) => hashSecuritySignal('email', email));
     const sanitizedEmail = sanitizedEmailAllowlist[0];
-    const sanitizedPhone = phoneAllowed ? sanitizeInput(phoneAllowed.trim()) : undefined;
 
     // Validate expiration time (1-168 hours = 1 hour to 1 week)
     const validExpirationHours = Math.max(1, Math.min(168, expiresInHours || 24));
@@ -172,7 +170,6 @@ async function handlePOST(req: NextRequest) {
             emailHashes,
             allowlistCount: emailHashes.length,
           }),
-          ...(sanitizedPhone && { phone: sanitizedPhone }),
         },
         security: {
           singleUse: !isWaitingRoomEnabled, // Not single use if waiting room enabled
@@ -189,11 +186,6 @@ async function handlePOST(req: NextRequest) {
         created: new Date() as any,
       },
     };
-
-    // Add phone if provided
-    if (sanitizedPhone) {
-      invitation.phoneAllowed = sanitizedPhone;
-    }
 
     // Store invitation in Firestore
     try {

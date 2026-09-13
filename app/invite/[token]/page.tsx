@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, Suspense, Dispatch, SetStateA
 import { useParams, useRouter } from 'next/navigation';
 import { sendEmailVerification } from 'firebase/auth';
 import PatientLiveKitRoom from './components/PatientLiveKitRoom';
-import PatientRegistration from '@/components/PatientRegistration';
+import TelehealthConsentStep from '@/components/TelehealthConsentStep';
 import { useAuthSession } from '@/hooks/useAuthSession';
 import {
   trackConsultationEvent,
@@ -15,6 +15,17 @@ import {
   ValidateInvitationRequest, 
   ValidateInvitationResponse
 } from '@/lib/types';
+
+/** A text-level action inside a sentence, presented as a link. */
+const inlineActionStyle = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  color: '#1d4ed8',
+  textDecoration: 'underline',
+  cursor: 'pointer',
+  font: 'inherit',
+} as const;
 
 // Component for waiting room with admission polling
 function WaitingRoomView({ 
@@ -52,7 +63,7 @@ function WaitingRoomView({
           body: JSON.stringify({
             accessToken: validationResult.liveKitToken,
             invitationId: validationResult.invitationId,
-            patientEmail: validationResult.registeredEmail || invitationEmail || undefined,
+            patientEmail: invitationEmail || undefined,
             waitingPatientId: waitingPatientIdRef.current || undefined,
           }),
         });
@@ -119,7 +130,6 @@ function WaitingRoomView({
     setValidationResult,
     validationResult?.invitationId,
     validationResult?.liveKitToken,
-    validationResult?.registeredEmail,
     validationResult?.roomName,
     validationResult?.waitingRoomEnabled,
     validationResult?.waitingRoomToken,
@@ -141,7 +151,7 @@ function InvitePageContent() {
   const [error, setError] = useState<string | null>(null);
   const [validationFailureKind, setValidationFailureKind] = useState<'access' | 'service' | null>(null);
   const [validationAttempt, setValidationAttempt] = useState(0);
-  const [requiresRegistration, setRequiresRegistration] = useState(false);
+  const [requiresConsent, setRequiresConsent] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
   const [verificationEmailState, setVerificationEmailState] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [verificationEmailError, setVerificationEmailError] = useState<string | null>(null);
@@ -184,6 +194,18 @@ function InvitePageContent() {
       setVerificationEmailState('idle');
     }
   }, [user]);
+
+  /**
+   * Goes to sign-in and returns to this invitation afterwards. The allowlist
+   * can only recognise a signed-in patient, so this is the way from the queue
+   * to joining directly — whether they arrived signed out or with another
+   * account. Signing in replaces the current session; nothing is signed out
+   * here, so this page never revalidates as a guest on the way out.
+   */
+  const signInForThisInvitation = useCallback(() => {
+    router.push('/patient/login?next=' + encodeURIComponent('/invite/' + token));
+  }, [router, token]);
+
   const [allowLiveKitMount, setAllowLiveKitMount] = useState(false);
   const [activeConsultationSessionId, setActiveConsultationSessionId] = useState<string | null>(null);
   const trackedJoinKeyRef = useRef<string | null>(null);
@@ -251,10 +273,8 @@ function InvitePageContent() {
             setInvitationEmail(user.email.toLowerCase());
           }
           setValidationResult(result);
-        } else if (result.requiresRegistration) {
-          // User needs to register first
-          setRequiresRegistration(true);
-          setInvitationEmail(result.registeredEmail || '');
+        } else if (result.requiresConsent) {
+          setRequiresConsent(true);
         } else {
           setValidationFailureKind('access');
           setError(result.error || 'Validation failed');
@@ -297,7 +317,7 @@ function InvitePageContent() {
       action: 'join',
       patientName: 'Patient',
       userId: user?.uid,
-      patientEmail: user?.email || validationResult.registeredEmail || invitationEmail || null,
+      patientEmail: user?.email || invitationEmail || null,
     })
       .then((result) => {
         updateActiveConsultationSessionId(result.consultationSessionId || null);
@@ -315,7 +335,6 @@ function InvitePageContent() {
     user?.uid,
     validationResult?.invitationId,
     validationResult?.liveKitToken,
-    validationResult?.registeredEmail,
     validationResult?.roomName,
     validationResult?.waitingRoomEnabled,
     updateActiveConsultationSessionId,
@@ -398,7 +417,7 @@ function InvitePageContent() {
           action: 'leave',
           patientName: 'Patient',
           userId: user?.uid,
-          patientEmail: user?.email || currentValidation.registeredEmail || invitationEmail || null,
+          patientEmail: user?.email || invitationEmail || null,
           consultationSessionId: activeConsultationSessionIdRef.current,
         });
 
@@ -410,7 +429,7 @@ function InvitePageContent() {
               action: 'leave',
               patientName: 'Patient',
               userId: user?.uid,
-              patientEmail: user?.email || currentValidation.registeredEmail || invitationEmail || null,
+              patientEmail: user?.email || invitationEmail || null,
               consultationSessionId: activeConsultationSessionIdRef.current,
             },
             { keepalive: true }
@@ -476,52 +495,19 @@ function InvitePageContent() {
     };
   }, []);
 
-  // Handle registration requirement
-  if (requiresRegistration) {
+  // A signed-in patient who has not yet agreed to the telehealth statement.
+  // Agreeing re-runs the one validation request above, which carries their ID
+  // token; there is deliberately no second request that could leave it out.
+  if (requiresConsent) {
     return (
-      <PatientRegistration
-        invitationToken={token}
-        invitationEmail={invitationEmail}
-        onRegistrationComplete={async (registeredEmail: string) => {
-          // After registration, re-validate the invitation
-          try {
-            setIsValidating(true);
-            setRequiresRegistration(false);
-            setError(null);
-            setValidationFailureKind(null);
-
-            const request: ValidateInvitationRequest = {
-              token,
-              userEmail: registeredEmail,
-            };
-
-            const response = await fetch('/api/invite/validate', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(request),
-            });
-
-            const result: ValidateInvitationResponse = await response.json();
-
-            if (response.status >= 500) {
-              setValidationFailureKind('service');
-              setError('We could not verify this invitation right now. Your link has not been rejected. Please try again.');
-            } else if (result.success) {
-              setValidationResult(result);
-            } else {
-              setValidationFailureKind('access');
-              setError(result.error || 'Validation failed after registration');
-            }
-          } catch (err) {
-            setValidationFailureKind('service');
-            setError('We could not reach the invitation service. Check your connection, then try again.');
-            console.error('Error validating invitation after registration:', err);
-          } finally {
-            setIsValidating(false);
-          }
+      <TelehealthConsentStep
+        accountEmail={user?.email || null}
+        onConsentRecorded={() => {
+          setRequiresConsent(false);
+          setIsValidating(true);
+          setValidationAttempt((attempt) => attempt + 1);
         }}
+        onUseDifferentAccount={signInForThisInvitation}
       />
     );
   }
@@ -722,6 +708,40 @@ function InvitePageContent() {
                 margin: 0
               }}>
                 <strong>Tip:</strong> Keep this page open. You&apos;ll automatically join the consultation when the doctor admits you.
+              </p>
+            </div>
+
+            {/* Who the patient is here as, and the one action that changes
+                whether they wait. The allowlist can only recognise a signed-in
+                patient, and someone who opened the link signed out, or with
+                another account, cannot tell that from this screen. */}
+            <div style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '0.5rem',
+              padding: '0.875rem 1rem',
+              marginBottom: '1.5rem',
+              textAlign: 'left',
+            }}>
+              <p style={{ fontSize: '0.875rem', color: '#334155', margin: 0, lineHeight: 1.6 }}>
+                {user ? (
+                  <>
+                    Signed in as <strong style={{ overflowWrap: 'anywhere' }}>{user.email}</strong>. If your
+                    doctor invited a different email,{' '}
+                    <button type="button" onClick={signInForThisInvitation} style={inlineActionStyle}>
+                      sign in with that account
+                    </button>
+                    .
+                  </>
+                ) : (
+                  <>
+                    If your doctor added your email to this invitation,{' '}
+                    <button type="button" onClick={signInForThisInvitation} style={inlineActionStyle}>
+                      sign in
+                    </button>{' '}
+                    to join without waiting.
+                  </>
+                )}
               </p>
             </div>
 

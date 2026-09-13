@@ -18,6 +18,7 @@ import {
 import { decideAdmission, type VisitorIdentity } from './admission-policy';
 import { finalizeConsultationForRoom } from '../services/consultation-finalization';
 import { UserRepository } from '../repositories/user-repository';
+import { hasTelehealthConsent } from '../consent/telehealth-consent';
 import { FieldValue } from 'firebase-admin/firestore';
 import { hashSecuritySignal } from '../security/security-signal';
 import { resolveWaitingPatientId } from './waiting-patient-key';
@@ -288,67 +289,80 @@ async function reserveWaitingPatient(
   return reserved ? waitingPatientId : null;
 }
 
+/**
+ * Establishes who is at the door, and whether anything must happen before they
+ * can be placed.
+ *
+ * A signed-in visitor is identified by their account, however they signed in.
+ * Their profile is read by uid — never searched for by email — and the only
+ * precondition is agreement to the telehealth statement: the account already
+ * is the registration. A visitor without an account is a guest. Nothing a
+ * guest types can admit them, so nothing is demanded of them here; the doctor
+ * decides in the waiting room.
+ */
 async function resolveUserContext(
   db: any,
   invitation: Invitation,
   tokenPayload: InvitationToken,
-  userEmail: string | undefined,
-  authenticatedEmail: string | undefined,
+  declaredEmail: string | undefined,
+  visitor: VisitorIdentity | undefined,
   clientIP: string,
   userAgent: string,
   violations: SecurityViolation[]
 ): Promise<{ lookup: UserLookupContext; earlyResult?: ValidateInvitationResult }> {
-  const lookup: UserLookupContext = {
-    // The token claim is read only for links issued before allowlists moved out
-    // of JWTs. It remains self-declared and never grants direct admission.
-    userEmailToCheck: normalizeEmail(authenticatedEmail || userEmail || tokenPayload.email),
-  };
+  const accountId = visitor && !visitor.isAnonymousAccount ? visitor.userId || undefined : undefined;
+  const accountEmail = accountId ? normalizeEmail(visitor?.authenticatedEmail || undefined) : undefined;
 
-  if (!lookup.userEmailToCheck) {
-    console.log('Open invitation (no email constraint) - allowing access');
-    return { lookup };
-  }
+  const lookup: UserLookupContext = accountId && accountEmail
+    ? { userEmailToCheck: accountEmail, userDocId: accountId }
+    : {
+        // The token claim is read only for links issued before allowlists moved
+        // out of JWTs. Like a typed address it only labels the guest for the
+        // doctor; it never links them to anyone's records.
+        userEmailToCheck: normalizeEmail(declaredEmail || tokenPayload.email),
+      };
 
-  const userDoc = await new UserRepository(db).findByEmail(lookup.userEmailToCheck);
+  if (lookup.userDocId) {
+    const profileDoc = await new UserRepository(db).getById(lookup.userDocId);
+    lookup.userProfile = profileDoc.exists ? profileDoc.data() : undefined;
 
-  if (!userDoc) {
-    return {
-      lookup,
-      earlyResult: result(403, {
-        success: false,
-        error: 'User not registered. Please register first.',
-        requiresRegistration: true,
-        registeredEmail: lookup.userEmailToCheck,
-      }),
-    };
-  }
+    const role = lookup.userProfile?.role;
+    if (role && role !== 'patient') {
+      return {
+        lookup,
+        earlyResult: result(403, {
+          success: false,
+          error: 'You are signed in with a clinician or staff account. To join as the patient, open this link in a private window or sign out first.',
+        }),
+      };
+    }
 
-  lookup.userDocId = userDoc.id;
-  lookup.userProfile = userDoc.data();
-
-  if (!lookup.userProfile.consentGiven) {
-    return {
-      lookup,
-      earlyResult: result(403, {
-        success: false,
-        error: 'Consent is required before joining this consultation.',
-        requiresRegistration: true,
-        registeredEmail: lookup.userEmailToCheck,
-      }),
-    };
+    // Asked once per account, at the point of care. A first visit can arrive
+    // before any sign-in screen wrote a profile; recording consent creates it.
+    if (!hasTelehealthConsent(lookup.userProfile)) {
+      return {
+        lookup,
+        earlyResult: result(403, {
+          success: false,
+          requiresConsent: true,
+          error: 'Please read and accept the consultation consent to continue.',
+        }),
+      };
+    }
   }
 
   if (
-    hasInvitationEmailAllowlist(invitation)
+    lookup.userEmailToCheck
+    && hasInvitationEmailAllowlist(invitation)
     && !isEmailAllowedByInvitation(invitation, lookup.userEmailToCheck)
   ) {
     violations.push(
       buildSecurityViolation({
         type: 'wrong_email',
-        details: 'The presented account is not on this invitation allowlist.',
+        details: 'The presented email is not on this invitation allowlist.',
         clientIP,
         userAgent,
-        actorType: 'patient',
+        actorType: lookup.userDocId ? 'patient' : 'anonymous',
         actorId: lookup.userDocId || null,
       })
     );
@@ -544,8 +558,10 @@ async function handleWaitingRoomAccess(params: {
 
   const identity = buildWaitingPatientIdentity({
     explicitUserEmail,
-    profileEmail: lookup.userProfile?.email,
-    invitationEmail: lookup.userEmailToCheck,
+    // A signed-in visitor's address is the one their account holds, as the
+    // identity provider attests it. A guest has only what they declared.
+    profileEmail: lookup.userDocId ? lookup.userEmailToCheck : undefined,
+    invitationEmail: tokenPayload.email,
     userDocId: lookup.userDocId,
   });
 
@@ -795,7 +811,7 @@ export async function validateInvitationAndIssueToken(
       invitation,
       tokenPayload,
       context.userEmail,
-      context.authenticatedVisitor?.authenticatedEmail || undefined,
+      context.authenticatedVisitor,
       context.clientIP,
       context.userAgent,
       violations

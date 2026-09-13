@@ -11,6 +11,7 @@ const protectedRequests = [
   { method: 'post', path: '/api/invite/create', data: {} },
   { method: 'post', path: '/api/invite/revoke', data: {} },
   { method: 'post', path: '/api/link-patient-consultations', data: {} },
+  { method: 'post', path: '/api/patient/consent', data: { consentVersion: 'security-test' } },
   { method: 'post', path: '/api/summary/generate', data: {} },
   { method: 'post', path: '/api/token', data: {} },
   {

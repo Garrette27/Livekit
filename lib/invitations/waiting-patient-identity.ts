@@ -1,7 +1,7 @@
 interface BuildWaitingPatientIdentityInput {
   /** Email the visitor typed in this session. Self-asserted, so weakest source. */
   explicitUserEmail?: string;
-  /** Email on the registered `users` profile the server resolved. Strongest source. */
+  /** Email of the signed-in account, as its verified ID token states it. Strongest source. */
   profileEmail?: string;
   /** Email carried by the server-signed invitation token. */
   invitationEmail?: string;

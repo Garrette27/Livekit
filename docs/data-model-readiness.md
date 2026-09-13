@@ -60,7 +60,8 @@ attachments, appointments, or clinical evidence.
    registration route previously wrote them with a generated document id, so
    an invited patient held a profile no sign-in could match and gained a
    second one when they did sign in. `UserRepository` no longer offers a way
-   to create a profile under a generated id.
+   to create a profile under a generated id, and the registration route itself
+   was removed in 0.2.0 in favour of a versioned consent record.
 9. A queue entry is keyed by invitation and patient, so a reload or a return
    visit updates the entry the patient already holds. Each arrival is appended
    to a `visits` subcollection instead of creating another top-level row.

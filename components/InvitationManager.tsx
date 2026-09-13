@@ -57,7 +57,6 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
           id: result.invitationId,
           roomName: formData.roomName,
           emailAllowed: primaryEmail,
-          phoneAllowed: formData.phoneAllowed,
           expiresAt: Timestamp.fromDate(new Date(result.expiresAt)),
           maxUses: formData.maxUses ?? 999999,
           currentUses: 0,
@@ -74,7 +73,6 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
             constraints: {
               email: primaryEmail,
               ...(normalizedAllowlist.length > 0 ? { emails: normalizedAllowlist } : {}),
-              phone: formData.phoneAllowed,
             },
             security: {
               singleUse: formData.waitingRoomEnabled !== true,
