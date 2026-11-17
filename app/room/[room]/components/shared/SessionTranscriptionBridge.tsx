@@ -3,6 +3,7 @@
 import React from 'react';
 import { useTracks } from '@livekit/components-react';
 import { Track } from 'livekit-client';
+import { useToast } from '@/components/ui/feedback/ToastProvider';
 
 const CHUNK_DURATION_MS = 10_000;
 const AUDIO_BITS_PER_SECOND = 32_000;
@@ -42,6 +43,7 @@ export default function SessionTranscriptionBridge({
   accessToken: string;
   consentConfirmed: boolean;
 }) {
+  const { showToast } = useToast();
   const microphoneTracks = useTracks([Track.Source.Microphone], { onlySubscribed: false });
   const localMicrophone = microphoneTracks.find((reference) => reference.participant.isLocal);
   const mediaStreamTrack = localMicrophone?.publication.track?.mediaStreamTrack || null;
@@ -92,6 +94,14 @@ export default function SessionTranscriptionBridge({
       })
         .then((response) => {
           if ([401, 403, 404, 503].includes(response.status)) {
+            if (!uploadUnavailableRef.current) {
+              showToast({
+                kind: 'info',
+                title: 'Transcription paused',
+                message: 'Optional audio transcription is unavailable for this call. Your call can continue without it.',
+                durationMs: 10_000,
+              });
+            }
             uploadUnavailableRef.current = true;
             disposed = true;
             if (stopTimer !== null) {
@@ -163,7 +173,7 @@ export default function SessionTranscriptionBridge({
         recorder.stop();
       }
     };
-  }, [accessToken, consentConfirmed, consultationSessionId, isMuted, mediaStreamTrack]);
+  }, [accessToken, consentConfirmed, consultationSessionId, isMuted, mediaStreamTrack, showToast]);
 
   return null;
 }

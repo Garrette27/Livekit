@@ -5,7 +5,7 @@ import { ConsultationTranscriptRepository } from '@/lib/repositories/consultatio
 import { FirestoreSummaryProjectionService } from '@/lib/services/history-summary';
 import { authorizeSessionParticipant } from '@/lib/services/shared/session-participant-auth';
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
-import { OpenAiAudioTranscriber } from '@/lib/services/transcription/openai-audio-transcriber';
+import { AudioTranscriptionProviderError, OpenAiAudioTranscriber } from '@/lib/services/transcription/openai-audio-transcriber';
 
 export const maxDuration = 60;
 
@@ -160,9 +160,14 @@ async function handlePOST(req: NextRequest) {
       'Session audio transcription failed:',
       error instanceof Error ? error.message : 'Unknown transcription error'
     );
-    const status = error instanceof Error && error.message.includes('not configured') ? 503 : 502;
+    const providerLimited = error instanceof AudioTranscriptionProviderError && error.providerStatus === 429;
+    const status = providerLimited || (error instanceof Error && error.message.includes('not configured')) ? 503 : 502;
     return NextResponse.json(
-      { success: false, error: 'Audio transcription is temporarily unavailable' },
+      {
+        success: false,
+        error: 'Audio transcription is temporarily unavailable',
+        ...(providerLimited && { code: 'transcription_capacity_limited' }),
+      },
       { status }
     );
   }

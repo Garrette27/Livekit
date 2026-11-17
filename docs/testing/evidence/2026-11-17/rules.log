@@ -1,0 +1,96 @@
+i  emulators: Starting emulators: firestore, storage
+i  emulators: Detected demo project ID "demo-livekit-security", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail.
+i  firestore: Firestore Emulator logging to firestore-debug.log
+✔  firestore: Firestore Emulator was started in standard edition.
+✔  firestore: Firestore Emulator UI websocket is running on 9150.
+i  Running script: npm --prefix functions run test:rules; cd functions && node --test test/deployed-assessment.cjs
+
+> test:rules
+> node --test test/security-rules.test.cjs
+
+TAP version 13
+# [2026-11-17T09:59:01.068Z]  @firebase/firestore: Firestore (12.16.0): GrpcConnection RPC 'Write' stream 0x29c86ea4 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# false for 'create' @ L129, false for 'update' @ L129
+# Subtest: server-owned operational collections deny every client role
+ok 1 - server-owned operational collections deny every client role
+  ---
+  duration_ms: 3145.039438
+  ...
+# Subtest: summary ownership permits the doctor and denies a patient
+ok 2 - summary ownership permits the doctor and denies a patient
+  ---
+  duration_ms: 314.271643
+  ...
+# [2026-11-17T09:59:01.567Z]  @firebase/firestore: Firestore (12.16.0): GrpcConnection RPC 'Write' stream 0x29c86ea9 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# Property admin is undefined on object. for 'create' @ L89, evaluation error at L100:24 for 'update' @ L100, false for 'update' @ L100
+# Subtest: a user cannot elevate their own role
+ok 3 - a user cannot elevate their own role
+  ---
+  duration_ms: 180.98871
+  ...
+# Subtest: doctor note attachments are owner-only and type bounded
+not ok 4 - doctor note attachments are owner-only and type bounded
+  ---
+  duration_ms: 316.640396
+  location: '/home/garre/Livekit/functions/test/security-rules.test.cjs:92:1'
+  failureType: 'testCodeFailure'
+  error: "Firebase Storage: User does not have permission to access 'notes/doctor-1/room-1/note.png'. (storage/unauthorized)"
+  code: 'storage/unauthorized'
+  name: 'FirebaseError'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 3
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4475.9226
+TAP version 13
+# Subtest: deployed rules should deny reading another patient profile
+not ok 1 - deployed rules should deny reading another patient profile
+  ---
+  duration_ms: 481.069023
+  location: '/home/garre/Livekit/functions/test/deployed-assessment.cjs:15:1'
+  failureType: 'testCodeFailure'
+  error: 'Expected request to fail, but it succeeded.'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    /home/garre/Livekit/functions/node_modules/@firebase/rules-unit-testing/dist/index.cjs.js:580:31
+    async TestContext.<anonymous> (/home/garre/Livekit/functions/test/deployed-assessment.cjs:17:3)
+    async Test.run (node:internal/test_runner/test:797:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: deployed rules should deny changing patient role to doctor
+not ok 2 - deployed rules should deny changing patient role to doctor
+  ---
+  duration_ms: 68.808338
+  location: '/home/garre/Livekit/functions/test/deployed-assessment.cjs:19:1'
+  failureType: 'testCodeFailure'
+  error: 'Expected request to fail, but it succeeded.'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    /home/garre/Livekit/functions/node_modules/@firebase/rules-unit-testing/dist/index.cjs.js:580:31
+    process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    async TestContext.<anonymous> (/home/garre/Livekit/functions/test/deployed-assessment.cjs:21:3)
+    async Test.run (node:internal/test_runner/test:797:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 832.437641
+⚠  Script exited unsuccessfully (code 1)
+i  emulators: Shutting down emulators.
+i  firestore: Stopping Firestore Emulator
+i  storage: Stopping Storage Emulator
+i  hub: Stopping emulator hub
+i  logging: Stopping Logging Emulator
+
+Error: Script "npm --prefix functions run test:rules; cd functions && node --test test/deployed-assessment.cjs" exited with code 1

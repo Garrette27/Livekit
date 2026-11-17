@@ -1,0 +1,11 @@
+import {spawnSync} from 'node:child_process';
+import {readFileSync,writeFileSync} from 'node:fs';
+const dir='docs/testing/evidence/2026-11-17-remediation';
+const deployed=JSON.parse(readFileSync(`${dir}/deployed-firestore-rules.json`,'utf8')).source;
+const local=readFileSync('firestore.rules','utf8');
+if(deployed.replace(/\r/g,'').trim()!==local.replace(/\r/g,'').trim()) throw new Error('Deployed rules do not match reviewed source');
+const r=spawnSync('npx',['-y','firebase-tools@15.36.0','emulators:exec','--only','firestore','--project','demo-livekit-security','--config','firebase.json','cd functions && node --test test/deployed-assessment.cjs'],{encoding:'utf8',timeout:180000,env:{...process.env,THESIS_DEPLOYED_RULES:'../docs/testing/evidence/2026-11-17-remediation/deployed-firestore-rules.json'}});
+writeFileSync(`${dir}/deployed-rules-retest.log`,(r.stdout||'')+(r.stderr||''));
+writeFileSync(`${dir}/deployment-verification.json`,JSON.stringify({verifiedAt:new Date().toISOString(),project:'livekit-5eef6',sourceMatches:true,deployedRulesRetestExitCode:r.status,method:'Retrieved active Firestore rules via authenticated MCP, compared normalized source, reproduced original two attacks with synthetic emulator records',productionAttackWrites:false},null,2));
+console.log({sourceMatches:true,retestExitCode:r.status});
+process.exitCode=r.status===0?0:1;

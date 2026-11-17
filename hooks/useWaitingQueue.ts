@@ -11,7 +11,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setWaitingQueueSnapshot } from '@/store/slices/waiting-queue-slice';
 import {
   fetchWaitingQueueOnce,
-  subscribeToDoctorWaitingPatients,
+  subscribeToDoctorQueueChanges,
   subscribeToWaitingQueuePoll,
 } from '@/lib/waiting-room/waiting-queue-coordinator';
 
@@ -137,13 +137,14 @@ export function useWaitingQueue({
 
   /**
    * Applies this hook's invitation and selection scoping, then stores the
-   * result. Shared by the realtime stream and the polling fallback so both
-   * produce identical state.
+   * result. Only the server projection supplies rows; realtime is an
+   * invalidation signal, never a second unfiltered read model.
    */
   const publishPatients = useCallback(
     (incomingPatients: WaitingPatient[]) => {
       const scopedPatients = incomingPatients.filter((waitingPatient) =>
-        shouldIncludeInvitation(invitationIdsSet, waitingPatient.invitationId)
+        (!roomName || waitingPatient.roomName === roomName)
+        && shouldIncludeInvitation(invitationIdsSet, waitingPatient.invitationId)
       );
 
       const counts = countWaitingPatientsByInvitation(scopedPatients);
@@ -160,7 +161,7 @@ export function useWaitingQueue({
         })
       );
     },
-    [dispatch, invitationIdsSet, scopeKey, selectedInvitationId]
+    [dispatch, invitationIdsSet, roomName, scopeKey, selectedInvitationId]
   );
 
   const refresh = useCallback(
@@ -289,55 +290,47 @@ export function useWaitingQueue({
     void refresh(true);
   }, [refresh]);
 
-  // Prefer Firestore's push stream; fall back to timed refreshes only when it
-  // is unavailable, so a rules or connectivity problem degrades to the old
-  // behaviour instead of leaving the doctor with an empty queue.
-  const [isStreaming, setIsStreaming] = useState(false);
-
+  // Firestore announces changes, while the API owns the projection. Never
+  // overwrite the filtered result with historical rows from a raw snapshot.
   useEffect(() => {
     if (!autoRefresh || !doctorUserId) {
-      setIsStreaming(false);
       return;
     }
 
     let cancelled = false;
-    const unsubscribe = subscribeToDoctorWaitingPatients({
+    const unsubscribe = subscribeToDoctorQueueChanges({
       doctorUserId,
-      onPatients: (waitingPatients) => {
+      onInvalidate: () => {
         if (cancelled) {
           return;
         }
-        setIsStreaming(true);
-        setScopeInitialized(true);
-        setLoading(false);
-        publishPatients(waitingPatients.filter((patient) => normalizedStatuses.includes(patient.status)));
+        void refresh(false);
       },
-      onUnavailable: (reason) => {
+      onUnavailable: () => {
         if (cancelled) {
           return;
         }
-        console.warn('Waiting queue live updates unavailable; falling back to polling.', reason);
-        setIsStreaming(false);
+        console.warn('Waiting queue live updates unavailable; periodic refresh remains active.');
       },
     });
 
     return () => {
       cancelled = true;
       unsubscribe?.();
-      setIsStreaming(false);
     };
-  }, [autoRefresh, doctorUserId, normalizedStatuses, publishPatients]);
+  }, [autoRefresh, doctorUserId, refresh]);
 
   useEffect(() => {
-    if (!autoRefresh || isStreaming) {
+    if (!autoRefresh) {
       return;
     }
 
-    // One timer per scope regardless of how many panels are mounted.
+    // Expiry and age advance even without Firestore writes. Keep one timer
+    // per scope, also bounding staleness if an event overlaps an in-flight read.
     return subscribeToWaitingQueuePoll(requestKey, pollIntervalMs, () => {
       void refresh(false);
     });
-  }, [autoRefresh, isStreaming, pollIntervalMs, refresh, requestKey]);
+  }, [autoRefresh, pollIntervalMs, refresh, requestKey]);
 
   return useMemo(
     () => ({

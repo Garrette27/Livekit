@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { DisconnectReason } from 'livekit-client';
+import { useToast } from '@/components/ui/feedback/ToastProvider';
 import RoomShell from '../components/shared/RoomShell';
 import PatientSessionPanels from './components/PatientSessionPanels';
 import { PATIENT_ROOM_CONTROLS } from '../components/shared/room-controls-policy';
@@ -22,6 +24,7 @@ import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 
 function PatientRoomClient({ roomName }: { roomName: string }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const { user, isAuthenticated } = useAuthSession();
   const [token, setToken] = useState<string | null>(null);
   const [patientName, setPatientName] = useState('');
@@ -128,7 +131,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (!token) {
+      if (!token || isLeavingRef.current) {
         return;
       }
       const trackedWithBeacon = trackConsultationEventWithBeacon({
@@ -240,6 +243,22 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
     setToken(null);
     router.replace(getPostCallRedirectPath());
   }, [getPostCallRedirectPath, roomName, router, trackPatientLeave, updateConsultationSessionId]);
+
+  /** Replacement transfers the connection, not ownership of a leave command. */
+  const handleRoomDisconnect = useCallback((reason?: unknown) => {
+    if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
+      isLeavingRef.current = true;
+      showToast({
+        kind: 'info',
+        title: 'Consultation opened elsewhere',
+        message: 'Another browser or device joined this patient admission. Continue there; this window has disconnected.',
+        durationMs: 10_000,
+      });
+      router.replace(getPostCallRedirectPath());
+      return;
+    }
+    void leaveConsultation();
+  }, [getPostCallRedirectPath, leaveConsultation, router, showToast]);
 
   if (!token) {
     return (
@@ -389,10 +408,7 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
       <RoomShell
         token={token}
         consultationSessionId={consultationSessionId}
-        onDisconnected={(reason) => {
-          console.log('Patient disconnected from room:', roomName, 'reason:', reason);
-          void leaveConsultation();
-        }}
+        onDisconnected={handleRoomDisconnect}
         onError={(roomError) => {
           const isCameraPermissionError =
             roomError.message?.includes('NotReadableError') ||

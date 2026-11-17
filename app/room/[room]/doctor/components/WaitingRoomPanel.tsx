@@ -106,7 +106,7 @@ export default function WaitingRoomPanel({
             margin: 0,
           }}
         >
-          Queue ({waitingOnly.length}) | In Room ({admittedOnly.length})
+          Queue ({waitingOnly.length}) | Admitted ({admittedOnly.length})
         </h3>
 
         {showRefreshButton && (
@@ -319,10 +319,10 @@ export default function WaitingRoomPanel({
                 letterSpacing: '0.04em',
               }}
             >
-              In Consultation Room
+              Admitted patients
             </p>
             {admittedOnly.length === 0 ? (
-              <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>No admitted patient currently in room.</p>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>No admitted patients for active invitations.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {admittedOnly.map((patient) => {
@@ -358,8 +358,8 @@ export default function WaitingRoomPanel({
                         )}
                         <p style={{ fontSize: '0.7rem', color: '#059669', margin: '0.25rem 0 0 0' }}>
                           {admittedMinutes === null
-                            ? 'In-room duration unavailable'
-                            : `In room for ${admittedMinutes} minute${admittedMinutes !== 1 ? 's' : ''}`}
+                            ? 'Admission time unavailable'
+                            : `Admitted ${admittedMinutes} minute${admittedMinutes !== 1 ? 's' : ''} ago`}
                         </p>
                       </div>
                       {showRemoveControl && (

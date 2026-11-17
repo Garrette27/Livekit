@@ -386,10 +386,10 @@ export default function WaitingPatientsList({
             letterSpacing: '0.04em',
           }}
         >
-          In Consultation Room ({admittedOnly.length})
+          Admitted patients ({admittedOnly.length})
         </p>
         {admittedOnly.length === 0 ? (
-          <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280' }}>No admitted patient currently in room.</p>
+          <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280' }}>No admitted patients for active invitations.</p>
         ) : (
           admittedOnly.map((patient) => {
             const admittedAt = dateValueToDate(patient.admittedAt || patient.joinedAt);
@@ -428,8 +428,8 @@ export default function WaitingPatientsList({
                   </p>
                   <p style={{ fontSize: '0.75rem', color: '#059669', marginTop: '0.5rem' }}>
                     {admittedMinutes === null
-                      ? 'In-room duration unavailable'
-                      : `In room for ${admittedMinutes} minute${admittedMinutes !== 1 ? 's' : ''}`}
+                      ? 'Admission time unavailable'
+                      : `Admitted ${admittedMinutes} minute${admittedMinutes !== 1 ? 's' : ''} ago`}
                   </p>
                 </div>
 

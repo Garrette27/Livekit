@@ -1,0 +1,23 @@
+{
+  "recordedAt": "2026-11-17T10:17:26.433Z",
+  "results": [
+    {
+      "kind": "media",
+      "n": 0,
+      "status": "NOT_TESTED",
+      "reason": "No measured trials supplied."
+    },
+    {
+      "kind": "capacity",
+      "n": 0,
+      "status": "NOT_TESTED",
+      "reason": "No measured trials supplied."
+    },
+    {
+      "kind": "documentation",
+      "n": 0,
+      "status": "NOT_TESTED",
+      "reason": "No measured trials supplied."
+    }
+  ]
+}

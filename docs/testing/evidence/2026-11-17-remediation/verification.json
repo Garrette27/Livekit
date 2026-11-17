@@ -1,0 +1,63 @@
+{
+  "testedAt": "2026-11-17T10:15:43.339Z",
+  "node": "v22.23.0",
+  "baseCommit": "fa5a33cca4b341513dae6d78538f4eeede26a92b",
+  "sourceState": "working tree remediation; release commit recorded in PR",
+  "checks": [
+    {
+      "name": "policy",
+      "exitCode": 0,
+      "durationMs": 1105,
+      "status": "PASS"
+    },
+    {
+      "name": "typecheck",
+      "exitCode": 0,
+      "durationMs": 8013,
+      "status": "PASS"
+    },
+    {
+      "name": "lint",
+      "exitCode": 0,
+      "status": "PASS",
+      "durationMs": 5919
+    },
+    {
+      "name": "build",
+      "exitCode": 0,
+      "durationMs": 48156,
+      "status": "PASS"
+    },
+    {
+      "name": "rules",
+      "exitCode": 0,
+      "durationMs": 8859,
+      "status": "PASS"
+    },
+    {
+      "name": "application-audit",
+      "exitCode": 0,
+      "durationMs": 1021,
+      "status": "PASS"
+    },
+    {
+      "name": "functions-audit",
+      "exitCode": 0,
+      "durationMs": 806,
+      "status": "PASS"
+    }
+  ],
+  "rulesSha256": "a96044637bfb56c7821c7bb791faa59b553486659027956a051581d741c8b53f",
+  "finishedAt": "2026-11-17T10:16:56.823Z",
+  "sourceHashes": {
+    "firestore.rules": "a96044637bfb56c7821c7bb791faa59b553486659027956a051581d741c8b53f",
+    "package.json": "4e7beb470e1057226a9d97d728c1993158c2b71735a8a95b40d70576c12a1c79",
+    "package-lock.json": "360097517fa83505442f9fc314e5d8442fb3d1bee59d275fd77be49659204f79",
+    "functions/package.json": "3f2ca27539e09297ea379888c614c88aaea65374519fe177abaac9262612b891",
+    "functions/package-lock.json": "a982c6b4630a7db2a732a1525fc91858f4856181486a4d80bb8bc2c2682d24e5",
+    "app/patient/login/page.tsx": "5370719c2a7c06dda9f0bae422bae8cff285b853fdafb2b03054c63a3cbfdaf1",
+    "functions/test/security-rules.test.cjs": "5d9fb968ccf3be5cda419c40b98933c83753bb46f0f59472352553b9d13d478a",
+    "eslint.config.mjs": "ff65c7ea35c057d68f426d506f72fe101d48a68709d503e5352c4975aa5443a9"
+  },
+  "finalizedAt": "2026-11-17T10:21:31.221Z"
+}

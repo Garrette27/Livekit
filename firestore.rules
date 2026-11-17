@@ -79,28 +79,41 @@ service cloud.firestore {
       allow write: if false;
     }
     
-    // User profiles are private. Elevated roles must be provisioned through
-    // trusted Firebase custom claims before their profile can be created.
+    // users/{uid}: private email/role plus legacy profile fields. Client creates
+    // use the bounded login schema; updates only refresh login time. Consent and
+    // role provisioning are server-owned. Legacy fields can remain unchanged.
     match /users/{userId} {
-      allow read: if request.auth != null && (
-        request.auth.uid == userId ||
-        request.auth.token.admin == true
-      );
+      function isValidUser(data) {
+        return data.keys().hasAll(['email', 'role']) &&
+          data.email is string && data.email.size() > 0 && data.email.size() <= 320 &&
+          data.role in ['patient', 'doctor', 'faculty_reviewer', 'admin'];
+      }
+      function isValidNewProfile(data) {
+        return data.keys().hasOnly(['email', 'role', 'registeredAt', 'lastLoginAt',
+            'consentGiven', 'doctorName', 'doctorEmail']) &&
+          (!('doctorName' in data) || (data.doctorName is string && data.doctorName.size() <= 200)) &&
+          (!('doctorEmail' in data) || data.doctorEmail == data.email) &&
+          (!('consentGiven' in data) || data.consentGiven == false) &&
+          (!('registeredAt' in data) || data.registeredAt == request.time) &&
+          (!('lastLoginAt' in data) || data.lastLoginAt == request.time);
+      }
+      allow read: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && 
         request.auth.uid == userId &&
-        request.resource.data.keys().hasAll(['email', 'role']) &&
-        request.resource.data.email is string &&
-        request.resource.data.role in ['patient', 'doctor', 'faculty_reviewer', 'admin'] &&
+        isValidUser(request.resource.data) && isValidNewProfile(request.resource.data) &&
+        request.resource.data.email.lower() == request.auth.token.email.lower() &&
         (
           request.resource.data.role == 'patient' ||
-          request.auth.token.role == request.resource.data.role ||
-          request.auth.token.admin == true
+          request.auth.token.get('role', '') == request.resource.data.role ||
+          request.auth.token.get('admin', false) == true
         );
-      // Allow users to update their own profile while keeping email and role immutable.
+      // An owner cannot replace/delete/recreate their profile to assign a role,
+      // inject permissions, rewrite consent evidence, or change their identity.
       allow update: if request.auth != null &&
         request.auth.uid == userId &&
-        request.resource.data.role == resource.data.role &&
-        request.resource.data.email == resource.data.email;
+        isValidUser(request.resource.data) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt']) &&
+        request.resource.data.lastLoginAt == request.time;
       allow delete: if false;
     }
     

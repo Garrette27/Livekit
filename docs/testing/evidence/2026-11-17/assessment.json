@@ -1,0 +1,1165 @@
+{
+  "startedAt": "2026-11-17T08:36:36.149Z",
+  "commit": "fa5a33cca4b341513dae6d78538f4eeede26a92b",
+  "dirtyPaths": [
+    "M AGENTS.md",
+    " M package-lock.json",
+    "?? firestore-debug.log",
+    "?? scripts/thesis/"
+  ],
+  "node": "v20.20.2",
+  "platform": "linux",
+  "os": "6.6.87.2-microsoft-standard-WSL2",
+  "cpu": "AMD Ryzen 5 5500GT with Radeon Graphics",
+  "checks": [
+    {
+      "id": "POLICY",
+      "exitCode": 0,
+      "durationMs": 1170,
+      "status": "PASS"
+    },
+    {
+      "id": "TYPES",
+      "exitCode": 0,
+      "durationMs": 2993,
+      "status": "PASS"
+    },
+    {
+      "id": "LINT",
+      "exitCode": 0,
+      "durationMs": 5118,
+      "status": "PASS"
+    }
+  ],
+  "dependencies": {
+    "source": "committed HEAD package-lock.json",
+    "exitCode": 1,
+    "counts": {
+      "info": 0,
+      "low": 1,
+      "moderate": 9,
+      "high": 9,
+      "critical": 4,
+      "total": 23
+    },
+    "packages": [
+      {
+        "name": "@fastify/busboy",
+        "severity": "high",
+        "direct": false,
+        "range": "<=3.2.1",
+        "advisories": [
+          {
+            "title": "@fastify/busboy vulnerable to Denial of Service via oversized multipart boundary",
+            "url": "https://github.com/advisories/GHSA-xjh9-v7x6-24jw"
+          },
+          {
+            "title": "@fastify/busboy vulnerable to Denial of Service via prototype-named multipart part header",
+            "url": "https://github.com/advisories/GHSA-x8mw-p69m-v3mx"
+          },
+          {
+            "title": "@fastify/busboy vulnerable to CRLF injection via multipart Content-Disposition filename and name",
+            "url": "https://github.com/advisories/GHSA-gxm5-99cw-xjw9"
+          }
+        ]
+      },
+      {
+        "name": "@google-cloud/firestore",
+        "severity": "moderate",
+        "direct": false,
+        "range": "7.5.0-pre.0 || 7.6.0 - 7.11.6",
+        "advisories": []
+      },
+      {
+        "name": "@google-cloud/storage",
+        "severity": "moderate",
+        "direct": false,
+        "range": "2.2.0 - 2.5.0 || 5.19.0 - 8.0.0",
+        "advisories": []
+      },
+      {
+        "name": "@grpc/grpc-js",
+        "severity": "high",
+        "direct": false,
+        "range": "<=1.13.5",
+        "advisories": [
+          {
+            "title": "@grpc/grpc-js: A malformed request can cause a server crash",
+            "url": "https://github.com/advisories/GHSA-5375-pq7m-f5r2"
+          },
+          {
+            "title": "@grpc/grpc-js: A malformed request can cause a server crash",
+            "url": "https://github.com/advisories/GHSA-5375-pq7m-f5r2"
+          },
+          {
+            "title": "@grpc/grpc-js: An incoming malformed compressed message can cause a client or server crash",
+            "url": "https://github.com/advisories/GHSA-99f4-grh7-6pcq"
+          },
+          {
+            "title": "@grpc/grpc-js: An incoming malformed compressed message can cause a client or server crash",
+            "url": "https://github.com/advisories/GHSA-99f4-grh7-6pcq"
+          },
+          {
+            "title": "@grpc/grpc-js: In certain configurations, getAuthContext can return unauthorized certificates as though they were authorized",
+            "url": "https://github.com/advisories/GHSA-m9gg-hp2v-232j"
+          },
+          {
+            "title": "@grpc/grpc-js: The server transmits some error messages thrown by method handlers to the client in status messages",
+            "url": "https://github.com/advisories/GHSA-f596-whhp-79r4"
+          }
+        ]
+      },
+      {
+        "name": "@protobufjs/utf8",
+        "severity": "moderate",
+        "direct": false,
+        "range": "<=1.1.0",
+        "advisories": [
+          {
+            "title": "protobufjs has overlong UTF-8 decoding",
+            "url": "https://github.com/advisories/GHSA-q6x5-8v7m-xcrf"
+          }
+        ]
+      },
+      {
+        "name": "@tootallnate/once",
+        "severity": "low",
+        "direct": false,
+        "range": "<2.0.1",
+        "advisories": [
+          {
+            "title": "@tootallnate/once vulnerable to Incorrect Control Flow Scoping",
+            "url": "https://github.com/advisories/GHSA-vpq2-c234-7xj6"
+          }
+        ]
+      },
+      {
+        "name": "fast-xml-parser",
+        "severity": "critical",
+        "direct": false,
+        "range": "<=5.11.2",
+        "advisories": [
+          {
+            "title": "fast-xml-parser has an entity encoding bypass via regex injection in DOCTYPE entity names",
+            "url": "https://github.com/advisories/GHSA-m7jm-9gc2-mpf2"
+          },
+          {
+            "title": "fast-xml-parser affected by DoS through entity expansion in DOCTYPE (no expansion limit)",
+            "url": "https://github.com/advisories/GHSA-jmr7-xgp7-cmfj"
+          },
+          {
+            "title": "fast-xml-parser has stack overflow in XMLBuilder with preserveOrder",
+            "url": "https://github.com/advisories/GHSA-fj3w-jwp8-x2g3"
+          },
+          {
+            "title": "fast-xml-parser affected by numeric entity expansion bypassing all entity expansion limits (incomplete fix for CVE-2026-26278)",
+            "url": "https://github.com/advisories/GHSA-8gc5-j5rx-235r"
+          },
+          {
+            "title": "Entity Expansion Limits Bypassed When Set to Zero Due to JavaScript Falsy Evaluation in fast-xml-parser",
+            "url": "https://github.com/advisories/GHSA-jp2q-39xq-3w4g"
+          },
+          {
+            "title": "fast-xml-parser XMLBuilder: XML Comment and CDATA Injection via Unescaped Delimiters",
+            "url": "https://github.com/advisories/GHSA-gh4j-gqv2-49f6"
+          },
+          {
+            "title": "fast-xml-parser: Quadratic CPU consumption scanning unterminated stop-node tags",
+            "url": "https://github.com/advisories/GHSA-474x-hrwr-fgx4"
+          }
+        ]
+      },
+      {
+        "name": "firebase-admin",
+        "severity": "moderate",
+        "direct": true,
+        "range": "12.1.1 - 13.10.0",
+        "advisories": []
+      },
+      {
+        "name": "form-data",
+        "severity": "high",
+        "direct": false,
+        "range": "<2.5.6",
+        "advisories": [
+          {
+            "title": "form-data: CRLF injection in form-data via unescaped multipart field names and filenames",
+            "url": "https://github.com/advisories/GHSA-hmw2-7cc7-3qxx"
+          }
+        ]
+      },
+      {
+        "name": "gaxios",
+        "severity": "moderate",
+        "direct": false,
+        "range": "6.4.0 - 6.7.1",
+        "advisories": []
+      },
+      {
+        "name": "google-gax",
+        "severity": "moderate",
+        "direct": false,
+        "range": "4.0.5-experimental - 4.6.1",
+        "advisories": []
+      },
+      {
+        "name": "jws",
+        "severity": "high",
+        "direct": false,
+        "range": "=4.0.0 || <3.2.3",
+        "advisories": [
+          {
+            "title": "auth0/node-jws Improperly Verifies HMAC Signature",
+            "url": "https://github.com/advisories/GHSA-869p-cjfg-cm3x"
+          },
+          {
+            "title": "auth0/node-jws Improperly Verifies HMAC Signature",
+            "url": "https://github.com/advisories/GHSA-869p-cjfg-cm3x"
+          }
+        ]
+      },
+      {
+        "name": "nanoid",
+        "severity": "high",
+        "direct": false,
+        "range": "<=3.3.17",
+        "advisories": [
+          {
+            "title": "nanoid: non-secure generators can loop indefinitely with negative size",
+            "url": "https://github.com/advisories/GHSA-28wg-ghj8-5hjv"
+          },
+          {
+            "title": "nanoid: custom generators can loop indefinitely when size is zero",
+            "url": "https://github.com/advisories/GHSA-2v37-7h3g-55p8"
+          },
+          {
+            "title": "nanoid: Integer Overflow or Wraparound",
+            "url": "https://github.com/advisories/GHSA-xwg4-73v4-xw9w"
+          }
+        ]
+      },
+      {
+        "name": "next",
+        "severity": "critical",
+        "direct": true,
+        "range": "9.3.4-canary.0 - 16.3.0-preview.10",
+        "advisories": [
+          {
+            "title": "Next Server Actions Source Code Exposure ",
+            "url": "https://github.com/advisories/GHSA-w37m-7fhw-fmv9"
+          },
+          {
+            "title": "Next Vulnerable to Denial of Service with Server Components",
+            "url": "https://github.com/advisories/GHSA-mwv6-3258-q52c"
+          },
+          {
+            "title": "Next.js self-hosted applications vulnerable to DoS via Image Optimizer remotePatterns configuration",
+            "url": "https://github.com/advisories/GHSA-9g9p-9gw9-jx7f"
+          },
+          {
+            "title": "Next.js HTTP request deserialization can lead to DoS when using insecure React Server Components",
+            "url": "https://github.com/advisories/GHSA-h25m-26qc-wcjf"
+          },
+          {
+            "title": "Next.js: HTTP request smuggling in rewrites",
+            "url": "https://github.com/advisories/GHSA-ggv3-7p47-pfv8"
+          },
+          {
+            "title": "Next.js: Unbounded next/image disk cache growth can exhaust storage",
+            "url": "https://github.com/advisories/GHSA-3x4c-7xq6-9pq8"
+          },
+          {
+            "title": "Next.js has a Denial of Service with Server Components",
+            "url": "https://github.com/advisories/GHSA-q4gf-8mx6-v5v3"
+          },
+          {
+            "title": "Next.js Vulnerable to Denial of Service with Server Components",
+            "url": "https://github.com/advisories/GHSA-8h8q-6873-q5fj"
+          },
+          {
+            "title": "Next.js's Middleware / Proxy redirects can be cache-poisoned",
+            "url": "https://github.com/advisories/GHSA-3g8h-86w9-wvmq"
+          },
+          {
+            "title": "Next.js vulnerable to cross-site scripting in App Router applications using CSP nonces",
+            "url": "https://github.com/advisories/GHSA-ffhc-5mcf-pf4q"
+          },
+          {
+            "title": "Next.js vulnerable to cache poisoning via collisions in React Server Component cache-busting",
+            "url": "https://github.com/advisories/GHSA-vfv6-92ff-j949"
+          },
+          {
+            "title": "Next.js has cross-site scripting in beforeInteractive scripts with untrusted input",
+            "url": "https://github.com/advisories/GHSA-gx5p-jg67-6x7h"
+          },
+          {
+            "title": "Next.js vulnerable to Denial of Service via connection exhaustion in applications using Cache Components",
+            "url": "https://github.com/advisories/GHSA-mg66-mrh9-m8jx"
+          },
+          {
+            "title": "Next.js has a Denial of Service in the Image Optimization API",
+            "url": "https://github.com/advisories/GHSA-h64f-5h5j-jqjh"
+          },
+          {
+            "title": "Next.js vulnerable to server-side request forgery in applications using WebSocket upgrades",
+            "url": "https://github.com/advisories/GHSA-c4j6-fc7j-m34r"
+          },
+          {
+            "title": "Next.js has a Middleware / Proxy bypass through dynamic route parameter injection",
+            "url": "https://github.com/advisories/GHSA-492v-c6pp-mqqv"
+          },
+          {
+            "title": "Next.js vulnerable to cache poisoning in React Server Component responses",
+            "url": "https://github.com/advisories/GHSA-wfc6-r584-vfw7"
+          },
+          {
+            "title": "Next.js has a Middleware / Proxy bypass in App Router applications via segment-prefetch routes",
+            "url": "https://github.com/advisories/GHSA-267c-6grr-h53f"
+          },
+          {
+            "title": "Next.js has a Middleware / Proxy bypass in Pages Router applications using i18n",
+            "url": "https://github.com/advisories/GHSA-36qx-fr4f-26g5"
+          },
+          {
+            "title": "Next.js: Denial of Service in App Router using Server Actions",
+            "url": "https://github.com/advisories/GHSA-m99w-x7hq-7vfj"
+          },
+          {
+            "title": "Next.js: Server-Side Request Forgery in Server Actions on custom servers",
+            "url": "https://github.com/advisories/GHSA-89xv-2m56-2m9x"
+          },
+          {
+            "title": "Next.js: Cache confusion of response bodies for requests with bodies",
+            "url": "https://github.com/advisories/GHSA-68g3-v927-f742"
+          },
+          {
+            "title": "Next.js: Cache confusion of response bodies for requests with bodies containing invalid UTF-8 byte sequences",
+            "url": "https://github.com/advisories/GHSA-4633-3j49-mh5q"
+          },
+          {
+            "title": "Next.js: Unbounded Server Action payload in Edge runtime",
+            "url": "https://github.com/advisories/GHSA-4c39-4ccg-62r3"
+          },
+          {
+            "title": "Next.js: Server-Side Request Forgery in rewrites via attacker-controlled destination hostname",
+            "url": "https://github.com/advisories/GHSA-p9j2-gv94-2wf4"
+          },
+          {
+            "title": "Next.js: Unauthenticated disclosure of internal Server Function endpoints",
+            "url": "https://github.com/advisories/GHSA-955p-x3mx-jcvp"
+          },
+          {
+            "title": "Next.js: Unauthenticated Remote Code Execution on windows-hosted servers",
+            "url": "https://github.com/advisories/GHSA-p293-qw3h-jr36"
+          },
+          {
+            "title": "Next.js: Unauthenticated Remote Code Execution in Image Optimization API when AVIF files are used",
+            "url": "https://github.com/advisories/GHSA-2xp9-vwfh-vxw4"
+          },
+          {
+            "title": "Next.js has cache poisoning of SSG and ISR pages in self-hosted applications",
+            "url": "https://github.com/advisories/GHSA-4jqv-mc3x-m676"
+          },
+          {
+            "title": "Next.js has cache poisoning in SSG/ISR rendering that leads to cross-user content substitution and persistent denial of service",
+            "url": "https://github.com/advisories/GHSA-mcj8-r9mp-w47p"
+          },
+          {
+            "title": "Next.js: Unauthenticated Remote Code Execution in Image Optimization API when SVG files are used",
+            "url": "https://github.com/advisories/GHSA-2464-fhr4-w9xw"
+          },
+          {
+            "title": "Next.js: Denial of Service in App Router using Server Actions",
+            "url": "https://github.com/advisories/GHSA-p3m5-59mp-jv5r"
+          },
+          {
+            "title": "Next.js has a Middleware / Proxy bypass in App Router applications via segment-prefetch routes - Incomplete Fix Follow-Up",
+            "url": "https://github.com/advisories/GHSA-26hh-7cqf-hhc6"
+          }
+        ]
+      },
+      {
+        "name": "node-forge",
+        "severity": "high",
+        "direct": false,
+        "range": "<=1.4.2",
+        "advisories": [
+          {
+            "title": "node-forge has ASN.1 Unbounded Recursion",
+            "url": "https://github.com/advisories/GHSA-554w-wpv2-vw27"
+          },
+          {
+            "title": "node-forge has an Interpretation Conflict vulnerability via its ASN.1 Validator Desynchronization",
+            "url": "https://github.com/advisories/GHSA-5gfm-wpxj-wjgq"
+          },
+          {
+            "title": "node-forge is vulnerable to ASN.1 OID Integer Truncation",
+            "url": "https://github.com/advisories/GHSA-65ch-62r8-g69g"
+          },
+          {
+            "title": "Forge has a basicConstraints bypass in its certificate chain verification (RFC 5280 violation)",
+            "url": "https://github.com/advisories/GHSA-2328-f5f3-gj25"
+          },
+          {
+            "title": "Forge has signature forgery in Ed25519 due to missing S > L check",
+            "url": "https://github.com/advisories/GHSA-q67f-28xg-22rw"
+          },
+          {
+            "title": "Forge has Denial of Service via Infinite Loop in BigInteger.modInverse() with Zero Input",
+            "url": "https://github.com/advisories/GHSA-5m6q-g25r-mvwx"
+          },
+          {
+            "title": "Forge has signature forgery in RSA-PKCS due to ASN.1 extra field  ",
+            "url": "https://github.com/advisories/GHSA-ppp5-5v6c-4jwp"
+          },
+          {
+            "title": "node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements",
+            "url": "https://github.com/advisories/GHSA-86w9-cpqp-85rv"
+          },
+          {
+            "title": "Forge: ASN.1 OID first arc truncation in asn1.oidToDer",
+            "url": "https://github.com/advisories/GHSA-4642-5mcj-2rqw"
+          },
+          {
+            "title": "Forge: Prototype Pollution in forge.http cookie handling via a malicious Set-Cookie",
+            "url": "https://github.com/advisories/GHSA-6wvx-3r32-xmcg"
+          },
+          {
+            "title": "Forge: TLS client crash when the server sends no certificate",
+            "url": "https://github.com/advisories/GHSA-525v-9gp9-w22h"
+          },
+          {
+            "title": "Forge: Regular expression denial of service in PEM decoding (pem.decode)",
+            "url": "https://github.com/advisories/GHSA-7wch-p9px-956x"
+          },
+          {
+            "title": "Forge: Denial of Service via infinite loop in BigInteger.modInverse() with negative input (incomplete fix of CVE-2026-33891)",
+            "url": "https://github.com/advisories/GHSA-h6cr-wjv9-3cpp"
+          },
+          {
+            "title": "Forge: verifyCertificateChain() removes trusted CA certificates with the same subject from the CA store",
+            "url": "https://github.com/advisories/GHSA-4487-j8r4-4g2f"
+          },
+          {
+            "title": "Forge: AES-GCM authentication bypass via unvalidated tagLength option",
+            "url": "https://github.com/advisories/GHSA-5cwg-6vw7-rj6p"
+          },
+          {
+            "title": "Forge: PKCS#12 MAC forgery and constant-key PBE via zero iteration count",
+            "url": "https://github.com/advisories/GHSA-jc66-7q78-782g"
+          },
+          {
+            "title": "Forge: Denial of service in TLS record processing via a record interleaved with a fragmented handshake message",
+            "url": "https://github.com/advisories/GHSA-8hrf-8g6f-7xwp"
+          },
+          {
+            "title": "Forge: Denial of service in TLS record processing via call stack exhaustion",
+            "url": "https://github.com/advisories/GHSA-hqq3-7jhf-c5jx"
+          },
+          {
+            "title": "Forge: X.509 basicConstraints bypass in verifyCertificateChain() via deprecated extension OIDs 2.5.29.10 and 2.5.29.13",
+            "url": "https://github.com/advisories/GHSA-5x38-2vff-x55p"
+          },
+          {
+            "title": "Forge: Certificate signature verified with the issuer's RSA signature scheme",
+            "url": "https://github.com/advisories/GHSA-9wg5-mj3p-v49q"
+          },
+          {
+            "title": "Forge: Incomplete PKCS#7 padding validation in AES/DES CBC and ECB decryption",
+            "url": "https://github.com/advisories/GHSA-2vgq-wchc-25w7"
+          },
+          {
+            "title": "Forge: X.509 pathLenConstraint not enforced by verifyCertificateChain() for CA certificates without keyUsage",
+            "url": "https://github.com/advisories/GHSA-h46v-rmh6-fq4f"
+          },
+          {
+            "title": "Forge: ASN.1 resource exhaustion via BIT STRING decoding in asn1.fromDer",
+            "url": "https://github.com/advisories/GHSA-rhr8-3pm8-cq29"
+          },
+          {
+            "title": "Forge: RSA PKCS#1 v1.5 signature forgery via non-canonical DigestInfo encoding",
+            "url": "https://github.com/advisories/GHSA-6qrw-m8cv-hcxf"
+          },
+          {
+            "title": "Forge: Ed25519 signature verification accepts small-order public keys",
+            "url": "https://github.com/advisories/GHSA-6889-vf6x-f3g5"
+          },
+          {
+            "title": "Forge: TLS client crash on an unsupported ServerHello compression method",
+            "url": "https://github.com/advisories/GHSA-w4xr-hqv8-ch44"
+          },
+          {
+            "title": "Forge: ReDoS in forge.http response header and cookie trimming",
+            "url": "https://github.com/advisories/GHSA-6cv4-p8m7-4r25"
+          },
+          {
+            "title": "Forge: TLS client crash on a handshake record received without a session",
+            "url": "https://github.com/advisories/GHSA-j8rw-jp99-435v"
+          }
+        ]
+      },
+      {
+        "name": "postcss",
+        "severity": "high",
+        "direct": false,
+        "range": "<=8.5.22",
+        "advisories": [
+          {
+            "title": "PostCSS has XSS via Unescaped </style> in its CSS Stringify Output",
+            "url": "https://github.com/advisories/GHSA-qx2v-qp2m-jg93"
+          },
+          {
+            "title": "PostCSS: Arbitrary file read and information disclosure via attacker-controlled sourceMappingURL in CSS comments",
+            "url": "https://github.com/advisories/GHSA-6g55-p6wh-862q"
+          },
+          {
+            "title": "PostCSS: incomplete fix of GHSA-6g55-p6wh-862q — attacker-controlled sourceMappingURL reads arbitrary .map files when `from` is unset",
+            "url": "https://github.com/advisories/GHSA-fxqj-rqcc-2cmp"
+          },
+          {
+            "title": "PostCSS: Path Traversal in Previous Source Map Auto-Loading (sourceMappingURL) leads to Arbitrary .map File Disclosure",
+            "url": "https://github.com/advisories/GHSA-r28c-9q8g-f849"
+          }
+        ]
+      },
+      {
+        "name": "protobufjs",
+        "severity": "critical",
+        "direct": false,
+        "range": "<=7.6.4",
+        "advisories": [
+          {
+            "title": "protobuf.js: Code injection through bytes field defaults in generated toObject code",
+            "url": "https://github.com/advisories/GHSA-66ff-xgx4-vchm"
+          },
+          {
+            "title": "protobuf.js: Denial of service from crafted field names in generated code",
+            "url": "https://github.com/advisories/GHSA-2pr8-phx7-x9h3"
+          },
+          {
+            "title": "protobuf.js: Prototype injection in generated message constructors",
+            "url": "https://github.com/advisories/GHSA-fx83-v9x8-x52w"
+          },
+          {
+            "title": "protobuf.js: Code generation gadget after prototype pollution",
+            "url": "https://github.com/advisories/GHSA-75px-5xx7-5xc7"
+          },
+          {
+            "title": "protobuf.js: Process-wide denial of service through unsafe option paths",
+            "url": "https://github.com/advisories/GHSA-jvwf-75h9-cwgg"
+          },
+          {
+            "title": "protobuf.js: Denial of service through unbounded protobuf recursion",
+            "url": "https://github.com/advisories/GHSA-685m-2w69-288q"
+          },
+          {
+            "title": "protobufjs has overlong UTF-8 decoding",
+            "url": "https://github.com/advisories/GHSA-q6x5-8v7m-xcrf"
+          },
+          {
+            "title": "protobufjs: Denial of Service via unbounded recursive JSON descriptor expansion",
+            "url": "https://github.com/advisories/GHSA-jggg-4jg4-v7c6"
+          },
+          {
+            "title": "protobufjs: Denial of service through unbounded Any expansion during JSON conversion",
+            "url": "https://github.com/advisories/GHSA-wcpc-wj8m-hjx6"
+          },
+          {
+            "title": "protobufjs : Schema-derived names can shadow runtime-significant properties",
+            "url": "https://github.com/advisories/GHSA-f38q-mgvj-vph7"
+          },
+          {
+            "title": "protobufjs: Denial of Service via infinite loop in .proto option parsing",
+            "url": "https://github.com/advisories/GHSA-j3f2-48v5-ccww"
+          },
+          {
+            "title": "protobufjs has an arbitrary code execution issue",
+            "url": "https://github.com/advisories/GHSA-xq3m-2v4x-88gg"
+          }
+        ]
+      },
+      {
+        "name": "retry-request",
+        "severity": "moderate",
+        "direct": false,
+        "range": "7.0.0 - 7.0.2",
+        "advisories": []
+      },
+      {
+        "name": "sharp",
+        "severity": "high",
+        "direct": false,
+        "range": "<=0.35.5-rc.1",
+        "advisories": [
+          {
+            "title": "sharp inherited vulnerabilities in libvips: CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591",
+            "url": "https://github.com/advisories/GHSA-f88m-g3jw-g9cj"
+          },
+          {
+            "title": "sharp: Vulnerabilities in libheif: GHSA-g89c-p67h-r497 and GHSA-2jg2-4ch7-h545",
+            "url": "https://github.com/advisories/GHSA-rgj7-g3m4-5g8c"
+          },
+          {
+            "title": "sharp : Vulnerability in librsvg dependency CVE-2026-96889",
+            "url": "https://github.com/advisories/GHSA-wq5f-xc86-pv6w"
+          }
+        ]
+      },
+      {
+        "name": "source-map-js",
+        "severity": "high",
+        "direct": false,
+        "range": "1.0.0 - 1.2.1",
+        "advisories": [
+          {
+            "title": "source-map-js allows event-loop denial of service through indexed source-map section offsets",
+            "url": "https://github.com/advisories/GHSA-68fv-2mgg-jv7q"
+          }
+        ]
+      },
+      {
+        "name": "teeny-request",
+        "severity": "moderate",
+        "direct": false,
+        "range": "3.9.1 - 9.0.0",
+        "advisories": []
+      },
+      {
+        "name": "uuid",
+        "severity": "moderate",
+        "direct": false,
+        "range": "<11.1.1",
+        "advisories": [
+          {
+            "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+            "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq"
+          }
+        ]
+      },
+      {
+        "name": "websocket-driver",
+        "severity": "critical",
+        "direct": false,
+        "range": "<=0.7.4",
+        "advisories": [
+          {
+            "title": "websocket-driver: Resource limit bypass via message compression",
+            "url": "https://github.com/advisories/GHSA-mp7j-qc5w-4988"
+          },
+          {
+            "title": "websocket-driver: Message corruption via abuse of protocol length headers",
+            "url": "https://github.com/advisories/GHSA-xv26-6w52-cph6"
+          }
+        ]
+      }
+    ]
+  },
+  "target": "https://livekit-frontend-tau.vercel.app",
+  "api": [
+    {
+      "method": "GET",
+      "path": "/api/doctor/history",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 2300,
+      "status": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/patient/consultations",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 336,
+      "status": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/patient/pending-waiting-room",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 337,
+      "status": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/summary/process-queue",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 2127,
+      "status": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/invite/get-link?roomName=thesis-synthetic",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 309,
+      "status": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/waiting-room/list",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 346,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/doctor-access",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 333,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/invite/create",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 2341,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/invite/revoke",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 371,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/link-patient-consultations",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 315,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/patient/consent",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 919,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/summary/generate",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 356,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/token",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 318,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/track-consultation",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 388,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/track-doctor-presence",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 325,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/user/role-conflict",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 330,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/waiting-room/admit",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 309,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/waiting-room/check-admission",
+      "statusCode": 400,
+      "successFalse": true,
+      "durationMs": 479,
+      "status": "FAIL"
+    },
+    {
+      "method": "POST",
+      "path": "/api/waiting-room/mark-left",
+      "statusCode": 400,
+      "successFalse": true,
+      "durationMs": 320,
+      "status": "FAIL"
+    },
+    {
+      "method": "POST",
+      "path": "/api/waiting-room/reject",
+      "statusCode": 401,
+      "successFalse": true,
+      "durationMs": 302,
+      "status": "PASS"
+    }
+  ],
+  "pages": [
+    {
+      "path": "/",
+      "samples": [
+        {
+          "trial": 1,
+          "statusCode": 200,
+          "headersMs": 58,
+          "totalMs": 62,
+          "bytes": 6615,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 2,
+          "statusCode": 200,
+          "headersMs": 51,
+          "totalMs": 52,
+          "bytes": 6615,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 3,
+          "statusCode": 200,
+          "headersMs": 47,
+          "totalMs": 48,
+          "bytes": 6615,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 4,
+          "statusCode": 200,
+          "headersMs": 55,
+          "totalMs": 55,
+          "bytes": 6615,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 5,
+          "statusCode": 200,
+          "headersMs": 48,
+          "totalMs": 49,
+          "bytes": 6615,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 6,
+          "statusCode": 200,
+          "headersMs": 46,
+          "totalMs": 47,
+          "bytes": 6615,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 7,
+          "statusCode": 200,
+          "headersMs": 82,
+          "totalMs": 82,
+          "bytes": 6615,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 8,
+          "statusCode": 200,
+          "headersMs": 51,
+          "totalMs": 52,
+          "bytes": 6615,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 9,
+          "statusCode": 200,
+          "headersMs": 64,
+          "totalMs": 66,
+          "bytes": 6615,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 10,
+          "statusCode": 200,
+          "headersMs": 47,
+          "totalMs": 48,
+          "bytes": 6615,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        }
+      ],
+      "n": 10,
+      "medianMs": 52,
+      "p95Ms": 82,
+      "meanMs": 56,
+      "criterion": "Exploratory HTTP body response p95 <= 3000 ms and all ten status 200; this is not browser LCP or media latency",
+      "status": "PASS"
+    },
+    {
+      "path": "/access-denied?reason=invalid-token",
+      "samples": [
+        {
+          "trial": 1,
+          "statusCode": 200,
+          "headersMs": 1461,
+          "totalMs": 1462,
+          "bytes": 6687,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "PRERENDER"
+          }
+        },
+        {
+          "trial": 2,
+          "statusCode": 200,
+          "headersMs": 192,
+          "totalMs": 192,
+          "bytes": 6687,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 3,
+          "statusCode": 200,
+          "headersMs": 93,
+          "totalMs": 94,
+          "bytes": 6687,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 4,
+          "statusCode": 200,
+          "headersMs": 88,
+          "totalMs": 89,
+          "bytes": 6687,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 5,
+          "statusCode": 200,
+          "headersMs": 84,
+          "totalMs": 85,
+          "bytes": 6687,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 6,
+          "statusCode": 200,
+          "headersMs": 66,
+          "totalMs": 66,
+          "bytes": 6687,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 7,
+          "statusCode": 200,
+          "headersMs": 73,
+          "totalMs": 74,
+          "bytes": 6687,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 8,
+          "statusCode": 200,
+          "headersMs": 74,
+          "totalMs": 75,
+          "bytes": 6687,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 9,
+          "statusCode": 200,
+          "headersMs": 108,
+          "totalMs": 109,
+          "bytes": 6687,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        },
+        {
+          "trial": 10,
+          "statusCode": 200,
+          "headersMs": 89,
+          "totalMs": 90,
+          "bytes": 6687,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT"
+          }
+        }
+      ],
+      "n": 10,
+      "medianMs": 89.5,
+      "p95Ms": 1462,
+      "meanMs": 234,
+      "criterion": "Exploratory HTTP body response p95 <= 3000 ms and all ten status 200; this is not browser LCP or media latency",
+      "status": "PASS"
+    }
+  ],
+  "finishedAt": "2026-11-17T08:37:14.462Z"
+}

@@ -1,10 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { User } from 'firebase/auth';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
+import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 import { useAuthSession } from '@/hooks/useAuthSession';
 import {
   getPendingConsultationSessionIds,
@@ -165,15 +165,14 @@ export default function PatientDashboard() {
   const { showToast } = useToast();
   const router = useRouter();
 
-  const handleAuthenticated = useCallback(async (authenticatedUser: User) => {
+  // Identity comes from the bearer token; only pending record ids are payload.
+  const handleAuthenticated = useCallback(async () => {
     try {
       const pendingSessionIds = getPendingConsultationSessionIds();
-      const response = await fetch('/api/link-patient-consultations', {
+      const response = await authenticatedFetch('/api/link-patient-consultations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: authenticatedUser.uid,
-          userEmail: authenticatedUser.email,
           pendingSessionIds,
         }),
       });
