@@ -7,7 +7,7 @@ import { PATIENT_ROOM_GRID } from '../../../room/[room]/components/shared/room-g
 
 interface PatientLiveKitRoomProps {
   token: string;
-  onDisconnected: () => void;
+  onDisconnected: (reason?: unknown) => void;
   onError: (error: Error) => void;
   onLeaveClick?: () => void;
   consultationSessionId?: string | null;

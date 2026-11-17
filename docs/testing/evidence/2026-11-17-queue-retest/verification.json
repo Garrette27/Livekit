@@ -1,0 +1,81 @@
+{
+  "testedAt": "2026-11-17T15:09:06.897Z",
+  "node": "v22.23.0",
+  "baseCommit": "6df6ef7dbae88a23fb28a48366abcd21021ea6fe",
+  "sourceState": "working tree remediation; release commit recorded in PR",
+  "checks": [
+    {
+      "name": "typecheck",
+      "exitCode": 0,
+      "durationMs": 4542,
+      "status": "PASS"
+    },
+    {
+      "name": "build",
+      "exitCode": 0,
+      "durationMs": 49646,
+      "status": "PASS"
+    },
+    {
+      "name": "rules",
+      "exitCode": 0,
+      "durationMs": 12890,
+      "status": "PASS"
+    },
+    {
+      "name": "application-audit",
+      "exitCode": 0,
+      "durationMs": 1093,
+      "status": "PASS"
+    },
+    {
+      "name": "functions-audit",
+      "exitCode": 0,
+      "durationMs": 890,
+      "status": "PASS"
+    },
+    {
+      "name": "lint",
+      "exitCode": 0,
+      "status": "PASS",
+      "durationMs": 6473
+    },
+    {
+      "name": "policy",
+      "exitCode": 0,
+      "status": "PASS",
+      "durationMs": 1286
+    },
+    {
+      "name": "api-regressions",
+      "exitCode": 0,
+      "status": "PASS",
+      "durationMs": 29125
+    }
+  ],
+  "rulesSha256": "a96044637bfb56c7821c7bb791faa59b553486659027956a051581d741c8b53f",
+  "finishedAt": "2026-11-17T15:10:19.560Z",
+  "sourceHashes": {
+    "firestore.rules": "a96044637bfb56c7821c7bb791faa59b553486659027956a051581d741c8b53f",
+    "package.json": "9fd30a6e1c9ea3c522db9b09cb9999373112507d999c4d11b31b4547c8019b10",
+    "package-lock.json": "360097517fa83505442f9fc314e5d8442fb3d1bee59d275fd77be49659204f79",
+    "functions/package.json": "3f2ca27539e09297ea379888c614c88aaea65374519fe177abaac9262612b891",
+    "functions/package-lock.json": "a982c6b4630a7db2a732a1525fc91858f4856181486a4d80bb8bc2c2682d24e5",
+    "app/patient/login/page.tsx": "5370719c2a7c06dda9f0bae422bae8cff285b853fdafb2b03054c63a3cbfdaf1",
+    "functions/test/security-rules.test.cjs": "5d9fb968ccf3be5cda419c40b98933c83753bb46f0f59472352553b9d13d478a",
+    "eslint.config.mjs": "ff65c7ea35c057d68f426d506f72fe101d48a68709d503e5352c4975aa5443a9",
+    "app/patient/dashboard/page.tsx": "73413128595b29870ca9b3ea07cdd10b924cb57822bc08c4c1a88f13d066d1b5",
+    "hooks/useWaitingQueue.ts": "8c128f6c989a56cc28faf056976d676a5fb54d67ee0e6d35bd7e2d78957236f1",
+    "lib/waiting-room/waiting-queue-coordinator.ts": "63030535c1aab17c522e7f38f9994a95ac6d631f2cb752d57bac20c51117932c",
+    "lib/services/transcription/openai-audio-transcriber.ts": "3076a7154105c4b96aafdd0a80149bd911b7a1720814cab3077fa4ecd055dfbb",
+    "app/api/session-transcription/chunks/route.ts": "401a58cd93f944c4a9247cd42edf8f814a9d8dfcde4e323ef0d7dcc1123afaa8",
+    "app/room/[room]/components/shared/SessionTranscriptionBridge.tsx": "807abbe5174573015af5694390db9693da8350415f2e10a87e2c8b19901a52c4",
+    "app/room/[room]/doctor/components/WaitingRoomPanel.tsx": "e5eaaf38cce416b5d728d4f1a6a8f7682cc682820ce469eeacc452a230b8e8cb",
+    "app/doctor/invitations/components/WaitingPatientsList.tsx": "7cdf871a4a37ddf00296ea3576913c77fe2046224327094f404edb06a036e1f1",
+    "tests/queue-and-auth-regressions.test.mjs": "dcb19699bfce35fe739c9b593780aa83faa22141e52ed29b0c564e7d1a7e7ed6",
+    "app/invite/[token]/page.tsx": "f7f139a84b040f8dd44f1a360a37b836b2a9898042a0229472d91ae230a7bf7e",
+    "app/invite/[token]/components/PatientLiveKitRoom.tsx": "bda6d52984b8b12be98fecc55b48838b1dde951cceccdc1413b6c0320b01d7b9",
+    "app/room/[room]/patient/page.tsx": "a72e42b1ea7b13557e492b187827f54f55115ae05f2fb2859f471a00081f3913"
+  },
+  "finalizedAt": "2026-11-17T15:11:36.041Z"
+}

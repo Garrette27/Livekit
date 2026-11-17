@@ -1,0 +1,118 @@
+
+> livekit-frontend@0.2.0 test:security
+> node scripts/regression-security-contracts.mjs && node scripts/regression-thesis-flow-contracts.mjs && node --test tests/security-policies.test.mjs tests/queue-and-auth-regressions.test.mjs
+
+Security architecture regression contracts passed.
+Thesis invitation, consent, summary, and UI contracts verified.
+TAP version 13
+# Subtest: duplicate-identity replacement detaches the old page without closing the continuing visit
+ok 1 - duplicate-identity replacement detaches the old page without closing the continuing visit
+  ---
+  duration_ms: 137.229241
+  type: 'test'
+  ...
+# Subtest: authenticated requests add the token without sending caller-asserted identity
+ok 2 - authenticated requests add the token without sending caller-asserted identity
+  ---
+  duration_ms: 40.327573
+  type: 'test'
+  ...
+# Subtest: realtime invalidates without exposing snapshot rows, shares a listener, and cleans up
+ok 3 - realtime invalidates without exposing snapshot rows, shares a listener, and cleans up
+  ---
+  duration_ms: 32.537293
+  type: 'test'
+  ...
+# Subtest: periodic refresh survives stream failure and shared requests stay deduplicated
+ok 4 - periodic refresh survives stream failure and shared requests stay deduplicated
+  ---
+  duration_ms: 21.864327
+  type: 'test'
+  ...
+# Subtest: canonical queue excludes stale, expired, revoked, other-room and other-doctor rows
+ok 5 - canonical queue excludes stale, expired, revoked, other-room and other-doctor rows
+  ---
+  duration_ms: 123.182239
+  type: 'test'
+  ...
+# Subtest: transcription retries at most twice and carries only bounded provider status
+ok 6 - transcription retries at most twice and carries only bounded provider status
+  ---
+  duration_ms: 21.637281
+  type: 'test'
+  ...
+# Subtest: faculty reviewer remains deny-by-default except for assignment permission
+ok 7 - faculty reviewer remains deny-by-default except for assignment permission
+  ---
+  duration_ms: 69.355125
+  type: 'test'
+  ...
+# Subtest: review assignment is exact, active, and time bounded
+ok 8 - review assignment is exact, active, and time bounded
+  ---
+  duration_ms: 17.661455
+  type: 'test'
+  ...
+# Subtest: concurrent invitation reservations cannot exceed maxUses
+ok 9 - concurrent invitation reservations cannot exceed maxUses
+  ---
+  duration_ms: 35.098497
+  type: 'test'
+  ...
+# Subtest: consultation history sort values describe the resulting order
+ok 10 - consultation history sort values describe the resulting order
+  ---
+  duration_ms: 53.25386
+  type: 'test'
+  ...
+# Subtest: waiting-room timestamp transport understands Firestore JSON shapes
+ok 11 - waiting-room timestamp transport understands Firestore JSON shapes
+  ---
+  duration_ms: 12.459017
+  type: 'test'
+  ...
+# Subtest: invitation presentation counts hashed identities without exposing addresses
+ok 12 - invitation presentation counts hashed identities without exposing addresses
+  ---
+  duration_ms: 19.373081
+  type: 'test'
+  ...
+# Subtest: prepared consultation capabilities default to disabled
+ok 13 - prepared consultation capabilities default to disabled
+  ---
+  duration_ms: 5.570305
+  type: 'test'
+  ...
+# Subtest: only a verified allowlisted identity skips the waiting room
+ok 14 - only a verified allowlisted identity skips the waiting room
+  ---
+  duration_ms: 16.302376
+  type: 'test'
+  ...
+# Subtest: security-signal hashing keeps production invitation validation available
+ok 15 - security-signal hashing keeps production invitation validation available
+  ---
+  duration_ms: 15.872441
+  type: 'test'
+  ...
+# Subtest: Google and password accounts with a confirmed email are the same evidence
+ok 16 - Google and password accounts with a confirmed email are the same evidence
+  ---
+  duration_ms: 11.023454
+  type: 'test'
+  ...
+# Subtest: consent is a versioned record, and the old registration flag is not it
+ok 17 - consent is a versioned record, and the old registration flag is not it
+  ---
+  duration_ms: 16.52225
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 972.347635

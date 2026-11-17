@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState, Suspense, Dispatch, SetStateAction } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { sendEmailVerification } from 'firebase/auth';
+import { DisconnectReason } from 'livekit-client';
+import { useToast } from '@/components/ui/feedback/ToastProvider';
 import PatientLiveKitRoom from './components/PatientLiveKitRoom';
 import TelehealthConsentStep from '@/components/TelehealthConsentStep';
 import { useAuthSession } from '@/hooks/useAuthSession';
@@ -144,6 +146,7 @@ function InvitePageContent() {
   const router = useRouter();
   const token = params.token as string;
   const { user, isAuthenticated, isLoading: authLoading } = useAuthSession();
+  const { showToast } = useToast();
   const disableLiveKitForE2E = process.env.NEXT_PUBLIC_E2E_MODE === '1';
   
   const [isValidating, setIsValidating] = useState(true);
@@ -468,6 +471,26 @@ function InvitePageContent() {
   const handleConsultationExit = useCallback(() => {
     finalizeConsultationExit(true);
   }, [finalizeConsultationExit]);
+
+  /** A replaced transport is not a leave command for the continuing visit. */
+  const handleRoomDisconnect = useCallback((reason?: unknown) => {
+    if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
+      // This page no longer owns the connection. Its unload/unmount handlers
+      // must not mark the shared admission left or finalize the other client.
+      hasProcessedExitRef.current = true;
+      validationResultRef.current = null;
+      trackedJoinKeyRef.current = null;
+      showToast({
+        kind: 'info',
+        title: 'Consultation opened elsewhere',
+        message: 'Another browser or device joined this patient admission. Continue there; this window has disconnected.',
+        durationMs: 10_000,
+      });
+      router.replace(getPostCallRedirectPath());
+      return;
+    }
+    handleConsultationExit();
+  }, [getPostCallRedirectPath, handleConsultationExit, router, showToast]);
 
   useEffect(() => {
     finalizeConsultationExitRef.current = finalizeConsultationExit;
@@ -823,10 +846,7 @@ function InvitePageContent() {
                 <PatientLiveKitRoom
                   token={validationResult.liveKitToken}
                   consultationSessionId={null}
-                  onDisconnected={() => {
-                    console.log('Patient disconnected from waiting room');
-                    router.push('/');
-                  }}
+                  onDisconnected={handleRoomDisconnect}
                   onError={(error) => {
                     console.error('Waiting room error:', error);
                   }}
@@ -919,10 +939,7 @@ function InvitePageContent() {
         <PatientLiveKitRoom
           token={validationResult.liveKitToken}
           consultationSessionId={activeConsultationSessionId}
-          onDisconnected={() => {
-            console.log('Patient disconnected from consultation');
-            handleConsultationExit();
-          }}
+          onDisconnected={handleRoomDisconnect}
           onError={(error) => {
             console.error('LiveKit error:', error);
             // Only set error for critical errors, not permission warnings

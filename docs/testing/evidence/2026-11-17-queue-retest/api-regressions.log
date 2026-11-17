@@ -1,0 +1,30 @@
+
+Running 23 tests using 1 worker
+
+  ✓   1 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › GET /api/doctor/history rejects anonymous callers (2.0s)
+  ✓   2 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › GET /api/patient/consultations rejects anonymous callers (428ms)
+  ✓   3 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › GET /api/patient/pending-waiting-room rejects anonymous callers (915ms)
+  ✓   4 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › GET /api/summary/process-queue rejects anonymous callers (467ms)
+  ✓   5 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › GET /api/invite/get-link?roomName=security-test rejects anonymous callers (464ms)
+  ✓   6 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › GET /api/waiting-room/list rejects anonymous callers (2.9s)
+  ✓   7 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/doctor-access rejects anonymous callers (573ms)
+  ✓   8 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/invite/create rejects anonymous callers (516ms)
+  ✓   9 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/invite/revoke rejects anonymous callers (561ms)
+  ✓  10 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/link-patient-consultations rejects anonymous callers (598ms)
+  ✓  11 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/patient/consent rejects anonymous callers (542ms)
+  ✓  12 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/summary/generate rejects anonymous callers (597ms)
+  ✓  13 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/token rejects anonymous callers (561ms)
+  ✓  14 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/track-consultation rejects anonymous callers (775ms)
+  ✓  15 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/track-doctor-presence rejects anonymous callers (705ms)
+  ✓  16 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/user/role-conflict rejects anonymous callers (802ms)
+  ✓  17 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/waiting-room/admit rejects anonymous callers (732ms)
+  ✓  18 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/waiting-room/check-admission rejects anonymous callers (804ms)
+  ✓  19 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/waiting-room/mark-left rejects anonymous callers (788ms)
+  ✓  20 [mobile-chromium] › e2e/api-access-control.spec.ts:40:9 › API access control › POST /api/waiting-room/reject rejects anonymous callers (832ms)
+  ✓  21 [mobile-chromium] › e2e/api-access-control.spec.ts:52:7 › API access control › password reset response does not disclose account details (770ms)
+  ✓  22 [mobile-chromium] › e2e/api-access-control.spec.ts:65:7 › API access control › password reset does not expose a user-status GET endpoint (43ms)
+  ✓  23 [mobile-chromium] › e2e/api-access-control.spec.ts:70:7 › API access control › unsigned LiveKit webhooks fail closed (995ms)
+
+  23 passed (27.2s)
+[2m[WebServer] [22mLiveKit webhook verification is not configured
+[2m[WebServer] [22mRejected webhook request: verification_not_configured

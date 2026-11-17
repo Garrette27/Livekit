@@ -14,6 +14,10 @@ fix and successful focused retests; read it for the current disposition.
 The HTTP performance pilot meets its limited response-time target. Overall
 consultation performance remains NOT TESTED. These are different conclusions.
 
+The [application/RBAC follow-up](application-readiness-follow-up.md) documents
+the subsequently reported queue, history-linking and transcription failures,
+candidate fixes, browser-session interpretation and deployment blockers.
+
 The package contains measured evidence, reproducible scripts, proposed acceptance
 criteria, and failures. It is suitable as technical supporting material, subject
 to the authors checking their manuscript and adviser requirements. It is not an

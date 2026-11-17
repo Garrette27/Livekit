@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-17",
+  "timezone": "Asia/Singapore",
+  "sources": {
+    "browser": "User-supplied screenshots and live redacted accessibility inspection of Chrome DevTools",
+    "runtimeLogs": "Authorized Vercel production log search; 40-minute lookback; query Session audio transcription failed; limit 20"
+  },
+  "observations": [
+    {"endpoint": "/api/link-patient-consultations", "status": 401, "code": "missing_token", "sourceVerified": true},
+    {"endpoint": "/api/session-transcription/chunks", "status": 502, "upstreamProviderStatus": 429, "matchingSampledLogRecords": 20, "totalFailureRateEstablished": false},
+    {"event": "patient_session_replaced_after_second_browser_join", "source": "user report", "duplicateIdentityConsistentWithSource": true, "actualDisconnectReasonRecovered": false}
+  ],
+  "measurementStatus": {
+    "mediaLatency": "NOT TESTED",
+    "concurrentCallCapacity": "NOT TESTED",
+    "clinicianDocumentationEfficiency": "NOT TESTED"
+  },
+  "productionRecordsDeleted": false,
+  "agentCreatedTestInvitation": false
+}

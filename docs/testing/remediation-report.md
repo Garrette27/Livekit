@@ -36,7 +36,7 @@ are required to collect the remaining results.
 | Application dependency audit | 23 affected production package entries, including 4 critical and 9 high | Zero findings in full candidate audit |
 | Cloud Functions dependency audit | Not established by original application-only inventory | Zero findings in full candidate audit |
 | Existing Storage upload test | Failed because it expected removed note uploads | Corrected to assert disabled upload behavior; passes |
-| Application policy tests | 11 passed | 11 passed |
+| Application policy tests | 11 passed | 17 passed after follow-up (11 existing plus 6 focused regressions) |
 | Repository Firebase rules suite | 3 passed, 1 obsolete test failed | 7 passed, including positive owner and provisioned-doctor cases |
 | Tests using retrieved deployed rules | 2 failed | 2 passed |
 | Candidate local API regression suite | Not run in baseline | 23 passed, including missing-credential denial and unsigned webhook rejection |
@@ -117,7 +117,7 @@ The baseline assessment identified two authorization failures in the active
 Firestore rules. A signed-in synthetic user could read another profile and
 change their own role to doctor. After remediation and deployment verification,
 both original attack cases were denied in an emulator using the retrieved
-updated rule source. Seven repository rules cases and eleven application policy
+updated rule source. Seven repository rules cases and seventeen application
 tests passed. Audits of both updated dependency trees returned zero findings at
 the time of the retest.
 
@@ -142,6 +142,39 @@ statements as well as time. Without a reviewer, the study cannot claim reduced
 clinical documentation effort. Use `record-performance.mjs` to validate completed
 observations; an empty dataset produces NOT TESTED rather than a fabricated pass.
 
+## Application and RBAC follow-up
+
+The follow-up verified a missing bearer token on the patient dashboard's
+history-link request and a second, unfiltered realtime queue read path. The
+candidate now uses the shared authenticated request adapter and re-queries the
+canonical doctor-owned, room-scoped API when Firestore invalidates the queue.
+Periodic refresh remains active for expiry and stale-entry filtering. Historical
+records are retained. Queue labels say Admitted, not that admission proves a
+current media connection. Six focused regressions join the eleven existing tests.
+
+The observed optional-transcription 502 responses corresponded to upstream
+OpenAI 429 responses in a bounded production log sample. The candidate reports
+provider capacity refusal as unavailable, pauses optional uploads with visible
+feedback, and caps retries at two attempts. Provider rate/quota availability is
+not fixed by this code. No automatic transcription consent was accepted.
+
+The reported replacement of a patient call after a second browser joined is
+consistent with reused participant identity and LiveKit's documented uniqueness
+policy; the actual disconnect reason was not recovered. A related client defect
+was fixed: the replaced page must not mark the continuing shared admission left
+or finalize its encounter. Both patient routes now detach with a modeless notice
+on duplicate identity, while ordinary exits keep their normal path. Incognito is a temporary
+isolated browser session, not a demonstrated performance optimization. Keep one
+patient connection per admission. RSC navigation payloads and region-discovery
+responses are not media-latency measurements.
+
+The PR's application release remains blocked by Vercel Git-author/team access
+checks. These patches are not asserted to be live. No account permissions,
+clinical history, faculty scope, attachment capability or scheduling capability
+was changed. The labelled new test invitation has not been created by the agent.
+Real media metrics, concurrent calls and clinician efficiency remain NOT TESTED.
+See application-readiness-follow-up.md and the separate queue-retest evidence.
+
 ## References
 
 OWASP ASVS 5.0.0: https://asvs.owasp.org/downloads/
@@ -155,3 +188,7 @@ ISO/IEC 25010:2023: https://www.iso.org/standard/78176.html
 Firebase rule testing: https://firebase.google.com/docs/rules/unit-tests
 
 WebRTC statistics: https://www.w3.org/TR/webrtc-stats/
+
+LiveKit participant identity: https://docs.livekit.io/intro/basics/rooms-participants-tracks/participants/
+
+Chrome Incognito sessions: https://support.google.com/chrome/answer/95464?hl=en

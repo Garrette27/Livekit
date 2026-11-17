@@ -23,6 +23,8 @@ for name in ['Title', 'Heading1', 'Heading2']:
 styles['BodyText'].fontSize = 10.5
 styles['BodyText'].leading = 15
 styles['BodyText'].spaceAfter = 8
+styles['BodyText'].allowWidows = 0
+styles['BodyText'].allowOrphans = 0
 styles.add(ParagraphStyle(name='Cell', fontName='Helvetica', fontSize=9, leading=12, wordWrap='CJK'))
 story = []
 lines = source.read_text(encoding='utf8').splitlines()

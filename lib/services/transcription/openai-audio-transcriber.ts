@@ -2,6 +2,14 @@ const OPENAI_TRANSCRIPTION_ENDPOINT = 'https://api.openai.com/v1/audio/transcrip
 const DEFAULT_TRANSCRIPTION_MODEL = 'gpt-4o-transcribe';
 const TRANSCRIPTION_TIMEOUT_MS = 25_000;
 
+/** Bounded provider status only; never retain the upstream audio/error body. */
+export class AudioTranscriptionProviderError extends Error {
+  constructor(public readonly providerStatus: number) {
+    super(`OpenAI audio transcription failed with status ${providerStatus}`);
+    this.name = 'AudioTranscriptionProviderError';
+  }
+}
+
 export interface AudioTranscriptionResult {
   text: string;
   model: string;
@@ -53,9 +61,11 @@ export class OpenAiAudioTranscriber {
     };
 
     let response: Response;
+    let transportRetried = false;
     try {
       response = await attempt();
     } catch (firstError) {
+      transportRetried = true;
       console.warn('OpenAI audio transcription request failed; retrying once.');
       try {
         response = await attempt();
@@ -64,12 +74,14 @@ export class OpenAiAudioTranscriber {
       }
     }
 
-    if (isTransientStatus(response.status)) {
+    // A transport retry already consumed the budget. Keep at most two
+    // 25-second attempts inside the route's 60-second execution limit.
+    if (isTransientStatus(response.status) && !transportRetried) {
       console.warn('OpenAI audio transcription returned a transient status; retrying once:', response.status);
       response = await attempt();
     }
     if (!response.ok) {
-      throw new Error(`OpenAI audio transcription failed with status ${response.status}`);
+      throw new AudioTranscriptionProviderError(response.status);
     }
 
     const payload = (await response.json()) as { text?: unknown };

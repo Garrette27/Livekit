@@ -14,28 +14,26 @@
 
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { WaitingPatient } from '@/lib/types';
 
 type Unsubscribe = () => void;
 
 interface StreamSubscriber {
-  onPatients: (waitingPatients: WaitingPatient[]) => void;
+  onInvalidate: () => void;
   onUnavailable: (reason: unknown) => void;
 }
 
 interface StreamGroup {
   subscribers: Set<StreamSubscriber>;
   unsubscribe: Unsubscribe;
-  latestPatients: WaitingPatient[] | null;
 }
 
 const streamGroupsByDoctor = new Map<string, StreamGroup>();
 
 /**
- * Streams the doctor's waiting patients from Firestore instead of asking the
- * server on a timer. Firestore pushes changes, so a patient appears in the
- * queue as soon as they arrive rather than up to one poll interval later, and
- * an idle consultation costs nothing.
+ * Invalidates the doctor's queue when Firestore changes. Snapshot contents
+ * never become UI state: callers re-query the authenticated API, whose room,
+ * invitation-expiry and freshness projection is authoritative. Sharing this
+ * listener keeps multiple panels from creating duplicate subscriptions.
  *
  * `onUnavailable` is the important part of this interface: security rules,
  * offline state, or a missing client can all make the stream impossible, and in
@@ -43,9 +41,9 @@ const streamGroupsByDoctor = new Map<string, StreamGroup>();
  * rather than show an empty queue. Returns null when no listener could be
  * started at all.
  */
-export function subscribeToDoctorWaitingPatients(input: {
+export function subscribeToDoctorQueueChanges(input: {
   doctorUserId: string;
-  onPatients: (waitingPatients: WaitingPatient[]) => void;
+  onInvalidate: () => void;
   onUnavailable: (reason: unknown) => void;
 }): Unsubscribe | null {
   if (!db || !input.doctorUserId) {
@@ -53,7 +51,7 @@ export function subscribeToDoctorWaitingPatients(input: {
   }
 
   const subscriber: StreamSubscriber = {
-    onPatients: input.onPatients,
+    onInvalidate: input.onInvalidate,
     onUnavailable: input.onUnavailable,
   };
 
@@ -67,19 +65,13 @@ export function subscribeToDoctorWaitingPatients(input: {
       );
       const createdGroup: StreamGroup = {
         subscribers,
-        latestPatients: null,
         unsubscribe: () => undefined,
       };
       createdGroup.unsubscribe = onSnapshot(
         waitingQuery,
-        (snapshot) => {
-          const patients = snapshot.docs.map((waitingDoc) => ({
-            id: waitingDoc.id,
-            ...(waitingDoc.data() as Omit<WaitingPatient, 'id'>),
-          }));
-          createdGroup.latestPatients = patients;
+        () => {
           createdGroup.subscribers.forEach((currentSubscriber) => {
-            currentSubscriber.onPatients(patients);
+            currentSubscriber.onInvalidate();
           });
         },
         (streamError) => {
@@ -94,9 +86,6 @@ export function subscribeToDoctorWaitingPatients(input: {
     }
 
     group.subscribers.add(subscriber);
-    if (group.latestPatients) {
-      subscriber.onPatients(group.latestPatients);
-    }
 
     const joinedGroup = group;
     return () => {

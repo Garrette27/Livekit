@@ -3,7 +3,7 @@ import {mkdirSync,writeFileSync,readFileSync,readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 
 /** Keep remediation evidence separate from the failed baseline. */
-const dir='docs/testing/evidence/2026-11-17-remediation';
+const dir=process.env.THESIS_OUTPUT || 'docs/testing/evidence/2026-11-17-remediation';
 mkdirSync(dir,{recursive:true});
 const report={testedAt:new Date().toISOString(),node:process.version,baseCommit:spawnSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).stdout.trim(),sourceState:'working tree remediation; release commit recorded in PR',checks:[]};
 for (const [name,command,args] of [
@@ -15,10 +15,10 @@ for (const [name,command,args] of [
   ['application-audit','npm',['audit','--json']],
   ['functions-audit','npm',['--prefix','functions','audit','--json']],
 ]) {
-  const start=Date.now();
+  const start=performance.now();
   const r=spawnSync(command,args,{encoding:'utf8',timeout:240000,maxBuffer:10*1024*1024});
   writeFileSync(`${dir}/${name}.${name.includes('audit')?'json':'log'}`,(r.stdout||'')+(name.includes('audit')?'':r.stderr||''));
-  report.checks.push({name,exitCode:r.status,durationMs:Date.now()-start,status:r.status===0?'PASS':'FAIL'});
+  report.checks.push({name,exitCode:r.status,durationMs:Math.round(performance.now()-start),status:r.status===0?'PASS':'FAIL'});
   console.log(report.checks.at(-1));
 }
 report.rulesSha256=createHash('sha256').update(readFileSync('firestore.rules')).digest('hex');
