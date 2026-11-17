@@ -1,0 +1,13 @@
+{
+  "assessment.json": "85b9e1af0e47c3d1393bf4f4bb99804de54a3957e6eaaf0ce36b03e6794fc191",
+  "auth-retest.json": "b5de8bf14e7e29796c4bb6af100050c40c12b0ed67c16862611c3719549496bc",
+  "dependency-audit.json": "3c159a48659fe6a3798fa0ae92b1f650fa0f74b1bd75e50e3a06b4426396efdc",
+  "deployed-firestore-rules.json": "762c476ced46836dd9f0e0ba37a6d08cd9a0901ddde26516f2ce1f5098b6f704",
+  "deployment-observations.json": "dc5dc26ec2ce3e0e49bbbd9ced34f2d047d23c0a29fb5db3c5e7d298b37e486f",
+  "firestore-aggregates.json": "b9357e67cd285cc02fedf7f5e16af52ebe748811680e45e7d06be2d50baa2916",
+  "lint.log": "9ae2b7bf3cbc90d648bd0378f70acd82fe21d6f2e2c90a2f572fc20375293b7b",
+  "policy.log": "3717d1bf139c33b1d87f7ed1f3d5cec66b22507a9f8be211b86f5a0bf123a137",
+  "rules-audit.json": "157c27bdfea3d523dca88f0d32f109ab991b3b318cf380f2a96d8bcb104eff97",
+  "rules.log": "2a9002c231aaada5c37e73b8dba77ec1f9b9075fb6d0cf4555490eb2d5871e15",
+  "types.log": "b51c3330d3b901853ab8dae60fc7dbb1809d911c5c4153001e73ac9d5c8d7f14"
+}

@@ -1,0 +1,10 @@
+{
+  "date": "2026-11-17",
+  "command": "npm run test:e2e -- e2e/api-access-control.spec.ts --project=mobile-chromium",
+  "target": "local Next.js development server; NEXT_PUBLIC_E2E_MODE=1; no production provider credentials",
+  "passed": 23,
+  "failed": 0,
+  "elapsed": "1.1 minutes reported by Playwright",
+  "provenance": "Observed Playwright terminal output in this task; no exported raw trace is asserted",
+  "limit": "Negative API cases only; not a successful paired video consultation"
+}

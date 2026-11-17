@@ -1,0 +1,82 @@
+
+> livekit-frontend@0.2.0 test:security
+> node scripts/regression-security-contracts.mjs && node scripts/regression-thesis-flow-contracts.mjs && node --test tests/security-policies.test.mjs
+
+Security architecture regression contracts passed.
+Thesis invitation, consent, summary, and UI contracts verified.
+TAP version 13
+# Subtest: faculty reviewer remains deny-by-default except for assignment permission
+ok 1 - faculty reviewer remains deny-by-default except for assignment permission
+  ---
+  duration_ms: 57.581198
+  type: 'test'
+  ...
+# Subtest: review assignment is exact, active, and time bounded
+ok 2 - review assignment is exact, active, and time bounded
+  ---
+  duration_ms: 13.072287
+  type: 'test'
+  ...
+# Subtest: concurrent invitation reservations cannot exceed maxUses
+ok 3 - concurrent invitation reservations cannot exceed maxUses
+  ---
+  duration_ms: 23.255381
+  type: 'test'
+  ...
+# Subtest: consultation history sort values describe the resulting order
+ok 4 - consultation history sort values describe the resulting order
+  ---
+  duration_ms: 34.758184
+  type: 'test'
+  ...
+# Subtest: waiting-room timestamp transport understands Firestore JSON shapes
+ok 5 - waiting-room timestamp transport understands Firestore JSON shapes
+  ---
+  duration_ms: 10.685694
+  type: 'test'
+  ...
+# Subtest: invitation presentation counts hashed identities without exposing addresses
+ok 6 - invitation presentation counts hashed identities without exposing addresses
+  ---
+  duration_ms: 16.072869
+  type: 'test'
+  ...
+# Subtest: prepared consultation capabilities default to disabled
+ok 7 - prepared consultation capabilities default to disabled
+  ---
+  duration_ms: 4.423074
+  type: 'test'
+  ...
+# Subtest: only a verified allowlisted identity skips the waiting room
+ok 8 - only a verified allowlisted identity skips the waiting room
+  ---
+  duration_ms: 14.101682
+  type: 'test'
+  ...
+# Subtest: security-signal hashing keeps production invitation validation available
+ok 9 - security-signal hashing keeps production invitation validation available
+  ---
+  duration_ms: 10.752143
+  type: 'test'
+  ...
+# Subtest: Google and password accounts with a confirmed email are the same evidence
+ok 10 - Google and password accounts with a confirmed email are the same evidence
+  ---
+  duration_ms: 9.555229
+  type: 'test'
+  ...
+# Subtest: consent is a versioned record, and the old registration flag is not it
+ok 11 - consent is a versioned record, and the old registration flag is not it
+  ---
+  duration_ms: 11.191753
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 853.407253

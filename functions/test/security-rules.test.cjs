@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { after, before, beforeEach, test } = require('node:test');
-const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const {
@@ -8,7 +7,7 @@ const {
   assertSucceeds,
   initializeTestEnvironment,
 } = require('@firebase/rules-unit-testing');
-const { doc, getDoc, setDoc } = require('firebase/firestore');
+const { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, serverTimestamp } = require('firebase/firestore');
 const { getBytes, ref, uploadBytes } = require('firebase/storage');
 
 let rulesEnvironment;
@@ -89,7 +88,7 @@ test('a user cannot elevate their own role', async () => {
   }));
 });
 
-test('doctor note attachments are owner-only and type bounded', async () => {
+test('disabled attachments deny even owner uploads', async () => {
   const doctorStorage = rulesEnvironment.authenticatedContext('doctor-1', {
     role: 'doctor',
   }).storage();
@@ -98,7 +97,7 @@ test('doctor note attachments are owner-only and type bounded', async () => {
   }).storage();
   const path = 'notes/doctor-1/room-1/note.png';
 
-  await assertSucceeds(uploadBytes(
+  await assertFails(uploadBytes(
     ref(doctorStorage, path),
     new Uint8Array([137, 80, 78, 71]),
     { contentType: 'image/png' }
@@ -110,5 +109,39 @@ test('doctor note attachments are owner-only and type bounded', async () => {
     { contentType: 'text/html' }
   ));
 
-  assert.ok(true);
+});
+
+test('private profiles allow owner reads but deny other users and listing', async () => {
+  await rulesEnvironment.withSecurityRulesDisabled(async c => {
+    await setDoc(doc(c.firestore(), 'users/patient-1'), {email:'patient@example.test',role:'patient'});
+  });
+  const owner = rulesEnvironment.authenticatedContext('patient-1').firestore();
+  const other = rulesEnvironment.authenticatedContext('patient-2').firestore();
+  await assertSucceeds(getDoc(doc(owner,'users/patient-1')));
+  await assertFails(getDoc(doc(other,'users/patient-1')));
+  await assertFails(getDocs(collection(other,'users')));
+  await assertFails(getDoc(doc(rulesEnvironment.unauthenticatedContext().firestore(),'users/patient-1')));
+});
+
+test('profile updates cannot inject authority, consent, or change identity', async () => {
+  await rulesEnvironment.withSecurityRulesDisabled(async c => {
+    await setDoc(doc(c.firestore(), 'users/patient-1'), {email:'patient@example.test',role:'patient',legacyField:'preserved'});
+  });
+  const db = rulesEnvironment.authenticatedContext('patient-1',{email:'patient@example.test'}).firestore();
+  const target = doc(db,'users/patient-1');
+  for (const patch of [{role:'doctor'}, {role:'admin'}, {admin:true}, {permissions:['all']}, {email:'other@example.test'}, {consentVersion:'forged'}, {lastLoginAt:'bad'}, {extra:'x'.repeat(100000)}]) {
+    await assertFails(updateDoc(target,patch));
+  }
+  await assertFails(deleteDoc(target));
+  await assertSucceeds(updateDoc(target,{lastLoginAt:serverTimestamp()}));
+});
+
+test('only trusted claims can provision clinician profiles', async () => {
+  const patientDb = rulesEnvironment.authenticatedContext('new-patient',{email:'patient@example.test'}).firestore();
+  await assertFails(setDoc(doc(patientDb,'users/new-patient'),{email:'patient@example.test',role:'doctor'}));
+  await assertFails(setDoc(doc(patientDb,'users/new-patient'),{email:'spoof@example.test',role:'patient'}));
+  await assertFails(setDoc(doc(patientDb,'users/new-patient'),{email:'patient@example.test',role:'patient',admin:true}));
+  await assertSucceeds(setDoc(doc(patientDb,'users/new-patient'),{email:'patient@example.test',role:'patient',consentGiven:false,registeredAt:serverTimestamp()}));
+  const doctorDb=rulesEnvironment.authenticatedContext('new-doctor',{email:'doctor@example.test',role:'doctor'}).firestore();
+  await assertSucceeds(setDoc(doc(doctorDb,'users/new-doctor'),{email:'doctor@example.test',role:'doctor',doctorName:'Synthetic Doctor',doctorEmail:'doctor@example.test',registeredAt:serverTimestamp()}));
 });

@@ -1,0 +1,71 @@
+
+> livekit-frontend@0.2.0 test:security
+> node scripts/regression-security-contracts.mjs && node scripts/regression-thesis-flow-contracts.mjs && node --test tests/security-policies.test.mjs
+
+Security architecture regression contracts passed.
+Thesis invitation, consent, summary, and UI contracts verified.
+TAP version 13
+# Subtest: faculty reviewer remains deny-by-default except for assignment permission
+ok 1 - faculty reviewer remains deny-by-default except for assignment permission
+  ---
+  duration_ms: 55.372452
+  ...
+# Subtest: review assignment is exact, active, and time bounded
+ok 2 - review assignment is exact, active, and time bounded
+  ---
+  duration_ms: 11.995429
+  ...
+# Subtest: concurrent invitation reservations cannot exceed maxUses
+ok 3 - concurrent invitation reservations cannot exceed maxUses
+  ---
+  duration_ms: 23.019875
+  ...
+# Subtest: consultation history sort values describe the resulting order
+ok 4 - consultation history sort values describe the resulting order
+  ---
+  duration_ms: 38.379497
+  ...
+# Subtest: waiting-room timestamp transport understands Firestore JSON shapes
+ok 5 - waiting-room timestamp transport understands Firestore JSON shapes
+  ---
+  duration_ms: 11.106288
+  ...
+# Subtest: invitation presentation counts hashed identities without exposing addresses
+ok 6 - invitation presentation counts hashed identities without exposing addresses
+  ---
+  duration_ms: 17.224326
+  ...
+# Subtest: prepared consultation capabilities default to disabled
+ok 7 - prepared consultation capabilities default to disabled
+  ---
+  duration_ms: 5.954115
+  ...
+# Subtest: only a verified allowlisted identity skips the waiting room
+ok 8 - only a verified allowlisted identity skips the waiting room
+  ---
+  duration_ms: 13.311562
+  ...
+# Subtest: security-signal hashing keeps production invitation validation available
+ok 9 - security-signal hashing keeps production invitation validation available
+  ---
+  duration_ms: 10.256493
+  ...
+# Subtest: Google and password accounts with a confirmed email are the same evidence
+ok 10 - Google and password accounts with a confirmed email are the same evidence
+  ---
+  duration_ms: 11.922788
+  ...
+# Subtest: consent is a versioned record, and the old registration flag is not it
+ok 11 - consent is a versioned record, and the old registration flag is not it
+  ---
+  duration_ms: 10.516046
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 880.220844

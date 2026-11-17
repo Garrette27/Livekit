@@ -1,0 +1,10 @@
+
+> livekit-frontend@0.2.0 lint
+> eslint .
+
+
+/home/garre/Livekit/scripts/thesis/run-assessment.mjs
+  71:258  warning  'samples' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)
+

@@ -1,0 +1,3 @@
+# Preserve evidence bytes so published checksums survive checkout.
+/docs/testing/evidence/** -text -whitespace
+/output/pdf/*.pdf binary

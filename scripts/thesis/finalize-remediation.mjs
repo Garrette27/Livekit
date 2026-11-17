@@ -1,0 +1,15 @@
+import {spawnSync} from 'node:child_process';
+import {readFileSync,writeFileSync,readdirSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+const dir='docs/testing/evidence/2026-11-17-remediation';
+const report=JSON.parse(readFileSync(`${dir}/verification.json`,'utf8'));
+const start=Date.now();
+const lint=spawnSync('npm',['run','lint'],{encoding:'utf8'});
+writeFileSync(`${dir}/lint.log`,lint.stdout+lint.stderr);
+report.checks=report.checks.map(c=>c.name==='lint'?{name:'lint',exitCode:lint.status,status:lint.status===0?'PASS':'FAIL',durationMs:Date.now()-start}:c);
+report.sourceHashes=Object.fromEntries(['firestore.rules','package.json','package-lock.json','functions/package.json','functions/package-lock.json','app/patient/login/page.tsx','functions/test/security-rules.test.cjs','eslint.config.mjs'].map(f=>[f,createHash('sha256').update(readFileSync(f)).digest('hex')]));
+report.finalizedAt=new Date().toISOString();
+writeFileSync(`${dir}/verification.json`,JSON.stringify(report,null,2));
+writeFileSync(`${dir}/sha256.json`,JSON.stringify(Object.fromEntries(readdirSync(dir).filter(f=>f!=='sha256.json').sort().map(f=>[f,createHash('sha256').update(readFileSync(`${dir}/${f}`)).digest('hex')])),null,2));
+console.log(report.checks);
+process.exitCode=report.checks.every(c=>c.status==='PASS')?0:1;

@@ -1,0 +1,35 @@
+i  emulators: Starting emulators: firestore
+i  emulators: Detected demo project ID "demo-livekit-security", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail.
+i  firestore: Firestore Emulator logging to firestore-debug.log
+✔  firestore: Firestore Emulator was started in standard edition.
+✔  firestore: Firestore Emulator UI websocket is running on 9150.
+i  Running script: cd functions && node --test test/deployed-assessment.cjs
+TAP version 13
+# Subtest: deployed rules should deny reading another patient profile
+ok 1 - deployed rules should deny reading another patient profile
+  ---
+  duration_ms: 2120.989064
+  type: 'test'
+  ...
+# [2026-11-17T10:14:16.215Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x708a20d8 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# Subtest: deployed rules should deny changing patient role to doctor
+ok 2 - deployed rules should deny changing patient role to doctor
+  ---
+  duration_ms: 148.088112
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2703.769086
+✔  Script exited successfully (code 0)
+i  emulators: Shutting down emulators.
+i  firestore: Stopping Firestore Emulator
+i  hub: Stopping emulator hub
+i  logging: Stopping Logging Emulator

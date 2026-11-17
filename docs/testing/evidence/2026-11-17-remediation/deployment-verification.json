@@ -1,0 +1,8 @@
+{
+  "verifiedAt": "2026-11-17T10:14:17.269Z",
+  "project": "livekit-5eef6",
+  "sourceMatches": true,
+  "deployedRulesRetestExitCode": 0,
+  "method": "Retrieved active Firestore rules via authenticated MCP, compared normalized source, reproduced original two attacks with synthetic emulator records",
+  "productionAttackWrites": false
+}

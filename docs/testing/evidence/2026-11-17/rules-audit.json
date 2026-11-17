@@ -1,0 +1,24 @@
+{
+  "score": 1,
+  "summary": "Production Firestore rules differ from the repository and permit cross-user profile reads and self role changes. Reproduced with the retrieved deployed source in emulators; no production attack writes performed.",
+  "findings": [
+    {
+      "check": "Field-Level vs Identity-Level Security",
+      "severity": "critical",
+      "issue": "Any authenticated user can read another users document under the deployed rules.",
+      "recommendation": "Review and deploy the intended private-profile rules, then retest positive owner access and cross-user denial."
+    },
+    {
+      "check": "The Update Bypass",
+      "severity": "critical",
+      "issue": "The deployed owner-write rule accepts a patient changing role to doctor.",
+      "recommendation": "Use trusted role provisioning and immutable role/email client updates; verify deployed rule hash and emulator cases after release."
+    },
+    {
+      "check": "Business Logic vs Rules",
+      "severity": "minor",
+      "issue": "Existing Storage test expects a removed client notes uploader and fails against intentional deny-all repository Storage rules.",
+      "recommendation": "Update the test to assert disabled attachment behavior without relaxing Storage."
+    }
+  ]
+}

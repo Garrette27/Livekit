@@ -1,0 +1,36 @@
+{
+  "observationDate": "2026-11-17",
+  "source": "Authenticated Vercel connector list_deployments, get_alias, list_deployment_events and get_runtime_logs",
+  "teamId": "team_JFjzwna4AIl203lan2e1NTIc",
+  "frontend": {
+    "projectId": "prj_4U4goAPtZ5TnyyWPZyPceX7AAM0E",
+    "alias": "livekit-frontend-tau.vercel.app",
+    "deploymentId": "dpl_FzHC1v6uwfCc1vcAeB8vzQV1kz7o",
+    "commit": "fa5a33cca4b341513dae6d78538f4eeede26a92b",
+    "state": "READY"
+  },
+  "duplicateProject": {
+    "projectId": "prj_M43ycnnor16MgvFAKaI0sXBPxqMe",
+    "deploymentId": "dpl_DpGKXogs1RTNLsStdmJG7ApPvpya",
+    "state": "ERROR",
+    "buildError": "The specified Root Directory livekit-frontend does not exist. Please update your Project Settings."
+  },
+  "runtimeLogQuery": {
+    "since": "30m",
+    "groupBy": "level",
+    "returnedGroups": 0,
+    "interpretation": "Bounded window before HTTP probes; not evidence of long-term availability"
+  },
+  "databaseMetadata": {
+    "edition": "STANDARD",
+    "location": "asia-southeast1",
+    "pointInTimeRecovery": "DISABLED",
+    "deleteProtection": "DISABLED"
+  },
+  "localBuild": {
+    "command": "npm run build",
+    "exitCode": 0,
+    "generatedStaticPages": 43,
+    "provenance": "Observed terminal execution during this assessment; raw build transcript is in the Codex task, not an exported evidence file"
+  }
+}
