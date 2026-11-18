@@ -1,0 +1,129 @@
+{
+  "recordedAt": "2026-11-18T13:38:45+08:00",
+  "deploymentCommit": "80c7e8155d4400ffc7fbd503fabd784c41043244",
+  "deploymentId": "dpl_GG9W6QxCP7SiKXFXyS9LP3qXs79Z",
+  "origin": "https://livekit-frontend-tau.vercel.app",
+  "environment": "WSL2, Node.js 22.23.5, single network",
+  "method": "Sequential HTTPS GET, full response body, 250 ms between requests, nearest-rank p95",
+  "criteria": "10 HTTP 200 responses per path and p95 <= 3000 ms",
+  "pages": [
+    {
+      "path": "/",
+      "n": 10,
+      "median": 50.5,
+      "p95": 304,
+      "pass": true,
+      "samples": [
+        {
+          "status": 200,
+          "ms": 304,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 51,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 45,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 53,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 59,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 44,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 40,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 41,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 50,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 61,
+          "cache": "HIT"
+        }
+      ]
+    },
+    {
+      "path": "/access-denied?reason=invalid-token",
+      "n": 10,
+      "median": 71,
+      "p95": 1239,
+      "pass": true,
+      "samples": [
+        {
+          "status": 200,
+          "ms": 1239,
+          "cache": "PRERENDER"
+        },
+        {
+          "status": 200,
+          "ms": 69,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 56,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 61,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 65,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 73,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 80,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 87,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 64,
+          "cache": "HIT"
+        },
+        {
+          "status": 200,
+          "ms": 77,
+          "cache": "HIT"
+        }
+      ]
+    }
+  ]
+}

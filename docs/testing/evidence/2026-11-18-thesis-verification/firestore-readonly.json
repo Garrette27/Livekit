@@ -1,0 +1,28 @@
+{
+  "observedDate": "2026-11-18",
+  "timezone": "Asia/Singapore",
+  "databaseEdition": "STANDARD",
+  "databaseLocation": "asia-southeast1",
+  "billingEnabled": false,
+  "queueAudit": {
+    "complete": true,
+    "examined": 152,
+    "statusCounts": {
+      "waiting": 13,
+      "admitted": 68,
+      "left": 57,
+      "rejected": 14
+    },
+    "otherOrMissing": 0,
+    "missingJoinedAt": 0
+  },
+  "deployedFirestoreRules": {
+    "matchesRepository": true,
+    "recordedAt": "2026-11-18T05:47:17.901Z",
+    "sha256OfRetrievedRulesJson": "8e6c8a31af5c5fbb8b333b405fcd3bb90b109de7c5f9371959e86aaccef9a4e6"
+  },
+  "deployedStorageRules": {
+    "status": "BLOCKED",
+    "scope": "retrieval only"
+  }
+}

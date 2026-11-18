@@ -1,0 +1,31 @@
+{
+  "deploymentCommit": "80c7e8155d4400ffc7fbd503fabd784c41043244",
+  "deploymentId": "dpl_GG9W6QxCP7SiKXFXyS9LP3qXs79Z",
+  "route": "POST /api/user/role-conflict",
+  "anonymousControl": {
+    "observedAt": "2026-11-18T05:33:31.101Z",
+    "httpStatus": 401,
+    "responseCode": "missing_token"
+  },
+  "authenticatedRetries": [
+    {
+      "observedAt": "2026-11-18T05:39:36.273Z",
+      "httpStatus": 500,
+      "firestoreCode": 8,
+      "firestoreStatus": "RESOURCE_EXHAUSTED"
+    },
+    {
+      "observedAt": "2026-11-18T05:39:46.768Z",
+      "httpStatus": 500,
+      "firestoreCode": 8,
+      "firestoreStatus": "RESOURCE_EXHAUSTED"
+    },
+    {
+      "observedAt": "2026-11-18T05:40:11.479Z",
+      "httpStatus": 500,
+      "firestoreCode": 8,
+      "firestoreStatus": "RESOURCE_EXHAUSTED"
+    }
+  ],
+  "source": "Vercel production runtime logs, sanitized"
+}
