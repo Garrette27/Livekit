@@ -1,0 +1,22 @@
+{
+  "observedAt": "2026-11-18T14:46:00+08:00",
+  "deployment": "28b437e on livekit-frontend production (deployed after owner-authored commit)",
+  "browserObservation": {
+    "doctorDashboardLoads": true,
+    "failingRequests": [
+      { "route": "GET /api/waiting-room/list", "httpStatus": 500, "body": "Internal server error" },
+      { "route": "GET /api/invite/get-link", "httpStatus": 500, "body": "Internal server error" },
+      { "route": "POST /api/doctor-access", "httpStatus": 500, "body": "Internal server error" },
+      { "route": "POST /api/invite/create", "observed": "no response shown; UI stayed on 'Creating secure link…'" }
+    ]
+  },
+  "firestoreProbe": {
+    "method": "One read-only REST GET of a nonexistent document using the project owner's Firebase CLI credentials",
+    "observedAt": "2026-11-18T15:00+08:00 (approximate)",
+    "httpStatus": 429,
+    "status": "RESOURCE_EXHAUSTED",
+    "message": "Quota exceeded."
+  },
+  "conclusion": "Daily free Firestore read quota exhausted; not a defect of the new deployment. Opaque 500 responses fixed in eb5dbf0 to report HTTP 503 with a retry message.",
+  "personalDataIncluded": false
+}

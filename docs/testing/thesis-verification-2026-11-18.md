@@ -2,8 +2,8 @@
 
 Report date: 18 November 2026, Asia/Singapore (UTC+8).
 Source of truth: GitHub `Garrette27/Livekit`, branch `main`.
-Code under test: `3883450` for the full test inventory; `28b437e` adds the AI-credit fix (28/28 tests).
-Production deployment: `28b437e`, deployed 18 November (see section 9).
+Code under test: `3883450` for the full test inventory; `eb5dbf0` is the latest code (29/29 tests).
+Production deployment: `main`, deployed from 18 November 14:40 (see section 9).
 
 This report is for the thesis adviser and co-authors. It states what was
 tested, how, what passed, what failed, and what has not been tested yet. Every
@@ -20,7 +20,7 @@ NOT TESTED, NOT APPLICABLE.
 | Production dependency audit | PASS | 0 findings for shipped application and Cloud Functions packages |
 | Full dependency audit (incl. developer tools) | FAIL, accepted risk | One upstream advisory in the lint toolchain; no patched release exists |
 | Public page response time (pilot) | PASS | p95 304 ms and 1,239 ms against a 3,000 ms budget |
-| Doctor login on 18 Nov | BLOCKED | Free-tier database read quota exhausted; not a code defect |
+| Doctor workflow on production, 18 Nov | BLOCKED until the 16:00 quota reset | App opens and the dashboard loads after the deployment fix, but link creation, links, queue and doctor room access fail: Firestore returned "Quota exceeded" (section 4.1) |
 | Authenticated, video and concurrent-call performance | NOT TESTED | Needs a staging project and synthetic accounts |
 | Usability evaluation | NOT TESTED | Survey protocol prepared; sessions not yet run |
 | AI transcription, summary and documentation evaluation | BLOCKED | No OpenAI credit; the call works and summaries are recorded as unavailable (`docs/ai-summary-status.md`) |
@@ -40,6 +40,10 @@ usability and AI evaluation still need their planned trials.
 | 18 Nov, 13:38 | HTTP response-time pilot on production (section 6) |
 | 18 Nov, 13:39–13:40 | Doctor sign-in returned HTTP 500 three times; logs show Firestore `RESOURCE_EXHAUSTED` (daily free read quota used up); billing disabled on the project |
 | 18 Nov, afternoon | Remediation commits `7e751dc` → `3883450` (sections 3.2 and 4); all pushed to `main` |
+| 18 Nov, about 14:40 | First owner-authored commit (`28b437e`) deployed; earlier commits had been blocked by Vercel's Hobby collaboration limit |
+| 18 Nov, 14:46 | On the new deployment the doctor dashboard loads, but `waiting-room/list`, `invite/get-link` and `doctor-access` return HTTP 500 and link creation does not finish |
+| 18 Nov, about 15:00 | Read-only Firestore probe returns HTTP 429 `RESOURCE_EXHAUSTED` "Quota exceeded": cause confirmed as the quota |
+| 18 Nov, 15:05 | `eb5dbf0`: those routes now return HTTP 503 with a retry message instead of an opaque 500 |
 | 18 Nov | New advisory GHSA-fc5q-39xc-vjpf (picomatch) makes the full audit fail; it was not reported by the 17 Nov audit |
 
 ## 3. Security results
@@ -67,6 +71,8 @@ retest, not an edit of the original.
 | `80c7e81` | Bind admission to the patient's current visit; restore JWT library loading | Stale visit reused for admission; login outage | Focused queue/admission tests |
 | `7e751dc` | Role lookup returns HTTP 503 "try again" when the database is unavailable; email bound to the verified identity | Outage shown as crash; email mismatch | Mismatched email and unavailable lookup tests |
 | `382ac86` | Invitation creation no longer reports whether an email has an account | Account enumeration; one wasted read per invitation | Contract forbids the lookup |
+| `28b437e` | Exhausted OpenAI credit recorded once as an unavailable summary, not retried as a failure | Wasted retries and Firestore writes | Classifier test |
+| `eb5dbf0` | Database quota, deadline and outage errors answer HTTP 503 with a retry message across link, queue, creation, doctor-access and authorization paths | Opaque failures; users cannot tell an outage from a bug | Classifier test and route contracts |
 | `3883450` | Reuse sentinel `999999` defined once and always shown as "reusable until expiry" | Inconsistent or misleading use limits | Contract rejects stray literals; test checks the label |
 
 ### 3.3 Dependency audit
@@ -118,6 +124,18 @@ Read-reduction work in response:
   again (`10ca271`).
 - Invitation creation no longer performs an unused account lookup (`382ac86`).
 
+### 4.1 Second occurrence after the deployment (afternoon)
+
+After the deployment fix (section 9) the application opened and a signed-in
+doctor's dashboard loaded. Every database-backed action then failed: link
+creation did not finish, invitation links and the waiting queue showed
+"Internal server error", and doctor room access stayed on "Loading…". A single
+read-only Firestore request returned HTTP 429 `RESOURCE_EXHAUSTED`, "Quota
+exceeded" (evidence: `post-deploy-quota.json`). Two separate causes therefore
+affected availability on 18 November: the blocked deployment, which is now
+resolved, and the free database quota, which recovers at 16:00. The opaque
+500 responses were a reporting defect, fixed in `eb5dbf0`.
+
 No production read-savings percentage was measured. The survey pilot in
 `survey-and-interview-protocol.md` section 4.1 will measure reads per
 consultation.
@@ -132,7 +150,7 @@ results apply to the emulator only.
 
 | Suite | Count | What it proves | Result |
 | --- | --- | --- | --- |
-| `npm run test:security`: node tests | 27 | Access policy, faculty-reviewer deny-by-default, admission decisions, queue scoping and polling, consent, invitation presentation | PASS 27/27 |
+| `npm run test:security`: node tests | 27 (29 on `eb5dbf0`) | Access policy, faculty-reviewer deny-by-default, admission decisions, queue scoping and polling, consent, invitation presentation | PASS 27/27 |
 | `npm run test:security`: contract scripts | 2 scripts | Source-level invariants: no account enumeration, no device fingerprinting or IP geolocation, no professor/faculty route, no raw IP in audit, sentinel defined once, AGENTS.md scope | PASS |
 | Firestore and Storage rules (emulator) | 8 | Owner access, denial of cross-user profile read, self role change, cross-doctor live queue query, disabled uploads | PASS 8/8 (CI `firebase-functions` job) |
 | Mobile browser tests (Playwright, Pixel 7 profile) | 29 | Waiting-room lifecycle, revoked/left states, API access control, unsigned webhook rejection, accessibility smoke, invitation guidance with JavaScript disabled | PASS 29/29 in 1.4 min |
@@ -225,7 +243,7 @@ the application and can be disconnected by the owner.
 
 | Task | Needs | Owner |
 | --- | --- | --- |
-| Verify doctor login on production after 16:00 (deployment done) | Test doctor account | App owner |
+| After 16:00: verify login, link creation, queue and doctor join on production | Test doctor account | App owner |
 | Survey pilot: measure reads/writes per consultation | 2 teammates, 1 hour after 16:00 | Survey team |
 | Usability sessions (patients, doctors, IT) | Consent forms approved by adviser | Survey team |
 | AI documentation comparison | Fictional transcripts, 1–2 clinicians | Survey team + app owner |

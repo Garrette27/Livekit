@@ -18,18 +18,29 @@ Survey scores are **perceptions**. They cannot prove security or measure video
 latency. Keep them in their own subsection of Chapter IV, separate from the
 automated test results.
 
-## 2. Participant groups
+## 2. Participant groups (convenience sample, no budget)
 
-| Group | Who | Suggested size (adviser to confirm) | Account they use |
-| --- | --- | --- | --- |
-| A. Patients | Adults able to use a smartphone or laptop; mix of ages and tech comfort | At least 15–30 | Join as **guest** (no account). No personal sign-in needed |
-| B. Doctors / dentists | Practising or trainee clinicians | At least 5 | A **test doctor account** prepared by the app owner |
-| C. IT evaluators | IT staff, developers, IT faculty | At least 5 | A test doctor account (to see the doctor side) and the guest link |
+We have no budget for recruitment or incentives, so the study uses a
+**convenience sample**: whoever is available among IT people, doctors/dentists
+and other willing participants. There is no minimum or target size. Do not
+delay testing to reach a number.
 
-Five to eight participants per group usually reveal most usability problems in
-observed testing. SUS and TUQ averages become steadier with larger groups, so
-patients are the group to grow if time allows. Report the actual number of
-people who completed each instrument; never round up or extrapolate.
+| Group | Who | Account they use |
+| --- | --- | --- |
+| A. Patients / general participants | Any available adult who can use a phone or laptop | Join as **guest** (no account) |
+| B. Doctors / dentists | Any available practising or trainee clinician | A **test doctor account** prepared by the app owner |
+| C. IT evaluators | Any available IT staff, developer or IT faculty | A test doctor account and the guest link |
+
+How to write this in the paper (methodology and limitations):
+
+- State the sampling as convenience sampling due to no budget, and give the
+  exact number who completed each instrument per group (for example "IT n = 4,
+  doctors n = 2, patients n = 7"). Never round up or extrapolate.
+- Report results as descriptive (mean, standard deviation, counts, themes).
+  Do not claim the results generalize to all doctors or patients.
+- If a group has very few people, still report it; small numbers are a
+  stated limitation, not a reason to drop the group.
+- Tell the adviser this decision early so it is not a surprise at defense.
 
 ## 3. Ethics and data handling (non-negotiable)
 
@@ -55,6 +66,16 @@ plan. The counter resets at **midnight US Pacific time = 4:00 p.m.
 Philippine/Singapore time** (3:00 p.m. while the US is on daylight saving time,
 March to early November). If reads run out, every login fails until the next
 reset. That is what happened on 18 November.
+
+### 4.0 What happens when the quota runs out (seen on 18 November)
+
+When the daily read quota is used up, pages still open and a doctor who is
+already signed in still sees the dashboard, but **every action that needs the
+database fails**: "Creating secure link…" does not finish, invitation links show
+an error, the waiting queue does not load, and "Join as Doctor" stays on
+"Loading…". Since commit `eb5dbf0` these show "The database is temporarily
+unavailable … try again later" instead of "Internal server error". Nothing
+can be done until the reset at 4:00 p.m.; record affected sessions as BLOCKED.
 
 ### 4.1 Measure before scheduling (pilot day)
 

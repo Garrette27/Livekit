@@ -105,6 +105,10 @@ Use these result words consistently: **PASS, FAIL, BLOCKED, NOT TESTED, NOT
 APPLICABLE**. A failure that was fixed stays in the paper as a FAIL row plus a
 separate retest PASS row. That is stronger evidence than an all-green table.
 
+**Participants:** we have no budget, so the survey uses whoever is available
+(IT people, doctors, other participants), with no target size. Report the
+exact numbers as a convenience sample; see the survey protocol, section 2.
+
 ## 7. The Firebase free-tier limit (why the app sometimes refuses login)
 
 The database (Cloud Firestore) is on Google's free Spark plan: **50,000 document
@@ -119,6 +123,24 @@ temporarily unavailable". It *is* a capacity limitation worth one paragraph in
 Chapter IV's limitations, and it is why the survey schedule in
 `docs/testing/survey-and-interview-protocol.md` starts sessions right after
 4:00 p.m.
+
+### What we saw on 18 November (two separate problems)
+
+1. **Deployment problem (fixed).** From the morning until about 2:40 p.m. the
+   live site was running an older version, because Vercel's free plan refused
+   to publish commits made from a non-owner account. Once a commit was made
+   from the owner account, the new version went live and the app opened
+   normally.
+2. **Firebase quota (still active until 4:00 p.m.).** On the new version the
+   doctor dashboard opened, but creating a secure link never finished, links
+   and the waiting queue showed "Internal server error", and "Join as Doctor"
+   stayed on "Loading…". A direct check of the database returned
+   "Quota exceeded". So the database, not the new code, blocked these actions.
+   Since `eb5dbf0` the app says the database is temporarily unavailable instead
+   of "Internal server error".
+
+Write both in Chapter IV limitations: hosting-plan restrictions and the free
+database quota both affected availability during testing.
 
 ## 8. AI summaries are currently unavailable
 
