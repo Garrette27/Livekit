@@ -7,6 +7,7 @@ import { CreateInvitationRequest, CreateInvitationResponse, Invitation } from '@
 import InvitationForm from './InvitationForm';
 import InvitationResult from './InvitationResult';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
+import { REUSABLE_INVITATION_MAX_USES } from '@/lib/invitations/invitation-use-reservation';
 
 interface InvitationManagerProps {
   user: User;
@@ -58,7 +59,7 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
           roomName: formData.roomName,
           emailAllowed: primaryEmail,
           expiresAt: Timestamp.fromDate(new Date(result.expiresAt)),
-          maxUses: formData.maxUses ?? 999999,
+          maxUses: formData.maxUses ?? REUSABLE_INVITATION_MAX_USES,
           currentUses: 0,
           maxPatients: formData.maxPatients ?? 10,
           waitingRoomEnabled: formData.waitingRoomEnabled ?? true,

@@ -96,4 +96,20 @@ assert.equal(existsSync(resolve(root, 'app/api/faculty')), false);
 const inviteCreateSource = read('app/api/invite/create/route.ts');
 assert.doesNotMatch(inviteCreateSource, /existingAccount|findByEmail|UserRepository/);
 
+// The reusable-invitation sentinel is defined once; a stray literal would let
+// a new screen show "999999 uses" or drift from the presentation rule.
+for (const path of [
+  'app/api/invite/create/route.ts',
+  'app/create-room/[room]/CreateRoomClient.tsx',
+  'components/InvitationForm.tsx',
+  'components/InvitationManager.tsx',
+  'lib/invitations/invitation-presentation.ts',
+]) {
+  assert.doesNotMatch(read(path), /\b999999\b/, `${path} must use REUSABLE_INVITATION_MAX_USES`);
+}
+
+// AGENTS.md governs only this teleconsultation product. Rules copied from an
+// unrelated product (CMS page builder, HR ATS) mislead contributors and agents.
+assert.doesNotMatch(read('AGENTS.md'), /RideMax|Page Builder|HR Mini ATS|Marketing CMS/);
+
 console.log('Security architecture regression contracts passed.');

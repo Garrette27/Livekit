@@ -215,9 +215,19 @@ test('waiting-room timestamp transport understands Firestore JSON shapes', async
 });
 
 test('invitation presentation counts hashed identities without exposing addresses', async () => {
-  const presentation = await importTypeScriptModule(
-    'lib/invitations/invitation-presentation.ts'
+  const presentation = await importTypeScriptModuleWithDependencies(
+    'lib/invitations/invitation-presentation.ts',
+    { '@/lib/invitations/invitation-use-reservation': 'lib/invitations/invitation-use-reservation.ts' }
   );
+  const reservation = await importTypeScriptModule('lib/invitations/invitation-use-reservation.ts');
+  // The stored sentinel is presented as a policy, never as a number of uses.
+  const reusableLabel = presentation.formatInvitationUsage({
+    currentUses: 2,
+    maxUses: reservation.REUSABLE_INVITATION_MAX_USES,
+    waitingRoomEnabled: true,
+  });
+  assert.equal(reusableLabel, '2 joins · reusable until expiry');
+  assert.doesNotMatch(reusableLabel, /\d{4,}/);
   assert.equal(
     presentation.countDirectAdmissionIdentities({
       metadata: {

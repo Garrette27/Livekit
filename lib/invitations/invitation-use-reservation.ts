@@ -1,5 +1,14 @@
 import type { Invitation } from '@/lib/types';
 
+/**
+ * Stored `maxUses` for a waiting-room invitation that stays reusable until it
+ * expires. It is a legacy storage sentinel, not a real visit limit: the
+ * waiting room and expiry are the actual controls. Never show this number to
+ * a person; present it as "reusable until expiry"
+ * (see formatInvitationUsage).
+ */
+export const REUSABLE_INVITATION_MAX_USES = 999999;
+
 const MAX_ACCESS_EVENTS_PER_INVITATION = 100;
 const MAX_ACCESS_EVENTS_PRUNED_PER_WRITE = 25;
 

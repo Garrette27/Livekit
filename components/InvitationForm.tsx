@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { CreateInvitationRequest } from '@/lib/types';
 import { describeInvitationAudience } from '@/lib/invitations/invitation-presentation';
+import { REUSABLE_INVITATION_MAX_USES } from '@/lib/invitations/invitation-use-reservation';
 
 interface InvitationFormProps {
   roomName: string;
@@ -15,7 +16,7 @@ export default function InvitationForm({ roomName, onInvitationCreated }: Invita
     expiresInHours: 24,
     waitingRoomEnabled: true, // Enable waiting room by default
     maxPatients: 10, // Default to 10 patients
-    maxUses: 999999, // Unlimited uses for waiting room
+    maxUses: REUSABLE_INVITATION_MAX_USES,
   });
   const [emailAllowlistInput, setEmailAllowlistInput] = useState('');
   const [isCreating, setIsCreating] = useState(false);

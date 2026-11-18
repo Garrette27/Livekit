@@ -8,6 +8,7 @@ import { getDoctorHistoryRoute } from '@/lib/routes/doctor-routes';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 import { compactInvitationUrl } from '@/lib/invitations/invitation-link-display';
 
+import { REUSABLE_INVITATION_MAX_USES } from '@/lib/invitations/invitation-use-reservation';
 interface CreateRoomClientProps {
   room: string;
 }
@@ -47,7 +48,7 @@ export default function CreateRoomClient({ room }: CreateRoomClientProps) {
           expiresInHours: 24,
           waitingRoomEnabled: true,
           maxPatients: 10,
-          maxUses: 999999,
+          maxUses: REUSABLE_INVITATION_MAX_USES,
           doctorName: user?.displayName || undefined,
         }),
       });

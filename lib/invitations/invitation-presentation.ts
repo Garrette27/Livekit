@@ -6,6 +6,8 @@
  * answer that question in one place so the list stays scannable.
  */
 
+import { REUSABLE_INVITATION_MAX_USES } from '@/lib/invitations/invitation-use-reservation';
+
 export type InvitationStatus = 'active' | 'expired' | 'revoked' | 'used';
 
 export interface InvitationStatusPresentation {
@@ -61,8 +63,8 @@ export function formatWaitingRoomOccupancy(
 }
 
 /**
- * Human-readable use policy. Legacy waiting-room invitations used 999999 as
- * an internal compatibility sentinel; that implementation detail must never
+ * Human-readable use policy. Legacy waiting-room invitations store
+ * REUSABLE_INVITATION_MAX_USES as an internal compatibility sentinel; that implementation detail must never
  * be presented as a promise to a doctor.
  */
 export function formatInvitationUsage(input: {
@@ -75,7 +77,7 @@ export function formatInvitationUsage(input: {
   const currentUses = Math.max(0, Number(input.currentUses || 0));
   const isReusable =
     input.usagePolicy === 'reusable-until-expiry'
-    || (input.waitingRoomEnabled === true && Number(input.maxUses || 0) >= 999999);
+    || (input.waitingRoomEnabled === true && Number(input.maxUses || 0) >= REUSABLE_INVITATION_MAX_USES);
 
   if (isReusable) {
     return `${currentUses} join${currentUses === 1 ? '' : 's'} · reusable until expiry`;

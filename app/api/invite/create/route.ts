@@ -17,6 +17,7 @@ import {
   CreateInvitationResponse, 
   InvitationToken 
 } from '../../../../lib/types';
+import { REUSABLE_INVITATION_MAX_USES } from '@/lib/invitations/invitation-use-reservation';
 
 async function handlePOST(req: NextRequest) {
   try {
@@ -121,8 +122,8 @@ async function handlePOST(req: NextRequest) {
     const requestedMaxUses = Number(maxUses);
     const requestedMaxPatients = Number(maxPatients);
     const finalMaxUses = Number.isFinite(requestedMaxUses) && requestedMaxUses > 0
-      ? Math.min(999999, Math.floor(requestedMaxUses))
-      : isWaitingRoomEnabled ? 999999 : 1;
+      ? Math.min(REUSABLE_INVITATION_MAX_USES, Math.floor(requestedMaxUses))
+      : isWaitingRoomEnabled ? REUSABLE_INVITATION_MAX_USES : 1;
     const finalMaxPatients = isWaitingRoomEnabled
       ? Number.isFinite(requestedMaxPatients) && requestedMaxPatients > 0
         ? Math.min(100, Math.floor(requestedMaxPatients))
