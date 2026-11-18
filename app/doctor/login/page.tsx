@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/firebase";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
-import { checkRoleConflictByEmail } from "@/lib/auth/role-conflict";
+import { checkRoleConflictByEmail, RoleConflictUnavailableError } from "@/lib/auth/role-conflict";
 
 export const dynamic = 'force-dynamic';
 
@@ -111,7 +111,9 @@ export default function DoctorLoginPage() {
       // Redirect to doctor invitations page
       router.push('/doctor/invitations');
     } catch (err: unknown) {
-      if ((err as { code?: string })?.code === 'permission-denied') {
+      if (err instanceof RoleConflictUnavailableError) {
+        setError(err.message);
+      } else if ((err as { code?: string })?.code === 'permission-denied') {
         setError('This doctor account has not been provisioned. Please contact the system administrator.');
       } else if (err instanceof Error) {
         console.error('Login error:', err.message);

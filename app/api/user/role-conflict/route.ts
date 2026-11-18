@@ -39,7 +39,19 @@ async function handlePOST(req: NextRequest) {
   }
 
   const oppositeRole = expectedRole === 'doctor' ? 'patient' : 'doctor';
-  const profiles = await new UserRepository(db).findAllByEmail(email);
+  const profiles = await new UserRepository(db).findAllByEmail(email).catch((error: unknown) => {
+    const code = (error as { code?: unknown } | null)?.code;
+    // Firestore reports quota, deadline, and service availability failures as gRPC statuses.
+    if (code === 8 || code === 4 || code === 14) {
+      return null;
+    }
+    throw error;
+  });
+  if (!profiles) {
+    return serviceResultToResponse(
+      serviceError(503, 'role_check_unavailable', 'Account verification is temporarily unavailable. Please try again shortly.')
+    );
+  }
   const conflict = profiles.find((profile) => (
     profile.id !== auth.data.userId && profile.data()?.role === oppositeRole
   ));

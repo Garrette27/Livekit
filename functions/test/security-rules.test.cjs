@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const assert = require('node:assert/strict');
 const { after, before, beforeEach, test } = require('node:test');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
@@ -7,7 +8,7 @@ const {
   assertSucceeds,
   initializeTestEnvironment,
 } = require('@firebase/rules-unit-testing');
-const { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, serverTimestamp } = require('firebase/firestore');
+const { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where, serverTimestamp } = require('firebase/firestore');
 const { getBytes, ref, uploadBytes } = require('firebase/storage');
 
 let rulesEnvironment;
@@ -144,4 +145,25 @@ test('only trusted claims can provision clinician profiles', async () => {
   await assertSucceeds(setDoc(doc(patientDb,'users/new-patient'),{email:'patient@example.test',role:'patient',consentGiven:false,registeredAt:serverTimestamp()}));
   const doctorDb=rulesEnvironment.authenticatedContext('new-doctor',{email:'doctor@example.test',role:'doctor'}).firestore();
   await assertSucceeds(setDoc(doc(doctorDb,'users/new-doctor'),{email:'doctor@example.test',role:'doctor',doctorName:'Synthetic Doctor',doctorEmail:'doctor@example.test',registeredAt:serverTimestamp()}));
+});
+
+
+test('live queue queries return only the signed-in doctor’s waiting and admitted visits', async () => {
+  await rulesEnvironment.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    for (const [id, doctorUserId, status] of [
+      ['waiting-1', 'doctor-1', 'waiting'],
+      ['admitted-1', 'doctor-1', 'admitted'],
+      ['left-1', 'doctor-1', 'left'],
+      ['waiting-2', 'doctor-2', 'waiting'],
+    ]) {
+      await setDoc(doc(db, 'waitingPatients', id), { doctorUserId, status });
+    }
+  });
+  const doctorDb = rulesEnvironment.authenticatedContext('doctor-1', { role: 'doctor' }).firestore();
+  const rows = collection(doctorDb, 'waitingPatients');
+  const liveStatuses = where('status', 'in', ['waiting', 'admitted']);
+  const snapshot = await assertSucceeds(getDocs(query(rows, where('doctorUserId', '==', 'doctor-1'), liveStatuses)));
+  assert.deepEqual(snapshot.docs.map(row => row.id).sort(), ['admitted-1', 'waiting-1']);
+  await assertFails(getDocs(query(rows, where('doctorUserId', '==', 'doctor-2'), liveStatuses)));
 });

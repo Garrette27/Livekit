@@ -3,6 +3,13 @@ import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 
 export type AccountRole = 'doctor' | 'patient';
 
+/** The server could not verify the account role. The caller must stop sign-in. */
+export class RoleConflictUnavailableError extends Error {
+  constructor() {
+    super('Account verification is temporarily unavailable. Please try again shortly.');
+  }
+}
+
 interface RoleConflictCheckInput {
   db: Firestore;
   email: string;
@@ -42,6 +49,9 @@ export async function checkRoleConflictByEmail({
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: normalizedEmail, expectedRole }),
   });
+  if (response.status >= 500) {
+    throw new RoleConflictUnavailableError();
+  }
   const data = await response.json();
   if (!response.ok || !data.success) {
     throw new Error(data.error || 'Could not verify account role');

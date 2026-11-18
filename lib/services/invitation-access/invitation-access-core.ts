@@ -428,14 +428,13 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
   }
 
   private async loadInvitationsById(invitationIds: string[]): Promise<Map<string, InvitationSnapshot>> {
-    if (invitationIds.length === 0) {
+    const uniqueInvitationIds = new Set(invitationIds.filter((id) => id.trim() && !id.includes('/')));
+    if (uniqueInvitationIds.size === 0) {
       return new Map();
     }
 
-    const uniqueInvitationIds = Array.from(new Set(invitationIds.filter((invitationId) => invitationId.trim().length > 0)));
-    const invitationDocs = await Promise.all(
-      uniqueInvitationIds.map((invitationId) => this.db.collection('invitations').doc(invitationId).get())
-    );
+    const invitations = this.db.collection('invitations');
+    const invitationDocs = await this.db.getAll(...Array.from(uniqueInvitationIds, (id) => invitations.doc(id)));
 
     const invitationsById = new Map<string, InvitationSnapshot>();
     invitationDocs.forEach((invitationDoc) => {
@@ -458,98 +457,24 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
   }
 
   /**
-   * Returns invitation ids that are currently active for a doctor's waiting-room flow.
-   * Keeping this list centralized prevents stale waiting entries from leaking into doctor queue views.
+   * Check invitation authority only for recent queue candidates. Empty queues
+   * need no invitation reads, and visits on the same invitation share one read.
    */
-  private async loadDoctorActiveInvitationIds(input: {
-    doctorUserId: string;
-    roomName?: string;
-  }): Promise<Set<string>> {
-    const invitationsSnapshot = await this.db
-      .collection('invitations')
-      .where('createdBy', '==', input.doctorUserId)
-      .where('waitingRoomEnabled', '==', true)
-      .limit(500)
-      .get();
-
+  private async filterActiveEntries(
+    waitingPatients: WaitingPatient[],
+    doctorUserId?: string
+  ): Promise<WaitingPatient[]> {
     const nowMs = Date.now();
-    const activeInvitationIds = new Set<string>();
-
-    invitationsSnapshot.docs.forEach((invitationDoc) => {
-      const invitationData = invitationDoc.data() as Record<string, unknown>;
-      const invitation: InvitationSnapshot = {
-        id: invitationDoc.id,
-        status: typeof invitationData.status === 'string' ? invitationData.status : 'active',
-        expiresAt: invitationData.expiresAt,
-        roomName: typeof invitationData.roomName === 'string' ? invitationData.roomName : undefined,
-        waitingRoomEnabled: invitationData.waitingRoomEnabled === true,
-        createdBy: typeof invitationData.createdBy === 'string' ? invitationData.createdBy : undefined,
-      };
-
-      if (!isInvitationActive(invitation, nowMs)) {
-        return;
-      }
-
-      if (input.roomName && invitation.roomName !== input.roomName) {
-        return;
-      }
-
-      activeInvitationIds.add(invitation.id);
-    });
-
-    return activeInvitationIds;
-  }
-
-  private async filterActiveEntries(waitingPatients: WaitingPatient[]): Promise<WaitingPatient[]> {
-    if (waitingPatients.length === 0) {
-      return waitingPatients;
-    }
-
-    const invitationsById = await this.loadInvitationsById(
-      waitingPatients.map((waitingPatient) => waitingPatient.invitationId)
+    const recentPatients = waitingPatients.filter((patient) =>
+      hasValidJoinTimestamp(patient) && nowMs - toEntryActivityMillis(patient) <= MAX_ACTIVE_ENTRY_AGE_MS
     );
-    const nowMs = Date.now();
-
-    return waitingPatients.filter((waitingPatient) => {
-      const invitation = invitationsById.get(waitingPatient.invitationId);
-      if (!invitation) {
-        return false;
-      }
-
-      if (!isInvitationActive(invitation, nowMs)) {
-        return false;
-      }
-
-      if (!matchesInvitationRoom(waitingPatient, invitation)) {
-        return false;
-      }
-
-      if (!hasValidJoinTimestamp(waitingPatient)) {
-        return false;
-      }
-
-      const activityMs = toEntryActivityMillis(waitingPatient);
-      if (activityMs <= 0) {
-        return false;
-      }
-
-      return nowMs - activityMs <= MAX_ACTIVE_ENTRY_AGE_MS;
-    });
-  }
-
-  /**
-   * Applies the row-level freshness checks after the owning invitation set has
-   * already been validated. This avoids re-reading every invitation document
-   * on the high-frequency doctor queue path.
-   */
-  private filterRecentEntries(waitingPatients: WaitingPatient[], nowMs = Date.now()): WaitingPatient[] {
-    return waitingPatients.filter((waitingPatient) => {
-      if (!hasValidJoinTimestamp(waitingPatient)) {
-        return false;
-      }
-
-      const activityMs = toEntryActivityMillis(waitingPatient);
-      return activityMs > 0 && nowMs - activityMs <= MAX_ACTIVE_ENTRY_AGE_MS;
+    const invitationsById = await this.loadInvitationsById(recentPatients.map((patient) => patient.invitationId));
+    return recentPatients.filter((patient) => {
+      const invitation = invitationsById.get(patient.invitationId);
+      return invitation !== undefined
+        && (!doctorUserId || invitation.createdBy === doctorUserId)
+        && isInvitationActive(invitation, nowMs)
+        && matchesInvitationRoom(patient, invitation);
     });
   }
 
@@ -600,17 +525,6 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
     const activeOnly = input.activeOnly === true;
 
     if (input.doctorUserId) {
-      const activeInvitationIds = activeOnly
-        ? await this.loadDoctorActiveInvitationIds({
-            doctorUserId: input.doctorUserId,
-            roomName: input.roomName,
-          })
-        : null;
-
-      if (activeOnly && activeInvitationIds && activeInvitationIds.size === 0) {
-        return [];
-      }
-
       const baseQuery = this.db.collection('waitingPatients').where('doctorUserId', '==', input.doctorUserId);
       const snapshot = singleStatus
         ? await baseQuery.where('status', '==', singleStatus).get()
@@ -622,12 +536,8 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
       const roomScoped = input.roomName
         ? waitingPatients.filter((waitingPatient) => waitingPatient.roomName === input.roomName)
         : waitingPatients;
-      const invitationScoped =
-        activeOnly && activeInvitationIds
-          ? roomScoped.filter((waitingPatient) => activeInvitationIds.has(waitingPatient.invitationId))
-          : roomScoped;
-      const statusScoped = filterByStatus(invitationScoped, statuses);
-      const activeScoped = activeOnly ? this.filterRecentEntries(statusScoped) : statusScoped;
+      const statusScoped = filterByStatus(roomScoped, statuses);
+      const activeScoped = activeOnly ? await this.filterActiveEntries(statusScoped, input.doctorUserId) : statusScoped;
 
       return sortWaitingByJoinedAt(activeScoped);
     }

@@ -32,8 +32,9 @@ const streamGroupsByDoctor = new Map<string, StreamGroup>();
 /**
  * Invalidates the doctor's queue when Firestore changes. Snapshot contents
  * never become UI state: callers re-query the authenticated API, whose room,
- * invitation-expiry and freshness projection is authoritative. Sharing this
- * listener keeps multiple panels from creating duplicate subscriptions.
+ * invitation-expiry and freshness projection is authoritative. Subscribe to
+ * live statuses so historical rows do not fill the initial snapshot. Periodic
+ * API refresh still reconciles records with legacy or missing statuses.
  *
  * `onUnavailable` is the important part of this interface: security rules,
  * offline state, or a missing client can all make the stream impossible, and in
@@ -61,7 +62,8 @@ export function subscribeToDoctorQueueChanges(input: {
       const subscribers = new Set<StreamSubscriber>();
       const waitingQuery = query(
         collection(db, 'waitingPatients'),
-        where('doctorUserId', '==', input.doctorUserId)
+        where('doctorUserId', '==', input.doctorUserId),
+        where('status', 'in', ['waiting', 'admitted'])
       );
       const createdGroup: StreamGroup = {
         subscribers,

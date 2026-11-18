@@ -308,16 +308,66 @@ test('authenticated requests add the token without sending caller-asserted ident
   assert.doesNotMatch(dashboard, /fetch\('\/api\/link-patient-consultations'/);
 });
 
+test('login distinguishes a Firestore outage from a resolved role check', async () => {
+  const serviceResult = loadModule('lib/services/shared/service-result.ts');
+  const http = loadModule('lib/services/shared/http.ts', {
+    'next/server': { NextResponse: { json: (body, options) => ({ body, status: options.status }) } },
+  });
+  let lookupFailure;
+  let lookupCount = 0;
+  const route = loadModule('app/api/user/role-conflict/route.ts', {
+    '@/lib/firebase-admin': { getFirebaseAdmin: () => ({}) },
+    '@/lib/repositories/user-repository': { UserRepository: class {
+      async findAllByEmail() {
+        lookupCount++;
+        if (lookupFailure) throw lookupFailure;
+        return [];
+      }
+    } },
+    '@/lib/services/shared/http': http,
+    '@/lib/services/shared/request-auth': {
+      authenticateBearerToken: async () => serviceResult.serviceOk({ email: 'doctor@example.test', userId: 'd1' }),
+    },
+    '@/lib/services/shared/request-logging': { withRequestLogging: fn => fn },
+    '@/lib/services/shared/service-result': serviceResult,
+  });
+  const request = email => ({ json: async () => ({ email, expectedRole: 'doctor' }) });
+  assert.equal((await route.POST(request('other@example.test'))).status, 403);
+  assert.equal(lookupCount, 0);
+  for (const code of [4, 8, 14]) {
+    lookupFailure = { code, message: 'internal provider detail' };
+    const response = await route.POST(request('doctor@example.test'));
+    assert.equal(response.status, 503);
+    assert.equal(response.body.code, 'role_check_unavailable');
+    assert.doesNotMatch(JSON.stringify(response), /internal provider detail/);
+  }
+  lookupFailure = null;
+  assert.equal((await route.POST(request('doctor@example.test'))).body.hasConflict, false);
+
+  const client = loadModule('lib/auth/role-conflict.ts', {
+    '@/lib/auth/authenticated-fetch': { authenticatedFetch: async () => ({
+      status: 503, json: async () => { throw Error('The response may be HTML'); },
+    }) },
+  });
+  await assert.rejects(
+    client.checkRoleConflictByEmail({ email: 'doctor@example.test', expectedRole: 'doctor' }),
+    client.RoleConflictUnavailableError,
+  );
+});
+
 function queueHarness() {
   let snapshotCallback;
   let errorCallback;
   let listenerCount = 0;
   let unsubscribed = 0;
   const timers = new Map();
+  let queryConstraints;
   const coordinator = loadModule('lib/waiting-room/waiting-queue-coordinator.ts', {
     '@/lib/firebase': { db: {} },
     'firebase/firestore': {
-      collection: () => ({}), where: () => ({}), query: () => ({}),
+      collection: () => ({}),
+      where: (...constraint) => constraint,
+      query(_collection, ...constraints) { queryConstraints = constraints; },
       onSnapshot(_query, onSnapshot, onError) {
         listenerCount++;
         snapshotCallback = onSnapshot;
@@ -331,6 +381,7 @@ function queueHarness() {
   } });
   return {
     ...coordinator, timers,
+    constraints: () => queryConstraints,
     emit() { snapshotCallback({ get docs() { throw new Error('Raw rows must not enter the UI'); } }); },
     fail() { errorCallback(new Error('Synthetic permission failure')); },
     counts() { return { listenerCount, unsubscribed }; },
@@ -347,6 +398,9 @@ test('realtime invalidates without exposing snapshot rows, shares a listener, an
   const first = queue.subscribeToDoctorQueueChanges(input);
   const second = queue.subscribeToDoctorQueueChanges(input);
   assert.equal(queue.counts().listenerCount, 1);
+  assert.equal(JSON.stringify(queue.constraints()), JSON.stringify([
+    ['doctorUserId', '==', 'synthetic-doctor'], ['status', 'in', ['waiting', 'admitted']],
+  ]));
   queue.emit();
   assert.equal(invalidations, 2);
   first();
@@ -398,7 +452,20 @@ function syntheticDatabase(collections) {
       async get() { return { docs: rows.map(row => ({ id: row.id, data: () => row })) }; },
     };
   }
-  return { collection: name => query(collections[name] || []) };
+  return {
+    invitationBatches: [],
+    collection(name) {
+      assert.equal(name === 'invitations' || name === 'waitingPatients', true);
+      return name === 'invitations' ? { doc: id => id } : query(collections[name] || []);
+    },
+    async getAll(...ids) {
+      this.invitationBatches.push(ids);
+      return ids.map(id => {
+        const invitation = collections.invitations.find(row => row.id === id);
+        return { id, exists: !!invitation, data: () => invitation };
+      });
+    },
+  };
 }
 
 test('canonical queue excludes stale, expired, revoked, other-room and other-doctor rows', async () => {
@@ -410,8 +477,11 @@ test('canonical queue excludes stale, expired, revoked, other-room and other-doc
     invitations: [active, { ...active, id: 'expired', expiresAt: new Date(now - hour) },
       { ...active, id: 'revoked', status: 'revoked' },
       { ...active, id: 'other-room', roomName: 'room-b' },
-      { ...active, id: 'other-doctor', createdBy: 'd2' }],
+      { ...active, id: 'other-doctor', createdBy: 'd2' }, { ...active, id: 'unused' }],
     waitingPatients: [{ ...row, id: 'current' },
+      { ...row, id: 'legacy-status', status: undefined },
+      { ...row, id: 'foreign-invitation', invitationId: 'other-doctor' },
+      { ...row, id: 'wrong-room', invitationId: 'other-room' },
       { ...row, id: 'stale', joinedAt: new Date(now - 48 * hour) },
       { ...row, id: 'expired', invitationId: 'expired' },
       { ...row, id: 'revoked', invitationId: 'revoked' },
@@ -425,7 +495,11 @@ test('canonical queue excludes stale, expired, revoked, other-room and other-doc
   });
   const service = new FirestoreInvitationAccessCore(db, {}, {});
   const rows = await service.listWaitingEntries({ doctorUserId: 'd1', roomName: 'room-a', statuses: ['waiting', 'admitted'], activeOnly: true });
-  assert.deepEqual(Array.from(rows, item => item.id), ['current']);
+  assert.deepEqual(Array.from(rows, item => item.id), ['current', 'legacy-status']);
+  assert.deepEqual(db.invitationBatches, [['active', 'other-doctor', 'other-room', 'expired', 'revoked']]);
+  const empty = await service.listWaitingEntries({ doctorUserId: 'empty', statuses: ['waiting', 'admitted'], activeOnly: true });
+  assert.equal(empty.length, 0);
+  assert.equal(db.invitationBatches.length, 1);
   const history = await service.listWaitingEntries({ doctorUserId: 'd1', roomName: 'room-a', statuses: ['admitted'], activeOnly: false });
   assert.ok(history.some(item => item.id === 'stale'), 'History is retained, not deleted');
 });
