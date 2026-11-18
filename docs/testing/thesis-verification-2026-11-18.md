@@ -2,7 +2,7 @@
 
 18 November 2026 | Asia/Singapore
 
-Production baseline: `80c7e8155d4400ffc7fbd503fabd784c41043244`. Remediation tested locally: `f934a64388c90267618b005661acd81256933751` on `codex/thesis-login-performance`. The live Vercel alias was verified against the production baseline. Vercel blocked both branch previews at its project collaboration gate.
+Production baseline: `80c7e8155d4400ffc7fbd503fabd784c41043244`. Remediation tested locally: `08bd5bb` on `codex/thesis-login-performance` (earlier run: `f934a64`). The live Vercel alias was verified against the production baseline. Vercel blocked both branch previews at its project collaboration gate.
 
 ## Doctor sign-in incident
 
@@ -18,14 +18,24 @@ The branch shares one server-side filter for recent queue entries and reads only
 
 The browser regression also identified a blank direct patient-room page while waiting for hydration. The page now resolves the route parameter during render, and the existing secure-invitation guidance is available in the initial HTML. The test checks it with JavaScript disabled.
 
+## Follow-up changes (afternoon, 18 November)
+
+Three further changes were made while production Firestore was quota-limited, each with a focused regression:
+
+1. **Background polling pause.** A hidden doctor tab no longer polls the waiting queue (Page Visibility API). Returning to the tab triggers one reconciling refresh. Live queue events and clinician actions still refresh immediately. This directly targets the read volume behind the quota incident.
+2. **No account-existence disclosure.** Invitation creation no longer looks up whether the invitee's email has an account or reports it to the caller. This removes an account-enumeration signal and one Firestore read per invitation.
+3. **CI gate isolation.** The dependency audit now runs as its own CI job, so the unpatched development-tooling advisory still fails visibly but no longer hides the test, lint and build results.
+
+The design rationale for these and the existing security patterns, plus a compliance check against `AGENTS.md`, is in `docs/design-pattern-review-2026-11-18.md`.
+
 ## Observed results
 
 | Check | Status | Evidence |
 | --- | --- | --- |
-| Local application checks | PASS | Typecheck, lint, production build, and 26 application/policy regressions. |
+| Local application checks | PASS | Typecheck, lint, production build, 27 application tests and the security/thesis-flow contract scripts on `08bd5bb`. |
 | Firebase rule checks | PASS in emulator | Eight Firestore/Storage tests, including owner access and denial of a cross-doctor live queue query. |
 | Browser and HTTP regression | PASS locally | All 29 mobile Chromium tests passed, including the missing-invitation guidance with JavaScript disabled. The pre-fix run passed 28 of 29. |
-| Dependency gate | FAIL, full inventory | Production app and Functions audits: 0 findings. Full app audit: 13 high entries tied to a single development-tooling advisory, GHSA-fc5q-39xc-vjpf. No patched release was available. GitHub Actions stopped the main application job at the audit step. |
+| Dependency gate | FAIL, full inventory | Production app and Functions audits: 0 findings. Full app audit: 13 high entries tied to a single development-tooling advisory, GHSA-fc5q-39xc-vjpf. No patched release was available. The audit now runs as a separate CI job, so the application job reports its own result. |
 | Landing page HTTP pilot | PASS | n=10, median 50.5 ms, p95 304 ms. All ten returned HTTP 200. |
 | Invalid-invitation help pilot | PASS | n=10, median 71 ms, p95 1,239 ms. All ten returned HTTP 200. |
 
@@ -33,6 +43,6 @@ The pilot used sequential requests from Windows Subsystem for Linux with 250 ms 
 
 ## Evidence still needed for the thesis
 
-Run the successful doctor login, legitimate invitations and the remaining account-ownership cases with synthetic accounts on isolated staging. Capture authenticated endpoint timings, admission until both clients receive media, two-way media transport, and the planned concurrent call levels. The published performance protocol also defines separate AI documentation and usability work. Keep results pending until the respective trials run. This brief supports the technical results section of the thesis. The overall security and consultation-performance gates remain open.
+Run the successful doctor login, legitimate invitations and the remaining account-ownership cases with synthetic accounts on isolated staging. Capture authenticated endpoint timings, admission until both clients receive media, two-way media transport, and the planned concurrent call levels. The published performance protocol also defines separate AI documentation and usability work. Keep results pending until the respective trials run. This brief supports the technical results section of the thesis. The overall security and consultation-performance gates remain open. Production sign-in after the daily quota reset (about 16:00 Singapore time) also needs to be re-checked and recorded.
 
 Technical references: repository performance assessment and remaining experiments, GitHub Actions run 44213350665, Firebase Firestore usage and limits documentation, and GitHub Advisory GHSA-fc5q-39xc-vjpf.
