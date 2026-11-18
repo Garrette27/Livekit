@@ -2,8 +2,8 @@
 
 Report date: 18 November 2026, Asia/Singapore (UTC+8).
 Source of truth: GitHub `Garrette27/Livekit`, branch `main`.
-Code under test: `3883450` (last code change; later commits are documentation).
-Production deployment: still `80c7e81` (see section 9).
+Code under test: `3883450` for the full test inventory; `28b437e` adds the AI-credit fix (28/28 tests).
+Production deployment: `28b437e`, deployed 18 November (see section 9).
 
 This report is for the thesis adviser and co-authors. It states what was
 tested, how, what passed, what failed, and what has not been tested yet. Every
@@ -103,8 +103,8 @@ Conclusion: an availability limit, not a security defect. The system refused
 to guess the user's role, which is the correct fail-closed behavior. The fix in
 `7e751dc` turns this into an honest HTTP 503 "Account verification is
 temporarily unavailable" message. Successful login after the quota reset has
-**not yet been verified on production**, and the fix itself is not live until
-`main` is deployed (section 9).
+**not yet been verified on production**. The fix is deployed as of `28b437e`
+(section 9).
 
 Read-reduction work in response:
 
@@ -205,23 +205,27 @@ inaccuracies, now corrected:
 4. It said "no patched release was available" without the version; the latest
    `picomatch` is 4.0.7, which is still affected.
 
-## 9. Deployment status (honest limitation)
+## 9. Deployment status
 
-All commits after `80c7e81` are on `main` and pass CI, but **Vercel blocked
-their deployment**: the commit author account is not a member of the Vercel
-project ("Git author … must have access to the project on Vercel to create
-deployments"). Production therefore still serves `80c7e81`, which has the
-500-on-quota login behavior and none of the 18 November afternoon changes.
-The project owner must deploy `main` from the Vercel dashboard, add the author
-account to the Vercel project, or push a commit authored by the owner account.
-Until then, sections 3.2, 4 (fixes) and 5 describe the tested code, not the
-live site.
+Commits `7e751dc` to `6d0ea41` passed CI but Vercel blocked their deployment:
+the commit author account was not a member of the Vercel project, and the
+Hobby plan does not allow collaborators. Commit `28b437e` was authored by the
+project owner account, and Vercel deployed it to production
+(`livekit-frontend`, GitHub deployment 7876226964). It includes every earlier
+commit. Post-deployment smoke check: `/`, `/doctor/login` and the
+invalid-invitation page return HTTP 200, and the role endpoint returns the
+expected HTTP 401 `missing_token` without a session. Doctor sign-in itself
+still has to be verified after the 16:00 quota reset.
+
+A second Vercel project named `livekit` connected to the same repository
+fails on every commit, including `fa5a33c` before this work. It does not serve
+the application and can be disconnected by the owner.
 
 ## 10. Remaining work and owners
 
 | Task | Needs | Owner |
 | --- | --- | --- |
-| Deploy `main` to production, then verify doctor login after 16:00 | Vercel owner access | App owner |
+| Verify doctor login on production after 16:00 (deployment done) | Test doctor account | App owner |
 | Survey pilot: measure reads/writes per consultation | 2 teammates, 1 hour after 16:00 | Survey team |
 | Usability sessions (patients, doctors, IT) | Consent forms approved by adviser | Survey team |
 | AI documentation comparison | Fictional transcripts, 1–2 clinicians | Survey team + app owner |

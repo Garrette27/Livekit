@@ -16,8 +16,8 @@ Since the 18 November change
 (`lib/services/consultation-finalization/ai-provider-errors.ts`), an OpenAI "insufficient_quota"
 response is treated as *unavailable*, not as a temporary failure. Before that,
 each call was retried, marked `failed` and put in the retry queue, spending
-Firestore writes for an error that waiting cannot fix. The fix is live only
-once `main` is deployed.
+Firestore writes for an error that waiting cannot fix. Deployed to production
+in `28b437e`.
 
 ## Thesis reporting
 

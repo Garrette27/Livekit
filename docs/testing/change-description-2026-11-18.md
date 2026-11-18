@@ -1,6 +1,6 @@
 # Change description: 18 November 2026 (pushed directly to `main`)
 
-Range: `80c7e81..5c1f8fd`. This repository pushes directly to `main`; this file
+Range: `80c7e81..28b437e`. This repository pushes directly to `main`; this file
 stands in for a pull-request description.
 
 ## Problem
@@ -19,6 +19,7 @@ a survey plan that fits the free quota, and a check that the code follows
 | `f934a64` | Patient room page renders invitation guidance in the initial HTML (no blank page before hydration) |
 | `10ca271` | Hidden doctor tabs stop polling the waiting queue (Page Visibility API) and refresh once on return; dependency audit moved to its own CI job; AGENTS.md states that thesis acceptance and proven design patterns are both goals |
 | `382ac86`, `08bd5bb` | Invitation creation no longer reveals whether an email has an account (account enumeration) and skips that read; original line endings preserved |
+| `28b437e` | OpenAI `insufficient_quota` recorded once as an unavailable summary instead of retried failures; `docs/ai-summary-status.md` documents the no-credit status |
 | `3883450` | `999999` reuse sentinel replaced by one documented constant `REUSABLE_INVITATION_MAX_USES`; contracts reject a stray literal and reject unrelated product rules in AGENTS.md |
 
 ## Documentation
@@ -38,7 +39,7 @@ a survey plan that fits the free quota, and a check that the code follows
 
 ## Not done / risks
 
-- **Not deployed.** Vercel blocks deployments of these commits because the commit author is not a member of the Vercel project. Production still runs `80c7e81`.
+- Deployed to production at `28b437e` (owner-authored commit; earlier commits were blocked by Vercel's Hobby collaboration limit).
 - Production doctor login after the quota reset is not verified.
 - Authenticated, WebRTC and concurrent-call performance, usability and AI evaluation remain NOT TESTED.
 
