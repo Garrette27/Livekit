@@ -109,7 +109,7 @@ export function subscribeToDoctorQueueChanges(input: {
 const inFlightByRequest = new Map<string, Promise<unknown>>();
 
 interface PollGroup {
-  intervalId: number;
+  stop: Unsubscribe;
   tickers: Set<() => void>;
 }
 
@@ -135,10 +135,9 @@ export function fetchWaitingQueueOnce<T>(requestKey: string, fetcher: () => Prom
 }
 
 /**
- * Registers a periodic refresh for this scope. Every subscriber on a scope
- * shares one timer, so the polling rate is a property of the scope rather than
- * of how many components are mounted. Returns an unsubscribe function; the
- * timer stops when the last subscriber leaves.
+ * Shares one foreground refresh per query scope. A hidden tab stops periodic
+ * reconciliations and refreshes immediately when visible again. Live queue
+ * events and explicit clinician actions have their own refresh paths.
  */
 export function subscribeToWaitingQueuePoll(
   scopeKey: string,
@@ -149,11 +148,37 @@ export function subscribeToWaitingQueuePoll(
 
   if (!group) {
     const tickers = new Set<() => void>();
-    const intervalId = window.setInterval(() => {
-      // One shared request per interval; subscribers read the resulting state.
-      tickers.forEach((subscriberTick) => subscriberTick());
-    }, intervalMs);
-    group = { intervalId, tickers };
+    const refresh = () => tickers.forEach((subscriberTick) => subscriberTick());
+    let intervalId: number | undefined;
+    const stopTimer = () => {
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+        intervalId = undefined;
+      }
+    };
+    const startTimer = () => {
+      if (document.visibilityState === 'visible' && intervalId === undefined) {
+        intervalId = window.setInterval(refresh, intervalMs);
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        startTimer();
+        refresh();
+      } else {
+        stopTimer();
+      }
+    };
+
+    startTimer();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    group = {
+      tickers,
+      stop: () => {
+        stopTimer();
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      },
+    };
     pollGroupsByScope.set(scopeKey, group);
   }
 
@@ -163,7 +188,7 @@ export function subscribeToWaitingQueuePoll(
   return () => {
     joinedGroup.tickers.delete(tick);
     if (joinedGroup.tickers.size === 0) {
-      window.clearInterval(joinedGroup.intervalId);
+      joinedGroup.stop();
       pollGroupsByScope.delete(scopeKey);
     }
   };

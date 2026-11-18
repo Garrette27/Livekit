@@ -129,6 +129,12 @@ transcription, summary, or access-control behavior.
 
 ### Delivery priority
 
+- Meet the thesis acceptance criteria and use established design patterns that
+  fit the teleconsultation workflow and its privacy and reliability needs.
+  Explain the chosen pattern and its tradeoffs in the relevant design note.
+  Preserve the server-side security boundary and tag results with the tested
+  environment and evidence.
+
 - First make the existing doctor/patient journey work reliably; then harden it;
   then improve its interaction design. Do not trade a working call for an
   optional AI, attachment, scheduling, analytics, or reviewer feature.

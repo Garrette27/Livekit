@@ -361,6 +361,12 @@ function queueHarness() {
   let listenerCount = 0;
   let unsubscribed = 0;
   const timers = new Map();
+  const visibilityListeners = new Set();
+  const document = {
+    visibilityState: 'visible',
+    addEventListener(_event, listener) { visibilityListeners.add(listener); },
+    removeEventListener(_event, listener) { visibilityListeners.delete(listener); },
+  };
   let queryConstraints;
   const coordinator = loadModule('lib/waiting-room/waiting-queue-coordinator.ts', {
     '@/lib/firebase': { db: {} },
@@ -375,12 +381,16 @@ function queueHarness() {
         return () => { unsubscribed++; };
       },
     },
-  }, { window: {
+  }, { document, window: {
     setInterval(fn) { const id = timers.size + 1; timers.set(id, fn); return id; },
     clearInterval(id) { timers.delete(id); },
   } });
   return {
-    ...coordinator, timers,
+    ...coordinator, timers, visibilityListeners,
+    setVisibility(state) {
+      document.visibilityState = state;
+      visibilityListeners.forEach(listener => listener());
+    },
     constraints: () => queryConstraints,
     emit() { snapshotCallback({ get docs() { throw new Error('Raw rows must not enter the UI'); } }); },
     fail() { errorCallback(new Error('Synthetic permission failure')); },
@@ -438,6 +448,27 @@ test('periodic refresh survives stream failure and shared requests stay deduplic
   assert.doesNotMatch(hook, /onPatients:|isStreaming|setIsStreaming/);
   assert.match(hook, /onInvalidate:[\s\S]*?void refresh\(false\)/);
   assert.match(hook, /!roomName \|\| waitingPatient.roomName === roomName/);
+});
+
+test('periodic queue refresh pauses in background and reconciles once on return', () => {
+  const queue = queueHarness();
+  let calls = 0;
+  queue.setVisibility('hidden');
+  const stopOne = queue.subscribeToWaitingQueuePoll('scope', 15000, () => { calls++; });
+  const stopTwo = queue.subscribeToWaitingQueuePoll('scope', 15000, () => { calls++; });
+  assert.equal(queue.timers.size, 0);
+  assert.equal(queue.visibilityListeners.size, 1);
+  queue.setVisibility('visible');
+  assert.equal(calls, 2);
+  assert.equal(queue.timers.size, 1);
+  queue.setVisibility('hidden');
+  assert.equal(queue.timers.size, 0);
+  assert.equal(calls, 2);
+  stopOne();
+  stopTwo();
+  assert.equal(queue.visibilityListeners.size, 0);
+  queue.setVisibility('visible');
+  assert.equal(calls, 2);
 });
 
 /** Equality-query fake keeps filtering behavior in the actual domain service. */

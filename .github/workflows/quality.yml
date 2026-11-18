@@ -24,9 +24,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Audit application dependencies
-        run: npm audit --audit-level=high
-
       - name: Security and policy regressions
         run: npm run test:security
 
@@ -38,6 +35,21 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+  application-dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Audit application dependencies
+        run: npm audit --audit-level=high
 
   firebase-functions:
     runs-on: ubuntu-latest
