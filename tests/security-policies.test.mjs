@@ -444,3 +444,17 @@ test('consent is a versioned record, and the old registration flag is not it', a
     'the statement asks for nothing the consultation does not use'
   );
 });
+
+test('exhausted AI credit is classified as unavailable, not a retryable failure', async () => {
+  const errors = await importTypeScriptModule('lib/services/consultation-finalization/ai-provider-errors.ts');
+  const json = (status, body) => new Response(JSON.stringify(body), { status });
+  assert.equal(await errors.isQuotaExhaustedResponse(json(429, { error: { code: 'insufficient_quota', type: 'insufficient_quota' } })), true);
+  // An ordinary rate limit is transient and keeps the retry path.
+  assert.equal(await errors.isQuotaExhaustedResponse(json(429, { error: { code: 'rate_limit_exceeded' } })), false);
+  assert.equal(await errors.isQuotaExhaustedResponse(json(500, { error: { code: 'insufficient_quota' } })), false);
+  assert.equal(await errors.isQuotaExhaustedResponse(new Response('not json', { status: 429 })), false);
+  // Classification must not consume the body callers may still read.
+  const response = json(429, { error: { code: 'insufficient_quota' } });
+  await errors.isQuotaExhaustedResponse(response);
+  assert.equal(response.bodyUsed, false);
+});

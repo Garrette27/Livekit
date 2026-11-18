@@ -22,7 +22,8 @@ NOT TESTED, NOT APPLICABLE.
 | Public page response time (pilot) | PASS | p95 304 ms and 1,239 ms against a 3,000 ms budget |
 | Doctor login on 18 Nov | BLOCKED | Free-tier database read quota exhausted; not a code defect |
 | Authenticated, video and concurrent-call performance | NOT TESTED | Needs a staging project and synthetic accounts |
-| Usability and AI-documentation evaluation | NOT TESTED | Survey protocol prepared; sessions not yet run |
+| Usability evaluation | NOT TESTED | Survey protocol prepared; sessions not yet run |
+| AI transcription, summary and documentation evaluation | BLOCKED | No OpenAI credit; the call works and summaries are recorded as unavailable (`docs/ai-summary-status.md`) |
 
 Overall: the security remediation is complete for the tested scope, and the
 code passes every automated gate it controls. The thesis performance gate is
@@ -168,7 +169,7 @@ database, or video is.
 | PERF04 / PERF10 | Admission until both sides receive media | p95 ≤ 5 s | NOT TESTED |
 | PERF05 / PERF11–12 | Audio/video quality (RTT, jitter, loss, frame rate) | RTT ≤ 300 ms, jitter ≤ 30 ms, loss ≤ 1%, ≥ 24 fps | NOT TESTED |
 | PERF06 / PERF18 | 1, 3 and 5 simultaneous calls | Budgets above still hold | NOT TESTED |
-| PERF07 / PERF16–17 | AI generation and documentation time | p95 ≤ 60 s; paired time difference | NOT TESTED |
+| PERF07 / PERF16–17 | AI generation and documentation time | p95 ≤ 60 s; paired time difference | BLOCKED (no AI provider credit) |
 
 These need an isolated staging Firebase project with synthetic accounts (the
 free production quota cannot absorb load tests) and two real devices per call.

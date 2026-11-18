@@ -120,7 +120,15 @@ Chapter IV's limitations, and it is why the survey schedule in
 `docs/testing/survey-and-interview-protocol.md` starts sessions right after
 4:00 p.m.
 
-## 8. Glossary
+## 8. AI summaries are currently unavailable
+
+We have no OpenAI credit right now, and that is fine for the current phase.
+Calls, waiting room, chat and history all work; after a call, the summary says
+"AI summary unavailable" and the doctor writes notes manually. In the paper,
+mark the AI evaluation as BLOCKED (not failed). Keep transcription off during
+survey sessions. Details and options: `docs/ai-summary-status.md`.
+
+## 9. Glossary
 
 | Term | Meaning |
 | --- | --- |

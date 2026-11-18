@@ -20,6 +20,7 @@ import { SummaryJobRepository } from '@/lib/repositories/summary-job-repository'
 import { isConsultationCapabilityEnabled } from '@/lib/consultations/consultation-capabilities';
 import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import type { GenerateConsultationSummaryParams } from './contracts';
+import { AiProviderQuotaExhaustedError, isQuotaExhaustedResponse } from './ai-provider-errors';
 
 interface ParsedSummary {
   summary: string;
@@ -109,7 +110,7 @@ async function requestOpenAiCompletion(requestBody: string): Promise<Response> {
 
   try {
     const response = await attempt();
-    if (response.status !== 429 && response.status < 500) {
+    if ((response.status !== 429 && response.status < 500) || await isQuotaExhaustedResponse(response)) {
       return response;
     }
     console.warn('Transient OpenAI error, retrying once:', response.status);
@@ -930,6 +931,10 @@ export async function generateAndStoreConsultationSummary({
       })
     );
 
+    if (await isQuotaExhaustedResponse(response)) {
+      throw new AiProviderQuotaExhaustedError();
+    }
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('OpenAI API error:', response.status, errorText);
@@ -1029,14 +1034,24 @@ export async function generateAndStoreConsultationSummary({
       console.log('Parse error fallback summary stored successfully with user ID:', userId);
     }
   } catch (error) {
-    console.error('Error generating consultation summary:', error);
+    const quotaExhausted = error instanceof AiProviderQuotaExhaustedError;
+    if (quotaExhausted) {
+      console.warn('AI summary unavailable: provider quota exhausted');
+    } else {
+      console.error('Error generating consultation summary:', error);
+    }
 
     try {
       const summaryData = {
         roomName,
         consultationSessionId,
-        summary: `Error generating AI summary.${presenceTimelineNarrativeSuffix}`,
-        keyPoints: augmentKeyPointsWithPresenceTimeline(['Summary generation failed'], presenceTimeline),
+        summary: quotaExhausted
+          ? `AI summary unavailable: the AI provider account has no remaining credit. The consultation record is complete; document it manually.${presenceTimelineNarrativeSuffix}`
+          : `Error generating AI summary.${presenceTimelineNarrativeSuffix}`,
+        keyPoints: augmentKeyPointsWithPresenceTimeline(
+          [quotaExhausted ? 'No AI analysis available' : 'Summary generation failed'],
+          presenceTimeline
+        ),
         recommendations: [],
         followUpActions: [],
         riskLevel: 'Unknown',
@@ -1055,15 +1070,23 @@ export async function generateAndStoreConsultationSummary({
             transcriptRevision
           ),
           ...presenceTimelineMetadata,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          summaryStatus: 'failed',
+          ...(quotaExhausted
+            ? {
+                aiSummaryEnabled: false,
+                aiSummaryDisabledReason: 'AI provider quota exhausted',
+                summaryStatus: 'unavailable',
+              }
+            : {
+                error: error instanceof Error ? error.message : 'Unknown error',
+                summaryStatus: 'failed',
+              }),
           requiresClinicianReview: true,
         },
       };
 
       attachPatientFields(summaryData, patientUserId, patientEmail);
       await summaryRepo.overwriteGenerated(summaryDocumentId, summaryData, transcriptRevision);
-      await updateSummaryJob('failed');
+      await updateSummaryJob(quotaExhausted ? 'unavailable' : 'failed');
       console.log('Error summary stored successfully with user ID:', userId);
     } catch (storeError) {
       console.error('Error storing error summary:', storeError);
