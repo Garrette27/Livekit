@@ -112,4 +112,16 @@ for (const path of [
 // unrelated product (CMS page builder, HR ATS) mislead contributors and agents.
 assert.doesNotMatch(read('AGENTS.md'), /RideMax|Page Builder|HR Mini ATS|Marketing CMS/);
 
+// Quota exhaustion on 18 Nov surfaced as opaque 500s in the core doctor flow.
+// These routes must report database availability failures as a 503 retry.
+for (const path of [
+  'app/api/doctor-access/route.ts',
+  'app/api/invite/get-link/route.ts',
+  'app/api/invite/create/route.ts',
+]) {
+  assert.match(read(path), /unexpectedErrorResponse\(error\)/, `${path} must use unexpectedErrorResponse`);
+}
+assert.match(read('lib/services/invitation-access/invitation-access-core.ts'), /isDatabaseUnavailableError\(error\)/);
+assert.match(read('lib/services/shared/request-auth.ts'), /isDatabaseUnavailableError\(error\)/);
+
 console.log('Security architecture regression contracts passed.');

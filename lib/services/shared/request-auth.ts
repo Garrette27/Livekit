@@ -8,6 +8,11 @@ import {
 import { UserRepository } from '@/lib/repositories/user-repository';
 import { recordAuthenticatedUser } from './request-logging';
 import { serviceError, serviceOk, type ServiceResult } from './service-result';
+import {
+  DATABASE_UNAVAILABLE_CODE,
+  DATABASE_UNAVAILABLE_MESSAGE,
+  isDatabaseUnavailableError,
+} from './database-availability';
 
 export interface AuthenticatedRequester {
   userId: string;
@@ -78,7 +83,16 @@ export async function authorizeBearerRequest(
     : authenticated.data.claimedRole || null;
 
   if (!role) {
-    const profile = await new UserRepository(db).getById(authenticated.data.userId);
+    let profile;
+    try {
+      profile = await new UserRepository(db).getById(authenticated.data.userId);
+    } catch (error) {
+      // Fail closed: without the profile there is no role, so deny with 503.
+      if (isDatabaseUnavailableError(error)) {
+        return serviceError(503, DATABASE_UNAVAILABLE_CODE, DATABASE_UNAVAILABLE_MESSAGE);
+      }
+      throw error;
+    }
     role = profile.exists ? parseAppRole(profile.data()?.role) : null;
   }
 

@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { NextResponse, NextRequest } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
-import { serviceResultToResponse } from '@/lib/services/shared/http';
+import { serviceResultToResponse, unexpectedErrorResponse } from '@/lib/services/shared/http';
+import { isDatabaseUnavailableError } from '@/lib/services/shared/database-availability';
 import { DoctorRoomAccess } from '@/lib/services/room-access';
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
 import { enforceRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
@@ -174,6 +175,9 @@ async function handlePOST(req: NextRequest) {
       console.log('Invitation stored successfully in Firestore');
     } catch (firestoreError) {
       console.error('Firestore error:', firestoreError);
+      if (isDatabaseUnavailableError(firestoreError)) {
+        throw firestoreError;
+      }
       const errorMessage = firestoreError instanceof Error ? firestoreError.message : 'Unknown Firestore error';
       throw new Error(`Failed to store invitation: ${errorMessage}`);
     }
@@ -210,10 +214,7 @@ async function handlePOST(req: NextRequest) {
 
   } catch (error) {
     console.error('Error creating invitation:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
+    return unexpectedErrorResponse(error);
   }
 }
 

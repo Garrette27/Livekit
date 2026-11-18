@@ -22,6 +22,10 @@ function loadModule(path, dependencies = {}, globals = {}) {
     module: moduleRecord, exports: moduleRecord.exports, Date, Headers, FormData, Blob, AbortSignal,
     console: { log() {}, warn() {}, error() {} },
     require(name) {
+      // Pure, IO-free classifier: tests exercise the real implementation.
+      if (!(name in dependencies) && name.endsWith('database-availability')) {
+        return loadModule('lib/services/shared/database-availability.ts');
+      }
       assert.ok(name in dependencies, `Unexpected dependency ${name}`);
       return dependencies[name];
     },

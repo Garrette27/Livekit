@@ -3,6 +3,11 @@ import { validateInvitationAndIssueToken } from '@/lib/invitations/validate-serv
 import type { WaitingPatient } from '@/lib/types';
 import { isKnownUserId } from '@/lib/consultations/identity-utils';
 import {
+  DATABASE_UNAVAILABLE_CODE,
+  DATABASE_UNAVAILABLE_MESSAGE,
+  isDatabaseUnavailableError,
+} from '@/lib/services/shared/database-availability';
+import {
   FirestoreConsultationSessionCore,
   LiveKitRtcTransportAdapter,
 } from '@/lib/services/video-chat';
@@ -985,6 +990,10 @@ export function toInvitationAccessError(error: unknown): {
       code: error.code,
       message: error.message,
     };
+  }
+
+  if (isDatabaseUnavailableError(error)) {
+    return { status: 503, code: DATABASE_UNAVAILABLE_CODE, message: DATABASE_UNAVAILABLE_MESSAGE };
   }
 
   return {

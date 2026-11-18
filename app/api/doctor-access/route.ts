@@ -3,7 +3,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
-import { serviceResultToResponse } from '@/lib/services/shared/http';
+import { serviceResultToResponse, unexpectedErrorResponse } from '@/lib/services/shared/http';
 import { getJwtSecret } from '@/lib/invitations/token-utils';
 import { DoctorRoomAccess } from '@/lib/services/room-access';
 
@@ -95,10 +95,7 @@ async function handlePOST(req: NextRequest) {
     });
   } catch (error) {
     console.error('Error generating doctor access token:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
+    return unexpectedErrorResponse(error);
   }
 }
 

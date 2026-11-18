@@ -5,6 +5,7 @@ import { serviceResultToResponse } from '@/lib/services/shared/http';
 import { authenticateBearerToken } from '@/lib/services/shared/request-auth';
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { serviceError, serviceOk } from '@/lib/services/shared/service-result';
+import { isDatabaseUnavailableError } from '@/lib/services/shared/database-availability';
 
 /**
  * Checks only the authenticated user's email and returns a boolean, keeping
@@ -40,9 +41,7 @@ async function handlePOST(req: NextRequest) {
 
   const oppositeRole = expectedRole === 'doctor' ? 'patient' : 'doctor';
   const profiles = await new UserRepository(db).findAllByEmail(email).catch((error: unknown) => {
-    const code = (error as { code?: unknown } | null)?.code;
-    // Firestore reports quota, deadline, and service availability failures as gRPC statuses.
-    if (code === 8 || code === 4 || code === 14) {
+    if (isDatabaseUnavailableError(error)) {
       return null;
     }
     throw error;

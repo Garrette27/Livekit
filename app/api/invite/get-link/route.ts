@@ -7,7 +7,7 @@ import { InvitationToken } from '../../../../lib/types';
 import { finalizeConsultationForRoom } from '../../../../lib/services/consultation-finalization';
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
 import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
-import { serviceResultToResponse } from '@/lib/services/shared/http';
+import { serviceResultToResponse, unexpectedErrorResponse } from '@/lib/services/shared/http';
 
 function isExpiredInvitation(invitation: any): boolean {
   const expiresAtDate = invitation?.expiresAt
@@ -196,10 +196,7 @@ async function handleGET(req: NextRequest) {
 
   } catch (error) {
     console.error('Error getting invitation link:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
+    return unexpectedErrorResponse(error);
   }
 }
 

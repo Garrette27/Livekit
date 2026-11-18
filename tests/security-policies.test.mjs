@@ -458,3 +458,15 @@ test('exhausted AI credit is classified as unavailable, not a retryable failure'
   await errors.isQuotaExhaustedResponse(response);
   assert.equal(response.bodyUsed, false);
 });
+
+test('database availability failures are recognized from both Firestore SDKs', async () => {
+  const availability = await importTypeScriptModule('lib/services/shared/database-availability.ts');
+  // Server SDK gRPC codes: 8 quota exhausted, 4 deadline exceeded, 14 unavailable.
+  for (const code of [8, 4, 14, 'resource-exhausted', 'deadline-exceeded', 'unavailable', 'RESOURCE_EXHAUSTED']) {
+    assert.equal(availability.isDatabaseUnavailableError({ code }), true, `code ${code}`);
+  }
+  // Permission and logic errors are real faults and must not be disguised as outages.
+  for (const error of [{ code: 7 }, { code: 'permission-denied' }, new Error('boom'), null, undefined]) {
+    assert.equal(availability.isDatabaseUnavailableError(error), false);
+  }
+});
