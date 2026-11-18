@@ -91,4 +91,9 @@ assert.equal(existsSync(resolve(root, 'app/faculty')), false);
 assert.equal(existsSync(resolve(root, 'app/professor')), false);
 assert.equal(existsSync(resolve(root, 'app/api/faculty')), false);
 
+// Invitation creation must not reveal whether an email has an account
+// (enumeration) nor spend a Firestore read on information no UI consumes.
+const inviteCreateSource = read('app/api/invite/create/route.ts');
+assert.doesNotMatch(inviteCreateSource, /existingAccount|findByEmail|UserRepository/);
+
 console.log('Security architecture regression contracts passed.');

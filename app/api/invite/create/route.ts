@@ -5,7 +5,6 @@ import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
 import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
 import { serviceResultToResponse } from '@/lib/services/shared/http';
 import { DoctorRoomAccess } from '@/lib/services/room-access';
-import { UserRepository } from '../../../../lib/repositories/user-repository';
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
 import { enforceRateLimit, RateLimitConfigs } from '../../../../lib/rate-limit';
 import { validateEmail, validateRoomName, sanitizeInput } from '../../../../lib/validation';
@@ -112,25 +111,6 @@ async function handlePOST(req: NextRequest) {
       return serviceResultToResponse(roomAccess);
     }
 
-    // Check if email already has an account (optional - for informational purposes)
-    // Only check if email is provided
-    let existingAccount = null;
-    if (sanitizedEmail) {
-      try {
-        const existingUser = await new UserRepository(db).findByEmail(sanitizedEmail);
-        if (existingUser) {
-          existingAccount = {
-            exists: true,
-            uid: existingUser.id,
-            userData: existingUser.data()
-          };
-        }
-      } catch (error) {
-        console.log('Could not check for existing account:', error);
-        // Continue with invitation creation even if we can't check
-      }
-    }
-
     // Generate unique invitation ID
     // Keep identifiers opaque: the signed token carries the room binding, so
     // putting a room name and timestamp in the document id only leaks context.
@@ -216,10 +196,6 @@ async function handlePOST(req: NextRequest) {
       invitationId,
       inviteUrl,
       expiresAt: expiresAt.toISOString(),
-      existingAccount: existingAccount ? {
-        exists: true,
-        message: 'This email already has an account. The invitation will still work for joining the consultation.'
-      } : null,
     };
 
     console.log('Invitation created successfully:', {

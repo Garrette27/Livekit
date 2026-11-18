@@ -149,10 +149,6 @@ export interface CreateInvitationResponse {
   inviteUrl: string;
   expiresAt: string;
   error?: string;
-  existingAccount?: {
-    exists: boolean;
-    message: string;
-  } | null;
 }
 
 export interface ValidateInvitationRequest {
@@ -260,4 +256,4 @@ export interface UserProfile {
   doctorName?: string;
   doctorEmail?: string;
 }
-
+
