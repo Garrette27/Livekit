@@ -32,12 +32,10 @@ const inlineActionStyle = {
 // Component for waiting room with admission polling
 function WaitingRoomView({ 
   validationResult, 
-  invitationEmail,
   setValidationResult,
   setError
 }: { 
   validationResult: ValidateInvitationResponse; 
-  invitationEmail: string;
   setValidationResult: Dispatch<SetStateAction<ValidateInvitationResponse | null>>;
   setError: (error: string | null) => void;
 }) {
@@ -55,7 +53,12 @@ function WaitingRoomView({
       return;
     }
 
+    const controller = new AbortController();
+    let cancelled = false;
+    let inFlight = false;
     const checkAdmission = async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
       try {
         const response = await fetch('/api/waiting-room/check-admission', {
           method: 'POST',
@@ -65,12 +68,13 @@ function WaitingRoomView({
           body: JSON.stringify({
             accessToken: validationResult.liveKitToken,
             invitationId: validationResult.invitationId,
-            patientEmail: invitationEmail || undefined,
             waitingPatientId: waitingPatientIdRef.current || undefined,
           }),
+          signal: controller.signal,
         });
 
         const result = await response.json();
+        if (cancelled) return;
 
         if (result.success && result.admitted && result.liveKitToken) {
           waitingPatientIdRef.current = result.waitingPatientId || waitingPatientIdRef.current;
@@ -115,9 +119,12 @@ function WaitingRoomView({
           }
         }
       } catch (err: any) {
+        if (cancelled) return;
         console.error('Error checking admission:', err);
         // Don't set error for network issues during polling - just log it
         // setError('Network error while checking admission status.');
+      } finally {
+        inFlight = false;
       }
     };
 
@@ -125,9 +132,12 @@ function WaitingRoomView({
     checkAdmission();
     const interval = setInterval(checkAdmission, 3000);
 
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [
-    invitationEmail,
     setError,
     setValidationResult,
     validationResult?.invitationId,
@@ -231,6 +241,8 @@ function InvitePageContent() {
   useEffect(() => {
     if (!token || authLoading) return;
 
+    const controller = new AbortController();
+    let cancelled = false;
     const validateInvitation = async () => {
       try {
         setIsValidating(true);
@@ -254,8 +266,11 @@ function InvitePageContent() {
           ? await user
               .reload()
               .then(() => user.getIdToken(true))
-              .catch(() => null)
           : null;
+
+        // A changed account invalidates the old result. A failed signed-in
+        // refresh must not silently create an anonymous waiting visit.
+        if (cancelled) return;
 
         const response = await fetch('/api/invite/validate', {
           method: 'POST',
@@ -264,9 +279,11 @@ function InvitePageContent() {
             ...(visitorIdToken ? { Authorization: `Bearer ${visitorIdToken}` } : {}),
           },
           body: JSON.stringify(request),
+          signal: controller.signal,
         });
 
         const result: ValidateInvitationResponse = await response.json();
+        if (cancelled) return;
 
         if (response.status >= 500) {
           setValidationFailureKind('service');
@@ -283,15 +300,20 @@ function InvitePageContent() {
           setError(result.error || 'Validation failed');
         }
       } catch (err) {
+        if (cancelled) return;
         setValidationFailureKind('service');
         setError('We could not reach the invitation service. Check your connection, then try again.');
         console.error('Error validating invitation:', err);
       } finally {
-        setIsValidating(false);
+        if (!cancelled) setIsValidating(false);
       }
     };
 
     validateInvitation();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
     // `user` is the Firebase user object, stable for a signed-in session, and
     // is needed whole here to refresh its token before validating.
   }, [authLoading, token, user, user?.email, validationAttempt]);
@@ -835,7 +857,6 @@ function InvitePageContent() {
 
             <WaitingRoomView 
               validationResult={validationResult} 
-              invitationEmail={invitationEmail}
               setValidationResult={setValidationResult}
               setError={setError}
             />

@@ -70,28 +70,32 @@ interface LiveKitTokenOptions {
   roomName: string;
   participantName?: string;
   expiresIn?: jwt.SignOptions['expiresIn'];
+  purpose?: 'consultation' | 'waiting';
 }
 
+/** Waiting credentials authorize admission polling, never media between guests. */
 export function signLiveKitRoomToken({
   subject,
   roomName,
   participantName,
   expiresIn = '1h',
+  purpose = 'consultation',
 }: LiveKitTokenOptions): string {
+  const canExchangeMedia = purpose === 'consultation';
   const payload: Record<string, unknown> = {
     sub: subject,
     video: {
       roomJoin: true,
       room: roomName,
-      canPublish: true,
-      canSubscribe: true,
-      canPublishData: true,
+      canPublish: canExchangeMedia,
+      canSubscribe: canExchangeMedia,
+      canPublishData: canExchangeMedia,
     },
     audio: {
       roomJoin: true,
       room: roomName,
-      canPublish: true,
-      canSubscribe: true,
+      canPublish: canExchangeMedia,
+      canSubscribe: canExchangeMedia,
     },
   };
 

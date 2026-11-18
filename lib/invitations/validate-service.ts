@@ -698,6 +698,7 @@ async function handleWaitingRoomAccess(params: {
       liveKitToken: signLiveKitRoomToken({
         subject: `patient_${tokenPayload.invitationId}_${existingWaitingPatient.id}`,
         roomName: waitingRoomName,
+        purpose: 'waiting',
         participantName: participantDisplayName,
         expiresIn: '1h',
       }),
@@ -733,6 +734,7 @@ async function handleWaitingRoomAccess(params: {
     liveKitToken: signLiveKitRoomToken({
       subject: `patient_${tokenPayload.invitationId}_${waitingPatientId}`,
       roomName: waitingRoomName,
+      purpose: 'waiting',
       participantName: participantDisplayName,
       expiresIn: '1h',
     }),

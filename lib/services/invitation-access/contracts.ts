@@ -36,8 +36,9 @@ export interface ListWaitingEntriesInput {
 
 export interface CheckAdmissionInput {
   invitationId?: string;
-  patientEmail?: string;
-  waitingPatientId?: string;
+  waitingPatientId: string;
+  /** Verified room grant from the caller's signed waiting/consultation credential. */
+  credentialRoomName: string;
 }
 
 export interface CheckAdmissionResult {

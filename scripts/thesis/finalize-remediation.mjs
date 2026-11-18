@@ -21,6 +21,9 @@ report.sourceHashes=Object.fromEntries(['firestore.rules','package.json','packag
   'app/doctor/invitations/components/WaitingPatientsList.tsx','tests/queue-and-auth-regressions.test.mjs',
   'app/invite/[token]/page.tsx','app/invite/[token]/components/PatientLiveKitRoom.tsx',
   'app/room/[room]/patient/page.tsx',
+  'app/api/waiting-room/check-admission/route.ts','lib/invitations/token-utils.ts',
+  'lib/invitations/validate-service.ts','lib/services/invitation-access/contracts.ts',
+  'lib/services/invitation-access/invitation-access-core.ts',
 ].map(f=>[f,createHash('sha256').update(readFileSync(f)).digest('hex')]));
 report.finalizedAt=new Date().toISOString();
 writeFileSync(`${dir}/verification.json`,JSON.stringify(report,null,2));

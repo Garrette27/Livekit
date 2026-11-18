@@ -1,4 +1,4 @@
-import type { Firestore } from 'firebase-admin/firestore';
+import type { Firestore, Transaction } from 'firebase-admin/firestore';
 import { validateInvitationAndIssueToken } from '@/lib/invitations/validate-service';
 import type { WaitingPatient } from '@/lib/types';
 import { isKnownUserId } from '@/lib/consultations/identity-utils';
@@ -213,6 +213,43 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
     private readonly rtcAdapter: RtcTransportAdapter = new LiveKitRtcTransportAdapter(),
     private readonly sessionStore: Pick<ConsultationSessionStore, 'appendEvent' | 'closeSession'> = new FirestoreConsultationSessionCore(db)
   ) {}
+
+  /** Re-read the reserved visit and its authority together before any admission grant. */
+  private async readCurrentWaitingVisit(transaction: Transaction, waitingPatientId: string): Promise<WaitingPatient> {
+    const row = await transaction.get(this.db.collection('waitingPatients').doc(waitingPatientId));
+    if (!row.exists) {
+      throw new InvitationAccessError(404, 'not_found', 'Waiting patient not found');
+    }
+    const patient = mapWaitingDocToModel({ id: row.id, data: row.data() as Record<string, unknown> });
+    if (!patient.invitationId) {
+      throw new InvitationAccessError(403, 'invalid_invitation', 'This visit has no valid invitation');
+    }
+    const document = await transaction.get(this.db.collection('invitations').doc(patient.invitationId));
+    const invitation = document.exists
+      ? { ...document.data(), id: document.id } as InvitationSnapshot
+      : undefined;
+    if (
+      !isInvitationActive(invitation, Date.now())
+      || !invitation
+      || !matchesInvitationRoom(patient, invitation)
+      || !invitation.createdBy
+      || !hasValidJoinTimestamp(patient)
+    ) {
+      throw new InvitationAccessError(403, 'invitation_unavailable', 'This invitation is expired, revoked, or no longer available');
+    }
+    assertDoctorScope(patient, invitation.createdBy);
+    return patient;
+  }
+
+  /** Only a currently admitted, reserved visit may receive consultation media grants. */
+  private issueAdmissionToken(patient: WaitingPatient): string {
+    return this.rtcAdapter.issueRoomToken({
+      subject: buildParticipantIdentity(patient),
+      roomName: patient.roomName,
+      participantName: patient.patientName || patient.patientEmail || 'Anonymous Patient',
+      expiresIn: '2h',
+    });
+  }
 
   private async resolveConsultationSessionId(roomName: string): Promise<string | null> {
     const consultationDoc = await this.db.collection('consultations').doc(roomName).get();
@@ -667,57 +704,31 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
   async checkAdmission(input: CheckAdmissionInput): Promise<CheckAdmissionResult> {
     const invitationId = input.invitationId?.trim();
     const waitingPatientId = input.waitingPatientId?.trim();
-    const normalizedPatientEmail = normalizePatientEmail(input.patientEmail);
 
-    if (!invitationId && !waitingPatientId) {
+    if (!waitingPatientId || !input.credentialRoomName) {
       throw new InvitationAccessError(
         400,
         'invalid_argument',
-        'Missing required field: invitationId or waitingPatientId'
+        'A waiting entry and verified room credential are required'
       );
     }
 
-    const buildAdmittedResponse = (waitingPatient: WaitingPatient): CheckAdmissionResult => ({
-      success: true,
-      admitted: true,
-      status: 'admitted',
-      waitingPatientId: waitingPatient.id,
-      liveKitToken: this.rtcAdapter.issueRoomToken({
-        subject: buildParticipantIdentity(waitingPatient),
-        roomName: waitingPatient.roomName,
-        participantName: waitingPatient.patientName || waitingPatient.patientEmail || 'Anonymous Patient',
-        expiresIn: '2h',
-      }),
-      roomName: waitingPatient.roomName,
-    });
-
-    if (waitingPatientId) {
-      const waitingPatientDoc = await this.db.collection('waitingPatients').doc(waitingPatientId).get();
-      if (!waitingPatientDoc.exists) {
-        return {
-          success: false,
-          admitted: false,
-          status: 'not_found',
-          error: 'Waiting patient not found',
-        };
-      }
-
-      const waitingPatient = mapWaitingDocToModel({
-        id: waitingPatientDoc.id,
-        data: waitingPatientDoc.data() as Record<string, unknown>,
-      });
-
-      if (invitationId && waitingPatient.invitationId !== invitationId) {
-        return {
-          success: false,
-          admitted: false,
-          status: 'not_found',
-          error: 'Waiting patient invitation mismatch',
-        };
+    return this.db.runTransaction(async (transaction) => {
+      const waitingPatient = await this.readCurrentWaitingVisit(transaction, waitingPatientId);
+      if (
+        (invitationId && waitingPatient.invitationId !== invitationId)
+        || ![waitingPatient.roomName, `${waitingPatient.roomName}-waiting`].includes(input.credentialRoomName)
+      ) {
+        throw new InvitationAccessError(403, 'room_mismatch', 'Room credential does not match this visit');
       }
 
       if (waitingPatient.status === 'admitted') {
-        return buildAdmittedResponse(waitingPatient);
+        return {
+          success: true, admitted: true, status: 'admitted',
+          waitingPatientId: waitingPatient.id,
+          liveKitToken: this.issueAdmissionToken(waitingPatient),
+          roomName: waitingPatient.roomName,
+        };
       }
 
       if (waitingPatient.status === 'rejected') {
@@ -746,70 +757,7 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
         status: 'waiting',
         waitingPatientId: waitingPatient.id,
       };
-    }
-
-    const invitationSnapshot = await this.db
-      .collection('waitingPatients')
-      .where('invitationId', '==', invitationId as string)
-      .get();
-    const scopedPatients = invitationSnapshot.docs
-      .map((doc) => mapWaitingDocToModel({ id: doc.id, data: doc.data() as Record<string, unknown> }))
-      .filter((waitingPatient) => {
-        if (!normalizedPatientEmail) {
-          return true;
-        }
-        return normalizePatientEmail(waitingPatient.patientEmail) === normalizedPatientEmail;
-      })
-      .sort((left, right) => toMillis(right.joinedAt) - toMillis(left.joinedAt));
-
-    const waitingEntry = scopedPatients.find((waitingPatient) => waitingPatient.status === 'waiting');
-    if (waitingEntry) {
-      return {
-        success: true,
-        admitted: false,
-        status: 'waiting',
-        waitingPatientId: waitingEntry.id,
-      };
-    }
-
-    if (scopedPatients.length === 0) {
-      return {
-        success: true,
-        admitted: false,
-        status: 'not_found',
-        error: 'No active waiting entry found for this visit. Please re-open the invitation link.',
-      };
-    }
-
-    const latestEntry = scopedPatients[0];
-    if (latestEntry.status === 'admitted') {
-      return buildAdmittedResponse(latestEntry);
-    }
-    if (latestEntry.status === 'rejected' && normalizedPatientEmail) {
-      return {
-        success: true,
-        admitted: false,
-        status: 'rejected',
-        waitingPatientId: latestEntry.id,
-        error: 'You were rejected by the doctor. Please request a new invite if needed.',
-      };
-    }
-    if (latestEntry.status === 'left' && normalizedPatientEmail) {
-      return {
-        success: true,
-        admitted: false,
-        status: 'left',
-        waitingPatientId: latestEntry.id,
-        error: 'You left the waiting room. Please reopen the invitation link to rejoin.',
-      };
-    }
-
-    return {
-      success: true,
-      admitted: false,
-      status: 'not_found',
-      error: 'No active waiting entry found for this visit. Please re-open the invitation link.',
-    };
+    });
   }
 
   async admitWaitingEntry(input: {
@@ -825,54 +773,33 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
       );
     }
 
-    const waitingDoc = await this.db.collection('waitingPatients').doc(input.waitingPatientId).get();
-    if (!waitingDoc.exists) {
-      throw new InvitationAccessError(404, 'not_found', 'Waiting patient not found');
-    }
-
-    const waitingPatient = mapWaitingDocToModel({
-      id: waitingDoc.id,
-      data: waitingDoc.data() as Record<string, unknown>,
+    const { waitingPatient, alreadyAdmitted } = await this.db.runTransaction(async (transaction) => {
+      const patient = await this.readCurrentWaitingVisit(transaction, input.waitingPatientId);
+      assertDoctorScope(patient, input.doctorUserId);
+      if (patient.roomName !== input.roomName) {
+        throw new InvitationAccessError(400, 'room_mismatch', 'Room name mismatch');
+      }
+      if (patient.status === 'admitted') {
+        return { waitingPatient: patient, alreadyAdmitted: true };
+      }
+      if (patient.status !== 'waiting') {
+        throw new InvitationAccessError(400, 'invalid_state', 'Patient is no longer waiting');
+      }
+      transaction.set(this.db.collection('waitingPatients').doc(patient.id), {
+        status: 'admitted', admittedAt: new Date(),
+        metadata: {
+          ...(patient.metadata || {}), lastAccessed: new Date(), admissionMode: 'doctor-manual',
+        },
+      }, { merge: true });
+      return { waitingPatient: patient, alreadyAdmitted: false };
     });
-    assertDoctorScope(waitingPatient, input.doctorUserId);
 
-    if (waitingPatient.roomName !== input.roomName) {
-      throw new InvitationAccessError(400, 'room_mismatch', 'Room name mismatch');
-    }
-
-    if (waitingPatient.status === 'admitted') {
+    if (alreadyAdmitted) {
       return {
-        waitingPatientId: waitingPatient.id,
-        roomName: waitingPatient.roomName,
-        liveKitToken: this.rtcAdapter.issueRoomToken({
-          subject: buildParticipantIdentity(waitingPatient),
-          roomName: waitingPatient.roomName,
-          participantName: waitingPatient.patientName || waitingPatient.patientEmail || 'Anonymous Patient',
-          expiresIn: '2h',
-        }),
+        waitingPatientId: waitingPatient.id, roomName: waitingPatient.roomName,
+        liveKitToken: this.issueAdmissionToken(waitingPatient),
       };
     }
-
-    if (waitingPatient.status !== 'waiting') {
-      throw new InvitationAccessError(
-        400,
-        'invalid_state',
-        `Patient is no longer waiting. Current status: ${waitingPatient.status}`
-      );
-    }
-
-    await this.db.collection('waitingPatients').doc(waitingPatient.id).set(
-      {
-        status: 'admitted',
-        admittedAt: new Date(),
-        metadata: {
-          ...(waitingPatient.metadata || {}),
-          lastAccessed: new Date(),
-          admissionMode: 'doctor-manual',
-        },
-      },
-      { merge: true }
-    );
 
     try {
       await this.appendSessionModerationEvent({
@@ -896,12 +823,7 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
     return {
       waitingPatientId: waitingPatient.id,
       roomName: waitingPatient.roomName,
-      liveKitToken: this.rtcAdapter.issueRoomToken({
-        subject: buildParticipantIdentity(waitingPatient),
-        roomName: waitingPatient.roomName,
-        participantName: waitingPatient.patientName || waitingPatient.patientEmail || 'Anonymous Patient',
-        expiresIn: '2h',
-      }),
+      liveKitToken: this.issueAdmissionToken(waitingPatient),
     };
   }
 

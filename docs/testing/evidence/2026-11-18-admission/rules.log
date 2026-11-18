@@ -1,0 +1,96 @@
+i  emulators: Starting emulators: firestore, storage
+i  emulators: Detected demo project ID "demo-livekit-security", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail.
+i  firestore: Firestore Emulator logging to firestore-debug.log
+✔  firestore: Firestore Emulator was started in standard edition.
+✔  firestore: Firestore Emulator UI websocket is running on 9150.
+i  Running script: npm --prefix functions run test:rules
+
+> test:rules
+> node --test test/security-rules.test.cjs
+
+TAP version 13
+# [2026-11-17T20:06:15.047Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde7f error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# false for 'create' @ L142, false for 'update' @ L142
+# Subtest: server-owned operational collections deny every client role
+ok 1 - server-owned operational collections deny every client role
+  ---
+  duration_ms: 2646.658485
+  type: 'test'
+  ...
+# Subtest: summary ownership permits the doctor and denies a patient
+ok 2 - summary ownership permits the doctor and denies a patient
+  ---
+  duration_ms: 378.759148
+  type: 'test'
+  ...
+# [2026-11-17T20:06:15.611Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde84 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# false for 'create' @ L101, evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# Subtest: a user cannot elevate their own role
+ok 3 - a user cannot elevate their own role
+  ---
+  duration_ms: 182.86865
+  type: 'test'
+  ...
+# Subtest: disabled attachments deny even owner uploads
+ok 4 - disabled attachments deny even owner uploads
+  ---
+  duration_ms: 243.733204
+  type: 'test'
+  ...
+# Subtest: private profiles allow owner reads but deny other users and listing
+ok 5 - private profiles allow owner reads but deny other users and listing
+  ---
+  duration_ms: 307.68546
+  type: 'test'
+  ...
+# [2026-11-17T20:06:16.296Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde8a error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-17T20:06:16.325Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde8b error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-17T20:06:16.356Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde8c error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-17T20:06:16.383Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde8d error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-17T20:06:16.405Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde8e error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-17T20:06:16.424Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde8f error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-17T20:06:16.455Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde90 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-17T20:06:16.480Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde91 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-17T20:06:16.496Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde92 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# false for 'delete' @ L117
+# Subtest: profile updates cannot inject authority, consent, or change identity
+ok 6 - profile updates cannot inject authority, consent, or change identity
+  ---
+  duration_ms: 369.818207
+  type: 'test'
+  ...
+# [2026-11-17T20:06:16.605Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde94 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# false for 'create' @ L101, evaluation error at L112:24 for 'update' @ L112, false for 'create' @ L101
+# [2026-11-17T20:06:16.634Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde95 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# false for 'create' @ L101, evaluation error at L112:24 for 'update' @ L112, false for 'create' @ L101
+# [2026-11-17T20:06:16.684Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x43bdde96 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# false for 'create' @ L101, evaluation error at L112:24 for 'update' @ L112, false for 'create' @ L101
+# Subtest: only trusted claims can provision clinician profiles
+ok 7 - only trusted claims can provision clinician profiles
+  ---
+  duration_ms: 248.90492
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4810.674125
+✔  Script exited successfully (code 0)
+i  emulators: Shutting down emulators.
+i  firestore: Stopping Firestore Emulator
+i  storage: Stopping Storage Emulator
+i  hub: Stopping emulator hub
+i  logging: Stopping Logging Emulator

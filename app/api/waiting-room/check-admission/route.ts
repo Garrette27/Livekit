@@ -9,15 +9,7 @@ async function handlePOST(req: NextRequest) {
     const body = await req.json();
     const invitationId = typeof body.invitationId === 'string' ? body.invitationId.trim() : undefined;
     const waitingPatientId = typeof body.waitingPatientId === 'string' ? body.waitingPatientId.trim() : undefined;
-    const patientEmail = typeof body.patientEmail === 'string' ? body.patientEmail.trim() : undefined;
     const accessToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : undefined;
-
-    if (!invitationId && !waitingPatientId) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required field: invitationId or waitingPatientId' },
-        { status: 400 }
-      );
-    }
 
     const authorization = authorizeWaitingRoomRequest({
       accessToken,
@@ -28,6 +20,13 @@ async function handlePOST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: authorization.error },
         { status: authorization.status }
+      );
+    }
+
+    if (!waitingPatientId) {
+      return NextResponse.json(
+        { success: false, error: 'Missing required field: waitingPatientId' },
+        { status: 400 }
       );
     }
 
@@ -43,7 +42,7 @@ async function handlePOST(req: NextRequest) {
     const admissionResult = await invitationAccess.checkAdmission({
       invitationId,
       waitingPatientId,
-      patientEmail,
+      credentialRoomName: authorization.credential.roomName,
     });
 
     return NextResponse.json(admissionResult);

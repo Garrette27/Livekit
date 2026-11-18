@@ -4,6 +4,13 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { DisconnectReason } from 'livekit-client';
+import jwt from 'jsonwebtoken';
+import { spawnSync } from 'node:child_process';
+
+test('Firebase Auth starts without experimental CommonJS-to-ESM loading', () => {
+  const result = spawnSync(process.execPath, ['--no-experimental-require-module', '-e', 'require("firebase-admin/auth")'], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+});
 
 /** Execute real TypeScript modules with isolated IO adapters and synthetic data. */
 function loadModule(path, dependencies = {}, globals = {}) {
@@ -13,7 +20,7 @@ function loadModule(path, dependencies = {}, globals = {}) {
   }).outputText;
   runInNewContext(code, {
     module: moduleRecord, exports: moduleRecord.exports, Date, Headers, FormData, Blob, AbortSignal,
-    console: { warn() {}, error() {} },
+    console: { log() {}, warn() {}, error() {} },
     require(name) {
       assert.ok(name in dependencies, `Unexpected dependency ${name}`);
       return dependencies[name];
@@ -89,6 +96,200 @@ test('duplicate-identity replacement detaches the old page without closing the c
   assert.equal(leaves, 1);
   assert.equal(isLeavingRef.current, true);
   assert.match(legacyText, /!token \|\| isLeavingRef.current/);
+});
+
+/** Transaction fake rejects collection-wide queries; admission must name one reserved visit. */
+function admissionHarness(invitationPatch = {}, rowPatch = {}) {
+  const documents = {
+    'invitations/invite-a': { status: 'active', waitingRoomEnabled: true, roomName: 'room-a', createdBy: 'doctor-a', expiresAt: new Date(Date.now() + 3600000), ...invitationPatch },
+    'waitingPatients/visit-a': { invitationId: 'invite-a', roomName: 'room-a', doctorUserId: 'doctor-a', joinedAt: new Date(), status: 'admitted', ...rowPatch },
+  };
+  let tokens = 0;
+  let writes = 0;
+  const db = {
+    collection: name => ({ doc: id => ({ key: `${name}/${id}`, id }) }),
+    async runTransaction(callback) {
+      return callback({
+        async get(ref) { return { id: ref.id, exists: !!documents[ref.key], data: () => documents[ref.key] }; },
+        set(ref, patch) { writes++; documents[ref.key] = { ...documents[ref.key], ...patch }; },
+      });
+    },
+  };
+  const { FirestoreInvitationAccessCore } = loadModule('lib/services/invitation-access/invitation-access-core.ts', {
+    '@/lib/invitations/validate-service': {}, '@/lib/consultations/identity-utils': {}, '@/lib/services/video-chat': {},
+  });
+  const service = new FirestoreInvitationAccessCore(db, { issueRoomToken(input) {
+    tokens++;
+    assert.equal(input.roomName, 'room-a');
+    assert.equal(input.subject, 'patient_invite-a_visit-a');
+    return 'synthetic-consultation-token';
+  } }, {});
+  service.appendSessionModerationEvent = async () => {};
+  return { service, documents, counts: () => ({ tokens, writes }) };
+}
+
+const pollingInput = { invitationId: 'invite-a', waitingPatientId: 'visit-a', credentialRoomName: 'room-a-waiting' };
+const admittingInput = { waitingPatientId: 'visit-a', roomName: 'room-a', doctorUserId: 'doctor-a' };
+
+test('admission renewal rechecks persisted expiry, revocation, room and ownership', async () => {
+  for (const [invitation, row] of [
+    [{ status: 'revoked' }, {}], [{ expiresAt: new Date(Date.now() - 1) }, {}],
+    [{ roomName: 'room-b' }, {}], [{ createdBy: 'doctor-b' }, {}],
+    [{ waitingRoomEnabled: false }, {}], [{ expiresAt: null }, {}],
+    [{}, { invitationId: 'missing' }], [{}, { joinedAt: null }],
+  ]) {
+    const h = admissionHarness(invitation, row);
+    await assert.rejects(h.service.checkAdmission(pollingInput));
+    await assert.rejects(h.service.admitWaitingEntry(admittingInput));
+    assert.deepEqual(h.counts(), { tokens: 0, writes: 0 });
+  }
+});
+
+test('only the exact current visit can renew, and valid waiting/admission still works', async () => {
+  const h = admissionHarness();
+  for (const input of [
+    { ...pollingInput, waitingPatientId: undefined, patientEmail: 'other@example.test' },
+    { ...pollingInput, invitationId: 'invite-b' },
+    { ...pollingInput, credentialRoomName: 'room-b-waiting' },
+  ]) await assert.rejects(h.service.checkAdmission(input));
+  assert.equal(h.counts().tokens, 0);
+  assert.equal((await h.service.checkAdmission(pollingInput)).admitted, true);
+  for (const status of ['waiting', 'left', 'rejected']) {
+    h.documents['waitingPatients/visit-a'].status = status;
+    assert.equal((await h.service.checkAdmission(pollingInput)).admitted, false);
+  }
+  h.documents['waitingPatients/visit-a'].status = 'waiting';
+  await assert.rejects(h.service.admitWaitingEntry({ ...admittingInput, doctorUserId: 'doctor-b' }));
+  assert.equal((await h.service.admitWaitingEntry(admittingInput)).roomName, 'room-a');
+  assert.equal(h.documents['waitingPatients/visit-a'].status, 'admitted');
+  assert.equal((await h.service.admitWaitingEntry(admittingInput)).roomName, 'room-a');
+  assert.deepEqual(h.counts(), { tokens: 3, writes: 1 });
+});
+
+function tokenModule() {
+  return loadModule('lib/invitations/token-utils.ts', { jsonwebtoken: { default: jwt } }, {
+    process: { env: { LIVEKIT_API_SECRET: 'synthetic-local-test-secret', LIVEKIT_API_KEY: 'synthetic-issuer' } },
+  });
+}
+
+test('waiting credentials cannot publish, subscribe or send data; consultation media remains enabled', () => {
+  const tokens = tokenModule();
+  for (const purpose of ['waiting', 'consultation']) {
+    const token = tokens.signLiveKitRoomToken({ subject: 'patient_invite-a_visit-a', roomName: 'room-a-waiting', purpose });
+    const payload = jwt.decode(token);
+    assert.equal(payload.video.canPublish, purpose === 'consultation');
+    assert.equal(payload.video.canSubscribe, purpose === 'consultation');
+    assert.equal(payload.video.canPublishData, purpose === 'consultation');
+    assert.equal(payload.audio.canPublish, purpose === 'consultation');
+    assert.equal(tokens.verifyLiveKitRoomToken(token).identity, 'patient_invite-a_visit-a');
+  }
+  const source = readFileSync('lib/invitations/validate-service.ts', 'utf8');
+  assert.equal(source.match(/purpose: 'waiting'/g)?.length, 2, 'Both initial and reconnect waiting grants are media-disabled');
+});
+
+test('admission HTTP route rejects missing row/email lookup and another visit credential', async () => {
+  const tokens = tokenModule();
+  const { authorizeWaitingRoomRequest } = loadModule('lib/services/shared/waiting-room-auth.ts', {
+    '@/lib/invitations/token-utils': tokens,
+  });
+  let calls = 0;
+  const route = loadModule('app/api/waiting-room/check-admission/route.ts', {
+    '@/lib/services/shared/request-logging': { withRequestLogging: fn => fn },
+    'next/server': { NextResponse: { json: (body, options = {}) => ({ body, status: options.status || 200 }) } },
+    '../../../../lib/firebase-admin': { getFirebaseAdmin: () => ({}) },
+    '@/lib/services/shared/waiting-room-auth': { authorizeWaitingRoomRequest },
+    '@/lib/services/invitation-access': {
+      FirestoreInvitationAccessCore: class { async checkAdmission(input) { calls++; assert.equal(input.credentialRoomName, 'room-a-waiting'); return { success: true }; } },
+      toInvitationAccessError: () => ({ status: 500 }),
+    },
+  });
+  const accessToken = tokens.signLiveKitRoomToken({ subject: 'patient_invite-a_visit-a', roomName: 'room-a-waiting', purpose: 'waiting' });
+  const request = body => ({ json: async () => body });
+  assert.equal((await route.POST(request({ accessToken, invitationId: 'invite-a', patientEmail: 'other@example.test' }))).status, 400);
+  assert.equal((await route.POST(request({ accessToken, invitationId: 'invite-a', waitingPatientId: 'visit-b' }))).status, 403);
+  assert.equal(calls, 0);
+  assert.equal((await route.POST(request({ accessToken, invitationId: 'invite-a', waitingPatientId: 'visit-a' }))).status, 200);
+  assert.equal(calls, 1);
+});
+
+/** Extract a real effect so race tests exercise its cleanup and writes, not a duplicate implementation. */
+function invitationEffect(marker, globals) {
+  const path = 'app/invite/[token]/page.tsx';
+  const source = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let callback;
+  function visit(node) {
+    if (ts.isCallExpression(node) && node.expression.getText(source) === 'useEffect' && node.arguments[0].getText(source).includes(marker)) {
+      callback = node.arguments[0].getText(source);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(source);
+  assert.ok(callback);
+  const exports = {};
+  runInNewContext(ts.transpileModule(`export const effect = ${callback};`, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText, { exports, AbortController, console: { error() {}, log() {} }, ...globals });
+  return exports.effect();
+}
+
+const flush = () => new Promise(resolve => setImmediate(resolve));
+
+test('failed signed-in token refresh never silently queues as a guest', async () => {
+  let requests = 0;
+  let failure;
+  const cleanup = invitationEffect('const validateInvitation', {
+    token: 'synthetic-invitation', authLoading: false,
+    user: { reload: async () => { throw new Error('Synthetic refresh failure'); } },
+    fetch: async () => { requests++; }, setIsValidating() {}, setError() {},
+    setValidationFailureKind(value) { failure = value; },
+  });
+  await flush();
+  assert.equal(requests, 0);
+  assert.equal(failure, 'service');
+  cleanup();
+});
+
+test('obsolete invitation validation cannot overwrite the newer account admission', async () => {
+  let resolveOld;
+  const results = [];
+  const common = {
+    token: 'synthetic-invitation', authLoading: false, user: null,
+    setIsValidating() {}, setError() {}, setValidationFailureKind() {}, setRequiresConsent() {},
+    setValidationResult: value => results.push(value),
+  };
+  const stopOld = invitationEffect('const validateInvitation', { ...common,
+    fetch: () => new Promise(resolve => { resolveOld = resolve; }),
+  });
+  stopOld();
+  const stopNew = invitationEffect('const validateInvitation', { ...common,
+    fetch: async () => ({ status: 200, json: async () => ({ success: true, waitingRoomEnabled: false }) }),
+  });
+  await flush();
+  resolveOld({ status: 200, json: async () => ({ success: true, waitingRoomEnabled: true }) });
+  await flush();
+  assert.equal(results.length, 1);
+  assert.equal(results[0].waitingRoomEnabled, false);
+  stopNew();
+});
+
+test('waiting admission polling never overlaps or commits after the visit changes', async () => {
+  let tick;
+  let resolveRequest;
+  let requests = 0;
+  let writes = 0;
+  const stop = invitationEffect('const checkAdmission', {
+    validationResult: { invitationId: 'invite-a', waitingPatientId: 'visit-a', waitingRoomEnabled: true, waitingRoomToken: true },
+    waitingPatientIdRef: { current: 'visit-a' },
+    fetch: () => { requests++; return new Promise(resolve => { resolveRequest = resolve; }); },
+    setInterval: callback => { tick = callback; return 1; }, clearInterval() {},
+    setError() {}, setValidationResult() { writes++; },
+  });
+  tick(); tick();
+  assert.equal(requests, 1);
+  stop();
+  resolveRequest({ json: async () => ({ success: true, admitted: true, liveKitToken: 'synthetic' }) });
+  await flush();
+  assert.equal(writes, 0);
 });
 
 test('authenticated requests add the token without sending caller-asserted identity', async () => {

@@ -2,6 +2,7 @@
 from pathlib import Path
 from html import escape
 import re
+import sys
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
@@ -9,8 +10,8 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import letter
 
 root = Path(__file__).resolve().parents[2]
-source = root / 'docs/testing/remediation-report.md'
-out = root / 'output/pdf/TeleConsole-Security-Remediation-Thesis-Report.pdf'
+source = root / (sys.argv[1] if len(sys.argv) > 1 else 'docs/testing/remediation-report.md')
+out = root / (sys.argv[2] if len(sys.argv) > 2 else 'output/pdf/TeleConsole-Security-Remediation-Thesis-Report.pdf')
 out.parent.mkdir(parents=True, exist_ok=True)
 styles = getSampleStyleSheet()
 styles['Title'].fontName = 'Helvetica-Bold'
@@ -55,7 +56,7 @@ while i < len(lines):
         story.append(Paragraph(text(line[3:]),styles['Heading1']))
     else:
         chunk=[line]
-        while i+1<len(lines) and lines[i+1].strip() and not lines[i+1].startswith(('#','|')):
+        while i+1<len(lines) and lines[i+1].strip() and not lines[i+1].startswith(('#','|','- ')):
             i+=1
             chunk.append(lines[i].strip())
         story.append(Paragraph(text(' '.join(chunk)),styles['BodyText']))
@@ -63,7 +64,7 @@ while i < len(lines):
 def footer(canvas,doc):
     canvas.setFont('Helvetica',8)
     canvas.setFillColor(colors.HexColor('#555555'))
-    canvas.drawString(54,30,'TeleConsole | Security remediation and thesis testing | 17 November 2026')
+    canvas.drawString(54,30,'TeleConsole | Security remediation and thesis testing')
     canvas.drawRightString(558,30,str(doc.page))
 SimpleDocTemplate(str(out),pagesize=letter,leftMargin=72,rightMargin=72,topMargin=54,bottomMargin=85,title='TeleConsole Security Remediation and Thesis Testing',author='TeleConsole thesis team').build(story,onFirstPage=footer,onLaterPages=footer)
 print(out)
