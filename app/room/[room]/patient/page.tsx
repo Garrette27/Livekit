@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { use, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DisconnectReason } from 'livekit-client';
@@ -438,22 +438,8 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
   );
 }
 
+/** Resolve the room before rendering, so invitation guidance is in the initial response. */
 export default function PatientRoomPage({ params }: { params: Promise<{ room: string }> }) {
-  return <PatientRoomClientWrapper params={params} />;
-}
-
-function PatientRoomClientWrapper({ params }: { params: Promise<{ room: string }> }) {
-  const [roomName, setRoomName] = useState('');
-
-  useEffect(() => {
-    params.then((resolvedParams) => {
-      setRoomName(resolvedParams.room);
-    });
-  }, [params]);
-
-  if (!roomName) {
-    return null;
-  }
-
-  return <PatientRoomClient roomName={roomName} />;
+  const { room } = use(params);
+  return <PatientRoomClient roomName={room} />;
 }
