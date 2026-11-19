@@ -1,0 +1,38 @@
+{
+  "testedAt": "2026-11-19T11:49:23.804Z",
+  "activeRulesMatch": true,
+  "activeNormalizedSha256": "dd864ad4bb41db008b24e853e83c293a5c515a2a6f57e56c938587bfdbee9876",
+  "productionAttackWrites": false,
+  "probes": [
+    {
+      "path": "/api/doctor-access",
+      "method": "POST",
+      "status": 401,
+      "json": true,
+      "pass": true
+    },
+    {
+      "path": "/api/user/role-conflict",
+      "method": "POST",
+      "status": 401,
+      "json": true,
+      "pass": true
+    },
+    {
+      "path": "/api/patient/consultations",
+      "method": "GET",
+      "status": 401,
+      "json": true,
+      "pass": true
+    },
+    {
+      "path": "/api/waiting-room/list",
+      "method": "GET",
+      "status": 401,
+      "json": true,
+      "pass": true
+    }
+  ],
+  "emulatorExitCode": 0,
+  "scope": "Released-source match, equivalent-source emulator tests and anonymous API denials; not authenticated production journey or media acceptance"
+}

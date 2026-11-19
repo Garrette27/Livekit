@@ -39,7 +39,9 @@ Latest reviewed report: [consultation integrity remediation](consultation-integr
 | Full application and Functions dependency inventories | PASS, zero findings returned today | Fresh full audit JSONs in checkpoint directory; prior failing scans preserved; no claim of advisory remediation by code changes |
 | Typecheck, lint, production build | PASS | Checkpoint logs; lint retains the existing sanitizedEmail warning |
 | Latest application deployment | BLOCKED direct metadata verification | Vercel team scope unavailable; GitHub frontend status success for 1c7bace is only indirect evidence |
-| Latest Firestore rules deployment | FAIL, source drift | `evidence/2026-11-19-rules-read/`; active source still allows client consultation create/owner-write; no deployment performed |
+| Latest Firestore rules deployment | PASS, reviewed source deployed and retrieved | `evidence/2026-11-19-rules-release/`; source matches merged policy; 12 equivalent-source emulator cases pass; original drift evidence preserved |
+| Production anonymous API denial controls | PASS, 4/4 | Release acceptance.json: doctor access, role conflict, patient history and queue list return JSON 401; no authenticated journey claim |
+| Remote CI for add9a04 | PASS | Quality and security completed successfully before rules release |
 | Queue request/timer efficiency | PASS, deterministic local budgets | 100 consumers share one fetch/timer, isolated scopes, failed-fetch recovery, 100 visibility cycles and zero cleanup leaks; no cloud savings percentage |
 | Database outage classification | PASS, targeted matrix | Availability codes recognized; permission/authentication/message-only errors do not become retryable outages |
 | Public HTTP pilot | HISTORICAL PASS, n=10/page | 18 Nov pilot; not authenticated or media latency |
@@ -50,12 +52,13 @@ Pattern: an append-only evidence history with a single current-status projection
 It avoids rewriting failed baselines or duplicating mutable PASS claims across
 reports. This ledger is evidence navigation, not a certification score.
 
-Next unfinished task: obtain explicit direction for coordinated Firestore rule
-publication, restore Vercel team access for direct deployment inspection, then
-run synthetic authenticated positive/negative acceptance checks. This checkpoint
-does not authorize a production rules release or migration. Media/capacity and
-reviewer trials remain separate. No paid AI, cloud load or patient-data writes
-were performed. The local worktree's unrelated AGENTS.md edits remain preserved.
+Authorized follow-up: the owner approved deployment; Firestore rules only were
+released to livekit-5eef6 on 19 November. No data migration, Storage policy or
+Functions release occurred. See [release acceptance](rules-release-2026-11-19.md).
+Next unfinished task: restore Vercel team access for direct application commit
+inspection and run a synthetic authenticated doctor/patient journey. Media,
+capacity and clinician-review trials remain separate. No paid AI, cloud load or
+patient-data writes were performed. Local unrelated AGENTS.md edits are preserved.
 
 Reproduction and source hashes: `evidence/2026-11-19-checkpoint/scope.md`.
 No new mobile E2E claim is made: the 29-case result above is historical.

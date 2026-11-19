@@ -1,0 +1,9 @@
+{
+  "startedAt": "2026-11-19T11:48:17.707Z",
+  "commit": "add9a049387361a729d76d886083b027dc8f8972",
+  "project": "livekit-5eef6",
+  "scope": "firestore:rules",
+  "rulesSha256": "2d4ed451690a061191e1b6eb8ac78ecf753fa0f64707cf504e5dae9acb4ec997",
+  "exitCode": 0,
+  "finishedAt": "2026-11-19T11:48:29.732Z"
+}

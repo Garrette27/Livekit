@@ -1,0 +1,8 @@
+{
+  "acceptance.json": "3abc4dc8fc086d2ac88c2e3b07c20482197e512a4c7260ae150057a5fe1557fa",
+  "active-equivalent-rules-test.log": "dffc40acea6213718fac7531e760937fbedac9c58b3e03fdf6a5446745ce0673",
+  "deploy.log": "e6d93e56ce031c6f65b5d9b2544e89da821c1bbbdec59b84feeed8dd9e9aa181",
+  "deployed-firestore-rules.json": "3f62b1982b70cd1c721868cef5076668c21a17ad90e24f8878015e98509503dc",
+  "firestore-aggregates.json": "e8cf9deaf2f80f8e91e6887a71fee5fa17e031046262acd8a2239dbbe7d48184",
+  "release.json": "a5b1259cf5cd2fdd60cc6d252f60004e39c304b516f7a3400d9badef3ed2cf67"
+}
