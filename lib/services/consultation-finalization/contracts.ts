@@ -19,6 +19,8 @@ export type FinalizationReason =
 
 export interface FinalizeConsultationInput {
   roomName: string;
+  /** When known, finalize this exact encounter instead of the latest room visit. */
+  consultationSessionId?: string;
   finalizedAt: Date;
   reason: FinalizationReason;
   /**

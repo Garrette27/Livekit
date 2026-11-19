@@ -1,0 +1,38 @@
+TAP version 13
+# Subtest: late leave events cannot overwrite another patient or a later encounter in the same room
+not ok 1 - late leave events cannot overwrite another patient or a later encounter in the same room
+  ---
+  duration_ms: 80.831587
+  type: 'test'
+  location: '/home/ret/.codex/worktrees/consultation-integrity-fix/Livekit/tests/queue-and-auth-regressions.test.mjs:259:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/ret/.codex/worktrees/consultation-integrity-fix/Livekit/tests/queue-and-auth-regressions.test.mjs:266:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: the current patient can still close their own tracked encounter
+ok 2 - the current patient can still close their own tracked encounter
+  ---
+  duration_ms: 23.855365
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 1
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 399.93211

@@ -1,0 +1,33 @@
+TAP version 13
+# Subtest: direct invitation issuance binds the authenticated UID rather than the declared email
+not ok 1 - direct invitation issuance binds the authenticated UID rather than the declared email
+  ---
+  duration_ms: 97.566334
+  type: 'test'
+  location: '/home/ret/.codex/worktrees/consultation-integrity-fix/Livekit/tests/queue-and-auth-regressions.test.mjs:191:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + undefined
+    - 'patient-1'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'patient-1'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/ret/.codex/worktrees/consultation-integrity-fix/Livekit/tests/queue-and-auth-regressions.test.mjs:222:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 381.025496

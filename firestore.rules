@@ -43,7 +43,9 @@ service cloud.firestore {
         request.resource.data.createdBy == request.auth.uid;
     }
     
-    // Consultations collection - users can access consultations they created OR where they are a participant
+    // Server-owned encounter records retain current and legacy participant reads.
+    // Identity, visibility, and lifecycle mutations require an authorized server
+    // command; even an owning doctor must not rewrite them through the client.
     match /consultations/{consultationId} {
       // Helper function to check if user is a participant
       function isParticipant(resource) {
@@ -63,11 +65,7 @@ service cloud.firestore {
         resource.data.patientUserId == request.auth.uid ||
         isParticipant(resource)
       );
-      // Allow write if user is the creator
-      allow write: if request.auth != null && isOwner(resource);
-      // Allow create if user is the creator
-      allow create: if request.auth != null && 
-        request.resource.data.createdBy == request.auth.uid;
+      allow write: if false;
     }
     
     // Call summaries - read-only for doctors (creators only), write-only for server

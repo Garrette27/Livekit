@@ -1,0 +1,80 @@
+TAP version 13
+# Subtest: patient history requires a consistent recorded UID; matching email alone never grants access
+not ok 1 - patient history requires a consistent recorded UID; matching email alone never grants access
+  ---
+  duration_ms: 118.58493
+  type: 'test'
+  location: '/home/ret/.codex/worktrees/consultation-integrity-fix/Livekit/tests/queue-and-auth-regressions.test.mjs:427:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    +   'conflicting-session',
+    +   'conflicting-summary',
+    +   'guest-session',
+    +   'guest-summary',
+        'legacy-session',
+        'legacy-summary',
+    +   'other-session',
+    +   'other-summary',
+        'own-session',
+        'own-summary'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'legacy-session'
+    1: 'legacy-summary'
+    2: 'own-session'
+    3: 'own-summary'
+  actual:
+    0: 'conflicting-session'
+    1: 'conflicting-summary'
+    2: 'guest-session'
+    3: 'guest-summary'
+    4: 'legacy-session'
+    5: 'legacy-summary'
+    6: 'other-session'
+    7: 'other-summary'
+    8: 'own-session'
+    9: 'own-summary'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/ret/.codex/worktrees/consultation-integrity-fix/Livekit/tests/queue-and-auth-regressions.test.mjs:430:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: patient history excludes clinician AI drafts and other waiting participants
+not ok 2 - patient history excludes clinician AI drafts and other waiting participants
+  ---
+  duration_ms: 50.56472
+  type: 'test'
+  location: '/home/ret/.codex/worktrees/consultation-integrity-fix/Livekit/tests/queue-and-auth-regressions.test.mjs:435:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Patient history must not expose summary
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/ret/.codex/worktrees/consultation-integrity-fix/Livekit/tests/queue-and-auth-regressions.test.mjs:441:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 464.329406

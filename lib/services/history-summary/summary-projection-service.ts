@@ -1,5 +1,5 @@
 import type { Firestore } from 'firebase-admin/firestore';
-import { isKnownUserId } from '@/lib/consultations/identity-utils';
+import { hasRecordedPatientIdentity, isKnownUserId } from '@/lib/consultations/identity-utils';
 import { generateAndStoreConsultationSummary } from '@/lib/services/consultation-finalization';
 import { CallSummaryRepository } from '@/lib/repositories/call-summary-repository';
 import { ConsultationSessionRepository } from '@/lib/repositories/consultation-session-repository';
@@ -341,29 +341,23 @@ async function getSessionDocsByDoctor(db: Firestore, doctorUserId: string) {
 
 async function getSummaryDocsByPatient(
   db: Firestore,
-  patientUserId: string,
-  patientEmailCandidates: string[]
+  patientUserId: string
 ) {
   return new CallSummaryRepository(db).findByPatient(
-    { patientUserId, emails: patientEmailCandidates },
+    { patientUserId },
     300
   );
 }
 
 async function getSessionDocsByPatient(
   db: Firestore,
-  patientUserId: string,
-  patientEmailCandidates: string[]
+  patientUserId: string
 ) {
   const userScopedQueries = [
     db.collection('consultationSessions').where('patientUserId', '==', patientUserId).limit(300).get(),
     db.collection('consultationSessions').where('metadata.patientUserId', '==', patientUserId).limit(300).get(),
   ];
-  const emailScopedQueries = patientEmailCandidates.flatMap((email) => [
-    db.collection('consultationSessions').where('patientEmail', '==', email).limit(300).get(),
-    db.collection('consultationSessions').where('metadata.patientEmail', '==', email).limit(300).get(),
-  ]);
-  const snapshots = await Promise.all([...userScopedQueries, ...emailScopedQueries]);
+  const snapshots = await Promise.all(userScopedQueries);
 
   const docsBySessionId = new Map<string, (typeof snapshots)[number]['docs'][number]>();
   snapshots.forEach((snapshot) => {
@@ -656,6 +650,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
     );
   }
 
+  /** Return identity-bound encounter metadata; clinician drafts and queue details stay private. */
   async buildPatientHistory(input: {
     patientUserId: string;
     patientEmail?: string | null;
@@ -665,14 +660,9 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
       throw new Error('patientUserId is required');
     }
 
-    const normalizedEmail = input.patientEmail?.trim().toLowerCase() || '';
-    const patientEmailCandidates = Array.from(
-      new Set([normalizedEmail, input.patientEmail?.trim() || ''].filter((value) => value.length > 0))
-    );
-
     const [summaryDocs, sessionDocs] = await Promise.all([
-      getSummaryDocsByPatient(this.db, patientUserId, patientEmailCandidates),
-      getSessionDocsByPatient(this.db, patientUserId, patientEmailCandidates),
+      getSummaryDocsByPatient(this.db, patientUserId),
+      getSessionDocsByPatient(this.db, patientUserId),
     ]);
 
     const historyById = new Map<string, HistoryRecord>();
@@ -680,23 +670,19 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
 
     for (const summaryDoc of summaryDocs) {
       const summaryData = summaryDoc.data() as Record<string, unknown>;
+      if (!hasRecordedPatientIdentity(summaryData, patientUserId)) {
+        continue;
+      }
       const summaryMetadata = (summaryData.metadata as Record<string, unknown> | undefined) || {};
       const doctorUserId =
         (summaryData.createdBy as string | undefined)
         || (summaryMetadata.createdBy as string | undefined);
-      const resolvedPatientUserId =
-        (summaryData.patientUserId as string | undefined)
-        || (summaryMetadata.patientUserId as string | undefined);
       const doctorEmail = await resolveUserEmail(this.db, userEmailCache, doctorUserId);
       const patientEmail =
         (summaryData.patientEmail as string | undefined)
         || (summaryMetadata.patientEmail as string | undefined)
         || input.patientEmail
         || undefined;
-      const waitingRoomHistory = normalizeWaitingRoomHistory(
-        summaryData.waitingRoomHistory || summaryMetadata.waitingRoomHistory
-      );
-
       const record: HistoryRecord = {
         id: summaryDoc.id,
         roomName: (summaryData.roomName as string) || 'Unknown Room',
@@ -707,20 +693,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
         doctorEmail: doctorEmail || undefined,
         patientEmail: patientEmail || undefined,
         createdBy: doctorUserId,
-        patientUserId: resolvedPatientUserId,
-        summary: (summaryData.summary as string | undefined) || undefined,
-        riskLevel: (summaryData.riskLevel as string | undefined) || undefined,
-        category: (summaryData.category as string | undefined) || undefined,
-        keyPoints: Array.isArray(summaryData.keyPoints)
-          ? (summaryData.keyPoints as string[])
-          : undefined,
-        recommendations: Array.isArray(summaryData.recommendations)
-          ? (summaryData.recommendations as string[])
-          : undefined,
-        followUpActions: Array.isArray(summaryData.followUpActions)
-          ? (summaryData.followUpActions as string[])
-          : undefined,
-        waitingRoomHistory,
+        patientUserId,
       };
 
       const existing = historyById.get(record.id);
@@ -730,22 +703,17 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
     const sessionRoomNames = new Set<string>();
     for (const { sessionId, doc } of sessionDocs) {
       const sessionData = doc.data() as Record<string, unknown>;
-      if (!isCompletedSession(sessionData)) {
+      if (!isCompletedSession(sessionData) || !hasRecordedPatientIdentity(sessionData, patientUserId)) {
         continue;
       }
       const sessionMetadata = (sessionData.metadata as Record<string, unknown> | undefined) || {};
       const doctorUserId = (sessionData.doctorUserId as string | undefined) || undefined;
-      const resolvedPatientUserId =
-        (sessionData.patientUserId as string | undefined)
-        || (sessionMetadata.patientUserId as string | undefined);
       const doctorEmail = await resolveUserEmail(this.db, userEmailCache, doctorUserId);
       const patientEmail =
         (sessionData.patientEmail as string | undefined)
         || (sessionMetadata.patientEmail as string | undefined)
         || input.patientEmail
         || undefined;
-      const waitingRoomHistory = normalizeWaitingRoomHistory(sessionMetadata.waitingRoomHistory);
-
       const startedAt = toIsoString(sessionData.sessionStartedAt || sessionData.createdAt || sessionData.updatedAt);
       const endedAt = toIsoString(
         sessionData.sessionEndedAt
@@ -761,8 +729,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
         doctorEmail: doctorEmail || undefined,
         patientEmail: patientEmail || undefined,
         createdBy: doctorUserId,
-        patientUserId: resolvedPatientUserId,
-        waitingRoomHistory,
+        patientUserId,
       };
       sessionRoomNames.add(record.roomName.toLowerCase());
 
@@ -771,7 +738,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
     }
 
     const filteredHistory = Array.from(historyById.values()).filter((record) => {
-      const isRoomScopedSummaryDoc = Boolean(record.summary) && record.id === record.roomName;
+      const isRoomScopedSummaryDoc = record.id === record.roomName;
       if (!isRoomScopedSummaryDoc) {
         return true;
       }

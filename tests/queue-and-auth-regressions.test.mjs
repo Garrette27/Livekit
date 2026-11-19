@@ -110,6 +110,7 @@ function admissionHarness(invitationPatch = {}, rowPatch = {}) {
   };
   let tokens = 0;
   let writes = 0;
+  const issued = [];
   const db = {
     collection: name => ({ doc: id => ({ key: `${name}/${id}`, id }) }),
     async runTransaction(callback) {
@@ -124,12 +125,13 @@ function admissionHarness(invitationPatch = {}, rowPatch = {}) {
   });
   const service = new FirestoreInvitationAccessCore(db, { issueRoomToken(input) {
     tokens++;
+    issued.push(input);
     assert.equal(input.roomName, 'room-a');
     assert.equal(input.subject, 'patient_invite-a_visit-a');
     return 'synthetic-consultation-token';
   } }, {});
   service.appendSessionModerationEvent = async () => {};
-  return { service, documents, counts: () => ({ tokens, writes }) };
+  return { service, documents, issued, counts: () => ({ tokens, writes }) };
 }
 
 const pollingInput = { invitationId: 'invite-a', waitingPatientId: 'visit-a', credentialRoomName: 'room-a-waiting' };
@@ -175,6 +177,261 @@ function tokenModule() {
     process: { env: { LIVEKIT_API_SECRET: 'synthetic-local-test-secret', LIVEKIT_API_KEY: 'synthetic-issuer' } },
   });
 }
+
+test('room credentials preserve an issuer-bound Firebase patient UID separately from the media identity', () => {
+  const tokens = tokenModule();
+  const token = tokens.signLiveKitRoomToken({
+    subject: 'patient_invite-a_visit-a', roomName: 'room-a', patientUserId: 'firebase-patient-1',
+  });
+  const participant = tokens.verifyLiveKitRoomToken(token);
+  assert.equal(participant.identity, 'patient_invite-a_visit-a');
+  assert.equal(participant.patientUserId, 'firebase-patient-1');
+});
+
+test('direct invitation issuance binds the authenticated UID rather than the declared email', async () => {
+  const tokens = tokenModule();
+  const { validateInvitationAndIssueToken } = loadModule('lib/invitations/validate-service.ts', {
+    '../firebase-admin': { getFirebaseAdmin: () => ({ collection: () => ({ doc: () => ({
+      get: async () => ({ exists: true, data: () => ({
+        roomName: 'room-a', createdBy: 'doctor-1', status: 'active',
+        expiresAt: new Date(Date.now() + 3600000), waitingRoomEnabled: false,
+      }) }),
+    }) }) }) },
+    './token-utils': tokens,
+    './utils': { toDate: value => value },
+    './waiting-patient-identity': loadModule('lib/invitations/waiting-patient-identity.ts'),
+    '../events/event-schema': loadModule('lib/events/event-schema.ts'),
+    './email-allowlist': { hasInvitationEmailAllowlist: () => false },
+    './admission-policy': {},
+    '../services/consultation-finalization': {},
+    '../repositories/user-repository': { UserRepository: class {
+      async getById() { return { exists: true, data: () => ({ role: 'patient' }) }; }
+    } },
+    '../consent/telehealth-consent': { hasTelehealthConsent: () => true },
+    'firebase-admin/firestore': {},
+    '../security/security-signal': { hashSecuritySignal: () => 'synthetic-hash' },
+    './waiting-patient-key': {},
+    './invitation-use-reservation': { reserveInvitationUse: async () => true },
+  });
+  const result = await validateInvitationAndIssueToken({
+    token: tokens.signInvitationToken({ invitationId: 'invite-a', roomName: 'room-a' }),
+    userEmail: 'patient2@example.test', clientIP: 'synthetic-signal', userAgent: 'synthetic-agent',
+    authenticatedVisitor: { userId: 'patient-1', authenticatedEmail: 'patient1@example.test', isAnonymousAccount: false },
+  });
+  assert.equal(result.status, 200);
+  assert.equal(tokens.verifyLiveKitRoomToken(result.body.liveKitToken).patientUserId, 'patient-1');
+});
+
+test('admission binds history to the registered patient and never to a guest’s declared email', async () => {
+  const registered = admissionHarness({}, {
+    patientId: 'firebase-patient-1', metadata: { isAnonymous: false, identitySource: 'registered-profile' },
+  });
+  await registered.service.checkAdmission(pollingInput);
+  assert.equal(registered.issued[0].patientUserId, 'firebase-patient-1');
+  const guest = admissionHarness({}, {
+    patientId: 'anonymous_1', patientEmail: 'patient1@example.test',
+    metadata: { isAnonymous: true, identitySource: 'self-declared' },
+  });
+  await guest.service.checkAdmission(pollingInput);
+  assert.equal(guest.issued[0].patientUserId, undefined);
+});
+
+test('tracking uses the signed Firebase UID so a new admitted visit remains in patient history', async () => {
+  const tokens = tokenModule();
+  const accessToken = tokens.signLiveKitRoomToken({
+    subject: 'patient_invite-a_visit-a', roomName: 'room-a', patientUserId: 'patient-1',
+  });
+  let tracked;
+  const route = loadModule('app/api/track-consultation/route.ts', {
+    '@/lib/services/shared/request-logging': { withRequestLogging: fn => fn },
+    '@/lib/firebase-admin': { getFirebaseAdmin: () => ({}) },
+    '@/lib/services/shared/http': { serviceResultToResponse: result => result },
+    '@/lib/services/shared/service-result': loadModule('lib/services/shared/service-result.ts'),
+    '@/lib/services/consultation-tracking': { FirestoreConsultationTrackingCore: class {
+      async trackConsultation(input) { tracked = input; return { ok: true, data: {} }; }
+    } },
+    '@/lib/invitations/token-utils': tokens,
+  });
+  await route.POST({ text: async () => JSON.stringify({
+    accessToken, roomName: 'room-a', action: 'join', userId: 'patient-2',
+  }) });
+  assert.equal(tracked.userId, 'patient-1');
+  const service = patientHistoryFixture();
+  const history = await service.buildPatientHistory({ patientUserId: tracked.userId });
+  assert.ok(history.some(record => record.id === 'own-session'));
+});
+
+/** Exercise the tracking service with persisted encounter ownership and isolated writes. */
+function trackingOwnershipFixture(patientUserId = 'patient-2', changeBeforeCommit = false) {
+  let writes = 0;
+  let closes = 0;
+  const existing = {
+    roomName: 'room-a', consultationSessionId: 'current-session', patientUserId,
+    sessionStartedAt: new Date(), status: 'active', metadata: { patientUserId },
+  };
+  const { FirestoreConsultationTrackingCore } = loadModule('lib/services/consultation-tracking/consultation-tracking-core.ts', {
+    '@/lib/consultations/identity-utils': loadModule('lib/consultations/identity-utils.ts'),
+    '@/lib/consultations/session-timing': { calculateDurationMinutes: () => 0 },
+    '@/lib/consultations/consultation-session-store': { resolveLeaveSessionId: () => 'current-session' },
+    '@/lib/services/video-chat': { FirestoreConsultationSessionCore: class { async closeSession() { closes++; } } },
+    '@/lib/services/consultation-finalization': { finalizeConsultationForRoom: async () => {} },
+    '@/lib/repositories/room-repository': { RoomRepository: class {
+      async getByRoom() { return { exists: true, data: () => ({ createdBy: 'doctor-1' }) }; }
+    } },
+    '@/lib/repositories/consultation-repository': { ConsultationRepository: class {
+      async getByRoom() { return { exists: true, data: () => ({ ...existing, metadata: { ...existing.metadata } }) }; }
+      async mergeFields(_room, patch) { writes++; Object.assign(existing, patch); }
+    } },
+    '@/lib/repositories/consultation-session-repository': { ConsultationSessionRepository: class {
+      async getById() {
+        if (changeBeforeCommit) {
+          existing.patientUserId = 'patient-2';
+          existing.metadata.patientUserId = 'patient-2';
+          existing.consultationSessionId = 'later-session';
+        }
+        return { exists: true, data: () => ({ ...existing }) };
+      }
+    } },
+    '@/lib/services/shared/service-result': loadModule('lib/services/shared/service-result.ts'),
+  });
+  const db = {
+    collection: () => ({ doc: () => ({}) }),
+    async runTransaction(callback) {
+      return callback({
+        async get() { return { exists: true, data: () => ({ ...existing, metadata: { ...existing.metadata } }) }; },
+        set(_ref, patch) { writes++; Object.assign(existing, patch); },
+      });
+    },
+  };
+  return { service: new FirestoreConsultationTrackingCore(db), existing, counts: () => ({ writes, closes }) };
+}
+
+test('late leave events cannot overwrite another patient or a later encounter in the same room', async () => {
+  for (const [owner, sessionId] of [['patient-2', 'current-session'], ['patient-1', 'earlier-session']]) {
+    const fixture = trackingOwnershipFixture(owner);
+    const result = await fixture.service.trackConsultation({
+      roomName: 'room-a', action: 'leave', patientName: 'Synthetic visitor',
+      userId: 'patient-1', consultationSessionId: sessionId,
+    });
+    assert.equal(result.ok, false);
+    assert.deepEqual(fixture.counts(), { writes: 0, closes: 0 });
+    assert.equal(fixture.existing.patientUserId, owner);
+  }
+});
+
+test('the current patient can still close their own tracked encounter', async () => {
+  const fixture = trackingOwnershipFixture('patient-1');
+  const result = await fixture.service.trackConsultation({
+    roomName: 'room-a', action: 'leave', patientName: 'Synthetic visitor',
+    userId: 'patient-1', consultationSessionId: 'current-session',
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(fixture.counts(), { writes: 1, closes: 1 });
+  assert.equal(fixture.existing.patientUserId, 'patient-1');
+});
+
+test('a new encounter appearing before leave commit keeps its identity and lifecycle', async () => {
+  const fixture = trackingOwnershipFixture('patient-1', true);
+  await fixture.service.trackConsultation({
+    roomName: 'room-a', action: 'leave', patientName: 'Synthetic visitor',
+    userId: 'patient-1', consultationSessionId: 'current-session',
+  });
+  assert.deepEqual(fixture.counts(), { writes: 0, closes: 0 });
+  assert.equal(fixture.existing.patientUserId, 'patient-2');
+  assert.equal(fixture.existing.consultationSessionId, 'later-session');
+});
+
+test('leave finalization targets the requested encounter instead of a later visit sharing its room', async () => {
+  const sessions = {
+    earlier: { roomName: 'room-a', status: 'completed', createdAt: new Date('2026-01-01') },
+    later: { roomName: 'room-a', status: 'completed', createdAt: new Date('2026-01-02') },
+  };
+  const snapshot = id => ({ id, exists: true, data: () => sessions[id] });
+  const finalization = loadModule('lib/services/consultation-finalization/consultation-finalization-core.ts', {
+    '@/lib/consultations/session-timing': {},
+    '@/lib/consultations/identity-utils': loadModule('lib/consultations/identity-utils.ts'),
+    '@/lib/consultations/waiting-room-history': {},
+    '@/lib/services/shared/service-result': loadModule('lib/services/shared/service-result.ts'),
+    '@/lib/repositories/call-summary-repository': { CallSummaryRepository: class {
+      async getById() { return { exists: true, data: () => ({ duration: 1, metadata: { isEdited: true } }) }; }
+    } },
+    '@/lib/repositories/consultation-repository': { ConsultationRepository: class {} },
+    '@/lib/repositories/consultation-session-repository': { ConsultationSessionRepository: class {
+      async findByRoom() { return ['earlier', 'later'].map(snapshot); }
+      async getById(id) { return snapshot(id); }
+    } },
+    '@/lib/repositories/room-doctor-presence-repository': {},
+    './summary-generator': {},
+  });
+  const result = await finalization.finalizeConsultationForRoom({}, {
+    roomName: 'room-a', consultationSessionId: 'earlier', finalizedAt: new Date(), reason: 'patient_left',
+  });
+  assert.equal(result.consultationSessionId, 'earlier');
+});
+
+test('finalizing an earlier session preserves a later room encounter and keeps patient labels separate', async () => {
+  const earlier = {
+    roomName: 'room-a', status: 'completed', patientUserId: 'patient-1', doctorUserId: 'doctor-1',
+    createdAt: new Date('2026-01-01'), metadata: { patientName: 'Synthetic earlier' },
+  };
+  const room = {
+    consultationSessionId: 'later', status: 'active', patientUserId: 'patient-2',
+    patientName: 'Synthetic later', metadata: { patientUserId: 'patient-2' },
+  };
+  let generated;
+  let roomWrites = 0;
+  const snapshot = value => ({ exists: true, data: () => ({ ...value }) });
+  const db = {
+    collection: () => ({ doc: () => ({}) }),
+    async runTransaction(callback) {
+      return callback({
+        async get() { return snapshot(room); },
+        set(_ref, patch) { roomWrites++; Object.assign(room, patch); },
+      });
+    },
+  };
+  const finalization = loadModule('lib/services/consultation-finalization/consultation-finalization-core.ts', {
+    '@/lib/consultations/session-timing': { calculateDurationMinutes: () => 1 },
+    '@/lib/consultations/identity-utils': loadModule('lib/consultations/identity-utils.ts'),
+    '@/lib/consultations/waiting-room-history': { buildWaitingRoomHistorySnapshot: async () => ({
+      totalParticipants: 0, participants: [], participantEmails: [],
+      registeredParticipantCount: 0, anonymousParticipantCount: 0,
+    }) },
+    '@/lib/services/shared/service-result': loadModule('lib/services/shared/service-result.ts'),
+    '@/lib/repositories/call-summary-repository': { CallSummaryRepository: class {
+      async getById() { return { exists: false }; }
+    } },
+    '@/lib/repositories/consultation-repository': { ConsultationRepository: class {
+      async getByRoom() { return snapshot(room); }
+      async mergeFields(_id, patch) { roomWrites++; Object.assign(room, patch); }
+    } },
+    '@/lib/repositories/consultation-session-repository': { ConsultationSessionRepository: class {
+      async getById() { return { id: 'earlier', ...snapshot(earlier) }; }
+      async mergeFields(_id, patch) { Object.assign(earlier, patch); }
+    } },
+    '@/lib/repositories/room-doctor-presence-repository': {},
+    './summary-generator': { generateAndStoreConsultationSummary: async input => { generated = input; } },
+  });
+  await finalization.finalizeConsultationForRoom(db, {
+    roomName: 'room-a', consultationSessionId: 'earlier', finalizedAt: new Date(), reason: 'patient_left',
+  });
+  assert.equal(roomWrites, 0);
+  assert.equal(room.consultationSessionId, 'later');
+  assert.equal(room.patientUserId, 'patient-2');
+  assert.equal(room.status, 'active');
+  assert.equal(generated.patientName, 'Synthetic earlier');
+  assert.equal(generated.consultationSessionId, 'earlier');
+
+  room.consultationSessionId = 'earlier';
+  room.patientUserId = 'patient-1';
+  room.metadata.patientUserId = 'patient-1';
+  await finalization.finalizeConsultationForRoom(db, {
+    roomName: 'room-a', consultationSessionId: 'earlier', finalizedAt: new Date(), reason: 'patient_left',
+  });
+  assert.equal(roomWrites, 1);
+  assert.equal(room.patientUserId, 'patient-1');
+  assert.equal(room.status, 'completed');
+});
 
 test('waiting credentials cannot publish, subscribe or send data; consultation media remains enabled', () => {
   const tokens = tokenModule();
@@ -310,6 +567,136 @@ test('authenticated requests add the token without sending caller-asserted ident
   const dashboard = readFileSync('app/patient/dashboard/page.tsx', 'utf8');
   assert.match(dashboard, /authenticatedFetch\('\/api\/link-patient-consultations'/);
   assert.doesNotMatch(dashboard, /fetch\('\/api\/link-patient-consultations'/);
+});
+
+/** Run the actual legacy linking handler against synthetic persisted records. */
+function consultationLinkingFixture() {
+  const session = { doctorUserId: 'doctor-1', roomName: 'shared-room', patientUserId: 'patient-2' };
+  const consultation = {
+    createdBy: 'doctor-1', patientUserId: 'patient-2', consultationSessionId: 'later-session',
+    metadata: { visibleToUsers: ['doctor-1', 'patient-2'] },
+  };
+  const summary = { createdBy: 'doctor-1', patientUserId: 'patient-2' };
+  const snapshot = (id, value) => ({ id, exists: true, data: () => value });
+  const repository = (value) => class {
+    async getById(id) { return snapshot(id, value); }
+    async getByRoom(id) { return snapshot(id, value); }
+    async findByPatient() { return []; }
+    async findByPatientEmail() { return []; }
+    async mergeFields(_id, patch) { Object.assign(value, patch); }
+  };
+  const route = loadModule('app/api/link-patient-consultations/route.ts', {
+    'next/server': { NextResponse: { json: (body, options) => ({ body, status: options?.status || 200 }) } },
+    '@/lib/firebase-admin': { getFirebaseAdmin: () => ({}) },
+    '@/lib/repositories/call-summary-repository': { CallSummaryRepository: repository(summary) },
+    '@/lib/repositories/consultation-repository': { ConsultationRepository: repository(consultation) },
+    '@/lib/repositories/consultation-session-repository': { ConsultationSessionRepository: repository(session) },
+    '@/lib/repositories/invitation-repository': { InvitationRepository: class {
+      async findByEmailAllowed() { return [snapshot('allowlisted-invite', { roomName: 'shared-room' })]; }
+      async findByEmailAllowedHash() { return []; }
+    } },
+    '@/lib/services/shared/request-auth': {
+      authorizeBearerRequest: async () => ({ ok: true, data: { userId: 'patient-1', email: 'patient1@example.test', role: 'patient' } }),
+    },
+    '@/lib/services/shared/http': {},
+    '@/lib/services/shared/request-logging': { withRequestLogging: fn => fn },
+    '@/lib/security/security-signal': { hashSecuritySignal: () => 'synthetic-hash' },
+  });
+  return { route, session, consultation, summary };
+}
+
+test('browser-supplied pending session IDs cannot claim another patient or rewrite a later encounter', async () => {
+  const fixture = consultationLinkingFixture();
+  const response = await fixture.route.POST({ json: async () => ({ pendingSessionIds: ['earlier-session'] }) });
+  assert.equal(response.status, 200);
+  assert.equal(fixture.session.patientUserId, 'patient-2');
+  assert.equal(fixture.consultation.patientUserId, 'patient-2');
+  assert.equal(fixture.consultation.consultationSessionId, 'later-session');
+  assert.equal(fixture.summary.patientUserId, 'patient-2');
+  assert.equal(response.body.linkedCount, 0);
+});
+
+test('an invitation email match cannot grant visibility to another patient’s later consultation', async () => {
+  const fixture = consultationLinkingFixture();
+  const response = await fixture.route.POST({ json: async () => ({ pendingSessionIds: [] }) });
+  assert.equal(response.status, 200);
+  assert.deepEqual(fixture.consultation.metadata.visibleToUsers, ['doctor-1', 'patient-2']);
+  assert.equal(response.body.linkedCount, 0);
+});
+
+test('obsolete linking payloads cannot cause a crash or change patient identity', async () => {
+  const fixture = consultationLinkingFixture();
+  const response = await fixture.route.POST({ json: async () => ({ pendingSessionIds: [17, null, {}] }) });
+  assert.equal(response.status, 200);
+  assert.equal(fixture.session.patientUserId, 'patient-2');
+  assert.equal(response.body.linkedCount, 0);
+});
+
+/** Exercise the history projection and real repository query builders in memory. */
+function patientHistoryFixture() {
+  const own = { createdBy: 'doctor-1', patientUserId: 'patient-1', roomName: 'room-own' };
+  const legacy = { createdBy: 'doctor-1', roomName: 'room-legacy', metadata: { patientUserId: 'patient-1' } };
+  const wrongPatient = { ...own, patientUserId: 'patient-2', patientEmail: 'patient1@example.test' };
+  const guest = { ...wrongPatient, patientUserId: 'anonymous' };
+  const conflicting = { ...wrongPatient, metadata: { patientUserId: 'patient-1' } };
+  const data = {
+    'call-summaries': {
+      'own-summary': {
+        ...own, summary: 'synthetic draft marker', riskLevel: 'Unknown', keyPoints: ['synthetic marker'],
+        waitingRoomHistory: { totalParticipants: 1, participants: [{ patientEmail: 'other@example.test' }] },
+      },
+      'legacy-summary': legacy,
+      'other-summary': wrongPatient,
+      'guest-summary': guest,
+      'conflicting-summary': conflicting,
+    },
+    consultationSessions: {
+      'own-session': { ...own, status: 'completed' },
+      'legacy-session': { ...legacy, status: 'completed' },
+      'other-session': { ...wrongPatient, status: 'completed' },
+      'guest-session': { ...guest, status: 'completed' },
+      'conflicting-session': { ...conflicting, status: 'completed' },
+    },
+  };
+  const db = { collection(name) {
+    const filters = [];
+    return {
+      where(field, _operator, value) { filters.push([field, value]); return this; },
+      limit() { return this; },
+      async get() {
+        const docs = Object.entries(data[name] || {}).filter(([, value]) => filters.every(([field, expected]) =>
+          field.split('.').reduce((current, key) => current?.[key], value) === expected
+        )).map(([id, value]) => ({ id, data: () => value }));
+        return { docs };
+      },
+    };
+  } };
+  const { FirestoreSummaryProjectionService } = loadModule('lib/services/history-summary/summary-projection-service.ts', {
+    '@/lib/consultations/identity-utils': loadModule('lib/consultations/identity-utils.ts'),
+    '@/lib/services/consultation-finalization': { generateAndStoreConsultationSummary() { throw new Error('Unexpected AI call'); } },
+    '@/lib/repositories/call-summary-repository': loadModule('lib/repositories/call-summary-repository.ts'),
+    '@/lib/repositories/consultation-session-repository': loadModule('lib/repositories/consultation-session-repository.ts'),
+    '@/lib/repositories/user-repository': { UserRepository: class { async getEmail() { return undefined; } } },
+  });
+  return new FirestoreSummaryProjectionService(db);
+}
+
+test('patient history requires a consistent recorded UID; matching email alone never grants access', async () => {
+  const service = patientHistoryFixture();
+  const history = await service.buildPatientHistory({ patientUserId: 'patient-1', patientEmail: 'patient1@example.test' });
+  assert.deepEqual([...history.map(record => record.id)].sort(), [
+    'legacy-session', 'legacy-summary', 'own-session', 'own-summary',
+  ]);
+});
+
+test('patient history excludes clinician AI drafts and other waiting participants', async () => {
+  const service = patientHistoryFixture();
+  const history = await service.buildPatientHistory({ patientUserId: 'patient-1' });
+  const own = history.find(record => record.id === 'own-summary');
+  assert.ok(own);
+  for (const field of ['summary', 'riskLevel', 'keyPoints', 'category', 'recommendations', 'followUpActions', 'waitingRoomHistory', 'chatHistory']) {
+    assert.equal(field in own, false, `Patient history must not expose ${field}`);
+  }
 });
 
 test('login distinguishes a Firestore outage from a resolved role check', async () => {

@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: a new encounter appearing before leave commit keeps its identity and lifecycle
+not ok 1 - a new encounter appearing before leave commit keeps its identity and lifecycle
+  ---
+  duration_ms: 83.585493
+  type: 'test'
+  location: '/home/ret/.codex/worktrees/consultation-integrity-fix/Livekit/tests/queue-and-auth-regressions.test.mjs:299:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      {
+    +   closes: 1,
+    +   writes: 1
+    -   closes: 0,
+    -   writes: 0
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    writes: 0
+    closes: 0
+  actual:
+    writes: 1
+    closes: 1
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/ret/.codex/worktrees/consultation-integrity-fix/Livekit/tests/queue-and-auth-regressions.test.mjs:305:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: leave finalization targets the requested encounter instead of a later visit sharing its room
+not ok 2 - leave finalization targets the requested encounter instead of a later visit sharing its room
+  ---
+  duration_ms: 29.145994
+  type: 'test'
+  location: '/home/ret/.codex/worktrees/consultation-integrity-fix/Livekit/tests/queue-and-auth-regressions.test.mjs:310:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    'later' !== 'earlier'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'earlier'
+  actual: 'later'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/ret/.codex/worktrees/consultation-integrity-fix/Livekit/tests/queue-and-auth-regressions.test.mjs:335:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 418.50799

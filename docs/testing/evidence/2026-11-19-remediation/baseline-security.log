@@ -1,0 +1,190 @@
+
+> livekit-frontend@0.2.0 test:security
+> node scripts/regression-security-contracts.mjs && node scripts/regression-thesis-flow-contracts.mjs && node --test tests/security-policies.test.mjs tests/queue-and-auth-regressions.test.mjs
+
+Security architecture regression contracts passed.
+Thesis invitation, consent, summary, and UI contracts verified.
+TAP version 13
+# Subtest: Firebase Auth starts without experimental CommonJS-to-ESM loading
+ok 1 - Firebase Auth starts without experimental CommonJS-to-ESM loading
+  ---
+  duration_ms: 118.132111
+  type: 'test'
+  ...
+# Subtest: duplicate-identity replacement detaches the old page without closing the continuing visit
+ok 2 - duplicate-identity replacement detaches the old page without closing the continuing visit
+  ---
+  duration_ms: 53.47592
+  type: 'test'
+  ...
+# Subtest: admission renewal rechecks persisted expiry, revocation, room and ownership
+ok 3 - admission renewal rechecks persisted expiry, revocation, room and ownership
+  ---
+  duration_ms: 216.216768
+  type: 'test'
+  ...
+# Subtest: only the exact current visit can renew, and valid waiting/admission still works
+ok 4 - only the exact current visit can renew, and valid waiting/admission still works
+  ---
+  duration_ms: 15.223042
+  type: 'test'
+  ...
+# Subtest: waiting credentials cannot publish, subscribe or send data; consultation media remains enabled
+ok 5 - waiting credentials cannot publish, subscribe or send data; consultation media remains enabled
+  ---
+  duration_ms: 5.190461
+  type: 'test'
+  ...
+# Subtest: admission HTTP route rejects missing row/email lookup and another visit credential
+ok 6 - admission HTTP route rejects missing row/email lookup and another visit credential
+  ---
+  duration_ms: 6.925487
+  type: 'test'
+  ...
+# Subtest: failed signed-in token refresh never silently queues as a guest
+ok 7 - failed signed-in token refresh never silently queues as a guest
+  ---
+  duration_ms: 13.139043
+  type: 'test'
+  ...
+# Subtest: obsolete invitation validation cannot overwrite the newer account admission
+ok 8 - obsolete invitation validation cannot overwrite the newer account admission
+  ---
+  duration_ms: 10.303632
+  type: 'test'
+  ...
+# Subtest: waiting admission polling never overlaps or commits after the visit changes
+ok 9 - waiting admission polling never overlaps or commits after the visit changes
+  ---
+  duration_ms: 5.218358
+  type: 'test'
+  ...
+# Subtest: authenticated requests add the token without sending caller-asserted identity
+ok 10 - authenticated requests add the token without sending caller-asserted identity
+  ---
+  duration_ms: 2.447625
+  type: 'test'
+  ...
+# Subtest: login distinguishes a Firestore outage from a resolved role check
+ok 11 - login distinguishes a Firestore outage from a resolved role check
+  ---
+  duration_ms: 14.324729
+  type: 'test'
+  ...
+# Subtest: realtime invalidates without exposing snapshot rows, shares a listener, and cleans up
+ok 12 - realtime invalidates without exposing snapshot rows, shares a listener, and cleans up
+  ---
+  duration_ms: 5.270234
+  type: 'test'
+  ...
+# Subtest: periodic refresh survives stream failure and shared requests stay deduplicated
+ok 13 - periodic refresh survives stream failure and shared requests stay deduplicated
+  ---
+  duration_ms: 3.958464
+  type: 'test'
+  ...
+# Subtest: periodic queue refresh pauses in background and reconciles once on return
+ok 14 - periodic queue refresh pauses in background and reconciles once on return
+  ---
+  duration_ms: 3.358389
+  type: 'test'
+  ...
+# Subtest: canonical queue excludes stale, expired, revoked, other-room and other-doctor rows
+ok 15 - canonical queue excludes stale, expired, revoked, other-room and other-doctor rows
+  ---
+  duration_ms: 24.57366
+  type: 'test'
+  ...
+# Subtest: transcription retries at most twice and carries only bounded provider status
+ok 16 - transcription retries at most twice and carries only bounded provider status
+  ---
+  duration_ms: 7.314328
+  type: 'test'
+  ...
+# Subtest: faculty reviewer remains deny-by-default except for assignment permission
+ok 17 - faculty reviewer remains deny-by-default except for assignment permission
+  ---
+  duration_ms: 33.50769
+  type: 'test'
+  ...
+# Subtest: review assignment is exact, active, and time bounded
+ok 18 - review assignment is exact, active, and time bounded
+  ---
+  duration_ms: 6.503544
+  type: 'test'
+  ...
+# Subtest: concurrent invitation reservations cannot exceed maxUses
+ok 19 - concurrent invitation reservations cannot exceed maxUses
+  ---
+  duration_ms: 12.650332
+  type: 'test'
+  ...
+# Subtest: consultation history sort values describe the resulting order
+ok 20 - consultation history sort values describe the resulting order
+  ---
+  duration_ms: 19.638816
+  type: 'test'
+  ...
+# Subtest: waiting-room timestamp transport understands Firestore JSON shapes
+ok 21 - waiting-room timestamp transport understands Firestore JSON shapes
+  ---
+  duration_ms: 5.637282
+  type: 'test'
+  ...
+# Subtest: invitation presentation counts hashed identities without exposing addresses
+ok 22 - invitation presentation counts hashed identities without exposing addresses
+  ---
+  duration_ms: 32.821575
+  type: 'test'
+  ...
+# Subtest: prepared consultation capabilities default to disabled
+ok 23 - prepared consultation capabilities default to disabled
+  ---
+  duration_ms: 2.651877
+  type: 'test'
+  ...
+# Subtest: only a verified allowlisted identity skips the waiting room
+ok 24 - only a verified allowlisted identity skips the waiting room
+  ---
+  duration_ms: 5.163509
+  type: 'test'
+  ...
+# Subtest: security-signal hashing keeps production invitation validation available
+ok 25 - security-signal hashing keeps production invitation validation available
+  ---
+  duration_ms: 4.318763
+  type: 'test'
+  ...
+# Subtest: Google and password accounts with a confirmed email are the same evidence
+ok 26 - Google and password accounts with a confirmed email are the same evidence
+  ---
+  duration_ms: 4.54524
+  type: 'test'
+  ...
+# Subtest: consent is a versioned record, and the old registration flag is not it
+ok 27 - consent is a versioned record, and the old registration flag is not it
+  ---
+  duration_ms: 6.837152
+  type: 'test'
+  ...
+# Subtest: exhausted AI credit is classified as unavailable, not a retryable failure
+ok 28 - exhausted AI credit is classified as unavailable, not a retryable failure
+  ---
+  duration_ms: 15.291245
+  type: 'test'
+  ...
+# Subtest: database availability failures are recognized from both Firestore SDKs
+ok 29 - database availability failures are recognized from both Firestore SDKs
+  ---
+  duration_ms: 2.887455
+  type: 'test'
+  ...
+1..29
+# tests 29
+# suites 0
+# pass 29
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 849.552557

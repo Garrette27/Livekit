@@ -1,0 +1,21 @@
+{
+  "testedAt": "2026-11-19T07:33:05.665Z",
+  "environment": "Firestore emulator, demo-livekit-security",
+  "source": "local repaired rules; not deployed",
+  "productionWrites": false,
+  "results": [
+    {
+      "id": "ADD01",
+      "criterion": "A patient cannot bypass server role checks to create a consultation attributed to another patient",
+      "writeAllowed": false,
+      "readableByTargetPatient": false,
+      "status": "PASS"
+    },
+    {
+      "id": "ADD02",
+      "criterion": "An existing consultation owner cannot reassign trusted doctor/patient identity fields through a direct client update",
+      "reassignmentAllowed": false,
+      "status": "PASS"
+    }
+  ]
+}

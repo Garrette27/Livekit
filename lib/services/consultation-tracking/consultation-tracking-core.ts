@@ -1,5 +1,5 @@
 import type { Firestore } from 'firebase-admin/firestore';
-import { buildVisibleUserIds, isKnownUserId } from '@/lib/consultations/identity-utils';
+import { buildVisibleUserIds, hasRecordedPatientIdentity, isKnownUserId } from '@/lib/consultations/identity-utils';
 import { calculateDurationMinutes } from '@/lib/consultations/session-timing';
 import { resolveLeaveSessionId } from '@/lib/consultations/consultation-session-store';
 import { FirestoreConsultationSessionCore } from '@/lib/services/video-chat';
@@ -7,7 +7,7 @@ import { finalizeConsultationForRoom } from '@/lib/services/consultation-finaliz
 import { RoomRepository } from '@/lib/repositories/room-repository';
 import { ConsultationRepository } from '@/lib/repositories/consultation-repository';
 import { ConsultationSessionRepository } from '@/lib/repositories/consultation-session-repository';
-import { serviceOk, type ServiceResult } from '@/lib/services/shared/service-result';
+import { serviceError, serviceOk, type ServiceResult } from '@/lib/services/shared/service-result';
 import type {
   ConsultationTrackingService,
   TrackConsultationInput,
@@ -121,6 +121,19 @@ export class FirestoreConsultationTrackingCore implements ConsultationTrackingSe
 
     const consultationDoc = await this.consultationRepo.getByRoom(roomName);
     const existingData = consultationDoc.exists ? (consultationDoc.data() as Record<string, any>) : null;
+
+    // A room can be reused. A delayed leave must not close or reattribute the
+    // later patient's encounter, even when the old room credential still verifies.
+    if (action === 'leave' && existingData) {
+      if (!hasRecordedPatientIdentity(existingData, input.userId)) {
+        return serviceError(403, 'consultation_forbidden', 'This encounter belongs to a different participant');
+      }
+      const currentSessionId = existingData.consultationSessionId
+        || existingData.metadata?.consultationSessionId;
+      if (input.consultationSessionId && input.consultationSessionId !== currentSessionId) {
+        return serviceError(409, 'stale_consultation_session', 'This encounter is no longer the current consultation');
+      }
+    }
 
     const resolvedPatient = resolvePatientIdentity({
       userId: input.userId,
@@ -264,7 +277,7 @@ export class FirestoreConsultationTrackingCore implements ConsultationTrackingSe
     const finalDurationMinutes = Math.max(durationMinutes, doctorDurationFromSessionMinutes);
     const existingVisibleToUsers = existingData.metadata?.visibleToUsers || [];
 
-    await this.consultationRepo.mergeFields(roomName, {
+    const completedEncounter = {
       roomName,
       patientName: patientName || existingData.patientName || 'Unknown Patient',
       patientUserId,
@@ -288,7 +301,25 @@ export class FirestoreConsultationTrackingCore implements ConsultationTrackingSe
         consultationSessionId,
         visibleToUsers: buildVisibleUserIds(doctorUserId, patientUserId, existingVisibleToUsers),
       },
+    };
+
+    // Recheck at commit so a concurrent admission cannot be overwritten after
+    // the earlier ownership check. A superseded leave is an idempotent no-op.
+    const consultationRef = this.db.collection('consultations').doc(roomName);
+    const expectedSessionId = existingData.consultationSessionId || existingData.metadata?.consultationSessionId;
+    const applied = await this.db.runTransaction(async (transaction) => {
+      const currentDoc = await transaction.get(consultationRef);
+      const current = currentDoc.exists ? currentDoc.data() : null;
+      const currentSessionId = current?.consultationSessionId || current?.metadata?.consultationSessionId;
+      if (!current || !hasRecordedPatientIdentity(current, patientUserId) || currentSessionId !== expectedSessionId) {
+        return false;
+      }
+      transaction.set(consultationRef, completedEncounter, { merge: true });
+      return true;
     });
+    if (!applied) {
+      return { consultationSessionId: null, durationMinutes: 0 };
+    }
 
     await this.sessionCore.closeSession({
       sessionId: consultationSessionId,
@@ -309,6 +340,7 @@ export class FirestoreConsultationTrackingCore implements ConsultationTrackingSe
     try {
       await finalizeConsultationForRoom(this.db, {
         roomName,
+        consultationSessionId,
         finalizedAt: now,
         reason: 'patient_left',
         requireActiveSession: false,

@@ -1,0 +1,45 @@
+{
+  "project": "livekit-5eef6",
+  "database": "(default)",
+  "readAt": "2026-11-19T07:38:43.670Z",
+  "collections": {
+    "consultationSessions": {
+      "count": 53,
+      "complete": true,
+      "states": {
+        "completed": 52,
+        "active": 1
+      },
+      "schemaShapes": {
+        "{\"createdBy\":\"missing\",\"patientUserId\":\"stringValue\",\"metadataType\":\"mapValue\",\"metadata.createdBy\":\"missing\",\"metadata.patientUserId\":\"stringValue\",\"metadata.doctorUserId\":\"missing\",\"metadata.visibleToUsers\":\"missing\"}": 34,
+        "{\"createdBy\":\"missing\",\"patientUserId\":\"nullValue\",\"metadataType\":\"mapValue\",\"metadata.createdBy\":\"missing\",\"metadata.patientUserId\":\"nullValue\",\"metadata.doctorUserId\":\"missing\",\"metadata.visibleToUsers\":\"missing\"}": 12,
+        "{\"createdBy\":\"missing\",\"patientUserId\":\"stringValue\",\"metadataType\":\"missing\",\"metadata.createdBy\":\"missing\",\"metadata.patientUserId\":\"missing\",\"metadata.doctorUserId\":\"missing\",\"metadata.visibleToUsers\":\"missing\"}": 7
+      },
+      "missingExpiry": 53,
+      "expiredActive": 0,
+      "missingConsentVersion": 53
+    },
+    "call-summaries": {
+      "count": 9,
+      "complete": true,
+      "states": {
+        "other_or_missing": 9
+      },
+      "schemaShapes": {
+        "{\"createdBy\":\"stringValue\",\"patientUserId\":\"missing\",\"metadataType\":\"mapValue\",\"metadata.createdBy\":\"stringValue\",\"metadata.patientUserId\":\"missing\",\"metadata.doctorUserId\":\"missing\",\"metadata.visibleToUsers\":\"missing\"}": 1,
+        "{\"createdBy\":\"stringValue\",\"patientUserId\":\"stringValue\",\"metadataType\":\"mapValue\",\"metadata.createdBy\":\"stringValue\",\"metadata.patientUserId\":\"stringValue\",\"metadata.doctorUserId\":\"missing\",\"metadata.visibleToUsers\":\"missing\"}": 8
+      },
+      "missingExpiry": 9,
+      "expiredActive": 0,
+      "missingConsentVersion": 9
+    }
+  },
+  "firestoreRules": {
+    "sha256": "8e6c8a31af5c5fbb8b333b405fcd3bb90b109de7c5f9371959e86aaccef9a4e6",
+    "matchesRepository": false
+  },
+  "storageRules": {
+    "status": "BLOCKED",
+    "reason": "The authenticated rules read failed; no deployed rule result is asserted."
+  }
+}
