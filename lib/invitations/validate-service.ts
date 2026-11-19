@@ -606,6 +606,7 @@ async function handleWaitingRoomAccess(params: {
 
       const admittedToken = signLiveKitRoomToken({
         subject: `patient_${tokenPayload.invitationId}_${admissionHistory.latestAdmitted.id}`,
+        patientUserId: lookup.userDocId,
         roomName: tokenPayload.roomName,
         participantName: participantDisplayName,
         expiresIn: '2h',
@@ -647,6 +648,7 @@ async function handleWaitingRoomAccess(params: {
 
     const admittedToken = signLiveKitRoomToken({
       subject: `patient_${tokenPayload.invitationId}_${admittedWaitingPatientId}`,
+      patientUserId: lookup.userDocId,
       roomName: tokenPayload.roomName,
       participantName: participantDisplayName,
       expiresIn: '2h',
@@ -880,6 +882,7 @@ export async function validateInvitationAndIssueToken(
 
     const liveKitToken = signLiveKitRoomToken({
       subject: `patient_${tokenPayload.invitationId}_${Date.now()}`,
+      patientUserId: userResolution.lookup.userDocId,
       roomName: tokenPayload.roomName,
       participantName: participantDisplayName,
       expiresIn: '1h',

@@ -250,6 +250,10 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
   private issueAdmissionToken(patient: WaitingPatient): string {
     return this.rtcAdapter.issueRoomToken({
       subject: buildParticipantIdentity(patient),
+      patientUserId: patient.metadata?.isAnonymous === false
+        && patient.metadata?.identitySource === 'registered-profile'
+        ? patient.patientId
+        : undefined,
       roomName: patient.roomName,
       participantName: patient.patientName || patient.patientEmail || 'Anonymous Patient',
       expiresIn: '2h',

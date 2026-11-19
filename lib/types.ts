@@ -4,6 +4,7 @@
  */
 
 import { Timestamp } from 'firebase/firestore';
+import type { PatientIdentitySource } from './invitations/waiting-patient-identity';
 
 // Existing types
 export interface CallSummary {
@@ -205,6 +206,8 @@ export interface WaitingPatient {
     userAgentHash?: string;
     lastAccessed?: Timestamp | Date | any;
     isAnonymous?: boolean;
+    /** Server-recorded provenance for the patient identity reserved at entry. */
+    identitySource?: PatientIdentitySource;
     admissionMode?: 'doctor-manual' | 'auto-email-match';
     doctorUserId?: string;
     consultationSessionId?: string;

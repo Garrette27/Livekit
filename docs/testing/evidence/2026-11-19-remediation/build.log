@@ -1,0 +1,80 @@
+
+> livekit-frontend@0.2.0 build
+> next build
+
+   ▲ Next.js 15.5.29
+   - Experiments (use with caution):
+     ✓ forceSwcTransforms
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 2.7s
+   Skipping linting
+   Checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/43) ...
+   Generating static pages (10/43) 
+   Generating static pages (21/43) 
+   Generating static pages (32/43) 
+ ✓ Generating static pages (43/43)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                   Size  First Load JS
+┌ ○ /                                      5.02 kB         287 kB
+├ ○ /_not-found                              998 B         104 kB
+├ ○ /access-denied                         1.71 kB         108 kB
+├ ƒ /api/doctor-access                       206 B         103 kB
+├ ƒ /api/doctor/history                      206 B         103 kB
+├ ƒ /api/invite/create                       206 B         103 kB
+├ ƒ /api/invite/get-link                     206 B         103 kB
+├ ƒ /api/invite/revoke                       206 B         103 kB
+├ ƒ /api/invite/validate                     206 B         103 kB
+├ ƒ /api/link-patient-consultations          206 B         103 kB
+├ ƒ /api/password-reset                      206 B         103 kB
+├ ƒ /api/patient/consent                     206 B         103 kB
+├ ƒ /api/patient/consultations               206 B         103 kB
+├ ƒ /api/patient/pending-waiting-room        206 B         103 kB
+├ ƒ /api/session-chat/attachments            206 B         103 kB
+├ ƒ /api/session-chat/attachments/extract    206 B         103 kB
+├ ƒ /api/session-chat/messages               206 B         103 kB
+├ ƒ /api/session-transcription/chunks        206 B         103 kB
+├ ƒ /api/summary/delete                      206 B         103 kB
+├ ƒ /api/summary/generate                    206 B         103 kB
+├ ƒ /api/summary/process-queue               206 B         103 kB
+├ ƒ /api/summary/update                      206 B         103 kB
+├ ƒ /api/token                               206 B         103 kB
+├ ƒ /api/track-consultation                  206 B         103 kB
+├ ƒ /api/track-doctor-presence               206 B         103 kB
+├ ƒ /api/user/role-conflict                  206 B         103 kB
+├ ƒ /api/waiting-room/admit                  206 B         103 kB
+├ ƒ /api/waiting-room/check-admission        206 B         103 kB
+├ ƒ /api/waiting-room/list                   206 B         103 kB
+├ ƒ /api/waiting-room/mark-left              206 B         103 kB
+├ ƒ /api/waiting-room/reject                 206 B         103 kB
+├ ƒ /api/webhook                             206 B         103 kB
+├ ƒ /create-room/[room]                     3.2 kB         289 kB
+├ ○ /dashboard                               828 B         283 kB
+├ ○ /doctor/dashboard                      10.5 kB         292 kB
+├ ƒ /doctor/history                          206 B         103 kB
+├ ○ /doctor/invitations                      11 kB         305 kB
+├ ○ /doctor/login                           4.9 kB         287 kB
+├ ○ /invitations                             507 B         103 kB
+├ ƒ /invite/[token]                         7.4 kB         483 kB
+├ ○ /login                                   588 B         103 kB
+├ ○ /patient/dashboard                     8.46 kB         290 kB
+├ ○ /patient/login                         5.65 kB         284 kB
+├ ƒ /room/[room]                             197 B         500 kB
+├ ƒ /room/[room]/doctor                      198 B         500 kB
+├ ƒ /room/[room]/patient                   4.72 kB         484 kB
+└ ƒ /room/[room]/redirect                    527 B         103 kB
++ First Load JS shared by all               103 kB
+  ├ chunks/2023-95942d85806513ca.js        46.4 kB
+  ├ chunks/614f92a4-c2742218a529267a.js    54.2 kB
+  └ other shared chunks (total)            1.93 kB
+
+
+ƒ Middleware                                 35 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

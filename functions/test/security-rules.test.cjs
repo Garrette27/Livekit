@@ -167,3 +167,134 @@ test('live queue queries return only the signed-in doctor’s waiting and admitt
   assert.deepEqual(snapshot.docs.map(row => row.id).sort(), ['admitted-1', 'waiting-1']);
   await assertFails(getDocs(query(rows, where('doctorUserId', '==', 'doctor-2'), liveStatuses)));
 });
+
+test('consultation creation requires the server, including when the client names another patient', async () => {
+  const clients = [
+    rulesEnvironment.authenticatedContext('patient-1', { role: 'patient' }),
+    rulesEnvironment.authenticatedContext('doctor-1', { role: 'doctor' }),
+    rulesEnvironment.authenticatedContext('reviewer-1', { role: 'faculty_reviewer' }),
+    rulesEnvironment.authenticatedContext('admin-1', { role: 'admin', admin: true }),
+    rulesEnvironment.unauthenticatedContext(),
+  ];
+  for (const [index, context] of clients.entries()) {
+    const db = context.firestore();
+    const createdBy = ['patient-1', 'doctor-1', 'reviewer-1', 'admin-1', 'guest-1'][index];
+    await assertFails(setDoc(doc(db, 'consultations', `forged-${index}`), {
+      createdBy,
+      patientUserId: 'patient-2',
+      status: 'completed',
+    }));
+    await assertFails(setDoc(doc(db, 'consultations', `self-${index}`), {
+      createdBy,
+      patientUserId: createdBy,
+      status: 'active',
+    }));
+  }
+});
+
+test('consultation owners and participants cannot rewrite identities, visibility, or lifecycle', async () => {
+  const original = {
+    createdBy: 'doctor-1',
+    patientUserId: 'patient-1',
+    status: 'active',
+    metadata: { createdBy: 'doctor-1', visibleToUsers: ['patient-1'] },
+  };
+  await rulesEnvironment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'consultations/encounter-1'), original);
+  });
+  for (const [uid, claims] of [
+    ['doctor-1', { role: 'doctor' }],
+    ['patient-1', { role: 'patient' }],
+    ['admin-1', { role: 'admin', admin: true }],
+  ]) {
+    const target = doc(rulesEnvironment.authenticatedContext(uid, claims).firestore(), 'consultations/encounter-1');
+    for (const patch of [
+      { createdBy: 'doctor-2' },
+      { patientUserId: 'patient-2' },
+      { 'metadata.createdBy': 'doctor-2' },
+      { 'metadata.visibleToUsers': ['patient-2'] },
+      { status: 'completed' },
+      { extra: 'x'.repeat(100_000) },
+    ]) {
+      await assertFails(updateDoc(target, patch));
+    }
+    await assertFails(setDoc(target, { patientUserId: 'patient-2' }, { merge: true }));
+    await assertFails(setDoc(target, { createdBy: uid, patientUserId: 'patient-2' }));
+  }
+  await rulesEnvironment.withSecurityRulesDisabled(async (context) => {
+    const snapshot = await getDoc(doc(context.firestore(), 'consultations/encounter-1'));
+    assert.deepEqual(snapshot.data(), original);
+  });
+});
+
+test('even a consultation owner must use the server to delete an encounter', async () => {
+  await rulesEnvironment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'consultations/encounter-1'), {
+      createdBy: 'doctor-1', patientUserId: 'patient-1',
+    });
+  });
+  for (const [uid, role] of [['doctor-1', 'doctor'], ['patient-1', 'patient'], ['doctor-2', 'doctor']]) {
+    const db = rulesEnvironment.authenticatedContext(uid, { role }).firestore();
+    await assertFails(deleteDoc(doc(db, 'consultations/encounter-1')));
+  }
+});
+
+test('server lifecycle writes preserve current and legacy participant reads without granting unrelated access', async () => {
+  await rulesEnvironment.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'consultations/current'), {
+      createdBy: 'doctor-1', patientUserId: 'patient-1', status: 'active',
+    });
+    await updateDoc(doc(db, 'consultations/current'), { status: 'completed' });
+    await setDoc(doc(db, 'consultations/legacy'), {
+      metadata: {
+        createdBy: 'doctor-1', patientUserId: 'patient-1', doctorUserId: 'doctor-1',
+        visibleToUsers: ['legacy-observer'],
+      },
+    });
+    for (const [id, metadata] of [
+      ['legacy-creator', { createdBy: 'doctor-1' }],
+      ['legacy-doctor', { doctorUserId: 'doctor-1' }],
+      ['legacy-patient', { patientUserId: 'patient-1' }],
+      ['legacy-visible', { visibleToUsers: ['legacy-observer'] }],
+    ]) {
+      await setDoc(doc(db, 'consultations', id), { metadata });
+    }
+    await setDoc(doc(db, 'consultations/creator-only'), { createdBy: 'doctor-1' });
+    await setDoc(doc(db, 'consultations/null-metadata'), {
+      createdBy: 'doctor-1', patientUserId: 'patient-1', metadata: null,
+    });
+    await setDoc(doc(db, 'consultations/deleted-by-server'), { createdBy: 'doctor-1' });
+    await deleteDoc(doc(db, 'consultations/deleted-by-server'));
+  });
+  const doctorDb = rulesEnvironment.authenticatedContext('doctor-1', { role: 'doctor' }).firestore();
+  const patientDb = rulesEnvironment.authenticatedContext('patient-1', { role: 'patient' }).firestore();
+  for (const db of [doctorDb, patientDb]) {
+    for (const id of ['current', 'legacy', 'null-metadata']) {
+      await assertSucceeds(getDoc(doc(db, 'consultations', id)));
+    }
+  }
+  await assertSucceeds(getDoc(doc(doctorDb, 'consultations/creator-only')));
+  await assertSucceeds(getDoc(doc(doctorDb, 'consultations/legacy-creator')));
+  await assertSucceeds(getDoc(doc(doctorDb, 'consultations/legacy-doctor')));
+  await assertSucceeds(getDoc(doc(patientDb, 'consultations/legacy-patient')));
+  const visibleDb = rulesEnvironment.authenticatedContext('legacy-observer').firestore();
+  await assertSucceeds(getDoc(doc(visibleDb, 'consultations/legacy')));
+  await assertSucceeds(getDoc(doc(visibleDb, 'consultations/legacy-visible')));
+  const ownRows = await assertSucceeds(getDocs(query(
+    collection(doctorDb, 'consultations'), where('createdBy', '==', 'doctor-1')
+  )));
+  assert.equal(ownRows.size, 3);
+  for (const context of [
+    rulesEnvironment.authenticatedContext('doctor-2', { role: 'doctor' }),
+    rulesEnvironment.authenticatedContext('patient-2', { role: 'patient' }),
+    rulesEnvironment.authenticatedContext('reviewer-1', { role: 'faculty_reviewer' }),
+    rulesEnvironment.unauthenticatedContext(),
+  ]) {
+    const db = context.firestore();
+    for (const id of ['current', 'legacy', 'creator-only', 'null-metadata', 'legacy-creator', 'legacy-doctor', 'legacy-patient', 'legacy-visible']) {
+      await assertFails(getDoc(doc(db, 'consultations', id)));
+    }
+    await assertFails(getDocs(collection(db, 'consultations')));
+  }
+});

@@ -4,6 +4,18 @@ export function isKnownUserId(userId: string | null | undefined): userId is stri
   return Boolean(userId && !RESERVED_USER_IDS.has(userId));
 }
 
+/**
+ * Legacy metadata can supply a missing patient UID. Conflicting recorded UIDs
+ * fail closed; emails and caller-supplied encounter IDs never establish ownership.
+ */
+export function hasRecordedPatientIdentity(record: Record<string, unknown>, patientUserId: string): boolean {
+  const metadata = (record.metadata as Record<string, unknown> | undefined) || {};
+  const patientIds = [record.patientUserId, metadata.patientUserId].filter(
+    (value): value is string => typeof value === 'string' && isKnownUserId(value)
+  );
+  return patientIds.length > 0 && patientIds.every((id) => id === patientUserId);
+}
+
 export function choosePatientUserId(
   candidateUserId: string | null | undefined,
   existingUserId: string | null | undefined

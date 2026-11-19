@@ -1,0 +1,13 @@
+{
+  "stats": {
+    "startTime": "2026-11-19T07:57:48.447Z",
+    "duration": 19883.703999999998,
+    "expected": 29,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "profile": "mobile-chromium",
+  "runtime": "local Next.js E2E server; mocked waiting-room lifecycle APIs",
+  "rawConfigurationAndTracesExcluded": true
+}

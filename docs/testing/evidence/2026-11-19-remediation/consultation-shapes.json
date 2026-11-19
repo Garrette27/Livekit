@@ -1,0 +1,32 @@
+{
+  "project": "livekit-5eef6",
+  "database": "(default)",
+  "readAt": "2026-11-19T07:30:09.938Z",
+  "collections": {
+    "consultations": {
+      "count": 119,
+      "complete": true,
+      "states": {
+        "active": 71,
+        "completed": 48
+      },
+      "schemaShapes": {
+        "{\"createdBy\":\"stringValue\",\"patientUserId\":\"stringValue\",\"metadataType\":\"mapValue\",\"metadata.createdBy\":\"stringValue\",\"metadata.patientUserId\":\"stringValue\",\"metadata.doctorUserId\":\"stringValue\",\"metadata.visibleToUsers\":\"arrayValue\"}": 98,
+        "{\"createdBy\":\"stringValue\",\"patientUserId\":\"nullValue\",\"metadataType\":\"mapValue\",\"metadata.createdBy\":\"stringValue\",\"metadata.patientUserId\":\"nullValue\",\"metadata.doctorUserId\":\"stringValue\",\"metadata.visibleToUsers\":\"arrayValue\"}": 1,
+        "{\"createdBy\":\"missing\",\"patientUserId\":\"missing\",\"metadataType\":\"missing\",\"metadata.createdBy\":\"missing\",\"metadata.patientUserId\":\"missing\",\"metadata.doctorUserId\":\"missing\",\"metadata.visibleToUsers\":\"missing\"}": 19,
+        "{\"createdBy\":\"stringValue\",\"patientUserId\":\"missing\",\"metadataType\":\"mapValue\",\"metadata.createdBy\":\"stringValue\",\"metadata.patientUserId\":\"missing\",\"metadata.doctorUserId\":\"missing\",\"metadata.visibleToUsers\":\"missing\"}": 1
+      },
+      "missingExpiry": 119,
+      "expiredActive": 0,
+      "missingConsentVersion": 119
+    }
+  },
+  "firestoreRules": {
+    "sha256": "8e6c8a31af5c5fbb8b333b405fcd3bb90b109de7c5f9371959e86aaccef9a4e6",
+    "matchesRepository": true
+  },
+  "storageRules": {
+    "status": "BLOCKED",
+    "reason": "The authenticated rules read failed; no deployed rule result is asserted."
+  }
+}

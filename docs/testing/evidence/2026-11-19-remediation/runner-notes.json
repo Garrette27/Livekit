@@ -1,0 +1,17 @@
+{
+  "intermediateTypecheck": {
+    "result": "FAIL",
+    "errorCode": "TS6053",
+    "cause": "Overlapped Next.js dev regeneration of .next/types",
+    "rawIntermediateLogRetained": false,
+    "resolution": "Final npm run typecheck after browser server stopped returned exit 0"
+  },
+  "codeRegressionRedPhases": [
+    "Consultation client writes",
+    "Untrusted historical linking",
+    "Email-only history and clinician draft visibility",
+    "Signed Firebase UID binding",
+    "Late leave and commit race",
+    "Exact-session finalization and newer-room preservation"
+  ]
+}

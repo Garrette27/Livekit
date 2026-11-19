@@ -6,7 +6,7 @@ export interface TrackConsultationInput {
   roomName: string;
   action: ConsultationAction;
   patientName: string;
-  /** Caller-provided id of the participant; resolved to a patient or 'anonymous'. */
+  /** Identity established by a verified room credential, never a request-body UID. */
   userId: string;
   patientEmail?: string;
   /** Preferred session id for leave events (e.g. from the client). */

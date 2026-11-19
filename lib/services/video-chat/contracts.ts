@@ -89,6 +89,8 @@ export interface ChatMessageStore {
 
 export interface IssueRtcRoomTokenInput {
   subject: string;
+  /** Registered Firebase UID established by admission, never a typed email. */
+  patientUserId?: string;
   roomName: string;
   participantName: string;
   expiresIn: SignOptions['expiresIn'];

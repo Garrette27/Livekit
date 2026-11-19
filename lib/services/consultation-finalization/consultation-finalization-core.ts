@@ -241,6 +241,7 @@ async function runFinalization(
   db: Firestore,
   {
     roomName,
+    consultationSessionId: requestedSessionId,
     finalizedAt,
     reason,
     requireActiveSession = false,
@@ -250,7 +251,11 @@ async function runFinalization(
   const sessionRepo = new ConsultationSessionRepository(db);
   const consultationRepo = new ConsultationRepository(db);
 
-  const sessionDocs = await sessionRepo.findByRoom(roomName, 50);
+  const sessionDocs = requestedSessionId
+    ? [await sessionRepo.getById(requestedSessionId)].filter(
+      (doc) => doc.exists && doc.data()?.roomName === roomName
+    )
+    : await sessionRepo.findByRoom(roomName, 50);
   if (sessionDocs.length === 0) {
     return null;
   }
@@ -267,10 +272,10 @@ async function runFinalization(
   }
 
   const consultationSessionId =
-    typeof selectedSession.data.consultationSessionId === 'string' &&
+    requestedSessionId || (typeof selectedSession.data.consultationSessionId === 'string' &&
     selectedSession.data.consultationSessionId.trim()
       ? selectedSession.data.consultationSessionId.trim()
-      : selectedSession.id;
+      : selectedSession.id);
 
   // Skip duplicate finalization triggered by a backstop after the primary path
   // already produced a finalized summary for this session.
@@ -368,37 +373,53 @@ async function runFinalization(
       ? (consultationData.patientEmail as string | undefined)
         || (typeof consultationMetadata.patientEmail === 'string' ? consultationMetadata.patientEmail : null)
       : null);
-  await consultationRepo.mergeFields(roomName, {
-    roomName,
-    consultationSessionId,
-    sessionStartedAt,
-    leftAt: effectiveSessionEndedAt,
-    duration: finalDurationMinutes,
-    status: 'completed',
-    awaitingPatient: false,
-    patientUserId: sessionPatientUserId,
-    ...(consultationPatientEmail ? { patientEmail: consultationPatientEmail } : {}),
-    metadata: {
-      ...consultationMetadata,
-      durationMinutes: finalDurationMinutes,
-      finalDurationMinutes: finalDurationMinutes,
-      sessionEndedAt: effectiveSessionEndedAt.toISOString(),
-      finalizedAt: finalizedAt.toISOString(),
-      finalizationReason: reason,
-      waitingRoomHistory,
+  // Finalizing one encounter must not rewind a room that another patient has
+  // already entered. Recheck the session binding at the projection's commit.
+  const consultationRef = db.collection('consultations').doc(roomName);
+  await db.runTransaction(async (transaction) => {
+    const currentDoc = await transaction.get(consultationRef);
+    const current = currentDoc.exists ? currentDoc.data() : null;
+    if (!current || resolveConsultationSessionIdFromDoc(current) !== consultationSessionId) {
+      return;
+    }
+    const currentMetadata = (current.metadata as Record<string, unknown> | undefined) || {};
+    transaction.set(consultationRef, {
+      roomName,
+      consultationSessionId,
+      sessionStartedAt,
+      leftAt: effectiveSessionEndedAt,
+      duration: finalDurationMinutes,
+      status: 'completed',
+      awaitingPatient: false,
       patientUserId: sessionPatientUserId,
-    },
+      ...(consultationPatientEmail ? { patientEmail: consultationPatientEmail } : {}),
+      metadata: {
+        ...currentMetadata,
+        durationMinutes: finalDurationMinutes,
+        finalDurationMinutes: finalDurationMinutes,
+        sessionEndedAt: effectiveSessionEndedAt.toISOString(),
+        finalizedAt: finalizedAt.toISOString(),
+        finalizationReason: reason,
+        waitingRoomHistory,
+        patientUserId: sessionPatientUserId,
+      },
+    }, { merge: true });
   });
 
   if (regenerateSummary) {
     const summaryDoctorUserId =
       doctorUserId ||
-      (consultationData.createdBy as string | undefined) ||
-      (consultationMetadata.createdBy as string | undefined);
+      (consultationDocMatchesCurrentSession
+        ? (consultationData.createdBy as string | undefined)
+          || (consultationMetadata.createdBy as string | undefined)
+        : undefined);
     if (summaryDoctorUserId) {
       const patientName =
-        (consultationData.patientName as string | undefined) ||
-        ((sessionMetadata.patientName as string | undefined) || 'Patient');
+        (sessionMetadata.patientName as string | undefined)
+        || (consultationDocMatchesCurrentSession
+          ? (consultationData.patientName as string | undefined)
+          : undefined)
+        || 'Patient';
       const patientUserId =
         sessionPatientUserId
         || (consultationDocMatchesCurrentSession

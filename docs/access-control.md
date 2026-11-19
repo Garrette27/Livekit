@@ -54,6 +54,19 @@ verified Firebase tokens plus the server-side user profile.
   and match its room to the consultation session.
 - AI summary generation and edits require ownership of the completed
   consultation.
+- Consultation record writes are server-only, even for an owning doctor using
+  the Firebase client. Current and legacy participant read rules are retained.
+- Patient history is scoped to consistent recorded Firebase UIDs, including the
+  legacy metadata location. A matching email or browser-cached session ID never
+  grants historical ownership. The legacy linking endpoint is an authenticated
+  idempotent acknowledgment and performs no record reassignment.
+- Admission can bind the verified Firebase UID into a signed room credential,
+  separately from its LiveKit identity, so new signed-in visits need no later
+  self-service linking. Guest visits without such evidence are not adopted on
+  later login.
+- Patient history exposes encounter metadata, not clinician AI drafts or other
+  waiting participants. Late leave/finalization updates are bound to the exact
+  encounter so room reuse cannot reattribute a later visit.
 
 ## Deployment checklist
 

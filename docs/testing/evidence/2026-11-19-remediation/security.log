@@ -1,0 +1,274 @@
+
+> livekit-frontend@0.2.0 test:security
+> node scripts/regression-security-contracts.mjs && node scripts/regression-thesis-flow-contracts.mjs && node --test tests/security-policies.test.mjs tests/queue-and-auth-regressions.test.mjs
+
+Security architecture regression contracts passed.
+Thesis invitation, consent, summary, and UI contracts verified.
+TAP version 13
+# Subtest: Firebase Auth starts without experimental CommonJS-to-ESM loading
+ok 1 - Firebase Auth starts without experimental CommonJS-to-ESM loading
+  ---
+  duration_ms: 120.872405
+  type: 'test'
+  ...
+# Subtest: duplicate-identity replacement detaches the old page without closing the continuing visit
+ok 2 - duplicate-identity replacement detaches the old page without closing the continuing visit
+  ---
+  duration_ms: 61.40801
+  type: 'test'
+  ...
+# Subtest: admission renewal rechecks persisted expiry, revocation, room and ownership
+ok 3 - admission renewal rechecks persisted expiry, revocation, room and ownership
+  ---
+  duration_ms: 258.037235
+  type: 'test'
+  ...
+# Subtest: only the exact current visit can renew, and valid waiting/admission still works
+ok 4 - only the exact current visit can renew, and valid waiting/admission still works
+  ---
+  duration_ms: 20.847335
+  type: 'test'
+  ...
+# Subtest: room credentials preserve an issuer-bound Firebase patient UID separately from the media identity
+ok 5 - room credentials preserve an issuer-bound Firebase patient UID separately from the media identity
+  ---
+  duration_ms: 6.787835
+  type: 'test'
+  ...
+# Subtest: direct invitation issuance binds the authenticated UID rather than the declared email
+ok 6 - direct invitation issuance binds the authenticated UID rather than the declared email
+  ---
+  duration_ms: 29.680048
+  type: 'test'
+  ...
+# Subtest: admission binds history to the registered patient and never to a guest’s declared email
+ok 7 - admission binds history to the registered patient and never to a guest’s declared email
+  ---
+  duration_ms: 44.310626
+  type: 'test'
+  ...
+# Subtest: tracking uses the signed Firebase UID so a new admitted visit remains in patient history
+ok 8 - tracking uses the signed Firebase UID so a new admitted visit remains in patient history
+  ---
+  duration_ms: 46.84579
+  type: 'test'
+  ...
+# Subtest: late leave events cannot overwrite another patient or a later encounter in the same room
+ok 9 - late leave events cannot overwrite another patient or a later encounter in the same room
+  ---
+  duration_ms: 49.315655
+  type: 'test'
+  ...
+# Subtest: the current patient can still close their own tracked encounter
+ok 10 - the current patient can still close their own tracked encounter
+  ---
+  duration_ms: 17.68585
+  type: 'test'
+  ...
+# Subtest: a new encounter appearing before leave commit keeps its identity and lifecycle
+ok 11 - a new encounter appearing before leave commit keeps its identity and lifecycle
+  ---
+  duration_ms: 17.777006
+  type: 'test'
+  ...
+# Subtest: leave finalization targets the requested encounter instead of a later visit sharing its room
+ok 12 - leave finalization targets the requested encounter instead of a later visit sharing its room
+  ---
+  duration_ms: 18.968692
+  type: 'test'
+  ...
+# Subtest: finalizing an earlier session preserves a later room encounter and keeps patient labels separate
+ok 13 - finalizing an earlier session preserves a later room encounter and keeps patient labels separate
+  ---
+  duration_ms: 11.460668
+  type: 'test'
+  ...
+# Subtest: waiting credentials cannot publish, subscribe or send data; consultation media remains enabled
+ok 14 - waiting credentials cannot publish, subscribe or send data; consultation media remains enabled
+  ---
+  duration_ms: 8.253605
+  type: 'test'
+  ...
+# Subtest: admission HTTP route rejects missing row/email lookup and another visit credential
+ok 15 - admission HTTP route rejects missing row/email lookup and another visit credential
+  ---
+  duration_ms: 7.171307
+  type: 'test'
+  ...
+# Subtest: failed signed-in token refresh never silently queues as a guest
+ok 16 - failed signed-in token refresh never silently queues as a guest
+  ---
+  duration_ms: 18.387782
+  type: 'test'
+  ...
+# Subtest: obsolete invitation validation cannot overwrite the newer account admission
+ok 17 - obsolete invitation validation cannot overwrite the newer account admission
+  ---
+  duration_ms: 17.404633
+  type: 'test'
+  ...
+# Subtest: waiting admission polling never overlaps or commits after the visit changes
+ok 18 - waiting admission polling never overlaps or commits after the visit changes
+  ---
+  duration_ms: 5.950008
+  type: 'test'
+  ...
+# Subtest: authenticated requests add the token without sending caller-asserted identity
+ok 19 - authenticated requests add the token without sending caller-asserted identity
+  ---
+  duration_ms: 2.628666
+  type: 'test'
+  ...
+# Subtest: browser-supplied pending session IDs cannot claim another patient or rewrite a later encounter
+ok 20 - browser-supplied pending session IDs cannot claim another patient or rewrite a later encounter
+  ---
+  duration_ms: 2.061432
+  type: 'test'
+  ...
+# Subtest: an invitation email match cannot grant visibility to another patient’s later consultation
+ok 21 - an invitation email match cannot grant visibility to another patient’s later consultation
+  ---
+  duration_ms: 1.648815
+  type: 'test'
+  ...
+# Subtest: obsolete linking payloads cannot cause a crash or change patient identity
+ok 22 - obsolete linking payloads cannot cause a crash or change patient identity
+  ---
+  duration_ms: 1.74906
+  type: 'test'
+  ...
+# Subtest: patient history requires a consistent recorded UID; matching email alone never grants access
+ok 23 - patient history requires a consistent recorded UID; matching email alone never grants access
+  ---
+  duration_ms: 29.212719
+  type: 'test'
+  ...
+# Subtest: patient history excludes clinician AI drafts and other waiting participants
+ok 24 - patient history excludes clinician AI drafts and other waiting participants
+  ---
+  duration_ms: 20.214077
+  type: 'test'
+  ...
+# Subtest: login distinguishes a Firestore outage from a resolved role check
+ok 25 - login distinguishes a Firestore outage from a resolved role check
+  ---
+  duration_ms: 24.06078
+  type: 'test'
+  ...
+# Subtest: realtime invalidates without exposing snapshot rows, shares a listener, and cleans up
+ok 26 - realtime invalidates without exposing snapshot rows, shares a listener, and cleans up
+  ---
+  duration_ms: 4.832665
+  type: 'test'
+  ...
+# Subtest: periodic refresh survives stream failure and shared requests stay deduplicated
+ok 27 - periodic refresh survives stream failure and shared requests stay deduplicated
+  ---
+  duration_ms: 4.214602
+  type: 'test'
+  ...
+# Subtest: periodic queue refresh pauses in background and reconciles once on return
+ok 28 - periodic queue refresh pauses in background and reconciles once on return
+  ---
+  duration_ms: 3.198645
+  type: 'test'
+  ...
+# Subtest: canonical queue excludes stale, expired, revoked, other-room and other-doctor rows
+ok 29 - canonical queue excludes stale, expired, revoked, other-room and other-doctor rows
+  ---
+  duration_ms: 21.054243
+  type: 'test'
+  ...
+# Subtest: transcription retries at most twice and carries only bounded provider status
+ok 30 - transcription retries at most twice and carries only bounded provider status
+  ---
+  duration_ms: 12.458984
+  type: 'test'
+  ...
+# Subtest: faculty reviewer remains deny-by-default except for assignment permission
+ok 31 - faculty reviewer remains deny-by-default except for assignment permission
+  ---
+  duration_ms: 35.467035
+  type: 'test'
+  ...
+# Subtest: review assignment is exact, active, and time bounded
+ok 32 - review assignment is exact, active, and time bounded
+  ---
+  duration_ms: 7.260829
+  type: 'test'
+  ...
+# Subtest: concurrent invitation reservations cannot exceed maxUses
+ok 33 - concurrent invitation reservations cannot exceed maxUses
+  ---
+  duration_ms: 16.242639
+  type: 'test'
+  ...
+# Subtest: consultation history sort values describe the resulting order
+ok 34 - consultation history sort values describe the resulting order
+  ---
+  duration_ms: 33.180838
+  type: 'test'
+  ...
+# Subtest: waiting-room timestamp transport understands Firestore JSON shapes
+ok 35 - waiting-room timestamp transport understands Firestore JSON shapes
+  ---
+  duration_ms: 6.376716
+  type: 'test'
+  ...
+# Subtest: invitation presentation counts hashed identities without exposing addresses
+ok 36 - invitation presentation counts hashed identities without exposing addresses
+  ---
+  duration_ms: 34.856578
+  type: 'test'
+  ...
+# Subtest: prepared consultation capabilities default to disabled
+ok 37 - prepared consultation capabilities default to disabled
+  ---
+  duration_ms: 2.910791
+  type: 'test'
+  ...
+# Subtest: only a verified allowlisted identity skips the waiting room
+ok 38 - only a verified allowlisted identity skips the waiting room
+  ---
+  duration_ms: 5.2819
+  type: 'test'
+  ...
+# Subtest: security-signal hashing keeps production invitation validation available
+ok 39 - security-signal hashing keeps production invitation validation available
+  ---
+  duration_ms: 4.712561
+  type: 'test'
+  ...
+# Subtest: Google and password accounts with a confirmed email are the same evidence
+ok 40 - Google and password accounts with a confirmed email are the same evidence
+  ---
+  duration_ms: 4.671332
+  type: 'test'
+  ...
+# Subtest: consent is a versioned record, and the old registration flag is not it
+ok 41 - consent is a versioned record, and the old registration flag is not it
+  ---
+  duration_ms: 6.026899
+  type: 'test'
+  ...
+# Subtest: exhausted AI credit is classified as unavailable, not a retryable failure
+ok 42 - exhausted AI credit is classified as unavailable, not a retryable failure
+  ---
+  duration_ms: 17.234292
+  type: 'test'
+  ...
+# Subtest: database availability failures are recognized from both Firestore SDKs
+ok 43 - database availability failures are recognized from both Firestore SDKs
+  ---
+  duration_ms: 4.742485
+  type: 'test'
+  ...
+1..43
+# tests 43
+# suites 0
+# pass 43
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1217.671892

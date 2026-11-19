@@ -97,7 +97,9 @@ async function handlePOST(req: Request) {
       roomName,
       action,
       patientName: participant.participantName?.trim() || 'Patient',
-      userId: participant.identity,
+      // The signed Firebase binding preserves history without trusting body IDs.
+      // Legacy/guest tokens retain their pseudonymous transport identity.
+      userId: participant.patientUserId || participant.identity,
       consultationSessionId: body.consultationSessionId?.trim() || undefined,
     });
     return serviceResultToResponse(result);

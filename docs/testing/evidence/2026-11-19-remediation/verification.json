@@ -1,0 +1,64 @@
+{
+  "baseCommit": "0be08989759dbbe6aaef53c02444aa0121cb4baf",
+  "branch": "codex/consultation-integrity-fix",
+  "environment": "Local WSL2; Firebase emulator demo-livekit-security; synthetic fixtures",
+  "sourceHashes": {
+    "app/api/link-patient-consultations/route.ts": "04ef85c5d9df8bfa73f4bfe24095b4b743b938e15829ddf504e07bbc9504797a",
+    "app/api/track-consultation/route.ts": "ba9e9026e4d0ac7c90fc778d0f6b184b055b87808ca1b9394401adcb359f018f",
+    "docs/access-control.md": "8b75baa8c3cfca6a42f27c4f6da5ae73cbf370d7ba7155af6e42d8383699b51f",
+    "firestore.rules": "2d4ed451690a061191e1b6eb8ac78ecf753fa0f64707cf504e5dae9acb4ec997",
+    "functions/test/security-rules.test.cjs": "4aa9e04649594b1075b9d2af40c8b13a72cc1fe533ee48c9923e4432f95de98e",
+    "lib/consultations/identity-utils.ts": "03dc1cf8ff0b89b9ec4b84c4d5034f996fcf0d53039835e4657679f88fab594e",
+    "lib/invitations/token-utils.ts": "789f854fd834172c85cb3aaec774183b7df0722c319636f09387e3b695addd23",
+    "lib/invitations/validate-service.ts": "ce721bb2aef3248852c4a39e38fd6c1892e82f235961f37c70a6463b6d20b36b",
+    "lib/services/consultation-finalization/consultation-finalization-core.ts": "c714509be365596d0f2f67646fd090faf4846dcb4c37e7a319f4c8fbfb195fda",
+    "lib/services/consultation-finalization/contracts.ts": "caac4e097e94bec8433b0050a73333c5ced9b05004e24f5a2f3a951f47633c35",
+    "lib/services/consultation-tracking/consultation-tracking-core.ts": "11070356d4ffb9f0c46856466535b9ce485ef106a4d4ca998c7ba30a50cadea1",
+    "lib/services/consultation-tracking/contracts.ts": "c2846045ff8e5ebb55cd02d5a5be25ea302c38f77292df8272a3d38c0c4e3a66",
+    "lib/services/history-summary/summary-projection-service.ts": "1184a21767f6342d088b05fe8d5d09d412537df7c1e7075d89fd1d04688644c9",
+    "lib/services/invitation-access/invitation-access-core.ts": "8345413dc7a9e30af9ab61ed67e9d2fab7de799c62dec9d8bc2d785553ca46f2",
+    "lib/services/video-chat/contracts.ts": "9d34a95ff674fced70be16e35f3ee9ebe04013bf44ff94c5f38a4c6e5d5799df",
+    "lib/types.ts": "1162c3921e536f07b789a3b2cf546085fa2022232b49e31038bb2baf685351a4",
+    "tests/queue-and-auth-regressions.test.mjs": "89419489b3f5021c71d03f6c3b0cbbeab567f18eebea93549e602635e6e74c3e"
+  },
+  "checks": {
+    "security": {
+      "exitCode": 0,
+      "passed": 43,
+      "contractScripts": 2
+    },
+    "rules": {
+      "exitCode": 0,
+      "passed": 12
+    },
+    "originalAttackReproductions": {
+      "exitCode": 0,
+      "passed": 2
+    },
+    "mobileChromium": {
+      "exitCode": 0,
+      "passed": 29,
+      "durationMs": 19883.703999999998
+    },
+    "typecheck": {
+      "exitCode": 0
+    },
+    "lint": {
+      "exitCode": 0,
+      "warnings": 1
+    },
+    "productionBuild": {
+      "exitCode": 0
+    },
+    "applicationProductionAudit": {
+      "findings": 0
+    },
+    "functionsProductionAudit": {
+      "findings": 0
+    }
+  },
+  "deployed": false,
+  "productionWrites": false,
+  "performanceAcceptance": "NOT TESTED for media/authenticated/concurrency",
+  "publication": "Application and Firestore rules require coordinated review and release"
+}
