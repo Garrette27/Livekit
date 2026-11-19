@@ -1,5 +1,9 @@
 # TeleConsole thesis testing package
 
+Current results and mandatory commit/push checklist:
+[Verification status ledger](verification-status.md). Read it before interpreting
+the historical assessment below as today's acceptance status.
+
 Assessment date: 17 November 2026, Asia/Singapore. Code baseline:
 `fa5a33cca4b341513dae6d78538f4eeede26a92b`.
 
