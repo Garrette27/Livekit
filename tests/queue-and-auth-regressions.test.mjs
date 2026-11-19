@@ -862,6 +862,55 @@ test('periodic queue refresh pauses in background and reconciles once on return'
   assert.equal(calls, 2);
 });
 
+test('100 queue consumers share one in-flight request, recover after failure and isolate scopes', async () => {
+  const queue = queueHarness();
+  let calls = 0;
+  let finish;
+  const fetcher = () => { calls++; return new Promise(resolve => { finish = resolve; }); };
+  const requests = Array.from({ length: 100 }, () => queue.fetchWaitingQueueOnce('one-scope', fetcher));
+  assert.equal(calls, 1);
+  assert.ok(requests.every(request => request === requests[0]));
+  finish([]);
+  await Promise.all(requests);
+  await assert.rejects(queue.fetchWaitingQueueOnce('one-scope', async () => { throw Error('synthetic outage'); }));
+  assert.equal(await queue.fetchWaitingQueueOnce('one-scope', async () => 'recovered'), 'recovered');
+  const first = queue.fetchWaitingQueueOnce('one-scope', fetcher);
+  const finishFirst = finish;
+  const other = queue.fetchWaitingQueueOnce('other-scope', fetcher);
+  assert.notEqual(first, other);
+  assert.equal(calls, 3);
+  finishFirst([]); finish([]);
+  await Promise.all([first, other]);
+});
+
+test('100 queue subscribers use one timer and leak no timers or listeners over visibility cycles', () => {
+  const queue = queueHarness();
+  let ticks = 0;
+  const stops = Array.from({ length: 100 }, () => queue.subscribeToWaitingQueuePoll('one-scope', 15000, () => { ticks++; }));
+  assert.equal(queue.timers.size, 1);
+  assert.equal(queue.visibilityListeners.size, 1);
+  for (let cycle = 0; cycle < 100; cycle++) {
+    queue.setVisibility('hidden');
+    assert.equal(queue.timers.size, 0);
+    queue.setVisibility('visible');
+    assert.equal(queue.timers.size, 1);
+  }
+  assert.equal(ticks, 10000);
+  stops.forEach(stop => stop());
+  assert.equal(queue.timers.size, 0);
+  assert.equal(queue.visibilityListeners.size, 0);
+});
+
+test('database availability classification never converts permission errors into retryable outages', () => {
+  const { isDatabaseUnavailableError } = loadModule('lib/services/shared/database-availability.ts');
+  for (const code of [4, 8, 14, 'resource-exhausted', 'RESOURCE_EXHAUSTED', 'deadline-exceeded', 'unavailable']) {
+    assert.equal(isDatabaseUnavailableError({ code }), true, String(code));
+  }
+  for (const error of [null, undefined, {}, { code: 7 }, { code: 'permission-denied' }, { code: 'unauthenticated' }, { message: 'quota exceeded' }]) {
+    assert.equal(isDatabaseUnavailableError(error), false);
+  }
+});
+
 /** Equality-query fake keeps filtering behavior in the actual domain service. */
 function syntheticDatabase(collections) {
   function query(rows) {

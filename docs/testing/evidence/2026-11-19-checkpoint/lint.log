@@ -1,0 +1,10 @@
+
+> livekit-frontend@0.2.0 lint
+> eslint .
+
+
+/tmp/livekit-audit-20261119/app/api/invite/create/route.ts
+  89:11  warning  'sanitizedEmail' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)
+

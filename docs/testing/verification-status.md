@@ -32,16 +32,16 @@ Latest reviewed report: [consultation integrity remediation](consultation-integr
 
 | Claim | Status entering this checkpoint | Evidence / limits |
 | --- | --- | --- |
-| Application authorization/identity regressions | HISTORICAL PASS, 43 | `evidence/2026-11-19-remediation/security.log`; synthetic adapters |
-| Firestore/Storage candidate rules | HISTORICAL PASS, 12 | Same directory, `rules-green.log`; emulator only |
+| Application authorization/identity regressions | PASS, 46 | `evidence/2026-11-19-checkpoint/policy.log`; actual services with synthetic adapters; three new efficiency/outage cases |
+| Firestore/Storage candidate rules | PASS, 12 | `evidence/2026-11-19-checkpoint/rules.log`; emulator only |
 | Original consultation-write attacks denied | HISTORICAL PASS, 2 | Same directory, `supplemental-green.json`; not production writes |
 | Mobile Chromium workflow | HISTORICAL PASS, 29 | Same directory, `e2e-summary.json`; mocked waiting APIs |
-| Production dependencies | HISTORICAL PASS, zero | Same directory, production audit JSONs; not full dev inventory |
-| Full dependency inventory | FAIL at preceding scan | Unpatched picomatch advisory; fresh scan required |
-| Latest application deployment | NOT VERIFIED in this checkpoint | Git merge does not establish deployed commit |
-| Latest Firestore rules deployment | NOT VERIFIED | PR #8 report explicitly leaves coordinated release pending |
-| Queue request/timer efficiency | Targeted local retest pending | Shared-request and visibility controls; no cloud savings percentage |
-| Database outage classification | Targeted local retest pending | Retryable availability errors must not include permission failures |
+| Full application and Functions dependency inventories | PASS, zero findings returned today | Fresh full audit JSONs in checkpoint directory; prior failing scans preserved; no claim of advisory remediation by code changes |
+| Typecheck, lint, production build | PASS | Checkpoint logs; lint retains the existing sanitizedEmail warning |
+| Latest application deployment | BLOCKED direct metadata verification | Vercel team scope unavailable; GitHub frontend status success for 1c7bace is only indirect evidence |
+| Latest Firestore rules deployment | FAIL, source drift | `evidence/2026-11-19-rules-read/`; active source still allows client consultation create/owner-write; no deployment performed |
+| Queue request/timer efficiency | PASS, deterministic local budgets | 100 consumers share one fetch/timer, isolated scopes, failed-fetch recovery, 100 visibility cycles and zero cleanup leaks; no cloud savings percentage |
+| Database outage classification | PASS, targeted matrix | Availability codes recognized; permission/authentication/message-only errors do not become retryable outages |
 | Public HTTP pilot | HISTORICAL PASS, n=10/page | 18 Nov pilot; not authenticated or media latency |
 | Media latency / concurrent calls | NOT TESTED | Requires synthetic paired media clients and isolated staging |
 | Clinician documentation efficiency | NOT TESTED | Reviewer study required; no paid AI requests authorized |
@@ -50,5 +50,12 @@ Pattern: an append-only evidence history with a single current-status projection
 It avoids rewriting failed baselines or duplicating mutable PASS claims across
 reports. This ledger is evidence navigation, not a certification score.
 
-Next unfinished task: run the local efficiency/outage checks, refresh safe
-production deployment metadata, and publish the resulting evidence checkpoint.
+Next unfinished task: obtain explicit direction for coordinated Firestore rule
+publication, restore Vercel team access for direct deployment inspection, then
+run synthetic authenticated positive/negative acceptance checks. This checkpoint
+does not authorize a production rules release or migration. Media/capacity and
+reviewer trials remain separate. No paid AI, cloud load or patient-data writes
+were performed. The local worktree's unrelated AGENTS.md edits remain preserved.
+
+Reproduction and source hashes: `evidence/2026-11-19-checkpoint/scope.md`.
+No new mobile E2E claim is made: the 29-case result above is historical.

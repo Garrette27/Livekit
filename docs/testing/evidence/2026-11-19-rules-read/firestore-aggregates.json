@@ -1,0 +1,14 @@
+{
+  "project": "livekit-5eef6",
+  "database": "(default)",
+  "readAt": "2026-11-19T11:31:21.798Z",
+  "collections": {},
+  "firestoreRules": {
+    "sha256": "8e6c8a31af5c5fbb8b333b405fcd3bb90b109de7c5f9371959e86aaccef9a4e6",
+    "matchesRepository": false
+  },
+  "storageRules": {
+    "status": "BLOCKED",
+    "reason": "The authenticated rules read failed; no deployed rule result is asserted."
+  }
+}
