@@ -46,6 +46,17 @@ Rules for this pass, in priority order:
 Progress for this pass is recorded in
 [defense-readiness-2026-11-22.md](defense-readiness-2026-11-22.md).
 
+| Claim | Current result | Evidence / limits |
+| --- | --- | --- |
+| Policy, regression and source-contract tests | PASS, 52 | `evidence/2026-11-22-defense/policy-after.log`; red phase in `red-phase.json` |
+| Firestore/Storage rules suite | PASS, 13 | `rules-after.log`; synthetic emulator; new clinician-only room/call create test |
+| Typecheck, lint, production build | PASS | lint now 0 warnings |
+| npm audit, application and Functions | PASS, 0 findings | time-bound advisory result |
+| Remote CI and frontend deploy for aad4136 | PASS | Quality and security success; GitHub deployment status success |
+| Production smoke probe | PASS, status codes only | pages 200; unauthenticated/wrong-secret 401; security headers present |
+| Clinician-only room/call creation in production | NOT RELEASED | rules change awaits the manual Firebase deploy workflow |
+| Authenticated consultation, media, capacity | NOT TESTED | separate protocols still required |
+
 ## Previous checkpoint: 22 November 2026
 
 Remote fetched at 16df312; no newer commits were available. See
