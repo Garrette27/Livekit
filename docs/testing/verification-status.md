@@ -24,7 +24,29 @@ Never mark a test passed by relaxing an assertion, hiding a failing audit, or
 substituting HTTP timing for WebRTC timing. Use PASS, FAIL, BLOCKED, NOT TESTED,
 or HISTORICAL PASS, always with scope. New advisories can invalidate old scans.
 
-## Current checkpoint: 22 November 2026
+## Defense-readiness checkpoint: 22 November 2026 (defense on 23 November 2026)
+
+The thesis defense is tomorrow, 23 November 2026. This checkpoint is a
+pre-defense hardening pass over a93d635 (latest remote main at fetch time).
+Rules for this pass, in priority order:
+
+1. Do not break the working doctor/patient call. No risky refactors, no new
+   features, no dependency majors, no production data writes or rule releases
+   without separate review.
+2. Follow AGENTS.md: fix only confirmed defects with a focused regression that
+   fails first; keep established patterns (server-side policy boundary, scoped
+   bearer invitations, atomic reservation, shared quota/outage classification).
+3. Run the full gate (security/regression tests, rules emulator suite where
+   available, typecheck, lint, build, dependency audits) and push each verified
+   checkpoint to main immediately, so an interrupted session still leaves a
+   defensible, deployed state.
+4. Report honestly: PASS / FAIL / BLOCKED / NOT TESTED with scope. Never claim
+   HIPAA compliance, certification, WebRTC capacity or clinical accuracy.
+
+Progress for this pass is recorded in
+[defense-readiness-2026-11-22.md](defense-readiness-2026-11-22.md).
+
+## Previous checkpoint: 22 November 2026
 
 Remote fetched at 16df312; no newer commits were available. See
 [follow-up report](follow-up-2026-11-22.md) for current data, reproduced bugs,
