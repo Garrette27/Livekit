@@ -33,6 +33,7 @@ design tradeoffs and limits. Local unrelated AGENTS.md edits remain preserved.
 | Claim | Current result | Evidence / limits |
 | --- | --- | --- |
 | Application authorization and efficiency regressions | PASS, 48 | `evidence/2026-11-22-retest/policy.log`; includes reviewer malformed/blank denial and stale poll cleanup regressions |
+| Remote CI / frontend status for bee1843 | PASS | Quality and security run 44977057053: application, firebase-functions and application-dependency-audit all success; GitHub frontend deployment status success, not a live authenticated acceptance test |
 | Firestore/Storage repository rule suite | PASS, 12 | Same directory, `rules.log`; synthetic emulators |
 | Typecheck, lint, production build | PASS | Same directory; pre-existing sanitizedEmail warning remains |
 | Full application and Functions audits | PASS, zero returned findings | Same directory audit JSONs; time-bound advisory result |
@@ -43,7 +44,7 @@ design tradeoffs and limits. Local unrelated AGENTS.md edits remain preserved.
 | Current authenticated production / media / capacity / clinician efficiency | NOT TESTED | Existing protocols still required; no paid AI, media capture or cloud load performed |
 | Direct Vercel commit and active Storage policy | NOT VERIFIED in this checkpoint | Prior team-scope and Storage-read restrictions remain; local passes do not imply live acceptance |
 
-Next: verify remote CI for this checkpoint; authenticated synthetic acceptance
+Next: authenticated synthetic acceptance
 and controlled paired media trials remain separate. Never reuse old invitation
 links from screenshots: every stored-active link was expired at the recon read.
 
