@@ -3,6 +3,7 @@ import { CallSummaryRepository } from '@/lib/repositories/call-summary-repositor
 import { ConsultationRepository } from '@/lib/repositories/consultation-repository';
 import { ScheduledDeletionRepository } from '@/lib/repositories/scheduled-deletion-repository';
 import { serviceError, serviceOk, type ServiceResult } from '@/lib/services/shared/service-result';
+import { MAX_SUMMARY_EDIT_HISTORY } from './summary-edit-policy';
 import type {
   DeleteSummaryInput,
   SummaryEditableFields,
@@ -69,7 +70,9 @@ export class FirestoreSummaryManagementCore implements SummaryManagementService 
 
     updateData.metadata = {
       ...existingMetadata,
-      editHistory,
+      // Bounded: keep only the most recent edits so the record cannot grow
+      // without limit (AGENTS.md: bounded events, not growing arrays).
+      editHistory: editHistory.slice(-MAX_SUMMARY_EDIT_HISTORY),
       lastEditedAt: new Date(),
       lastEditedBy: editorUserId,
       isEdited: true,

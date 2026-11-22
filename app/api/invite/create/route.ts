@@ -20,6 +20,9 @@ import {
 } from '../../../../lib/types';
 import { REUSABLE_INVITATION_MAX_USES } from '@/lib/invitations/invitation-use-reservation';
 
+/** Upper bound on emails one invitation may allowlist for direct admission. */
+const MAX_ALLOWLIST_EMAILS = 50;
+
 async function handlePOST(req: NextRequest) {
   try {
     // Apply rate limiting
@@ -50,6 +53,18 @@ async function handlePOST(req: NextRequest) {
     const doctorEmail = auth.data.email;
 
     // Input validation - only roomName is required
+    // Bounded inputs: the allowlist and doctor name are persisted on the
+    // invitation, so oversized values are rejected instead of stored.
+    if (
+      (Array.isArray(emailAllowlist) && emailAllowlist.length > MAX_ALLOWLIST_EMAILS) ||
+      (doctorName !== undefined && doctorName !== null &&
+        (typeof doctorName !== 'string' || doctorName.length > 200))
+    ) {
+      return NextResponse.json(
+        { success: false, error: `Allowlist is limited to ${MAX_ALLOWLIST_EMAILS} emails and doctor name to 200 characters` },
+        { status: 400 }
+      );
+    }
     if (!roomName) {
       return NextResponse.json(
         { success: false, error: 'Missing required field: roomName is required' },

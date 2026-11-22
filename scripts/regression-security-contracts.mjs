@@ -151,4 +151,9 @@ assert.match(read('lib/services/shared/request-auth.ts'), /emailVerified: decode
 assert.match(read('app/api/session-chat/messages/route.ts'), /MAX_CHAT_MESSAGE_LENGTH/);
 assert.match(read('lib/services/video-chat/chat-message-store.ts'), /doc\(toChatMessageDocumentId\(input\.messageId\)\)/);
 
+// Persisted inputs are bounded before they reach Firestore.
+assert.match(read('app/api/invite/create/route.ts'), /emailAllowlist\.length > MAX_ALLOWLIST_EMAILS/);
+assert.match(read('app/api/summary/update/route.ts'), /validateSummaryEdit\(body\)/);
+assert.match(read('lib/services/summary-management/summary-management-core.ts'), /editHistory\.slice\(-MAX_SUMMARY_EDIT_HISTORY\)/);
+
 console.log('Security architecture regression contracts passed.');

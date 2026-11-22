@@ -538,3 +538,29 @@ test('waiting entries are found only by a provider-verified email', async () => 
   assert.equal(verifiedLookupEmail({ email: '   ', emailVerified: true }), null);
   assert.equal(verifiedLookupEmail({ email: null, emailVerified: true }), null);
 });
+
+test('summary edits accept the dashboard shape and reject wrong-typed or oversized values', async () => {
+  const { validateSummaryEdit, isSafeSummaryId, MAX_SUMMARY_EDIT_HISTORY } =
+    await importTypeScriptModule('lib/services/summary-management/summary-edit-policy.ts');
+  const dashboardEdit = {
+    summaryId: 'abc123', summary: 'Reviewed.', keyPoints: ['a', ''], recommendations: [],
+    followUpActions: ['Return in 2 weeks'], riskLevel: '', category: 'General',
+  };
+  const accepted = validateSummaryEdit(dashboardEdit);
+  assert.equal(accepted.ok, true);
+  assert.deepEqual(Object.keys(accepted.fields).sort(),
+    ['category', 'followUpActions', 'keyPoints', 'recommendations', 'riskLevel', 'summary']);
+  assert.equal('summaryId' in accepted.fields, false, 'only editable fields pass through');
+  assert.deepEqual(validateSummaryEdit({}), { ok: true, fields: {} });
+  assert.equal(validateSummaryEdit({ summary: 42 }).ok, false);
+  assert.equal(validateSummaryEdit({ summary: 'x'.repeat(20001) }).ok, false);
+  assert.equal(validateSummaryEdit({ keyPoints: 'not a list' }).ok, false);
+  assert.equal(validateSummaryEdit({ keyPoints: [{ injected: true }] }).ok, false);
+  assert.equal(validateSummaryEdit({ recommendations: Array(51).fill('x') }).ok, false);
+  assert.equal(validateSummaryEdit({ riskLevel: 'x'.repeat(101) }).ok, false);
+  assert.equal(isSafeSummaryId('abc123'), true);
+  assert.equal(isSafeSummaryId('a/b'), false);
+  assert.equal(isSafeSummaryId(''), false);
+  assert.equal(isSafeSummaryId(7), false);
+  assert.equal(MAX_SUMMARY_EDIT_HISTORY, 50);
+});
