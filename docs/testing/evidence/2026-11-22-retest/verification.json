@@ -1,0 +1,52 @@
+{
+  "testedAt": "2026-11-22T02:36:52.411Z",
+  "node": "v22.23.0",
+  "baseCommit": "16df312228fb0c6fa7e36c842571d800984948ef",
+  "sourceState": "working tree remediation; release commit recorded in PR",
+  "checks": [
+    {
+      "name": "policy",
+      "exitCode": 0,
+      "durationMs": 2165,
+      "status": "PASS"
+    },
+    {
+      "name": "typecheck",
+      "exitCode": 0,
+      "durationMs": 6297,
+      "status": "PASS"
+    },
+    {
+      "name": "lint",
+      "exitCode": 0,
+      "durationMs": 6116,
+      "status": "PASS"
+    },
+    {
+      "name": "build",
+      "exitCode": 0,
+      "durationMs": 38465,
+      "status": "PASS"
+    },
+    {
+      "name": "rules",
+      "exitCode": 0,
+      "durationMs": 11611,
+      "status": "PASS"
+    },
+    {
+      "name": "application-audit",
+      "exitCode": 0,
+      "durationMs": 730,
+      "status": "PASS"
+    },
+    {
+      "name": "functions-audit",
+      "exitCode": 0,
+      "durationMs": 652,
+      "status": "PASS"
+    }
+  ],
+  "rulesSha256": "2d4ed451690a061191e1b6eb8ac78ecf753fa0f64707cf504e5dae9acb4ec997",
+  "finishedAt": "2026-11-22T02:38:05.120Z"
+}

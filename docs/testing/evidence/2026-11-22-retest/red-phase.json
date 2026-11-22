@@ -1,0 +1,26 @@
+{
+  "baseCommit": "16df312228fb0c6fa7e36c842571d800984948ef",
+  "environment": "Local WSL2, Node 22.23.0, synthetic fixtures",
+  "productionWrites": false,
+  "observations": [
+    {
+      "command": "node --test tests/security-policies.test.mjs",
+      "exitCode": 1,
+      "passed": 13,
+      "failed": 1,
+      "assertion": "Blank reviewer/session IDs must deny",
+      "actual": true,
+      "expected": false
+    },
+    {
+      "command": "node --test --test-name-pattern=\"repeated stale unsubscribe\" tests/queue-and-auth-regressions.test.mjs",
+      "exitCode": 1,
+      "passed": 0,
+      "failed": 1,
+      "assertion": "Stale cleanup must not cause a second same-scope timer",
+      "actualTimers": 2,
+      "expectedTimers": 1
+    }
+  ],
+  "note": "Structured record of observed command results; not a verbatim raw log. Added tests were run against the original implementation before patching."
+}

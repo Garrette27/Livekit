@@ -187,7 +187,8 @@ export function subscribeToWaitingQueuePoll(
 
   return () => {
     joinedGroup.tickers.delete(tick);
-    if (joinedGroup.tickers.size === 0) {
+    // Cleanup owns only the group it joined, never a later same-scope replacement.
+    if (joinedGroup.tickers.size === 0 && pollGroupsByScope.get(scopeKey) === joinedGroup) {
       joinedGroup.stop();
       pollGroupsByScope.delete(scopeKey);
     }

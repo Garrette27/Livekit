@@ -74,6 +74,34 @@ test('review assignment is exact, active, and time bounded', async () => {
   );
 });
 
+test('review assignment denies blank identities and malformed persisted values without throwing', async () => {
+  const { hasActiveReviewAssignment } = await importTypeScriptModule('lib/auth/review-assignment-policy.ts');
+  const now = new Date('2026-11-22T12:00:00Z');
+  const valid = {
+    reviewerUserId: 'synthetic-reviewer', consultationSessionId: 'synthetic-session',
+    purpose: 'Synthetic review', grantedBy: 'synthetic-admin',
+    grantedAt: new Date('2026-11-22T11:00:00Z'), expiresAt: new Date('2026-11-22T13:00:00Z'), status: 'active',
+  };
+  const input = { reviewerUserId: valid.reviewerUserId, consultationSessionId: valid.consultationSessionId, now };
+  assert.equal(hasActiveReviewAssignment(valid, input), true);
+  for (const field of ['reviewerUserId', 'consultationSessionId']) {
+    for (const value of ['', '   ']) {
+      assert.equal(hasActiveReviewAssignment({ ...valid, [field]: value }, { ...input, [field]: value }), false);
+    }
+  }
+  for (const field of ['purpose', 'grantedBy', 'reviewerUserId', 'consultationSessionId']) {
+    for (const value of [null, undefined, 42, {}, '', '  ']) {
+      assert.equal(hasActiveReviewAssignment({ ...valid, [field]: value }, input), false, field);
+    }
+  }
+  for (const field of ['grantedAt', 'expiresAt']) {
+    for (const value of [null, undefined, '2026-11-22', {}, new Date(NaN)]) {
+      assert.equal(hasActiveReviewAssignment({ ...valid, [field]: value }, input), false, field);
+    }
+  }
+  assert.equal(hasActiveReviewAssignment(valid, { ...input, now: new Date(NaN) }), false);
+});
+
 test('concurrent invitation reservations cannot exceed maxUses', async () => {
   const { recordExistingInvitationAccess, reserveInvitationUse } = await importTypeScriptModule(
     'lib/invitations/invitation-use-reservation.ts'

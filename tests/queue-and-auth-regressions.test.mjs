@@ -862,6 +862,20 @@ test('periodic queue refresh pauses in background and reconciles once on return'
   assert.equal(calls, 2);
 });
 
+test('a repeated stale unsubscribe cannot detach a replacement poll group', () => {
+  const queue = queueHarness();
+  const stopOld = queue.subscribeToWaitingQueuePoll('same-scope', 15000, () => {});
+  stopOld();
+  const stopReplacement = queue.subscribeToWaitingQueuePoll('same-scope', 15000, () => {});
+  stopOld();
+  const stopPeer = queue.subscribeToWaitingQueuePoll('same-scope', 15000, () => {});
+  assert.equal(queue.timers.size, 1, 'Stale cleanup must not cause a second same-scope timer');
+  assert.equal(queue.visibilityListeners.size, 1);
+  stopReplacement(); stopPeer();
+  assert.equal(queue.timers.size, 0);
+  assert.equal(queue.visibilityListeners.size, 0);
+});
+
 test('100 queue consumers share one in-flight request, recover after failure and isolate scopes', async () => {
   const queue = queueHarness();
   let calls = 0;

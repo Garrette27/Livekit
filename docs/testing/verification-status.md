@@ -24,7 +24,30 @@ Never mark a test passed by relaxing an assertion, hiding a failing audit, or
 substituting HTTP timing for WebRTC timing. Use PASS, FAIL, BLOCKED, NOT TESTED,
 or HISTORICAL PASS, always with scope. New advisories can invalidate old scans.
 
-## Checkpoint: 19 November 2026
+## Current checkpoint: 22 November 2026
+
+Remote fetched at 16df312; no newer commits were available. See
+[follow-up report](follow-up-2026-11-22.md) for current data, reproduced bugs,
+design tradeoffs and limits. Local unrelated AGENTS.md edits remain preserved.
+
+| Claim | Current result | Evidence / limits |
+| --- | --- | --- |
+| Application authorization and efficiency regressions | PASS, 48 | `evidence/2026-11-22-retest/policy.log`; includes reviewer malformed/blank denial and stale poll cleanup regressions |
+| Firestore/Storage repository rule suite | PASS, 12 | Same directory, `rules.log`; synthetic emulators |
+| Typecheck, lint, production build | PASS | Same directory; pre-existing sanitizedEmail warning remains |
+| Full application and Functions audits | PASS, zero returned findings | Same directory audit JSONs; time-bound advisory result |
+| Read-only current Firestore recon | PASS, bounded masked read completed | `evidence/2026-11-22-recon/`; 208 invitations, 156 waiting rows, 55 completed sessions; no clinical content copied |
+| Active Firestore source | PASS, matches repository | Recon result; no rules release needed |
+| Queue lifecycle efficiency | PASS, deterministic count budget | Stale repeated unsubscribe no longer creates a second timer/listener; no cloud billing or media capacity inference |
+| Reserved reviewer assignment policy | PASS, focused regression | Blank IDs and malformed fields/dates deny; faculty remains backend-only, not enabled |
+| Current authenticated production / media / capacity / clinician efficiency | NOT TESTED | Existing protocols still required; no paid AI, media capture or cloud load performed |
+| Direct Vercel commit and active Storage policy | NOT VERIFIED in this checkpoint | Prior team-scope and Storage-read restrictions remain; local passes do not imply live acceptance |
+
+Next: verify remote CI for this checkpoint; authenticated synthetic acceptance
+and controlled paired media trials remain separate. Never reuse old invitation
+links from screenshots: every stored-active link was expired at the recon read.
+
+## Historical checkpoint: 19 November 2026
 
 Pulled `1c7bace` (PR #8). Working-tree AGENTS.md edits were preserved, not
 published. Clean detached verification worktree: `/tmp/livekit-audit-20261119`.
