@@ -4,6 +4,7 @@ import {
   isMessageVisibleForParticipant,
   type SessionChatVisibilityPolicy,
 } from '@/lib/chat/session-chat-model';
+import { toChatMessageDocumentId } from '@/lib/chat/chat-message-key';
 import type { ChatMessageStore, NormalizedChatMessage, NormalizedChatMessageInput } from './contracts';
 
 interface DateLike {
@@ -101,7 +102,7 @@ export class FirestoreChatMessageStore implements ChatMessageStore {
     };
 
     if (input.messageId) {
-      const messageRef = messagesRef.doc(input.messageId);
+      const messageRef = messagesRef.doc(toChatMessageDocumentId(input.messageId));
       const existingDoc = await messageRef.get();
       if (existingDoc.exists) {
         return {

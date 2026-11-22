@@ -5,7 +5,7 @@ import { finalizeConsultationForRoom } from '../../../../lib/services/consultati
 import { FirestoreInvitationAccessCore } from '@/lib/services/invitation-access';
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
 import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
-import { serviceResultToResponse } from '@/lib/services/shared/http';
+import { serviceResultToResponse, unexpectedErrorResponse } from '@/lib/services/shared/http';
 
 // Revocation can finalize the consultation and run AI summarization; give it
 // more than the 10s default.
@@ -115,15 +115,9 @@ async function handlePOST(req: NextRequest) {
       finalization: finalizationResult,
     });
   } catch (error) {
+    // Internal Firestore/finalization text stays in server logs, never the response.
     console.error('Error revoking invitation:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to revoke invitation',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
+    return unexpectedErrorResponse(error);
   }
 }
 

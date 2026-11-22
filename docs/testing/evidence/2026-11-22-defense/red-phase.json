@@ -1,0 +1,10 @@
+{
+  "base": "c8f0b2c (pre-fix source) with only the new tests/contracts copied in",
+  "rules": {"command": "firebase emulators:exec ... npm run test:rules", "result": "12 pass, 1 fail: 'only clinicians can claim room and call names from the browser'", "log": "rules-red-f1.log"},
+  "contracts": {"command": "node scripts/regression-security-contracts.mjs", "exit": 1, "firstFailure": "app/api/invite/revoke/route.ts must use unexpectedErrorResponse"},
+  "policyTests": {"command": "node --test tests/security-policies.test.mjs", "pass": 14, "fail": 3, "failed": [
+    "reserved waiting-room names cannot be claimed or joined as a doctor room",
+    "chat idempotency keys become safe, stable Firestore document ids",
+    "waiting entries are found only by a provider-verified email"
+  ], "note": "the three behaviour tests target new pure policy modules, so before the fix they fail on a missing module; the source contracts prove the routes were not wired"}
+}

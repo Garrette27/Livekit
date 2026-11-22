@@ -9,6 +9,19 @@ service cloud.firestore {
          resource.data.metadata.createdBy == request.auth.uid);
     }
     
+    // Room and call names are claimed first-come by createdBy, and the server
+    // treats rooms/{name}.createdBy as doctor ownership. Only a clinician
+    // (trusted claim or server-provisioned profile) may claim a name, so a
+    // patient account cannot squat a doctor's room name.
+    function isClinician() {
+      return request.auth != null && (
+        request.auth.token.get('role', '') in ['doctor', 'admin'] ||
+        request.auth.token.get('admin', false) == true ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'admin'])
+      );
+    }
+
     // Helper function to validate input data
     function isValidRoomData(data) {
       return data.keys().hasAll(['roomName', 'createdBy', 'createdAt', 'status']) &&
@@ -30,7 +43,7 @@ service cloud.firestore {
     // Rooms collection - users can only access their own rooms
     match /rooms/{roomId} {
       allow read, write: if request.auth != null && isOwner(resource);
-      allow create: if request.auth != null && 
+      allow create: if isClinician() && 
         isValidRoomData(request.resource.data) &&
         request.resource.data.createdBy == request.auth.uid;
     }
@@ -38,7 +51,7 @@ service cloud.firestore {
     // Calls collection - users can only access their own calls
     match /calls/{callId} {
       allow read, write: if request.auth != null && isOwner(resource);
-      allow create: if request.auth != null && 
+      allow create: if isClinician() && 
         isValidCallData(request.resource.data) &&
         request.resource.data.createdBy == request.auth.uid;
     }

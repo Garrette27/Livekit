@@ -1,6 +1,7 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { InvitationRepository } from '@/lib/repositories/invitation-repository';
 import { RoomRepository } from '@/lib/repositories/room-repository';
+import { isDoctorClaimableRoomName } from '@/lib/rooms/room-name-policy';
 import {
   serviceError,
   serviceOk,
@@ -19,6 +20,15 @@ interface DoctorRoomIdentity {
  * owner-field precedence or accidentally let a doctor claim another doctor's
  * room.
  */
+/** Rejection for reserved `-waiting` names and malformed room names. */
+function invalidRoomName<T>(): ServiceResult<T> {
+  return serviceError(
+    400,
+    'invalid_room_name',
+    'This room name cannot be used. Room names ending in "-waiting" are reserved.'
+  );
+}
+
 export class DoctorRoomAccess {
   private readonly rooms: RoomRepository;
   private readonly invitations: InvitationRepository;
@@ -33,6 +43,9 @@ export class DoctorRoomAccess {
     roomName: string;
     doctor: DoctorRoomIdentity;
   }): Promise<ServiceResult<{ roomName: string }>> {
+    if (!isDoctorClaimableRoomName(input.roomName)) {
+      return invalidRoomName();
+    }
     const claimed = await this.rooms.claimForDoctor(input.roomName, input.doctor);
     if (!claimed) {
       return serviceError(
@@ -53,6 +66,9 @@ export class DoctorRoomAccess {
     roomName: string;
     doctor: DoctorRoomIdentity;
   }): Promise<ServiceResult<{ roomName: string }>> {
+    if (!isDoctorClaimableRoomName(input.roomName)) {
+      return invalidRoomName();
+    }
     const roomDoc = await this.rooms.getByRoom(input.roomName);
     if (!roomDoc.exists) {
       const invitationDocs = await this.invitations.findActiveByRoom(input.roomName, 50);

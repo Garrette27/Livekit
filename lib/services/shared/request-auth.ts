@@ -17,6 +17,8 @@ import {
 export interface AuthenticatedRequester {
   userId: string;
   email?: string;
+  /** Firebase `email_verified`: the provider attests the caller controls `email`. */
+  emailVerified: boolean;
   claimedRole?: AppRole;
   isAdminClaim: boolean;
 }
@@ -50,6 +52,7 @@ export async function authenticateBearerToken(
     return serviceOk({
       userId: decoded.uid,
       email: decoded.email,
+      emailVerified: decoded.email_verified === true,
       claimedRole: parseAppRole(decoded.role) || undefined,
       isAdminClaim: decoded.admin === true,
     });

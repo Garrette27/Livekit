@@ -498,3 +498,43 @@ test('database availability failures are recognized from both Firestore SDKs', a
     assert.equal(availability.isDatabaseUnavailableError(error), false);
   }
 });
+
+test('reserved waiting-room names cannot be claimed or joined as a doctor room', async () => {
+  const { isDoctorClaimableRoomName, isWaitingRoomName } = await importTypeScriptModule('lib/rooms/room-name-policy.ts');
+  assert.equal(isDoctorClaimableRoomName('dr-smith-0930'), true);
+  assert.equal(isDoctorClaimableRoomName('dr-smith-0930-waiting'), false);
+  assert.equal(isDoctorClaimableRoomName('DR-SMITH-WAITING'), false);
+  assert.equal(isDoctorClaimableRoomName('dr-smith-waiting  '), false);
+  assert.equal(isDoctorClaimableRoomName(''), false);
+  assert.equal(isDoctorClaimableRoomName('   '), false);
+  assert.equal(isDoctorClaimableRoomName('a'.repeat(129)), false);
+  assert.equal(isDoctorClaimableRoomName(undefined), false);
+  assert.equal(isDoctorClaimableRoomName({ toString: () => 'room' }), false);
+  // A name that merely contains the word stays usable.
+  assert.equal(isDoctorClaimableRoomName('waiting-list-review'), true);
+  assert.equal(isWaitingRoomName('room-a-waiting'), true);
+});
+
+test('chat idempotency keys become safe, stable Firestore document ids', async () => {
+  const { toChatMessageDocumentId, MAX_CHAT_MESSAGE_LENGTH } = await importTypeScriptModule('lib/chat/chat-message-key.ts');
+  const liveKitId = '3f0c2a9e-6b1d-4c55-9a0e-1d2b3c4d5e6f';
+  assert.equal(toChatMessageDocumentId(liveKitId), liveKitId);
+  const fallbackKey = 'patient_inv_1:1763800000000:take 1/2 tablet';
+  const mapped = toChatMessageDocumentId(fallbackKey);
+  assert.match(mapped, /^k_[0-9a-f]{40}$/);
+  assert.equal(mapped.includes('/'), false);
+  assert.equal(mapped.includes('tablet'), false);
+  assert.equal(toChatMessageDocumentId(fallbackKey), mapped, 'retries must deduplicate');
+  assert.notEqual(toChatMessageDocumentId(`${fallbackKey}!`), mapped);
+  assert.match(toChatMessageDocumentId('x'.repeat(2000)), /^k_[0-9a-f]{40}$/);
+  assert.equal(MAX_CHAT_MESSAGE_LENGTH, 4000);
+});
+
+test('waiting entries are found only by a provider-verified email', async () => {
+  const { verifiedLookupEmail } = await importTypeScriptModule('lib/invitations/admission-policy.ts');
+  assert.equal(verifiedLookupEmail({ email: ' Patient@Example.test ', emailVerified: true }), 'patient@example.test');
+  assert.equal(verifiedLookupEmail({ email: 'patient@example.test', emailVerified: false }), null);
+  assert.equal(verifiedLookupEmail({ email: 'patient@example.test' }), null);
+  assert.equal(verifiedLookupEmail({ email: '   ', emailVerified: true }), null);
+  assert.equal(verifiedLookupEmail({ email: null, emailVerified: true }), null);
+});

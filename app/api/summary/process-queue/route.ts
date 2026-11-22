@@ -3,15 +3,12 @@ import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { SummaryJobRepository } from '@/lib/repositories/summary-job-repository';
 import { FirestoreSummaryProjectionService } from '@/lib/services/history-summary';
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
+import { bearerSecretMatches } from '@/lib/services/shared/admin-secret-auth';
 
 export const maxDuration = 60;
 
 function isAuthorizedCron(req: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET;
-  return Boolean(
-    cronSecret &&
-      req.headers.get('authorization') === `Bearer ${cronSecret}`
-  );
+  return bearerSecretMatches(req, process.env.CRON_SECRET);
 }
 
 /**

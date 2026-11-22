@@ -23,7 +23,12 @@ async function handlePOST(req: NextRequest) {
     const body = await req.json();
     const { roomName, doctorName } = body;
 
-    if (!roomName || !doctorName) {
+    // doctorName is embedded in the LiveKit JWT and its metadata, so it must be
+    // a bounded string; room-name rules are enforced by DoctorRoomAccess.
+    if (
+      typeof roomName !== 'string' || !roomName ||
+      typeof doctorName !== 'string' || !doctorName.trim() || doctorName.length > 200
+    ) {
       return NextResponse.json(
         { success: false, error: 'Room name and doctor name are required' },
         { status: 400 }

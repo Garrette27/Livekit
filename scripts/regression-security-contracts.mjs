@@ -124,4 +124,31 @@ for (const path of [
 assert.match(read('lib/services/invitation-access/invitation-access-core.ts'), /isDatabaseUnavailableError\(error\)/);
 assert.match(read('lib/services/shared/request-auth.ts'), /isDatabaseUnavailableError\(error\)/);
 
+// Defense-readiness pass (22 Nov 2026). Catch blocks must not echo internal
+// Firestore/finalization error text to clients; the shared helper masks it.
+for (const path of [
+  'app/api/invite/revoke/route.ts',
+  'app/api/track-consultation/route.ts',
+  'app/api/session-chat/messages/route.ts',
+]) {
+  const source = read(path);
+  assert.match(source, /unexpectedErrorResponse\(error\)/, `${path} must use unexpectedErrorResponse`);
+  assert.doesNotMatch(source, /error instanceof Error \? error\.message : '(Unknown error|Failed to store message)'/,
+    `${path} must not return raw error messages`);
+}
+// Operational secrets are compared in constant time, header-only.
+const processQueueSource = read('app/api/summary/process-queue/route.ts');
+assert.match(processQueueSource, /bearerSecretMatches\(req, process\.env\.CRON_SECRET\)/);
+assert.doesNotMatch(processQueueSource, /===\s*`Bearer/);
+assert.match(read('lib/services/shared/admin-secret-auth.ts'), /timingSafeEqual/);
+// Both doctor claim and join paths reject reserved `-waiting` room names.
+const doctorRoomAccessSource = read('lib/services/room-access/doctor-room-access.ts');
+assert.equal((doctorRoomAccessSource.match(/isDoctorClaimableRoomName\(input\.roomName\)/g) || []).length, 2);
+// Waiting entries are matched only by a provider-verified email.
+assert.match(read('app/api/patient/pending-waiting-room/route.ts'), /verifiedLookupEmail\(authorization\.data\)/);
+assert.match(read('lib/services/shared/request-auth.ts'), /emailVerified: decoded\.email_verified === true/);
+// Chat bodies are bounded and client keys never become raw document paths.
+assert.match(read('app/api/session-chat/messages/route.ts'), /MAX_CHAT_MESSAGE_LENGTH/);
+assert.match(read('lib/services/video-chat/chat-message-store.ts'), /doc\(toChatMessageDocumentId\(input\.messageId\)\)/);
+
 console.log('Security architecture regression contracts passed.');

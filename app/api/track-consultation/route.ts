@@ -1,6 +1,6 @@
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
-import { serviceResultToResponse } from '@/lib/services/shared/http';
+import { serviceResultToResponse, unexpectedErrorResponse } from '@/lib/services/shared/http';
 import { serviceError } from '@/lib/services/shared/service-result';
 import { FirestoreConsultationTrackingCore } from '@/lib/services/consultation-tracking';
 import type { ConsultationAction } from '@/lib/services/consultation-tracking';
@@ -105,14 +105,7 @@ async function handlePOST(req: Request) {
     return serviceResultToResponse(result);
   } catch (error) {
     console.error('Track consultation error:', error);
-    return serviceResultToResponse(
-      serviceError(
-        500,
-        'track_failed',
-        'Failed to track consultation',
-        error instanceof Error ? error.message : 'Unknown error'
-      )
-    );
+    return unexpectedErrorResponse(error);
   }
 }
 

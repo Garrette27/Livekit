@@ -4,7 +4,8 @@ import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import type { SessionChatVisibilityPolicy } from '@/lib/chat/session-chat-model';
 import { FirestoreChatMessageStore } from '@/lib/services/video-chat';
 import { authorizeSessionParticipant } from '@/lib/services/shared/session-participant-auth';
-import { serviceResultToResponse } from '@/lib/services/shared/http';
+import { serviceResultToResponse, unexpectedErrorResponse } from '@/lib/services/shared/http';
+import { MAX_CHAT_MESSAGE_LENGTH } from '@/lib/chat/chat-message-key';
 import { isConsultationCapabilityEnabled } from '@/lib/consultations/consultation-capabilities';
 import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
 
@@ -91,6 +92,12 @@ async function handlePOST(req: NextRequest) {
     const consultationSessionId =
       typeof body.consultationSessionId === 'string' ? body.consultationSessionId.trim() : '';
     const text = typeof body.text === 'string' ? body.text : '';
+    if (text.length > MAX_CHAT_MESSAGE_LENGTH) {
+      return NextResponse.json(
+        { success: false, error: `Message is too long (maximum ${MAX_CHAT_MESSAGE_LENGTH} characters)` },
+        { status: 400 }
+      );
+    }
     if (Array.isArray(body.attachments) && body.attachments.length > 0) {
       return NextResponse.json(
         { success: false, error: 'Attachment metadata must be resolved by the server' },
@@ -159,12 +166,14 @@ async function handlePOST(req: NextRequest) {
       duplicated: result.duplicated,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to store message';
-    const status = message.includes('Message must include text or attachment') ? 400 : 500;
-    return NextResponse.json(
-      { success: false, error: message },
-      { status }
-    );
+    // Only the store's own validation message is safe to echo; anything else
+    // (for example a Firestore path error) is masked by the shared helper.
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('Message must include text or attachment')) {
+      return NextResponse.json({ success: false, error: message }, { status: 400 });
+    }
+    console.error('Session chat message error:', error);
+    return unexpectedErrorResponse(error);
   }
 }
 

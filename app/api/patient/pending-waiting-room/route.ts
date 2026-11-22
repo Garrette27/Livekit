@@ -7,6 +7,7 @@ import type { InvitationToken } from '@/lib/types';
 import { WaitingPatientRepository } from '@/lib/repositories/waiting-patient-repository';
 import { InvitationRepository } from '@/lib/repositories/invitation-repository';
 import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
+import { verifiedLookupEmail } from '@/lib/invitations/admission-policy';
 
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -102,7 +103,7 @@ async function handleGET(req: NextRequest) {
       );
     }
 
-    const patientEmail = (authorization.data.email || '').trim().toLowerCase();
+    const patientEmail = verifiedLookupEmail(authorization.data);
     if (!patientEmail) {
       return NextResponse.json(
         { success: true, pendingWaitingRoom: null },

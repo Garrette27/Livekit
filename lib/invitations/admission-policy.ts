@@ -167,3 +167,18 @@ export function decideAdmission(input: {
     reason: 'Verified email matches this invitation’s skip-the-queue list',
   };
 }
+
+/**
+ * The email a signed-in caller may use to find their own waiting-room records,
+ * or null. Waiting entries can carry an email the guest merely typed, so only
+ * a provider-verified address may match them; otherwise anyone could register
+ * an unverified account under a patient's email and receive a fresh invitation
+ * link for that patient's queue entry.
+ */
+export function verifiedLookupEmail(caller: { email?: string | null; emailVerified?: boolean }): string | null {
+  if (caller.emailVerified !== true || typeof caller.email !== 'string') {
+    return null;
+  }
+  const normalized = caller.email.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
+}

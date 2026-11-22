@@ -298,3 +298,25 @@ test('server lifecycle writes preserve current and legacy participant reads with
     await assertFails(getDocs(collection(db, 'consultations')));
   }
 });
+
+test('only clinicians can claim room and call names from the browser', async () => {
+  await rulesEnvironment.withSecurityRulesDisabled(async (context) => {
+    const adminDb = context.firestore();
+    await setDoc(doc(adminDb, 'users/patient-1'), { email: 'patient@example.test', role: 'patient' });
+    await setDoc(doc(adminDb, 'users/doctor-1'), { email: 'doctor@example.test', role: 'doctor' });
+  });
+  const roomFor = (uid) => ({ roomName: 'dr-room-0930', createdBy: uid, createdAt: new Date(), status: 'active' });
+  const patientDb = rulesEnvironment.authenticatedContext('patient-1', { email: 'patient@example.test' }).firestore();
+  const strangerDb = rulesEnvironment.authenticatedContext('stranger-1', { email: 'x@example.test' }).firestore();
+  const doctorDb = rulesEnvironment.authenticatedContext('doctor-1', { email: 'doctor@example.test' }).firestore();
+
+  // A patient or profile-less account must not squat a room name the server
+  // later treats as proof of doctor ownership.
+  await assertFails(setDoc(doc(patientDb, 'rooms/dr-room-0930'), roomFor('patient-1')));
+  await assertFails(setDoc(doc(strangerDb, 'rooms/dr-room-0930'), roomFor('stranger-1')));
+  await assertFails(setDoc(doc(patientDb, 'calls/dr-room-0930'), roomFor('patient-1')));
+  // The doctor's own browser room/call records keep working.
+  await assertSucceeds(setDoc(doc(doctorDb, 'rooms/dr-room-0930'), roomFor('doctor-1')));
+  await assertSucceeds(setDoc(doc(doctorDb, 'calls/dr-room-0930'), roomFor('doctor-1')));
+  await assertSucceeds(setDoc(doc(doctorDb, 'rooms/dr-room-0930'), { status: 'completed' }, { merge: true }));
+});
