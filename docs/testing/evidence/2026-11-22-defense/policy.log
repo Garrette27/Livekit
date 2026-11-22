@@ -1,0 +1,252 @@
+Security architecture regression contracts passed.
+Thesis invitation, consent, summary, and UI contracts verified.
+TAP version 13
+# Subtest: Firebase Auth starts without experimental CommonJS-to-ESM loading
+ok 1 - Firebase Auth starts without experimental CommonJS-to-ESM loading
+  ---
+  duration_ms: 257.001322
+  ...
+# Subtest: duplicate-identity replacement detaches the old page without closing the continuing visit
+ok 2 - duplicate-identity replacement detaches the old page without closing the continuing visit
+  ---
+  duration_ms: 82.058202
+  ...
+# Subtest: admission renewal rechecks persisted expiry, revocation, room and ownership
+ok 3 - admission renewal rechecks persisted expiry, revocation, room and ownership
+  ---
+  duration_ms: 383.946954
+  ...
+# Subtest: only the exact current visit can renew, and valid waiting/admission still works
+ok 4 - only the exact current visit can renew, and valid waiting/admission still works
+  ---
+  duration_ms: 33.521802
+  ...
+# Subtest: room credentials preserve an issuer-bound Firebase patient UID separately from the media identity
+ok 5 - room credentials preserve an issuer-bound Firebase patient UID separately from the media identity
+  ---
+  duration_ms: 9.549745
+  ...
+# Subtest: direct invitation issuance binds the authenticated UID rather than the declared email
+ok 6 - direct invitation issuance binds the authenticated UID rather than the declared email
+  ---
+  duration_ms: 38.340549
+  ...
+# Subtest: admission binds history to the registered patient and never to a guest’s declared email
+ok 7 - admission binds history to the registered patient and never to a guest’s declared email
+  ---
+  duration_ms: 71.883821
+  ...
+# Subtest: tracking uses the signed Firebase UID so a new admitted visit remains in patient history
+ok 8 - tracking uses the signed Firebase UID so a new admitted visit remains in patient history
+  ---
+  duration_ms: 55.174042
+  ...
+# Subtest: late leave events cannot overwrite another patient or a later encounter in the same room
+ok 9 - late leave events cannot overwrite another patient or a later encounter in the same room
+  ---
+  duration_ms: 38.06123
+  ...
+# Subtest: the current patient can still close their own tracked encounter
+ok 10 - the current patient can still close their own tracked encounter
+  ---
+  duration_ms: 16.54793
+  ...
+# Subtest: a new encounter appearing before leave commit keeps its identity and lifecycle
+ok 11 - a new encounter appearing before leave commit keeps its identity and lifecycle
+  ---
+  duration_ms: 20.620258
+  ...
+# Subtest: leave finalization targets the requested encounter instead of a later visit sharing its room
+ok 12 - leave finalization targets the requested encounter instead of a later visit sharing its room
+  ---
+  duration_ms: 16.043438
+  ...
+# Subtest: finalizing an earlier session preserves a later room encounter and keeps patient labels separate
+ok 13 - finalizing an earlier session preserves a later room encounter and keeps patient labels separate
+  ---
+  duration_ms: 17.918021
+  ...
+# Subtest: waiting credentials cannot publish, subscribe or send data; consultation media remains enabled
+ok 14 - waiting credentials cannot publish, subscribe or send data; consultation media remains enabled
+  ---
+  duration_ms: 7.452349
+  ...
+# Subtest: admission HTTP route rejects missing row/email lookup and another visit credential
+ok 15 - admission HTTP route rejects missing row/email lookup and another visit credential
+  ---
+  duration_ms: 20.148417
+  ...
+# Subtest: failed signed-in token refresh never silently queues as a guest
+ok 16 - failed signed-in token refresh never silently queues as a guest
+  ---
+  duration_ms: 22.600785
+  ...
+# Subtest: obsolete invitation validation cannot overwrite the newer account admission
+ok 17 - obsolete invitation validation cannot overwrite the newer account admission
+  ---
+  duration_ms: 17.642541
+  ...
+# Subtest: waiting admission polling never overlaps or commits after the visit changes
+ok 18 - waiting admission polling never overlaps or commits after the visit changes
+  ---
+  duration_ms: 13.399913
+  ...
+# Subtest: authenticated requests add the token without sending caller-asserted identity
+ok 19 - authenticated requests add the token without sending caller-asserted identity
+  ---
+  duration_ms: 3.575174
+  ...
+# Subtest: browser-supplied pending session IDs cannot claim another patient or rewrite a later encounter
+ok 20 - browser-supplied pending session IDs cannot claim another patient or rewrite a later encounter
+  ---
+  duration_ms: 2.605598
+  ...
+# Subtest: an invitation email match cannot grant visibility to another patient’s later consultation
+ok 21 - an invitation email match cannot grant visibility to another patient’s later consultation
+  ---
+  duration_ms: 2.371715
+  ...
+# Subtest: obsolete linking payloads cannot cause a crash or change patient identity
+ok 22 - obsolete linking payloads cannot cause a crash or change patient identity
+  ---
+  duration_ms: 1.973382
+  ...
+# Subtest: patient history requires a consistent recorded UID; matching email alone never grants access
+ok 23 - patient history requires a consistent recorded UID; matching email alone never grants access
+  ---
+  duration_ms: 35.677353
+  ...
+# Subtest: patient history excludes clinician AI drafts and other waiting participants
+ok 24 - patient history excludes clinician AI drafts and other waiting participants
+  ---
+  duration_ms: 32.69854
+  ...
+# Subtest: login distinguishes a Firestore outage from a resolved role check
+ok 25 - login distinguishes a Firestore outage from a resolved role check
+  ---
+  duration_ms: 21.852287
+  ...
+# Subtest: realtime invalidates without exposing snapshot rows, shares a listener, and cleans up
+ok 26 - realtime invalidates without exposing snapshot rows, shares a listener, and cleans up
+  ---
+  duration_ms: 5.465156
+  ...
+# Subtest: periodic refresh survives stream failure and shared requests stay deduplicated
+ok 27 - periodic refresh survives stream failure and shared requests stay deduplicated
+  ---
+  duration_ms: 5.6039
+  ...
+# Subtest: periodic queue refresh pauses in background and reconciles once on return
+ok 28 - periodic queue refresh pauses in background and reconciles once on return
+  ---
+  duration_ms: 5.151306
+  ...
+# Subtest: a repeated stale unsubscribe cannot detach a replacement poll group
+ok 29 - a repeated stale unsubscribe cannot detach a replacement poll group
+  ---
+  duration_ms: 5.514035
+  ...
+# Subtest: 100 queue consumers share one in-flight request, recover after failure and isolate scopes
+ok 30 - 100 queue consumers share one in-flight request, recover after failure and isolate scopes
+  ---
+  duration_ms: 5.65748
+  ...
+# Subtest: 100 queue subscribers use one timer and leak no timers or listeners over visibility cycles
+ok 31 - 100 queue subscribers use one timer and leak no timers or listeners over visibility cycles
+  ---
+  duration_ms: 6.599669
+  ...
+# Subtest: database availability classification never converts permission errors into retryable outages
+ok 32 - database availability classification never converts permission errors into retryable outages
+  ---
+  duration_ms: 2.506364
+  ...
+# Subtest: canonical queue excludes stale, expired, revoked, other-room and other-doctor rows
+ok 33 - canonical queue excludes stale, expired, revoked, other-room and other-doctor rows
+  ---
+  duration_ms: 33.581362
+  ...
+# Subtest: transcription retries at most twice and carries only bounded provider status
+ok 34 - transcription retries at most twice and carries only bounded provider status
+  ---
+  duration_ms: 12.272027
+  ...
+# Subtest: faculty reviewer remains deny-by-default except for assignment permission
+ok 35 - faculty reviewer remains deny-by-default except for assignment permission
+  ---
+  duration_ms: 53.409171
+  ...
+# Subtest: review assignment is exact, active, and time bounded
+ok 36 - review assignment is exact, active, and time bounded
+  ---
+  duration_ms: 13.585256
+  ...
+# Subtest: review assignment denies blank identities and malformed persisted values without throwing
+ok 37 - review assignment denies blank identities and malformed persisted values without throwing
+  ---
+  duration_ms: 6.9243
+  ...
+# Subtest: concurrent invitation reservations cannot exceed maxUses
+ok 38 - concurrent invitation reservations cannot exceed maxUses
+  ---
+  duration_ms: 19.954688
+  ...
+# Subtest: consultation history sort values describe the resulting order
+ok 39 - consultation history sort values describe the resulting order
+  ---
+  duration_ms: 33.118767
+  ...
+# Subtest: waiting-room timestamp transport understands Firestore JSON shapes
+ok 40 - waiting-room timestamp transport understands Firestore JSON shapes
+  ---
+  duration_ms: 11.167536
+  ...
+# Subtest: invitation presentation counts hashed identities without exposing addresses
+ok 41 - invitation presentation counts hashed identities without exposing addresses
+  ---
+  duration_ms: 38.871844
+  ...
+# Subtest: prepared consultation capabilities default to disabled
+ok 42 - prepared consultation capabilities default to disabled
+  ---
+  duration_ms: 3.659384
+  ...
+# Subtest: only a verified allowlisted identity skips the waiting room
+ok 43 - only a verified allowlisted identity skips the waiting room
+  ---
+  duration_ms: 7.867491
+  ...
+# Subtest: security-signal hashing keeps production invitation validation available
+ok 44 - security-signal hashing keeps production invitation validation available
+  ---
+  duration_ms: 7.418589
+  ...
+# Subtest: Google and password accounts with a confirmed email are the same evidence
+ok 45 - Google and password accounts with a confirmed email are the same evidence
+  ---
+  duration_ms: 6.157243
+  ...
+# Subtest: consent is a versioned record, and the old registration flag is not it
+ok 46 - consent is a versioned record, and the old registration flag is not it
+  ---
+  duration_ms: 7.597036
+  ...
+# Subtest: exhausted AI credit is classified as unavailable, not a retryable failure
+ok 47 - exhausted AI credit is classified as unavailable, not a retryable failure
+  ---
+  duration_ms: 29.870639
+  ...
+# Subtest: database availability failures are recognized from both Firestore SDKs
+ok 48 - database availability failures are recognized from both Firestore SDKs
+  ---
+  duration_ms: 5.547423
+  ...
+1..48
+# tests 48
+# suites 0
+# pass 48
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2057.053461

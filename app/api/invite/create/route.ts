@@ -86,7 +86,6 @@ async function handlePOST(req: NextRequest) {
       new Set(normalizedEmailCandidates.map((email) => sanitizeInput(email)))
     );
     const emailHashes = sanitizedEmailAllowlist.map((email) => hashSecuritySignal('email', email));
-    const sanitizedEmail = sanitizedEmailAllowlist[0];
 
     // Validate expiration time (1-168 hours = 1 hour to 1 week)
     const validExpirationHours = Math.max(1, Math.min(168, expiresInHours || 24));

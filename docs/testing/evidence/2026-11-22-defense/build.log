@@ -1,0 +1,76 @@
+   ▲ Next.js 15.5.29
+   - Experiments (use with caution):
+     ✓ forceSwcTransforms
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 13.8s
+   Skipping linting
+   Checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/43) ...
+   Generating static pages (10/43) 
+   Generating static pages (21/43) 
+   Generating static pages (32/43) 
+ ✓ Generating static pages (43/43)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                   Size  First Load JS
+┌ ○ /                                      5.02 kB         286 kB
+├ ○ /_not-found                              995 B         103 kB
+├ ○ /access-denied                          1.7 kB         107 kB
+├ ƒ /api/doctor-access                       209 B         102 kB
+├ ƒ /api/doctor/history                      209 B         102 kB
+├ ƒ /api/invite/create                       209 B         102 kB
+├ ƒ /api/invite/get-link                     209 B         102 kB
+├ ƒ /api/invite/revoke                       209 B         102 kB
+├ ƒ /api/invite/validate                     209 B         102 kB
+├ ƒ /api/link-patient-consultations          209 B         102 kB
+├ ƒ /api/password-reset                      209 B         102 kB
+├ ƒ /api/patient/consent                     209 B         102 kB
+├ ƒ /api/patient/consultations               209 B         102 kB
+├ ƒ /api/patient/pending-waiting-room        209 B         102 kB
+├ ƒ /api/session-chat/attachments            209 B         102 kB
+├ ƒ /api/session-chat/attachments/extract    209 B         102 kB
+├ ƒ /api/session-chat/messages               209 B         102 kB
+├ ƒ /api/session-transcription/chunks        209 B         102 kB
+├ ƒ /api/summary/delete                      209 B         102 kB
+├ ƒ /api/summary/generate                    209 B         102 kB
+├ ƒ /api/summary/process-queue               209 B         102 kB
+├ ƒ /api/summary/update                      209 B         102 kB
+├ ƒ /api/token                               209 B         102 kB
+├ ƒ /api/track-consultation                  209 B         102 kB
+├ ƒ /api/track-doctor-presence               209 B         102 kB
+├ ƒ /api/user/role-conflict                  209 B         102 kB
+├ ƒ /api/waiting-room/admit                  209 B         102 kB
+├ ƒ /api/waiting-room/check-admission        209 B         102 kB
+├ ƒ /api/waiting-room/list                   209 B         102 kB
+├ ƒ /api/waiting-room/mark-left              209 B         102 kB
+├ ƒ /api/waiting-room/reject                 209 B         102 kB
+├ ƒ /api/webhook                             209 B         102 kB
+├ ƒ /create-room/[room]                    3.21 kB         288 kB
+├ ○ /dashboard                               837 B         282 kB
+├ ○ /doctor/dashboard                      10.5 kB         292 kB
+├ ƒ /doctor/history                          209 B         102 kB
+├ ○ /doctor/invitations                      11 kB         304 kB
+├ ○ /doctor/login                          4.88 kB         286 kB
+├ ○ /invitations                             513 B         103 kB
+├ ƒ /invite/[token]                        7.39 kB         482 kB
+├ ○ /login                                   594 B         103 kB
+├ ○ /patient/dashboard                     8.42 kB         290 kB
+├ ○ /patient/login                         5.65 kB         284 kB
+├ ƒ /room/[room]                             201 B         499 kB
+├ ƒ /room/[room]/doctor                      199 B         499 kB
+├ ƒ /room/[room]/patient                   4.72 kB         483 kB
+└ ƒ /room/[room]/redirect                    523 B         103 kB
++ First Load JS shared by all               102 kB
+  ├ chunks/20906965-cc8b7ddc2144bfda.js    54.2 kB
+  ├ chunks/9128-d14b57d8544118d2.js          46 kB
+  └ other shared chunks (total)            1.93 kB
+
+
+ƒ Middleware                               35.6 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
