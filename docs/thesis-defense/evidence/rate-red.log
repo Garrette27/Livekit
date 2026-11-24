@@ -1,0 +1,179 @@
+TAP version 13
+# Subtest: same-room credentials cannot access a different recorded encounter participant
+ok 1 - same-room credentials cannot access a different recorded encounter participant
+  ---
+  duration_ms: 25.344113
+  type: 'test'
+  ...
+# Subtest: ten browser participants persist only their own 200 total chat messages, not 2,000 copies
+ok 2 - ten browser participants persist only their own 200 total chat messages, not 2,000 copies
+  ---
+  duration_ms: 137.444001
+  type: 'test'
+  ...
+# Subtest: 100 simultaneous keyed retries create one message and touch the session once
+ok 3 - 100 simultaneous keyed retries create one message and touch the session once
+  ---
+  duration_ms: 22.302186
+  type: 'test'
+  ...
+# Subtest: 100 history records enrich chat with at most six outstanding reads and preserve every record
+ok 4 - 100 history records enrich chat with at most six outstanding reads and preserve every record
+  ---
+  duration_ms: 88.167556
+  type: 'test'
+  ...
+# Subtest: queue departure cannot overwrite the current encounter principal or close a later visit
+ok 5 - queue departure cannot overwrite the current encounter principal or close a later visit
+  ---
+  duration_ms: 86.176069
+  type: 'test'
+  ...
+# Subtest: a buffered local message is never reassigned after the encounter prop changes
+ok 6 - a buffered local message is never reassigned after the encounter prop changes
+  ---
+  duration_ms: 11.889974
+  type: 'test'
+  ...
+# Subtest: authenticated operation budgets isolate two principals behind the same clinic network
+not ok 7 - authenticated operation budgets isolate two principals behind the same clinic network
+  ---
+  duration_ms: 22.134257
+  type: 'test'
+  location: '/home/garre/Livekit/tests/defense-load-regressions.test.mjs:190:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + Response {
+    +   [Symbol(headers)]: Headers {},
+    +   [Symbol(state)]: {
+    +     aborted: false,
+    +     body: {
+    +       length: 47,
+    +       source: '{"error":"Rate limit exceeded","retryAfter":32}',
+    +       stream: <ref *1> ReadableStream {
+    +         [Symbol(kState)]: [Object: null prototype] {
+    +           controller: ReadableByteStreamController {
+    +             [Symbol(kState)]: {
+    +               autoAllocateChunkSize: undefined,
+    +               byobRequest: null,
+    +               cancelAlgorithm: [AsyncFunction: nonOpCancel],
+    +               closeRequested: false,
+    +               highWaterMark: 0,
+    +               pendingPullIntos: [],
+    +               pullAgain: false,
+    +               pullAlgorithm: [Function (anonymous)],
+    +               pulling: false,
+    +               queue: [],
+    +               queueTotalSize: 0,
+    +               started: true,
+    +               stream: [Circular *1]
+    +             },
+    +             [Symbol(kType)]: 'ReadableByteStreamController'
+    +           },
+    +           disturbed: false,
+    +           reader: undefined,
+    +           state: 'readable',
+    +           storedError: undefined,
+    +           transfer: [Object: null prototype] {
+    +             port1: undefined,
+    +             port2: undefined,
+    +             promise: undefined,
+    +             writable: undefined
+    +           }
+    +         },
+    +         [Symbol(kType)]: 'ReadableStream',
+    +         [Symbol(nodejs.webstream.controllerErrorFunction)]: [Function (anonymous)],
+    +         [Symbol(nodejs.webstream.isClosedPromise)]: {
+    +           promise: Promise {
+    +             <pending>,
+    +             [Symbol(async_id_symbol)]: 4097,
+    +             [Symbol(trigger_async_id_symbol)]: 4086
+    +           },
+    +           reject: [Function (anonymous)],
+    +           resolve: [Function (anonymous)]
+    +         }
+    +       }
+    +     },
+    +     cacheState: '',
+    +     headersList: HeadersList {
+    +       [Symbol(headers map sorted)]: null,
+    +       [Symbol(headers map)]: Map(5) {
+    +         'content-type' => {
+    +           name: 'Content-Type',
+    +           value: 'application/json'
+    +         },
+    +         'retry-after' => {
+    +           name: 'Retry-After',
+    +           value: '32'
+    +         },
+    +         'x-ratelimit-limit' => {
+    +           name: 'X-RateLimit-Limit',
+    +           value: '2'
+    +         },
+    +         'x-ratelimit-remaining' => {
+    +           name: 'X-RateLimit-Remaining',
+    +           value: '0'
+    +         },
+    +         'x-ratelimit-reset' => {
+    +           name: 'X-RateLimit-Reset',
+    +           value: '2026-11-24T21:41:00.000Z'
+    +         }
+    +       },
+    +       cookies: null
+    +     },
+    +     rangeRequested: false,
+    +     requestIncludesCredentials: false,
+    +     status: 429,
+    +     statusText: '',
+    +     timingAllowPassed: false,
+    +     timingInfo: null,
+    +     type: 'default',
+    +     urlList: []
+    +   }
+    + }
+    - null
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ~
+  actual:
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/garre/Livekit/tests/defense-load-regressions.test.mjs:203:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: chat persistence honors its authenticated rate refusal before writing a message
+not ok 8 - chat persistence honors its authenticated rate refusal before writing a message
+  ---
+  duration_ms: 16.577754
+  type: 'test'
+  location: '/home/garre/Livekit/tests/defense-load-regressions.test.mjs:206:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    200 !== 429
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 429
+  actual: 200
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/garre/Livekit/tests/defense-load-regressions.test.mjs:224:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 6
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 998.730696

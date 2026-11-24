@@ -1,0 +1,97 @@
+{
+  "status": "PLANNING ESTIMATE - NOT A BILL OR CAPACITY RESULT",
+  "date": "2026-11-25",
+  "retrieved_utc": "2026-11-24T21:13:23.044604+00:00",
+  "pricing_region": "asia-southeast1",
+  "public_source": "https://cloud.google.com/firestore/pricing?hl=en",
+  "source_html_sha256": "ac76eb78d6cc7ae07eaa33d4b42495f7cc6cc859b8436e43cc8b66b318474bc9",
+  "usd_rates": {
+    "read_per_100k": 0.0369,
+    "write_per_100k": 0.1107,
+    "delete_per_100k": 0.0123,
+    "storage_per_gib_month": 0.1846
+  },
+  "livekit_source": "https://livekit.com/pricing",
+  "vercel_source": "https://vercel.com/docs/plans/pro-plan",
+  "scenarios": [
+    {
+      "visits": 80,
+      "operating_days": 20,
+      "minutes_per_visit": 20,
+      "participants_per_visit": 2,
+      "downstream_mbps_per_receiver": 1.7,
+      "participant_minutes": 3200,
+      "downstream_gb_decimal": 40.8,
+      "livekit_ship_usd": 50.0,
+      "firestore_ops_usd": 0.0,
+      "vercel_one_deployer_base_usd": 20,
+      "modeled_subtotal_before_ai_and_exclusions_usd": 70.0,
+      "reads_per_visit_assumed": 2000,
+      "writes_per_visit_assumed": 1000
+    },
+    {
+      "visits": 440,
+      "operating_days": 22,
+      "minutes_per_visit": 20,
+      "participants_per_visit": 2,
+      "downstream_mbps_per_receiver": 1.7,
+      "participant_minutes": 17600,
+      "downstream_gb_decimal": 224.4,
+      "livekit_ship_usd": 50.0,
+      "firestore_ops_usd": 0.0,
+      "vercel_one_deployer_base_usd": 20,
+      "modeled_subtotal_before_ai_and_exclusions_usd": 70.0,
+      "reads_per_visit_assumed": 2000,
+      "writes_per_visit_assumed": 1000
+    },
+    {
+      "visits": 1000,
+      "operating_days": 20,
+      "minutes_per_visit": 20,
+      "participants_per_visit": 2,
+      "downstream_mbps_per_receiver": 1.7,
+      "participant_minutes": 40000,
+      "downstream_gb_decimal": 510.0,
+      "livekit_ship_usd": 81.2,
+      "firestore_ops_usd": 1.0332,
+      "vercel_one_deployer_base_usd": 20,
+      "modeled_subtotal_before_ai_and_exclusions_usd": 102.2332,
+      "reads_per_visit_assumed": 2000,
+      "writes_per_visit_assumed": 1000
+    }
+  ],
+  "record_capacity_assumptions": [
+    {
+      "kib_per_encounter_including_overhead": 50,
+      "encounters_in_1_gib_before_other_data": 20971
+    },
+    {
+      "kib_per_encounter_including_overhead": 100,
+      "encounters_in_1_gib_before_other_data": 10485
+    },
+    {
+      "kib_per_encounter_including_overhead": 1024,
+      "encounters_in_1_gib_before_other_data": 1024
+    }
+  ],
+  "free_20_minute_visit_limit_from_minutes_only": 125,
+  "free_20_minute_visit_limit_from_transfer_at_1_7_mbps_only": 98,
+  "proposed_3_repeat_1_3_5_pair_trial_including_2_minute_warmups": {
+    "participant_minutes": 648,
+    "estimated_downstream_gb_at_1_7_mbps": 8.262,
+    "status": "NOT RUN"
+  },
+  "excludes": [
+    "Existing traffic and balances",
+    "Stored-data overage and index growth",
+    "Network egress and backups",
+    "TTL operations",
+    "Cloud Functions / Cloud Run / Scheduler / Artifact Registry / Logging",
+    "Authentication charges if applicable",
+    "AI and transcription",
+    "Vercel usage above credit and extra seats",
+    "LiveKit rounding, idle connections and plan-specific account overrides",
+    "Taxes and FX",
+    "Domain, internet, devices, staff support, privacy/compliance work and contingency"
+  ]
+}

@@ -629,13 +629,20 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
       return sortHistoryDescending(history);
     }
 
-    const chatHistoryPairs = await Promise.all(
-      history.map(async (record) => {
-        const chatHistory = await loadSessionChatHistory(this.db, record.id);
-        return {
-          id: record.id,
-          chatHistory: mergeChatHistory(record.chatHistory, chatHistory),
-        };
+    // Enrichment is still bounded by repository result windows, but must not
+    // fan hundreds of independent Firestore reads out at once on one request.
+    const chatHistoryPairs: Array<{ id: string; chatHistory: HistoryChatRecord | undefined }> = [];
+    let nextRecord = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(6, history.length) }, async () => {
+        while (nextRecord < history.length) {
+          const record = history[nextRecord++];
+          const chatHistory = await loadSessionChatHistory(this.db, record.id);
+          chatHistoryPairs.push({
+            id: record.id,
+            chatHistory: mergeChatHistory(record.chatHistory, chatHistory),
+          });
+        }
       })
     );
     const chatHistoryById = new Map(

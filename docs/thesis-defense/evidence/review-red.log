@@ -1,0 +1,109 @@
+TAP version 13
+# Subtest: same-room credentials cannot access a different recorded encounter participant
+ok 1 - same-room credentials cannot access a different recorded encounter participant
+  ---
+  duration_ms: 24.014801
+  type: 'test'
+  ...
+# Subtest: ten browser participants persist only their own 200 total chat messages, not 2,000 copies
+ok 2 - ten browser participants persist only their own 200 total chat messages, not 2,000 copies
+  ---
+  duration_ms: 127.348298
+  type: 'test'
+  ...
+# Subtest: 100 simultaneous keyed retries create one message and touch the session once
+ok 3 - 100 simultaneous keyed retries create one message and touch the session once
+  ---
+  duration_ms: 24.05863
+  type: 'test'
+  ...
+# Subtest: 100 history records enrich chat with at most six outstanding reads and preserve every record
+ok 4 - 100 history records enrich chat with at most six outstanding reads and preserve every record
+  ---
+  duration_ms: 76.97509
+  type: 'test'
+  ...
+# Subtest: queue departure cannot overwrite the current encounter principal or close a later visit
+not ok 5 - queue departure cannot overwrite the current encounter principal or close a later visit
+  ---
+  duration_ms: 64.759752
+  type: 'test'
+  location: '/home/garre/Livekit/tests/defense-load-regressions.test.mjs:139:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'anonymous_old'
+    - 'patient_current'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'patient_current'
+  actual: 'anonymous_old'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/garre/Livekit/tests/defense-load-regressions.test.mjs:153:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a buffered local message is never reassigned after the encounter prop changes
+not ok 6 - a buffered local message is never reassigned after the encounter prop changes
+  ---
+  duration_ms: 19.210184
+  type: 'test'
+  location: '/home/garre/Livekit/tests/defense-load-regressions.test.mjs:159:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        [
+          'old-message',
+          'session-old'
+        ],
+        [
+    +     'old-message',
+    +     'session-new'
+    +   ],
+    +   [
+          'new-message',
+          'session-new'
+        ]
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0:
+      0: 'old-message'
+      1: 'session-old'
+    1:
+      0: 'new-message'
+      1: 'session-new'
+  actual:
+    0:
+      0: 'old-message'
+      1: 'session-old'
+    1:
+      0: 'old-message'
+      1: 'session-new'
+    2:
+      0: 'new-message'
+      1: 'session-new'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/garre/Livekit/tests/defense-load-regressions.test.mjs:186:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 4
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 893.469535

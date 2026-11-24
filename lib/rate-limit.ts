@@ -45,9 +45,10 @@ export interface RateLimitResult {
  */
 export function checkRateLimit(
   request: NextRequest,
-  config: RateLimitConfig
+  config: RateLimitConfig,
+  opaqueScope?: string
 ): RateLimitResult {
-  const ip = getClientIP(request);
+  const ip = opaqueScope || getClientIP(request);
   const now = Date.now();
   const windowStart = now - config.windowMs;
   const blockDuration = config.blockDurationMs || config.windowMs;
@@ -144,12 +145,13 @@ function getClientIP(request: NextRequest): string {
   return (request as any).ip || 'unknown';
 }
 
-function distributedRateLimitDocumentId(request: NextRequest, windowStartedAt: number): string {
+function distributedRateLimitDocumentId(request: NextRequest, windowStartedAt: number, authenticatedSubject?: string): string {
   const secret =
     process.env.RATE_LIMIT_HASH_SECRET ||
     process.env.INVITATION_TOKEN_SECRET ||
     'livekit-local-rate-limit';
-  const subject = `${request.nextUrl.pathname}:${getClientIP(request)}:${windowStartedAt}`;
+  const actor = authenticatedSubject ? `verified:${authenticatedSubject}` : getClientIP(request);
+  const subject = `${request.nextUrl.pathname}:${actor}:${windowStartedAt}`;
   return createHmac('sha256', secret).update(subject).digest('hex');
 }
 
@@ -157,20 +159,23 @@ function distributedRateLimitDocumentId(request: NextRequest, windowStartedAt: n
  * Enforce a fixed-window limit in Firestore so independent serverless
  * instances share one counter. If Firestore is unavailable, the existing
  * in-process limiter remains a fail-safe instead of silently allowing traffic.
+ * An optional subject must come from already-verified server identity, never a
+ * body field. It gives clinic users behind one network independent budgets.
  */
 export async function enforceRateLimit(
   request: NextRequest,
-  config: RateLimitConfig
+  config: RateLimitConfig,
+  authenticatedSubject?: string
 ): Promise<Response | null> {
-  const db = getFirebaseAdmin();
-  if (!db) {
-    return withRateLimit(config)(request);
-  }
-
   const now = Date.now();
   const windowStartedAt = Math.floor(now / config.windowMs) * config.windowMs;
   const resetTime = windowStartedAt + config.windowMs;
-  const documentId = distributedRateLimitDocumentId(request, windowStartedAt);
+  const documentId = distributedRateLimitDocumentId(request, windowStartedAt, authenticatedSubject);
+  const localScope = authenticatedSubject ? documentId : undefined;
+  const db = getFirebaseAdmin();
+  if (!db) {
+    return withRateLimit(config, localScope)(request);
+  }
   const counterRef = db.collection('securityRateLimits').doc(documentId);
 
   try {
@@ -208,7 +213,7 @@ export async function enforceRateLimit(
     });
   } catch (error) {
     console.error('Distributed rate-limit check failed; using local fallback:', error);
-    return withRateLimit(config)(request);
+    return withRateLimit(config, localScope)(request);
   }
 }
 
@@ -216,6 +221,9 @@ export async function enforceRateLimit(
  * Predefined rate limit configurations
  */
 export const RateLimitConfigs = {
+  // Persistence budgets, not limits on LiveKit data-channel transport.
+  CHAT_WRITE: { limit: 60, windowMs: 60 * 1000 },
+  SUMMARY_GENERATION: { limit: 3, windowMs: 60 * 1000 },
   // Strict rate limit for token generation
   TOKEN_GENERATION: {
     limit: 5,
@@ -261,9 +269,9 @@ export const RateLimitConfigs = {
 /**
  * Middleware function for rate limiting API routes
  */
-export function withRateLimit(config: RateLimitConfig) {
+export function withRateLimit(config: RateLimitConfig, opaqueScope?: string) {
   return function rateLimitMiddleware(request: NextRequest) {
-    const result = checkRateLimit(request, config);
+    const result = checkRateLimit(request, config, opaqueScope);
     
     if (!result.allowed) {
       return new Response(

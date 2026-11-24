@@ -103,27 +103,24 @@ export class FirestoreChatMessageStore implements ChatMessageStore {
 
     if (input.messageId) {
       const messageRef = messagesRef.doc(toChatMessageDocumentId(input.messageId));
-      const existingDoc = await messageRef.get();
-      if (existingDoc.exists) {
+      // Retries can arrive on separate serverless instances. The existence
+      // check and both writes must commit together, not race as get-then-set.
+      return this.db.runTransaction(async (transaction) => {
+        const existingDoc = await transaction.get(messageRef);
+        if (existingDoc.exists) {
+          return { messageId: existingDoc.id, duplicated: true };
+        }
+        transaction.create(messageRef, payload);
+        transaction.set(
+          this.db.collection('consultationSessions').doc(input.sessionId),
+          { lastMessageAt: Timestamp.now(), updatedAt: FieldValue.serverTimestamp() },
+          { merge: true }
+        );
         return {
-          messageId: existingDoc.id,
-          duplicated: true,
+          messageId: messageRef.id,
+          duplicated: false,
         };
-      }
-
-      await messageRef.set(payload, { merge: false });
-      await this.db.collection('consultationSessions').doc(input.sessionId).set(
-        {
-          lastMessageAt: Timestamp.now(),
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      return {
-        messageId: messageRef.id,
-        duplicated: false,
-      };
+      });
     }
 
     const createdMessageRef = await messagesRef.add(payload);

@@ -6,6 +6,7 @@ import { serviceResultToResponse } from '@/lib/services/shared/http';
 import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { serviceError, serviceOk } from '@/lib/services/shared/service-result';
+import { enforceRateLimit, RateLimitConfigs } from '@/lib/rate-limit';
 
 export const maxDuration = 60;
 
@@ -57,6 +58,9 @@ async function handlePOST(req: NextRequest) {
       serviceError(409, 'consultation_active', 'A consultation must end before its summary is generated')
     );
   }
+
+  const rateLimited = await enforceRateLimit(req, RateLimitConfigs.SUMMARY_GENERATION, auth.data.userId);
+  if (rateLimited) return rateLimited;
 
   const result = await new FirestoreSummaryProjectionService(db).buildSummary({
     consultationSessionId,

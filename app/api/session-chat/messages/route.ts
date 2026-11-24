@@ -8,6 +8,7 @@ import { serviceResultToResponse, unexpectedErrorResponse } from '@/lib/services
 import { MAX_CHAT_MESSAGE_LENGTH } from '@/lib/chat/chat-message-key';
 import { isConsultationCapabilityEnabled } from '@/lib/consultations/consultation-capabilities';
 import { AttachmentRepository } from '@/lib/repositories/attachment-repository';
+import { enforceRateLimit, RateLimitConfigs } from '@/lib/rate-limit';
 
 function toDate(value: unknown): Date | null {
   if (!value) {
@@ -134,6 +135,11 @@ async function handlePOST(req: NextRequest) {
     if (!participant.ok) {
       return serviceResultToResponse(participant);
     }
+
+    const rateLimited = await enforceRateLimit(
+      req, RateLimitConfigs.CHAT_WRITE, `${participant.data.identity}:${consultationSessionId}`
+    );
+    if (rateLimited) return rateLimited;
 
     if (attachmentIds.length > 0 && !isConsultationCapabilityEnabled('file-attachments')) {
       return NextResponse.json(

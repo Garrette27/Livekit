@@ -1,6 +1,7 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { verifyLiveKitRoomToken } from '@/lib/invitations/token-utils';
 import { ConsultationSessionRepository } from '@/lib/repositories/consultation-session-repository';
+import { hasRecordedPatientIdentity } from '@/lib/consultations/identity-utils';
 import { serviceError, serviceOk, type ServiceResult } from './service-result';
 
 export interface AuthorizedSessionParticipant {
@@ -12,8 +13,11 @@ export interface AuthorizedSessionParticipant {
 }
 
 /**
- * Binds a LiveKit participant credential to one persisted consultation. This
- * prevents callers from reading or writing chat by guessing a session id.
+ * Binds a room credential to its recorded encounter participant, not merely
+ * the reusable room name. Guest tracking records the signed transport identity
+ * as patientUserId; registered visits record the signed Firebase binding.
+ * This is a principal check, not proof of a unique visit: current credentials
+ * can outlive/recur across visits by that principal in a reusable room.
  */
 export async function authorizeSessionParticipant(
   req: Request,
@@ -38,12 +42,24 @@ export async function authorizeSessionParticipant(
     return serviceError(404, 'consultation_not_found', 'Consultation session not found');
   }
 
-  const sessionRoomName = sessionDoc.data()?.roomName;
+  const session = sessionDoc.data() as Record<string, unknown>;
+  const sessionRoomName = session.roomName;
   if (typeof sessionRoomName !== 'string' || sessionRoomName !== participant.roomName) {
     return serviceError(403, 'consultation_forbidden', 'Room token does not grant access to this consultation');
   }
 
-  const participantType = participant.identity.startsWith('doctor_') ? 'doctor' : 'patient';
+  const metadata = (session.metadata as Record<string, unknown> | undefined) || {};
+  const doctorIds = [session.doctorUserId, metadata.createdBy].filter(
+    (value): value is string => typeof value === 'string' && value.trim().length > 0
+  );
+  const isDoctor = doctorIds.length > 0
+    && doctorIds.every((id) => participant.identity === `doctor_${id}`);
+  const isPatient = participant.identity.startsWith('patient_')
+    && hasRecordedPatientIdentity(session, participant.patientUserId || participant.identity);
+  if (!isDoctor && !isPatient) {
+    return serviceError(403, 'consultation_forbidden', 'Room token does not belong to this encounter participant');
+  }
+  const participantType = isDoctor ? 'doctor' : 'patient';
   return serviceOk({
     identity: participant.identity,
     participantName: participant.participantName || participant.identity,

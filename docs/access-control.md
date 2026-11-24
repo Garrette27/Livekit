@@ -51,7 +51,10 @@ verified Firebase tokens plus the server-side user profile.
   `/api/patient/consent`, which requires that token, accepts only the current
   consent-statement version, and refuses non-patient accounts.
 - Persisted chat and attachment requests require the signed LiveKit room token
-  and match its room to the consultation session.
+  and match its room and recorded principal to the consultation session. This
+  is not a complete unique-visit/replay guarantee: reusable credentials can
+  identify the same principal across visits. Immutable visit-bound grants are
+  a real-clinic release gate; see the dated defense evidence.
 - AI summary generation and edits require ownership of the completed
   consultation.
 - Consultation record writes are server-only, even for an owning doctor using
@@ -65,8 +68,11 @@ verified Firebase tokens plus the server-side user profile.
   self-service linking. Guest visits without such evidence are not adopted on
   later login.
 - Patient history exposes encounter metadata, not clinician AI drafts or other
-  waiting participants. Late leave/finalization updates are bound to the exact
-  encounter so room reuse cannot reattribute a later visit.
+  waiting participants. Scoped leave/finalization carries the encounter id.
+  Operational queue departure/removal no longer closes or reattributes a
+  clinical record selected only by room. If scoped tracking and trustworthy
+  completion events are both lost, reconciliation is required; a reusable queue
+  row is not an alternate clinical authority.
 
 ## Deployment checklist
 

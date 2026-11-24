@@ -54,10 +54,9 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
   );
 
   useEffect(() => {
-    const storedConsultationSessionId = localStorage.getItem(consultationSessionStorageKey);
-    if (storedConsultationSessionId) {
-      updateConsultationSessionId(storedConsultationSessionId);
-    }
+    // A cached room id can belong to an earlier visit by the same account.
+    // Only the authenticated tracking response may bind new evidence to a visit.
+    updateConsultationSessionId(null);
   }, [consultationSessionStorageKey, updateConsultationSessionId]);
 
   useEffect(() => {

@@ -190,7 +190,8 @@ function inferSenderType(senderId: string): 'doctor' | 'patient' | 'system' {
 }
 
 /**
- * Persists LiveKit chat messages into consultation session storage.
+ * Persists only locally authored messages. Receivers must not save another
+ * speaker's text using their own credential or multiply persistence requests.
  * Idempotent message ids keep re-renders from creating duplicate records.
  */
 function ChatPersistenceBridge({
@@ -203,21 +204,11 @@ function ChatPersistenceBridge({
   accessToken: string;
 }) {
   const { chatMessages } = useChat();
+  const { localParticipant } = useLocalParticipant();
   const persistedMessageIdsRef = React.useRef<Set<string>>(new Set());
-  const activeSessionIdRef = React.useRef<string | null>(null);
-
-  React.useEffect(() => {
-    const normalizedSessionId =
-      typeof consultationSessionId === 'string' && consultationSessionId.trim()
-        ? consultationSessionId.trim()
-        : null;
-    if (activeSessionIdRef.current === normalizedSessionId) {
-      return;
-    }
-
-    activeSessionIdRef.current = normalizedSessionId;
-    persistedMessageIdsRef.current = new Set<string>();
-  }, [consultationSessionId]);
+  // A room buffer can outlive the encounter prop. Failed/in-flight old messages
+  // retain their original binding and must never be retried into a new visit.
+  const messageSessionIdsRef = React.useRef<Map<string, string>>(new Map());
 
   React.useEffect(() => {
     const normalizedSessionId =
@@ -230,6 +221,9 @@ function ChatPersistenceBridge({
 
     const persistMessages = async () => {
       for (const message of chatMessages) {
+        if (!localParticipant?.identity || message.from?.identity !== localParticipant.identity) {
+          continue;
+        }
         const messageText = typeof message.message === 'string' ? message.message.trim() : '';
         if (!messageText) {
           continue;
@@ -242,6 +236,12 @@ function ChatPersistenceBridge({
           typeof message.id === 'string' && message.id.trim()
             ? message.id.trim()
             : `${senderId}:${messageTimestamp}:${messageText}`;
+
+        const boundSessionId = messageSessionIdsRef.current.get(persistedMessageId);
+        if (boundSessionId && boundSessionId !== normalizedSessionId) {
+          continue;
+        }
+        messageSessionIdsRef.current.set(persistedMessageId, normalizedSessionId);
 
         if (persistedMessageIdsRef.current.has(persistedMessageId)) {
           continue;
@@ -276,7 +276,7 @@ function ChatPersistenceBridge({
     };
 
     void persistMessages();
-  }, [accessToken, chatMessages, consultationSessionId, enabled]);
+  }, [accessToken, chatMessages, consultationSessionId, enabled, localParticipant?.identity]);
 
   return null;
 }

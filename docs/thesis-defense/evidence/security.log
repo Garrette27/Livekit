@@ -1,0 +1,388 @@
+
+> livekit-frontend@0.2.0 test:security
+> node scripts/regression-security-contracts.mjs && node scripts/regression-thesis-flow-contracts.mjs && node --test tests/security-policies.test.mjs tests/queue-and-auth-regressions.test.mjs tests/defense-load-regressions.test.mjs
+
+Security architecture regression contracts passed.
+Thesis invitation, consent, summary, and UI contracts verified.
+TAP version 13
+# Subtest: same-room credentials cannot access a different recorded principal
+ok 1 - same-room credentials cannot access a different recorded principal
+  ---
+  duration_ms: 32.639516
+  type: 'test'
+  ...
+# Subtest: ten browser participants persist only their own 200 total chat messages, not 2,000 copies
+ok 2 - ten browser participants persist only their own 200 total chat messages, not 2,000 copies
+  ---
+  duration_ms: 188.677824
+  type: 'test'
+  ...
+# Subtest: 100 simultaneous keyed retries create one message and touch the session once
+ok 3 - 100 simultaneous keyed retries create one message and touch the session once
+  ---
+  duration_ms: 32.497591
+  type: 'test'
+  ...
+# Subtest: 100 history records enrich chat with at most six outstanding reads and preserve every record
+ok 4 - 100 history records enrich chat with at most six outstanding reads and preserve every record
+  ---
+  duration_ms: 112.201065
+  type: 'test'
+  ...
+# Subtest: queue departure cannot overwrite the current encounter principal or close a later visit
+ok 5 - queue departure cannot overwrite the current encounter principal or close a later visit
+  ---
+  duration_ms: 108.056311
+  type: 'test'
+  ...
+# Subtest: a buffered local message is never reassigned after the encounter prop changes
+ok 6 - a buffered local message is never reassigned after the encounter prop changes
+  ---
+  duration_ms: 20.757857
+  type: 'test'
+  ...
+# Subtest: authenticated operation budgets isolate two principals behind the same clinic network
+ok 7 - authenticated operation budgets isolate two principals behind the same clinic network
+  ---
+  duration_ms: 85.927066
+  type: 'test'
+  ...
+# Subtest: guest principal stays authorized when the queue notice arrives before or after a scoped request
+ok 8 - guest principal stays authorized when the queue notice arrives before or after a scoped request
+  ---
+  duration_ms: 105.54984
+  type: 'test'
+  ...
+# Subtest: chat persistence honors its authenticated rate refusal before writing a message
+ok 9 - chat persistence honors its authenticated rate refusal before writing a message
+  ---
+  duration_ms: 16.719158
+  type: 'test'
+  ...
+# Subtest: manual summary rate refusal prevents another provider-generation attempt
+ok 10 - manual summary rate refusal prevents another provider-generation attempt
+  ---
+  duration_ms: 10.054763
+  type: 'test'
+  ...
+# Subtest: Firebase Auth starts without experimental CommonJS-to-ESM loading
+ok 11 - Firebase Auth starts without experimental CommonJS-to-ESM loading
+  ---
+  duration_ms: 227.521777
+  type: 'test'
+  ...
+# Subtest: duplicate-identity replacement detaches the old page without closing the continuing visit
+ok 12 - duplicate-identity replacement detaches the old page without closing the continuing visit
+  ---
+  duration_ms: 138.972103
+  type: 'test'
+  ...
+# Subtest: admission renewal rechecks persisted expiry, revocation, room and ownership
+ok 13 - admission renewal rechecks persisted expiry, revocation, room and ownership
+  ---
+  duration_ms: 530.885268
+  type: 'test'
+  ...
+# Subtest: only the exact current visit can renew, and valid waiting/admission still works
+ok 14 - only the exact current visit can renew, and valid waiting/admission still works
+  ---
+  duration_ms: 32.20304
+  type: 'test'
+  ...
+# Subtest: room credentials preserve an issuer-bound Firebase patient UID separately from the media identity
+ok 15 - room credentials preserve an issuer-bound Firebase patient UID separately from the media identity
+  ---
+  duration_ms: 8.670086
+  type: 'test'
+  ...
+# Subtest: direct invitation issuance binds the authenticated UID rather than the declared email
+ok 16 - direct invitation issuance binds the authenticated UID rather than the declared email
+  ---
+  duration_ms: 54.339503
+  type: 'test'
+  ...
+# Subtest: admission binds history to the registered patient and never to a guest’s declared email
+ok 17 - admission binds history to the registered patient and never to a guest’s declared email
+  ---
+  duration_ms: 77.889243
+  type: 'test'
+  ...
+# Subtest: tracking uses the signed Firebase UID so a new admitted visit remains in patient history
+ok 18 - tracking uses the signed Firebase UID so a new admitted visit remains in patient history
+  ---
+  duration_ms: 73.50383
+  type: 'test'
+  ...
+# Subtest: late leave events cannot overwrite another patient or a later encounter in the same room
+ok 19 - late leave events cannot overwrite another patient or a later encounter in the same room
+  ---
+  duration_ms: 45.667859
+  type: 'test'
+  ...
+# Subtest: the current patient can still close their own tracked encounter
+ok 20 - the current patient can still close their own tracked encounter
+  ---
+  duration_ms: 27.120736
+  type: 'test'
+  ...
+# Subtest: a new encounter appearing before leave commit keeps its identity and lifecycle
+ok 21 - a new encounter appearing before leave commit keeps its identity and lifecycle
+  ---
+  duration_ms: 17.277621
+  type: 'test'
+  ...
+# Subtest: leave finalization targets the requested encounter instead of a later visit sharing its room
+ok 22 - leave finalization targets the requested encounter instead of a later visit sharing its room
+  ---
+  duration_ms: 20.31141
+  type: 'test'
+  ...
+# Subtest: finalizing an earlier session preserves a later room encounter and keeps patient labels separate
+ok 23 - finalizing an earlier session preserves a later room encounter and keeps patient labels separate
+  ---
+  duration_ms: 24.400791
+  type: 'test'
+  ...
+# Subtest: waiting credentials cannot publish, subscribe or send data; consultation media remains enabled
+ok 24 - waiting credentials cannot publish, subscribe or send data; consultation media remains enabled
+  ---
+  duration_ms: 5.126631
+  type: 'test'
+  ...
+# Subtest: admission HTTP route rejects missing row/email lookup and another visit credential
+ok 25 - admission HTTP route rejects missing row/email lookup and another visit credential
+  ---
+  duration_ms: 13.382685
+  type: 'test'
+  ...
+# Subtest: failed signed-in token refresh never silently queues as a guest
+ok 26 - failed signed-in token refresh never silently queues as a guest
+  ---
+  duration_ms: 23.061635
+  type: 'test'
+  ...
+# Subtest: obsolete invitation validation cannot overwrite the newer account admission
+ok 27 - obsolete invitation validation cannot overwrite the newer account admission
+  ---
+  duration_ms: 25.584817
+  type: 'test'
+  ...
+# Subtest: waiting admission polling never overlaps or commits after the visit changes
+ok 28 - waiting admission polling never overlaps or commits after the visit changes
+  ---
+  duration_ms: 11.403125
+  type: 'test'
+  ...
+# Subtest: authenticated requests add the token without sending caller-asserted identity
+ok 29 - authenticated requests add the token without sending caller-asserted identity
+  ---
+  duration_ms: 3.812781
+  type: 'test'
+  ...
+# Subtest: browser-supplied pending session IDs cannot claim another patient or rewrite a later encounter
+ok 30 - browser-supplied pending session IDs cannot claim another patient or rewrite a later encounter
+  ---
+  duration_ms: 3.438073
+  type: 'test'
+  ...
+# Subtest: an invitation email match cannot grant visibility to another patient’s later consultation
+ok 31 - an invitation email match cannot grant visibility to another patient’s later consultation
+  ---
+  duration_ms: 3.59947
+  type: 'test'
+  ...
+# Subtest: obsolete linking payloads cannot cause a crash or change patient identity
+ok 32 - obsolete linking payloads cannot cause a crash or change patient identity
+  ---
+  duration_ms: 3.637211
+  type: 'test'
+  ...
+# Subtest: patient history requires a consistent recorded UID; matching email alone never grants access
+ok 33 - patient history requires a consistent recorded UID; matching email alone never grants access
+  ---
+  duration_ms: 38.417585
+  type: 'test'
+  ...
+# Subtest: patient history excludes clinician AI drafts and other waiting participants
+ok 34 - patient history excludes clinician AI drafts and other waiting participants
+  ---
+  duration_ms: 34.215066
+  type: 'test'
+  ...
+# Subtest: login distinguishes a Firestore outage from a resolved role check
+ok 35 - login distinguishes a Firestore outage from a resolved role check
+  ---
+  duration_ms: 27.106924
+  type: 'test'
+  ...
+# Subtest: realtime invalidates without exposing snapshot rows, shares a listener, and cleans up
+ok 36 - realtime invalidates without exposing snapshot rows, shares a listener, and cleans up
+  ---
+  duration_ms: 5.907449
+  type: 'test'
+  ...
+# Subtest: periodic refresh survives stream failure and shared requests stay deduplicated
+ok 37 - periodic refresh survives stream failure and shared requests stay deduplicated
+  ---
+  duration_ms: 6.627273
+  type: 'test'
+  ...
+# Subtest: periodic queue refresh pauses in background and reconciles once on return
+ok 38 - periodic queue refresh pauses in background and reconciles once on return
+  ---
+  duration_ms: 5.512152
+  type: 'test'
+  ...
+# Subtest: a repeated stale unsubscribe cannot detach a replacement poll group
+ok 39 - a repeated stale unsubscribe cannot detach a replacement poll group
+  ---
+  duration_ms: 6.797389
+  type: 'test'
+  ...
+# Subtest: 100 queue consumers share one in-flight request, recover after failure and isolate scopes
+ok 40 - 100 queue consumers share one in-flight request, recover after failure and isolate scopes
+  ---
+  duration_ms: 5.998666
+  type: 'test'
+  ...
+# Subtest: 100 queue subscribers use one timer and leak no timers or listeners over visibility cycles
+ok 41 - 100 queue subscribers use one timer and leak no timers or listeners over visibility cycles
+  ---
+  duration_ms: 13.350121
+  type: 'test'
+  ...
+# Subtest: database availability classification never converts permission errors into retryable outages
+ok 42 - database availability classification never converts permission errors into retryable outages
+  ---
+  duration_ms: 5.619169
+  type: 'test'
+  ...
+# Subtest: canonical queue excludes stale, expired, revoked, other-room and other-doctor rows
+ok 43 - canonical queue excludes stale, expired, revoked, other-room and other-doctor rows
+  ---
+  duration_ms: 42.737803
+  type: 'test'
+  ...
+# Subtest: transcription retries at most twice and carries only bounded provider status
+ok 44 - transcription retries at most twice and carries only bounded provider status
+  ---
+  duration_ms: 11.347755
+  type: 'test'
+  ...
+# Subtest: faculty reviewer remains deny-by-default except for assignment permission
+ok 45 - faculty reviewer remains deny-by-default except for assignment permission
+  ---
+  duration_ms: 60.437888
+  type: 'test'
+  ...
+# Subtest: review assignment is exact, active, and time bounded
+ok 46 - review assignment is exact, active, and time bounded
+  ---
+  duration_ms: 14.975499
+  type: 'test'
+  ...
+# Subtest: review assignment denies blank identities and malformed persisted values without throwing
+ok 47 - review assignment denies blank identities and malformed persisted values without throwing
+  ---
+  duration_ms: 7.275909
+  type: 'test'
+  ...
+# Subtest: concurrent invitation reservations cannot exceed maxUses
+ok 48 - concurrent invitation reservations cannot exceed maxUses
+  ---
+  duration_ms: 34.530077
+  type: 'test'
+  ...
+# Subtest: consultation history sort values describe the resulting order
+ok 49 - consultation history sort values describe the resulting order
+  ---
+  duration_ms: 36.362424
+  type: 'test'
+  ...
+# Subtest: waiting-room timestamp transport understands Firestore JSON shapes
+ok 50 - waiting-room timestamp transport understands Firestore JSON shapes
+  ---
+  duration_ms: 14.941091
+  type: 'test'
+  ...
+# Subtest: invitation presentation counts hashed identities without exposing addresses
+ok 51 - invitation presentation counts hashed identities without exposing addresses
+  ---
+  duration_ms: 67.749109
+  type: 'test'
+  ...
+# Subtest: prepared consultation capabilities default to disabled
+ok 52 - prepared consultation capabilities default to disabled
+  ---
+  duration_ms: 5.183741
+  type: 'test'
+  ...
+# Subtest: only a verified allowlisted identity skips the waiting room
+ok 53 - only a verified allowlisted identity skips the waiting room
+  ---
+  duration_ms: 14.720019
+  type: 'test'
+  ...
+# Subtest: security-signal hashing keeps production invitation validation available
+ok 54 - security-signal hashing keeps production invitation validation available
+  ---
+  duration_ms: 11.386196
+  type: 'test'
+  ...
+# Subtest: Google and password accounts with a confirmed email are the same evidence
+ok 55 - Google and password accounts with a confirmed email are the same evidence
+  ---
+  duration_ms: 12.258294
+  type: 'test'
+  ...
+# Subtest: consent is a versioned record, and the old registration flag is not it
+ok 56 - consent is a versioned record, and the old registration flag is not it
+  ---
+  duration_ms: 16.456657
+  type: 'test'
+  ...
+# Subtest: exhausted AI credit is classified as unavailable, not a retryable failure
+ok 57 - exhausted AI credit is classified as unavailable, not a retryable failure
+  ---
+  duration_ms: 43.884976
+  type: 'test'
+  ...
+# Subtest: database availability failures are recognized from both Firestore SDKs
+ok 58 - database availability failures are recognized from both Firestore SDKs
+  ---
+  duration_ms: 6.392929
+  type: 'test'
+  ...
+# Subtest: reserved waiting-room names cannot be claimed or joined as a doctor room
+ok 59 - reserved waiting-room names cannot be claimed or joined as a doctor room
+  ---
+  duration_ms: 3.877905
+  type: 'test'
+  ...
+# Subtest: chat idempotency keys become safe, stable Firestore document ids
+ok 60 - chat idempotency keys become safe, stable Firestore document ids
+  ---
+  duration_ms: 5.381418
+  type: 'test'
+  ...
+# Subtest: waiting entries are found only by a provider-verified email
+ok 61 - waiting entries are found only by a provider-verified email
+  ---
+  duration_ms: 11.011336
+  type: 'test'
+  ...
+# Subtest: summary edits accept the dashboard shape and reject wrong-typed or oversized values
+ok 62 - summary edits accept the dashboard shape and reject wrong-typed or oversized values
+  ---
+  duration_ms: 11.965958
+  type: 'test'
+  ...
+1..62
+# tests 62
+# suites 0
+# pass 62
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2197.543876

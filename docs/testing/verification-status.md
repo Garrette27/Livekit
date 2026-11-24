@@ -24,7 +24,48 @@ Never mark a test passed by relaxing an assertion, hiding a failing audit, or
 substituting HTTP timing for WebRTC timing. Use PASS, FAIL, BLOCKED, NOT TESTED,
 or HISTORICAL PASS, always with scope. New advisories can invalidate old scans.
 
-## Defense-readiness checkpoint: 22 November 2026 (defense on 23 November 2026)
+## Current checkpoint: 25 November 2026 - manuscript and bounded app hardening
+
+Fetched/fast-forwarded to `aa041fe`; preserved unrelated local AGENTS.md edits
+and untracked drafts/ZIPs. The publishable app snapshot was tested in a clean
+detached baseline checkout because the user's dirty AGENTS.md triggers the
+repository's unrelated-product scope guard. That guard was not weakened.
+
+| Claim | Result | Evidence / limits |
+| --- | --- | --- |
+| Application policy/regression and source contracts | PASS, 62 tests | [Defense evidence](../thesis-defense/evidence/README.md); ten new focused cases; synthetic adapters, not real media clients |
+| Candidate Firestore/Storage rules | PASS, 14 tests | Same evidence directory, `rules.log`; emulator project only; no production policy release/read in this checkpoint |
+| Typecheck, lint, production build | PASS | Final logs; lint has no reported warnings; local build is not deployment |
+| Complete application and Functions npm audits | PASS, zero reported findings | Dated audit JSON; does not establish absence of authorization/design flaws |
+| Chat persistence amplification and keyed retry atomicity | PASS, deterministic local counts | Ten synthetic views/200 authored messages yield 200 POST attempts; 100 same-key attempts yield one create and one session touch |
+| Different-principal denial and queue/buffer safety | PASS, specified local cases | Signed principal checked as well as room; queue notice cannot reattribute latest clinical record; old messages retain original session |
+| Authenticated chat/manual-summary operation budgets | PASS, route refusal and subject-isolation cases | 60/min/principal/session persistence attempts; 3/min/doctor manual summary attempts; fallback is process-local, not a global spend/concurrency cap |
+| History enrichment concurrency | PASS, local peak <= 6 | 100 fixture records, all returned; total read volume unchanged; not complete history pagination |
+| Complete unique-visit credential/replay isolation | UNRESOLVED release gate | Reusable principal/queue keys are not immutable encounter grants; see full follow-up answer |
+| Revised manuscript integrity | PASS, document checks only | 259 pages; 32 substantive edits on 25 pages; expense amounts/total and numbering preserved; public-copy privacy redactions separately listed |
+| Authenticated production acceptance, cloud video capacity/complete audiovisual delay, clinician efficiency | NOT TESTED | No provider load, paid AI calls or production clinical writes/reads performed |
+| Final publication commit CI / deployed commit | NOT YET INSPECTED here | Confirm remote CI after push; never infer active runtime/rules/account state from source alone |
+
+Deliverables: [defense pack](../thesis-defense/README.md), including both full
+written answers, page-change register, Messenger briefing, scripts and revised
+public-copy PDF. The excluded earlier individual-call inspection is not included.
+The original supplied PDF is untouched; CV images are omitted only from the
+public repository copy. Clinical records were not published.
+
+Design decision: sender-owned persistence and transactional idempotency hide
+complexity behind existing modules; bounded workers limit per-request fan-out.
+Queue rows no longer act as clinical finalization authority. If scoped tracking
+and trustworthy completion events are both lost, reconciliation is required.
+Unique-visit grants need a separately reviewed protocol, not a rushed field-only
+migration. These are real-clinic release gates, not improvements claimed complete.
+
+Next unfinished work: implement immutable visit-bound grants and adversarial
+old-credential tests, then verify authenticated staging acceptance and execute
+controlled paired-media/clinician studies. Keep code, changed docs, failed and
+passing evidence together at each verified push. No broad production-security
+or clinical-readiness PASS is made.
+
+## Historical defense-readiness checkpoint: 22 November 2026 (defense on 23 November 2026)
 
 The thesis defense is tomorrow, 23 November 2026. This checkpoint is a
 pre-defense hardening pass over a93d635 (latest remote main at fetch time).
