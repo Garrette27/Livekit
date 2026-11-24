@@ -33,10 +33,18 @@ notes** only after the patient agrees out loud (line marked **[consent]**).
 **Patient:** I have a toothache on the lower left side. It started three days ago.
 **Doctor:** Can you describe the pain? Is it sharp, dull, or throbbing?
 **Patient:** It's sharp when I drink something cold, then it becomes a dull ache for a few minutes.
+**Doctor:** What about hot drinks, or sweet food like candy or chocolate?
+**Patient:** Hot coffee is okay. Sweets make it tingle a little, but not as bad as cold water.
+**Doctor:** Did anything happen before it started? For example, biting something hard, or an injury?
+**Patient:** I don't remember biting anything hard. It just started after lunch three days ago.
 **Doctor:** How strong is the pain from zero to ten, ten being the worst?
 **Patient:** About five when I drink something cold. Around two the rest of the time.
 **Doctor:** Does it wake you up at night?
 **Patient:** No, I can still sleep.
+**Doctor:** Has the pain stayed the same over the three days, or is it getting worse?
+**Patient:** About the same. Maybe a little worse yesterday, but today it's the same as the first day.
+**Doctor:** Have you taken anything for the pain?
+**Patient:** No, I didn't take anything. I just avoided cold drinks.
 **Doctor:** Any swelling in your face or gums, or a bad taste in your mouth?
 **Patient:** No swelling, and no bad taste.
 **Doctor:** Any fever?
@@ -49,6 +57,8 @@ notes** only after the patient agrees out loud (line marked **[consent]**).
 **Patient:** No medicines, and no allergies that I know of.
 **Doctor:** Any medical conditions like diabetes or high blood pressure?
 **Patient:** None.
+**Doctor:** How often do you brush your teeth, and when was your last dental check-up?
+**Patient:** I brush twice a day. My last check-up was the time I got the filling, two years ago.
 **Doctor:** Can you move closer to the camera and open your mouth, pointing to the tooth?
 **Patient:** Here, Doc. This one on the lower left, second from the back.
 **Doctor:** Thank you. I can see the area, but a video call can't replace a proper exam. Based on what you described, sensitivity to cold near an old filling, with no swelling or fever, I'd like to see you in the clinic for an examination and possibly an X-ray.
@@ -57,6 +67,9 @@ notes** only after the patient agrees out loud (line marked **[consent]**).
 **Patient:** Okay, I understand.
 **Doctor:** If your face swells, you get a fever, or the pain becomes severe and constant, please go to a clinic or emergency room right away instead of waiting.
 **Patient:** Noted, Doc.
+**Doctor:** Just to make sure I explained it clearly, can you tell me in your own words what you will do?
+**Patient:** I'll avoid very cold and very hot drinks, chew on the right side, use a soft toothbrush, and come to the clinic this week. If my face swells or I get a fever, I'll go to the clinic or ER right away.
+**Doctor:** That's exactly right.
 **Doctor:** Do you have any other questions?
 **Patient:** When should I come in?
 **Doctor:** Within this week. Our staff will contact you to schedule.
@@ -103,12 +116,22 @@ Patient B after Patient A leaves.
 **Patient A:** My gums bleed when I brush my teeth. It's been happening for about two weeks.
 **Doctor:** Is it every time you brush, or only sometimes?
 **Patient A:** Almost every time, especially in the morning.
+**Doctor:** About how much blood do you see? Just pink in the foam, or does it keep bleeding after you stop brushing?
+**Patient A:** Mostly pink foam when I spit. It stops by itself after a minute or so.
+**Doctor:** Have you had this problem before?
+**Patient A:** A little, a few years ago, but it went away on its own.
 **Doctor:** Which part of the mouth?
 **Patient A:** Mostly the lower front teeth.
+**Doctor:** Did anything change around the time it started, like a new toothpaste, a new toothbrush, or more stress than usual?
+**Patient A:** I bought a new toothbrush around that time, the hard one. Work has also been busy.
+**Doctor:** Do you smoke or vape?
+**Patient A:** No, I don't.
 **Doctor:** Any pain or swelling in the gums?
 **Patient A:** They feel a bit swollen and tender, but not really painful.
 **Doctor:** Does your gum bleed when you are not brushing, like when eating?
 **Patient A:** Sometimes a little when I eat apples.
+**Doctor:** Do you notice bad breath, or that your teeth feel loose?
+**Patient A:** Maybe some bad breath in the morning. My teeth don't feel loose.
 **Doctor:** How often do you brush and floss?
 **Patient A:** I brush twice a day. I don't really floss.
 **Doctor:** What kind of toothbrush do you use?
@@ -119,6 +142,11 @@ Patient B after Patient A leaves.
 **Patient A:** No medicines, no allergies, no conditions, and I'm not pregnant.
 **Doctor:** Do you notice bleeding elsewhere, like easy bruising or nosebleeds?
 **Patient A:** No, just the gums.
+**Doctor:** How is your diet? Do you eat fruits and vegetables most days?
+**Patient A:** Not much, honestly. I eat a lot of fast food because of work.
+**Doctor:** Do you drink sweet drinks often, like soft drinks or milk tea?
+**Patient A:** Milk tea maybe three times a week.
+**Doctor:** Thank you, that helps. Diet and brushing habits can both affect the gums.
 **Doctor:** Can you show me your lower front gums on camera?
 **Patient A:** Here, Doc.
 **Doctor:** Thank you. I can see some redness along the gum line, but I need to examine you in person to be sure. I'd like you to come in for a cleaning and a gum check.
@@ -126,6 +154,9 @@ Patient B after Patient A leaves.
 **Doctor:** Meanwhile, switch to a soft-bristle toothbrush, brush gently along the gum line twice a day, and start flossing once a day, gently.
 **Patient A:** Will the bleeding stop?
 **Doctor:** We'll know more after the exam. If the bleeding becomes heavy, doesn't stop, or you notice bruising elsewhere, please seek care right away.
+**Doctor:** Can you repeat the plan back to me so I know it was clear?
+**Patient A:** Soft toothbrush, brush gently twice a day, floss once a day, and come in for a cleaning. If the bleeding gets heavy or I get bruises, I seek care right away.
+**Doctor:** Perfect.
 **Patient A:** I understand. Thank you, Doc.
 **Doctor:** You're welcome, Bea. Our staff will schedule your cleaning. You may leave the call now.
 
@@ -145,18 +176,35 @@ Patient B after Patient A leaves.
 **Patient B:** It was about six out of ten the first two days. Now it's around two.
 **Doctor:** Is the pain getting better each day, or did it get worse at some point?
 **Patient B:** Better each day.
+**Doctor:** Did the dentist who removed the tooth give you instructions afterward?
+**Patient B:** Yes. Bite on gauze for the first hour, no rinsing on the first day, then gentle salt-water rinses.
+**Doctor:** Were you able to follow them?
+**Patient B:** Yes, I followed them.
 **Doctor:** Any bleeding now?
 **Patient B:** No. A little on the first day only.
 **Doctor:** Any swelling, fever, or bad taste or smell from the area?
 **Patient B:** The swelling went down. No fever. No bad smell.
 **Doctor:** Are you able to eat and drink normally?
 **Patient B:** I eat soft food and chew on the left side.
+**Doctor:** Do you feel any sharp bone or something poking out where the tooth was?
+**Patient B:** No, it just feels like a soft hole that's slowly closing.
+**Doctor:** Any numbness in your lip or chin on that side?
+**Patient B:** No numbness.
+**Doctor:** How about sleep? Does the area bother you at night?
+**Patient B:** The first two nights it did. Now I sleep fine.
+**Doctor:** How have you been taking care of the other teeth, near the extraction site?
+**Patient B:** I brush them, but I'm careful not to touch the hole with the brush.
+**Doctor:** That's right. You can brush the nearby teeth gently; just avoid scrubbing the socket itself.
 **Doctor:** Have you smoked or used a straw since the extraction?
 **Patient B:** No smoking, and I avoided straws.
 **Doctor:** Good. Are you taking any medicines right now?
 **Patient B:** Only the pain reliever the dentist gave, and only when needed. I took one yesterday.
 **Doctor:** Any allergies or medical conditions?
 **Patient B:** I have high blood pressure. It's controlled. No allergies.
+**Doctor:** Did you take your blood pressure today?
+**Patient B:** Yes, this morning. It was normal, around one-twenty over eighty.
+**Doctor:** Good. Are you taking your blood pressure medicine every day as prescribed?
+**Patient B:** Yes, every morning.
 **Doctor:** Can you show me the extraction area on camera?
 **Patient B:** Here, Doc, lower right at the back.
 **Doctor:** Thank you. From what I can see and what you describe, pain going down, no fever, no bad smell, the healing sounds like it's going as expected. I still can't fully examine it on video.
@@ -165,6 +213,9 @@ Patient B after Patient A leaves.
 **Patient B:** Okay, Doc.
 **Doctor:** If the pain suddenly gets worse after getting better, or you get fever, swelling, or a bad taste, contact the clinic right away.
 **Patient B:** I will.
+**Doctor:** Can you tell me back what you'll do until then?
+**Patient B:** Soft food a few more days, rinse gently, no straws, no smoking, keep taking my blood pressure medicine, and call the clinic if the pain comes back or I get a fever.
+**Doctor:** Very good.
 **Doctor:** Please come in for a quick in-person check next week.
 **Patient B:** Thank you, Doc.
 **Doctor:** You're welcome. Take care, Carlo. I'll end the call now.
