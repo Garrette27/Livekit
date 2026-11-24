@@ -79,6 +79,11 @@ export function useRoomLifecycle({ token, user, roomName, doctorName }: RoomLife
         {
           roomName,
           createdBy: user.uid,
+          // A buffer left by an earlier holder of this room name keeps their
+          // metadata.createdBy unless overwritten. Firestore rules let the
+          // current room owner take it over only when both owner fields are
+          // claimed and the stored lines are cleared in this same write.
+          metadata: { createdBy: user.uid },
           createdAt: new Date(),
           status: 'active',
           consultationSessionId: null,

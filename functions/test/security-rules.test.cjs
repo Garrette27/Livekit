@@ -320,3 +320,51 @@ test('only clinicians can claim room and call names from the browser', async () 
   await assertSucceeds(setDoc(doc(doctorDb, 'calls/dr-room-0930'), roomFor('doctor-1')));
   await assertSucceeds(setDoc(doc(doctorDb, 'rooms/dr-room-0930'), { status: 'completed' }, { merge: true }));
 });
+
+test('the current room owner can take over a call buffer left by an earlier holder only by clearing it', async () => {
+  await rulesEnvironment.withSecurityRulesDisabled(async (context) => {
+    const adminDb = context.firestore();
+    await setDoc(doc(adminDb, 'users/doctor-1'), { email: 'doctor1@example.test', role: 'doctor' });
+    await setDoc(doc(adminDb, 'users/doctor-2'), { email: 'doctor2@example.test', role: 'doctor' });
+    await setDoc(doc(adminDb, 'users/patient-1'), { email: 'patient@example.test', role: 'patient' });
+    // The room name now belongs to doctor-2; the call buffer is left over from doctor-1.
+    await setDoc(doc(adminDb, 'rooms/shared-name'), {
+      roomName: 'shared-name', createdBy: 'doctor-2', createdAt: new Date(), status: 'active',
+      metadata: { createdBy: 'doctor-2' },
+    });
+    await setDoc(doc(adminDb, 'calls/shared-name'), {
+      roomName: 'shared-name', createdBy: 'doctor-1', createdAt: new Date(), status: 'ended',
+      metadata: { createdBy: 'doctor-1' },
+      transcription: ['synthetic earlier line'], manualNotes: ['synthetic earlier note'],
+    });
+  });
+  const previousDb = rulesEnvironment.authenticatedContext('doctor-1', { email: 'doctor1@example.test' }).firestore();
+  const ownerDb = rulesEnvironment.authenticatedContext('doctor-2', { email: 'doctor2@example.test' }).firestore();
+  const patientDb = rulesEnvironment.authenticatedContext('patient-1', { email: 'patient@example.test' }).firestore();
+  const callRef = (db) => doc(db, 'calls/shared-name');
+  const consentWrite = { transcriptionCapture: { active: true, consentConfirmed: true }, lastUpdated: new Date() };
+  const takeover = (uid) => ({
+    roomName: 'shared-name', createdBy: uid, metadata: { createdBy: uid }, createdAt: new Date(),
+    status: 'active', consultationSessionId: null, transcription: [], manualNotes: [], lastUpdated: new Date(),
+  });
+
+  // Before takeover the room owner can neither read the earlier text nor write consent state.
+  await assertFails(getDoc(callRef(ownerDb)));
+  await assertFails(setDoc(callRef(ownerDb), consentWrite, { merge: true }));
+  // A takeover that keeps the earlier lines, or leaves the earlier metadata owner, is denied.
+  await assertFails(setDoc(callRef(ownerDb), { ...takeover('doctor-2'), transcription: ['synthetic earlier line'] }, { merge: true }));
+  await assertFails(setDoc(callRef(ownerDb), { createdBy: 'doctor-2', transcription: [], manualNotes: [] }, { merge: true }));
+  // Someone who does not own the room cannot take it over at all.
+  await assertFails(setDoc(callRef(patientDb), takeover('patient-1'), { merge: true }));
+
+  // The real join write claims the buffer and clears it; consent and notes then work.
+  await assertSucceeds(setDoc(callRef(ownerDb), takeover('doctor-2'), { merge: true }));
+  await assertSucceeds(setDoc(callRef(ownerDb), consentWrite, { merge: true }));
+  const afterTakeover = await assertSucceeds(getDoc(callRef(ownerDb)));
+  assert.deepEqual(afterTakeover.data().transcription, []);
+  assert.deepEqual(afterTakeover.data().manualNotes, []);
+
+  // The earlier holder loses access to the new consultation's buffer.
+  await assertFails(getDoc(callRef(previousDb)));
+  await assertFails(setDoc(callRef(previousDb), consentWrite, { merge: true }));
+});

@@ -48,9 +48,37 @@ service cloud.firestore {
         request.resource.data.createdBy == request.auth.uid;
     }
     
+    // The doctor who owns rooms/{roomName}, by the same field precedence the
+    // server uses (createdBy, then metadata.createdBy).
+    function ownsRoom(roomName) {
+      let roomPath = /databases/$(database)/documents/rooms/$(roomName);
+      let room = get(roomPath).data;
+      return exists(roomPath) && (
+        room.get('createdBy', '') == request.auth.uid ||
+        (room.get('createdBy', '') == '' &&
+          room.get('metadata', {}).get('createdBy', '') == request.auth.uid)
+      );
+    }
+
+    // calls/{roomName} is the browser transcript buffer for the room of the same
+    // name, so it follows room ownership. A buffer left by an earlier holder of
+    // the name may be taken over by the current room owner, but only in a write
+    // that claims both owner fields and clears every stored line and note, so
+    // the earlier holder's text never becomes readable to the new owner and the
+    // earlier holder loses access to the new consultation.
+    function isCallBufferTakeover(callId) {
+      let data = request.resource.data;
+      return request.auth != null && ownsRoom(callId) &&
+        data.get('createdBy', '') == request.auth.uid &&
+        data.get('metadata', {}).get('createdBy', request.auth.uid) == request.auth.uid &&
+        data.get('transcription', []).size() == 0 &&
+        data.get('manualNotes', []).size() == 0;
+    }
+
     // Calls collection - users can only access their own calls
     match /calls/{callId} {
       allow read, write: if request.auth != null && isOwner(resource);
+      allow update: if isCallBufferTakeover(callId);
       allow create: if isClinician() && 
         isValidCallData(request.resource.data) &&
         request.resource.data.createdBy == request.auth.uid;
