@@ -1,0 +1,37 @@
+{
+  "sourceBaseline": "c43b76f08886e8fc329d815c3ae3254d185656dd",
+  "targetProseWords": 60000,
+  "actualProseWords": 6049,
+  "remainingProseWords": 53951,
+  "authoredChapters": 5,
+  "plannedChapters": 60,
+  "complete": false,
+  "chapters": [
+    {
+      "file": "docs\\study-book\\01-a-green-build-and-a-broken-consultation.md",
+      "proseWords": 1189,
+      "sha256": "82effb32e612f5c8c93b1abd3ccbb2bfed32093282c4bde3bd8e3d770d22b127"
+    },
+    {
+      "file": "docs\\study-book\\02-map-the-systems.md",
+      "proseWords": 1184,
+      "sha256": "40d1f287a5d27fb455655c30835339aa2aa8c4ad2739834c984b9a465a682a03"
+    },
+    {
+      "file": "docs\\study-book\\03-evidence-authority-and-experiments.md",
+      "proseWords": 1222,
+      "sha256": "0a2173529d4ab56919cadd885df68cb243a755e4c2f575e553f3f18dbb99be38"
+    },
+    {
+      "file": "docs\\study-book\\04-read-the-repository-as-decisions.md",
+      "proseWords": 1178,
+      "sha256": "9cf225019942f3e43f0bec270b8daca0d70e1aeef60b0eed6b9a773ed54e8fb8"
+    },
+    {
+      "file": "docs\\study-book\\05-the-investigation-notebook.md",
+      "proseWords": 1276,
+      "sha256": "6e466723781bc1f137ca8dd9a856fd7f0fdbf1f3eb4e692de891fc1b26b667fe"
+    }
+  ],
+  "countMethod": "Regex word count excluding headings, fenced code, tables and source trails. Outline/README excluded."
+}

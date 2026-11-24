@@ -1,0 +1,16 @@
+{
+  "status": "incomplete-authoring-checkpoint",
+  "date": "2026-11-24",
+  "baseline": "c43b76f08886e8fc329d815c3ae3254d185656dd",
+  "chaptersAuthored": 5,
+  "proseWords": 6049,
+  "targetProseWords": 60000,
+  "previewPages": 17,
+  "searchablePages": 17,
+  "chapterBookmarks": 5,
+  "renderedPages": 17,
+  "visualReview": "All pages inspected through rendered contact sheets; no visible clipping or overlap. Final complete book must be reviewed again.",
+  "finalGateTest": "PASS: --final exits 1 with FINAL BLOCKED because chapter and word-count requirements are not yet met.",
+  "complete": false,
+  "next": "Author chapters 6-10, then continue the remaining parts; do not represent this checkpoint as the commissioned final book."
+}
