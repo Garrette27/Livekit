@@ -44,7 +44,8 @@ repository's unrelated-product scope guard. That guard was not weakened.
 | Complete unique-visit credential/replay isolation | UNRESOLVED release gate | Reusable principal/queue keys are not immutable encounter grants; see full follow-up answer |
 | Revised manuscript integrity | PASS, document checks only | 259 pages; 32 substantive edits on 25 pages; expense amounts/total and numbering preserved; public-copy privacy redactions separately listed |
 | Authenticated production acceptance, cloud video capacity/complete audiovisual delay, clinician efficiency | NOT TESTED | No provider load, paid AI calls or production clinical writes/reads performed |
-| Final publication commit CI / deployed commit | NOT YET INSPECTED here | Confirm remote CI after push; never infer active runtime/rules/account state from source alone |
+| Published app checkpoint CI | PASS for `25cd516` | All three jobs of [run 45496763839](https://github.com/Garrette27/Livekit/actions/runs/45496763839) completed successfully; later receipt-only docs do not change tested app code |
+| Deployment reporting | MIXED / direct verification BLOCKED | GitHub reports livekit-frontend successful, separate livekit project failed; Vercel team-scope metadata returned 403; no authenticated runtime acceptance claim |
 
 Deliverables: [defense pack](../thesis-defense/README.md), including both full
 written answers, page-change register, Messenger briefing, scripts and revised

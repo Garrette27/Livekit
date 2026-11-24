@@ -1,0 +1,35 @@
+{
+  "observed_at": "2026-11-25T06:02:31+08:00",
+  "repository": "Garrette27/Livekit",
+  "branch": "main",
+  "app_and_artifact_commit": "25cd516fff4cc81fd9b406745f6d7aad6f7c14f1",
+  "publication_method": "Expected-head GitHub commit through the authenticated repository-owner account; fetched and fast-forwarded locally",
+  "ci": {
+    "run_id": 45496763839,
+    "url": "https://github.com/Garrette27/Livekit/actions/runs/45496763839",
+    "status": "completed",
+    "conclusion": "success",
+    "jobs": {
+      "application": "success",
+      "application-dependency-audit": "success",
+      "firebase-functions": "success"
+    }
+  },
+  "github_reported_deployment_checks": {
+    "livekit-frontend": {
+      "state": "success",
+      "url": "https://vercel.com/garrette27s-projects/livekit-frontend/4tPXWoy5rs7rziPDvNFuq754CdJo"
+    },
+    "livekit": {
+      "state": "failure",
+      "url": "https://vercel.com/garrette27s-projects/livekit/2PyRVGk1VuaN8X7ofWoqm2NuDWZF",
+      "cause": "Not established: direct Vercel inspection blocked by team-scope access"
+    }
+  },
+  "direct_vercel_inspection": "403 team authorization unavailable",
+  "authenticated_production_acceptance": "NOT TESTED",
+  "cloud_media_capacity_and_complete_av_delay": "NOT TESTED",
+  "clinician_efficiency": "NOT TESTED",
+  "unique_visit_credential_replay_isolation": "UNRESOLVED release gate",
+  "later_receipt_commit_scope": "Documentation/status only; no additional app changes"
+}

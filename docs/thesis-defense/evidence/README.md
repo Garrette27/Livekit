@@ -2,6 +2,10 @@
 
 Scope: source baseline `aa041fe0fa43017856cbff3f69ae83502aaad061` plus the app changes published with this pack. Node 22.23.0 on local Ubuntu/WSL. Synthetic data only; no paid AI requests, cloud media load, production clinical reads/writes, migration or rules release. Final commit identity is discoverable from this folder's Git history; source fingerprints are in `checksums.txt`.
 
+App/artifact checkpoint `25cd516fff4cc81fd9b406745f6d7aad6f7c14f1` is on main. [GitHub run 45496763839](https://github.com/Garrette27/Livekit/actions/runs/45496763839) completed successfully in all three jobs. GitHub's frontend deployment status is successful; the separate livekit project status is failed. Direct Vercel metadata returned a team-scope 403, so the secondary failure cause and active runtime/alias configuration are not independently verified. [Remote receipt](remote-publication.json) distinguishes those facts. No team permissions, deployment settings or production policies were changed to inspect them.
+
+`checksums.txt` fingerprints published **Git blobs**, excluding itself, rather than promising identical Windows working-copy line endings. Verify against the publication commit's blobs; CRLF conversion in a local checkout can legitimately change raw text-file bytes. The manuscript's separate SHA-256 check is on PDF file bytes.
+
 ## Results
 
 | Check | Result | Evidence and exact scope |
