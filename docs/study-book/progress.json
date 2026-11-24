@@ -1,37 +1,315 @@
 {
   "sourceBaseline": "c43b76f08886e8fc329d815c3ae3254d185656dd",
   "targetProseWords": 60000,
-  "actualProseWords": 6049,
-  "remainingProseWords": 53951,
-  "authoredChapters": 5,
+  "actualProseWords": 60000,
+  "remainingProseWords": 0,
+  "authoredChapters": 60,
   "plannedChapters": 60,
-  "complete": false,
+  "complete": true,
   "chapters": [
     {
-      "file": "docs\\study-book\\01-a-green-build-and-a-broken-consultation.md",
+      "file": "docs/study-book/01-a-green-build-and-a-broken-consultation.md",
       "proseWords": 1189,
       "sha256": "82effb32e612f5c8c93b1abd3ccbb2bfed32093282c4bde3bd8e3d770d22b127"
     },
     {
-      "file": "docs\\study-book\\02-map-the-systems.md",
+      "file": "docs/study-book/02-map-the-systems.md",
       "proseWords": 1184,
       "sha256": "40d1f287a5d27fb455655c30835339aa2aa8c4ad2739834c984b9a465a682a03"
     },
     {
-      "file": "docs\\study-book\\03-evidence-authority-and-experiments.md",
+      "file": "docs/study-book/03-evidence-authority-and-experiments.md",
       "proseWords": 1222,
       "sha256": "0a2173529d4ab56919cadd885df68cb243a755e4c2f575e553f3f18dbb99be38"
     },
     {
-      "file": "docs\\study-book\\04-read-the-repository-as-decisions.md",
-      "proseWords": 1178,
-      "sha256": "9cf225019942f3e43f0bec270b8daca0d70e1aeef60b0eed6b9a773ed54e8fb8"
+      "file": "docs/study-book/04-read-the-repository-as-decisions.md",
+      "proseWords": 2600,
+      "sha256": "b20fafc3392a6d7b10d015c7ceea93341fabdcbdef3719a22924f504d3ee2eac"
     },
     {
-      "file": "docs\\study-book\\05-the-investigation-notebook.md",
-      "proseWords": 1276,
-      "sha256": "6e466723781bc1f137ca8dd9a856fd7f0fdbf1f3eb4e692de891fc1b26b667fe"
+      "file": "docs/study-book/05-the-investigation-notebook.md",
+      "proseWords": 1740,
+      "sha256": "5128c0ce1611acde6931f3e14bac372812ebb579abcb50d09057e6f2a3d318ec"
+    },
+    {
+      "file": "docs/study-book/06-windows-and-wsl.md",
+      "proseWords": 1811,
+      "sha256": "017db6b1006a1da87cd9cd051d387225364893299cb17a2c7b1c660c78d21c02"
+    },
+    {
+      "file": "docs/study-book/07-files-paths-and-executables.md",
+      "proseWords": 2934,
+      "sha256": "53d287e90a2a3230a12153bf7d7a5d6e76e404bbd7a4b7580cc87e461ea4d1ae"
+    },
+    {
+      "file": "docs/study-book/08-safe-command-composition.md",
+      "proseWords": 3886,
+      "sha256": "a1e4400df0e4512d5ea5a220858c2b7353613759184648f5a9c6c3fe882b423c"
+    },
+    {
+      "file": "docs/study-book/09-processes-ports-and-environments.md",
+      "proseWords": 2369,
+      "sha256": "93faf4b8882602e53c96e983836e02542158c2606928911aa105da2676e845d6"
+    },
+    {
+      "file": "docs/study-book/10-git-state-and-release-evidence.md",
+      "proseWords": 1673,
+      "sha256": "20d30c670190b5bef13090033b6576bea90a3fc9907e986fff2d0681267e8b47"
+    },
+    {
+      "file": "docs/study-book/11-url-to-pixels.md",
+      "proseWords": 1176,
+      "sha256": "503258cf5d69bd879ed971cfb0292e4f5226744fcf739f69491d1e81d120bee9"
+    },
+    {
+      "file": "docs/study-book/12-network-evidence.md",
+      "proseWords": 1035,
+      "sha256": "8597a241e2989d262e8e5e67f930a9dc9edb927763f2a2c89311a04d23220810"
+    },
+    {
+      "file": "docs/study-book/13-dom-layout-accessibility.md",
+      "proseWords": 379,
+      "sha256": "2153a5d5e198d61f041161a1e37d3f050a4983bb7a43cad8c59847293b791546"
+    },
+    {
+      "file": "docs/study-book/14-sources-and-callbacks.md",
+      "proseWords": 660,
+      "sha256": "1d7783f5a20611321fd8678e7900ae33f3d90b5f2a4f97a8f66355bb48763ab4"
+    },
+    {
+      "file": "docs/study-book/15-browser-storage-and-credentials.md",
+      "proseWords": 751,
+      "sha256": "d33e27bc03e2c77d81bcd0ce48e69e3de395836d7a046d7eb82dfa1e59edd5c6"
+    },
+    {
+      "file": "docs/study-book/16-account-and-room-identities.md",
+      "proseWords": 977,
+      "sha256": "10961950ee1c5370692eedc2266a0ca29f3b6a1be3f0c8e8f93f5b1ff399d377"
+    },
+    {
+      "file": "docs/study-book/17-claims-and-permissions.md",
+      "proseWords": 955,
+      "sha256": "09c1b1e322520fa257975fa52736dee2bfd2337d4d9e2d12048dcc44e408defa"
+    },
+    {
+      "file": "docs/study-book/18-invitation-capability.md",
+      "proseWords": 972,
+      "sha256": "c56831bf86171b6e1fd15dc20b93905f099da788775667476a6337bf1eeb97cb"
+    },
+    {
+      "file": "docs/study-book/19-direct-and-manual-admission.md",
+      "proseWords": 964,
+      "sha256": "1db19a78301739da5a0f61d0d0dbd45cd44bd8ab64e6c3a7a162b507d636c7ca"
+    },
+    {
+      "file": "docs/study-book/20-consent-and-stale-responses.md",
+      "proseWords": 1001,
+      "sha256": "16cfe3e445f5f93c221949248d82038899dc5435a365cfbfe74a8f0484c52cb5"
+    },
+    {
+      "file": "docs/study-book/21-safe-firestore-observation.md",
+      "proseWords": 324,
+      "sha256": "ef6765b65c3218e1c84c7c0d8d2fc7859c58bb1e73ca7c85b49aa4233ba6df75"
+    },
+    {
+      "file": "docs/study-book/22-records-and-projections.md",
+      "proseWords": 765,
+      "sha256": "bd76e6a14debf1feaebdc86e7ae9e986ba83d091212f8ff7ddeb44f08afc8a60"
+    },
+    {
+      "file": "docs/study-book/23-transactions-and-reservations.md",
+      "proseWords": 1427,
+      "sha256": "d0d86e6309818d26e61f4c8e2d974336b63ed01eca0fe83c6e465c9be37d75cc"
+    },
+    {
+      "file": "docs/study-book/24-rules-and-server-commands.md",
+      "proseWords": 966,
+      "sha256": "82d50ea58b10b297fb10298095d3f3b37a32556c27df139f4d87bbce77c8bbe3"
+    },
+    {
+      "file": "docs/study-book/25-legacy-identity-and-reconciliation.md",
+      "proseWords": 322,
+      "sha256": "d501530f985cd220c4c21f8379ea4223ccfe1372ff201b6161d4919e7e57ba28"
+    },
+    {
+      "file": "docs/study-book/26-session-lifecycle.md",
+      "proseWords": 325,
+      "sha256": "51e4c1f949207037b0059b860f4d26e3e817aee2e6003b84694ae6674ac869f3"
+    },
+    {
+      "file": "docs/study-book/27-reconnect-and-duplicate-identity.md",
+      "proseWords": 965,
+      "sha256": "a2b0e90033b0c63dfe342d31368f1c32cb5cf1bc8055b6156f42837f0674f755"
+    },
+    {
+      "file": "docs/study-book/28-late-leave-and-finalization.md",
+      "proseWords": 321,
+      "sha256": "f2d6a3aace9e32a4aba0f3124ed5da5f47870fffb6ecc0077212554a3c2d04b5"
+    },
+    {
+      "file": "docs/study-book/29-media-grants-and-adapters.md",
+      "proseWords": 322,
+      "sha256": "87a5ea013d3ee8a773c04c95c365abe38c9611832440d48a1fb8cec3bc5f26c1"
+    },
+    {
+      "file": "docs/study-book/30-chat-keys-and-retries.md",
+      "proseWords": 1217,
+      "sha256": "22941604b9d08e7840ebe77d78d360873430b15290f9092d48316b5878420d06"
+    },
+    {
+      "file": "docs/study-book/31-deep-modules.md",
+      "proseWords": 503,
+      "sha256": "c7befc7282e0c1fa14400e5696144b143a892b84b8841f5000bcb8f3de41ff74"
+    },
+    {
+      "file": "docs/study-book/32-pure-decisions-and-io.md",
+      "proseWords": 854,
+      "sha256": "526a5f2ad4c6240776af88dd6ca0a3b46e22e69f18b368b2e9a9dcbce02c442c"
+    },
+    {
+      "file": "docs/study-book/33-object-centered-workbench.md",
+      "proseWords": 315,
+      "sha256": "844b3ce45e2b8e0fd10099c459fafacfde0158d2b71e0d8c46b8b8ee7442a4a9"
+    },
+    {
+      "file": "docs/study-book/34-invalidation-and-projections.md",
+      "proseWords": 313,
+      "sha256": "3f94b09d7235f12ce164d0c4eff9e367c27e321609f4c2b025d508b009cd4b9e"
+    },
+    {
+      "file": "docs/study-book/35-resource-lifetime.md",
+      "proseWords": 951,
+      "sha256": "b7b0751e2c5c41f24e51ad06fdbf448a8b7d184e6bb665e7d1ae88449a977789"
+    },
+    {
+      "file": "docs/study-book/36-profile-security-lab.md",
+      "proseWords": 294,
+      "sha256": "c7fea436f5d8bae62146aa2537a7257642c0cf32bf0c31a1fd2cb175bc5602b3"
+    },
+    {
+      "file": "docs/study-book/37-consultation-write-lab.md",
+      "proseWords": 283,
+      "sha256": "d107a9a2bff7b3e4a8aa34ac675a6de6debed1ed447a8e80fbfc4b26bf24a1a1"
+    },
+    {
+      "file": "docs/study-book/38-room-namespace-security.md",
+      "proseWords": 290,
+      "sha256": "a67093dc123792927d595793d7541ef3216d91048605905cd871304918d9e589"
+    },
+    {
+      "file": "docs/study-book/39-enumeration-bounds-and-errors.md",
+      "proseWords": 294,
+      "sha256": "9443d5073a8edac8b92921b0f59df52e7740844ac7ae84f8d22228f17222afca"
+    },
+    {
+      "file": "docs/study-book/40-secrets-and-disabled-features.md",
+      "proseWords": 303,
+      "sha256": "5b7d07378ec692d7b423b2b66a3c6492b4ab3048e96f197c57b28940d50e2400"
+    },
+    {
+      "file": "docs/study-book/41-define-the-metric.md",
+      "proseWords": 1131,
+      "sha256": "cf2d51a367ebdbdf599dd3c355212509d25d9f7220892125be8f6715c2f91927"
+    },
+    {
+      "file": "docs/study-book/42-main-thread-network-database.md",
+      "proseWords": 1258,
+      "sha256": "f493c461cd91c0f8394a37080325731ad1ff9be75d732fb99334db80599afe42"
+    },
+    {
+      "file": "docs/study-book/43-authenticated-api-measurement.md",
+      "proseWords": 313,
+      "sha256": "ea092d6d0e41387d1e44adb6e54f72e27fb75a128c05253febb1af553fdaaf22"
+    },
+    {
+      "file": "docs/study-book/44-webrtc-statistics.md",
+      "proseWords": 1128,
+      "sha256": "81251f8fc61279d92c210cf0a084242cc18686e323ac4ada6635a60f0bf57602"
+    },
+    {
+      "file": "docs/study-book/45-capacity-and-reconnection.md",
+      "proseWords": 1034,
+      "sha256": "d2fc07e592f57cf1e301505ed33e45a57f8f292c8614fbc86da3171a453d5aca"
+    },
+    {
+      "file": "docs/study-book/46-transcript-consent-and-provenance.md",
+      "proseWords": 313,
+      "sha256": "ef29b42486edf02e271dccdb8030e8a5c3ff2ec3f4b3161af2f3f1a55f374f9b"
+    },
+    {
+      "file": "docs/study-book/47-conservative-summary-evidence.md",
+      "proseWords": 278,
+      "sha256": "823af1a77156952e8f4901b2173ff7c5c3c0d010c4781d7c92b86f4c9663c2e6"
+    },
+    {
+      "file": "docs/study-book/48-retries-and-entitlement.md",
+      "proseWords": 409,
+      "sha256": "52627e2a80a81bc3bb74b5ce81f87f9163413497a4b4054d84fbe7bed9ea01f3"
+    },
+    {
+      "file": "docs/study-book/49-clinician-edits-and-revisions.md",
+      "proseWords": 1441,
+      "sha256": "4f0111e3bb62c7b36cf8bbb5a3f3ab731565756017bee184af306568cd654855"
+    },
+    {
+      "file": "docs/study-book/50-clinician-efficiency-study.md",
+      "proseWords": 1172,
+      "sha256": "07dc0db3eb9f4c5227c85106e0780bab231d3c1be4fd949e61421004e6c0c8c3"
+    },
+    {
+      "file": "docs/study-book/51-test-counterexamples.md",
+      "proseWords": 932,
+      "sha256": "9b7981493314108a2f4ae8a5f94cdced53133cbf03cfe6c37ae8f7c1e8e75319"
+    },
+    {
+      "file": "docs/study-book/52-ci-and-dependencies.md",
+      "proseWords": 313,
+      "sha256": "107ade7ffa8a8c3acc28c37fb26b3eb21e57f6c40cb1fb22076d44e87bac6ad1"
+    },
+    {
+      "file": "docs/study-book/53-coordinated-release.md",
+      "proseWords": 1099,
+      "sha256": "a6d58fd8bae02aca280eebb06bdb31026a176e77540e7024bdd84fd76fa00da1"
+    },
+    {
+      "file": "docs/study-book/54-quota-and-read-budgets.md",
+      "proseWords": 297,
+      "sha256": "387fbfef506c0bfe4786db2651d7a57fce652007d6439095645e363303b01d3e"
+    },
+    {
+      "file": "docs/study-book/55-retention-backups-and-readiness.md",
+      "proseWords": 430,
+      "sha256": "57532eb1831aa79a01cb5024067bf395c28bbf495684b3069b959a69766a785e"
+    },
+    {
+      "file": "docs/study-book/56-capstone-allowlisted-patient-waits.md",
+      "proseWords": 1424,
+      "sha256": "34ba6aa08317d91a5acd02b64ee8e5ab28cb8c7e3fa9e242765871bb2575ef6e"
+    },
+    {
+      "file": "docs/study-book/57-capstone-wrong-person-history.md",
+      "proseWords": 1325,
+      "sha256": "d134615752d95972ff258c7fa2413c2c58abfc86dc2ac5a2a5d1ec1a7753b755"
+    },
+    {
+      "file": "docs/study-book/58-capstone-overnight-reads.md",
+      "proseWords": 1319,
+      "sha256": "419d3cdb85071a9c1b0768dddcc53164ec13f0a84b13f3a38f3a3195ae6042c4"
+    },
+    {
+      "file": "docs/study-book/59-capstone-unsupported-performance-claim.md",
+      "proseWords": 1235,
+      "sha256": "2ffe34b6a51eae83ca5e8492ada678fd5ccef71e926ea0ad21f9c7d21471a9fb"
+    },
+    {
+      "file": "docs/study-book/60-independent-engineering-defense.md",
+      "proseWords": 2317,
+      "sha256": "826b3c079fbeccb0813c2c99e36b1a61f491af087a7c84c2b84b1083c36ee465"
     }
   ],
-  "countMethod": "Regex word count excluding headings, fenced code, tables and source trails. Outline/README excluded."
+  "countMethod": "Regex word count of original and attributed adapted chapter prose, excluding headings, fenced code, tables, source trails, front matter, contents and source index. Outline/README excluded.",
+  "previewPages": 167,
+  "pdfPages": 167,
+  "pdfSha256": "10c4274b82efa2ea7a73717bd7186be889ea82f90f33243b90b796609a791bcf"
 }

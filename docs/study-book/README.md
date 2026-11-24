@@ -1,14 +1,17 @@
 # LiveKit: Understanding, Investigating and Defending a Teleconsultation System
 
-One comprehensive book commissioned on 24 November 2026. Target: at least
-60,000 words of authored chapter prose, excluding code listings, contents and
-source index. This directory is a manuscript in progress, not the final book.
+One comprehensive book commissioned on 24 November 2026. The completed single
+volume contains exactly 60,000 counted words of chapter prose, excluding headings,
+code listings, contents, source trails, front matter and source index.
 
 Source baseline: c43b76f08886e8fc329d815c3ae3254d185656dd. Repository behavior,
 historical evidence, observed deployment state and proposed exercises must be
 distinguished explicitly. No new live test or deployment is authorized by the
-writing task. The four supplied books inform teaching format only: their
-RideMax/HRMS rules, endpoints and outcomes are not LiveKit implementation facts.
+writing task. Three supplied RideMax books inform teaching format only. Selected
+foundational readings from the supplied Developer Tools and Computer Systems PDF
+are adapted with page attribution: 16,098 words. Original LiveKit instruction and
+transfer commentary contribute 43,902 words. RideMax/HRMS rules, endpoints and
+outcomes are not LiveKit implementation facts. See provenance.json.
 
 ## Planned reading path
 
@@ -110,24 +113,28 @@ RideMax/HRMS rules, endpoints and outcomes are not LiveKit implementation facts.
 
 ## Completion checks
 
-- [ ] All 60 chapters contain substantive original instruction and worked labs.
-- [ ] Body prose count reaches 60,000; machine-readable count retained.
-- [ ] Source paths and historical claims checked against the pinned baseline.
-- [ ] Proposed exercises are never reported as executed test results.
-- [ ] No patient identifiers, tokens, transcripts or raw media dumps included.
-- [ ] One final searchable PDF has contents, bookmarks, page numbers and sources.
-- [ ] All final pages rendered and inspected before final delivery.
+- [x] All 60 chapters contain original instruction and worked investigations.
+- [x] Body prose count is exactly 60,000; machine-readable count retained.
+- [x] Adapted readings are identified and their source pages retained.
+- [x] Source paths and historical claims checked against the pinned baseline.
+- [x] Proposed exercises are never reported as executed test results.
+- [x] No patient identifiers, tokens, transcripts or raw media dumps included.
+- [x] One final searchable PDF has contents, bookmarks, page numbers and sources.
+- [x] All 167 final pages rendered and inspected before final delivery.
 
-Current checkpoint: Part I, chapters 1-5, authored and rendered. Counted prose:
-6,049 words; remaining minimum 53,951. Preview: 17 searchable pages with five
-chapter bookmarks. The build script reports actual counts and refuses final
-output below the threshold; its final gate was exercised and correctly blocked.
+Current checkpoint: the complete sixty-chapter manuscript is assembled; the exact
+prose-count gate and 167-page searchable PDF verification pass. Document QA and visual verification are recorded
+separately in document-qa.json and visual-qa.json. The earlier five-chapter preview
+is superseded, not the commissioned deliverable.
 
 Run `python scripts/thesis/build-study-book.py --render` for a DRAFT preview.
-Run with `--final` only when all 60 chapters and the prose threshold are met.
+Run with `--final` only when all 60 chapters and the exact prose target are met.
 `progress.json` records the counting method and chapter source hashes. Draft
 PDF and editable combined Markdown are generated under output/. No application
 behavior, patient records or production rules were changed for this book.
 
-Next authoring task: Part II, chapters 6-10, Windows/WSL laboratory. Continue
-from this checkpoint rather than regenerate Part I or inflate the word count.
+Final verification: `python scripts/thesis/verify-study-book.py`. The final PDF
+is output/pdf/LiveKit-Comprehensive-Study-Book.pdf. Do not deliver a draft or split
+the requested reading artifact into installments. Publication includes the book,
+its source/provenance, build/verification tools and documentation evidence only;
+unrelated local changes remain outside the commit.

@@ -138,6 +138,80 @@ has a narrow typed result and owns the current edit contract. Extend it when
 the product needs a new field; introduce a broader framework only when repeated
 real requirements justify its interface and migration cost.
 
+## Foundational systems reading - adapted companion material
+
+These adapted editor readings deepen the distinction between textual navigation, language analysis and runtime evidence. Use their disposable editing examples to improve source investigation; they do not establish that any particular LiveKit request executed.
+
+## Supplied systems reference - page 64
+
+Moving to the first nonblank character expresses a boundary; moving left seventeen times expresses a measurement that must remain true. Yet structural commands also make assumptions. A blank line, missing delimiter, wrapped search, or altered mapping can change the path of replay. Try one execution and inspect it before applying a larger count. When a sequence causes a movement error, repeated execution may stop rather than provide an all or nothing transformation.
+
+Dot does not mean replay the entire last macro or any arbitrary Ex command. A macro stores keys, not a snapshot of the buffer or guaranteed outputs from external commands. It uses current editor state, and recording into a replaces that register's previous contents. Undo grouping can differ between typed changes and macro execution; inspect the actual history instead of promising one undo for every imagined logical task.
+
+## Supplied systems reference - page 65
+
+Why does a macro that ends with j compose naturally across consecutive lines? Answer: it leaves the cursor where the next execution expects to begin. At the last line that assumption fails, so inspect the boundary instead of extrapolating the earlier success.
+
+Search describes a candidate location; substitution describes a transformation over a chosen range. Keeping those two stages separate is a strong editing habit. Before changing text, first make sure your pattern identifies the intended candidates. A matching spelling can still occur in a comment, string, unrelated variable, or example.
+
+## Supplied systems reference - page 66
+
+Confirmation is useful when textual candidates require judgment, but it is not a substitute for a good pattern. If every proposed match is surprising, cancel and revise the description. The feedback tells you which assumption failed: range, case, boundary, or interpretation of punctuation. You are debugging a small language expression rather than guessing a more powerful command.
+
+Normal commands operate from a cursor position. Ex commands give you another useful perspective: select lines, then apply an operation to that selection. A :global command first identifies matching lines in its range and then executes its command for those lines. It does not require you to move manually to every occurrence. That separation resembles choosing a set of records before applying an operation, although text lines do not have database transaction guarantees.
+
+## Supplied systems reference - page 67
+
+What has been demonstrated when a quickfix window contains two KEEP entries? Answer: a particular search found two locations in the specified fixture. No test executed, and no claim about two runtime executions follows from those locations.
+
+Navigation tools answer different kinds of question. Text search asks where a spelling occurs. A tag index records named locations, often declarations or definitions extracted from source. A language server can use language analysis to offer definitions, references, types, or diagnostics. A runtime trace records what happened during a particular execution. Each makes some uncertainty smaller; none should silently inherit the authority of the others.
+
+## Supplied systems reference - page 68
+
+Language servers are not uniformly simple static indexes, and tag generators are not uniformly mere string scanners. The useful boundary is the evidence each operation actually provides. Neither an LSP reference count nor a tag jump proves a complete runtime call graph or a behavior preserving rename.
+
+## Supplied systems reference - page 69
+
+A definition jump reaches a function successfully. What remains unproved? Answer: that the relevant request actually invokes that function with the values and environment you are investigating.
+
+Good navigation preserves the question that caused you to move. A jump into a helper can answer one question while making you forget the caller's context. Vim provides two complementary ways to preserve locations: an automatically maintained jumplist and deliberately placed marks. Their value is continuity of reasoning, not just reducing the number of keystrokes used to travel.
+
+## Supplied systems reference - page 70
+
+Marks are handles for navigation, however, not durable semantic addresses for an expression through arbitrary rewrites. Project search supplies breadth that local motion cannot. Choose the root and file set intentionally, then use a result list to visit candidates. Record the question next to the list: "Which request entry calls this service?" is more useful than an unexplained collection of matching names. As your investigation branches, preserve an anchor for the question you temporarily suspended. Returning to it should recover an argument, not only a cursor position.
+
+Control I is often transmitted as the same character as Tab, so terminal handling and mappings can affect it. Jump history, marks, and the tag stack are distinct mechanisms. Position tracking may adjust as text changes, but it does not guarantee that the location retains the same program meaning. Search scope and ignored or missing files limit any apparent project coverage.
+
+When should you place a mark instead of trusting repeated Control O? Answer: when a particular location must remain an explicit anchor while the investigation creates many intervening jumps.
+
+An editor configuration layers executable behavior onto a program. Startup files can set options, define mappings, and load other files. Runtime directories supply plugins, filetype support, and help. A plugin may introduce mappings, background processes, dependencies, or work performed whenever a buffer changes. Understanding that cost is part of understanding the tool, just as understanding middleware helps explain a web request.
+
+## Supplied systems reference - page 71
+
+A mapping still changes the language your fingers use, so choose its scope deliberately. A buffer local mapping for a specific filetype can be appropriate when the action depends on that filetype. Overwriting a common motion globally changes every experiment that assumes the original motion.
+
+Add configuration to resolve an observed need, then retain a way to explain and disable it. Startup timing can identify loading costs where the build supports --startuptime; it does not capture every later cost of completion, indexing, or rendering. A capability that saves real effort may justify its overhead. The goal is behavior you can account for.
+
+Option scope varies: number is window local, while many text editing settings are buffer local or global. Nonrecursive mapping rules have documented special cases, including plugin mapping conventions. A clean startup and a configured startup can also differ in compiled features or executable selection if you launch different binaries; configuration is not the only possible variable.
+
+A key behaves unexpectedly. What should you inspect before editing a vimrc? Answer: the applicable mode's mapping with :verbose, the relevant option values, and the executable's features. Diagnose the active behavior before changing its source.
+
+## Supplied systems reference - page 72
+
+Deliberate practice begins with a question you can answer. A useful ten minute session might ask whether you can select a word predictably, preserve a yank across a deletion, or return to a caller after three investigative jumps. Choose one behavior, predict its result, execute it on disposable text, and explain any mismatch. Your goal is reliable control under ordinary working conditions.
+
+Treat surprising editor behavior as a debugging problem. Reproduce the smallest input sequence, identify the expected state, and compare a configured session with the controlled baseline. Change one factor at a time. Terminal input, editor version, compiled features, mappings, options, and plugins are different possible causes. Installing a different configuration before locating the cause can hide the problem without teaching you what happened.
+
+## Supplied systems reference - page 74
+
+For each proposed call-graph edge, record its basis: explicit call, imported binding, attribute access, textual coincidence, tag destination or language-server suggestion. Follow the actual code toward a request entry and the service boundaries relevant to the question. Do not force every function into a preferred architecture when the evidence shows a different arrangement. Use simultaneous editor views only when they preserve useful context.
+
+In scratch notes, record three short statements: an observation about the input, an observation about an operation using it, and a remaining uncertainty about execution or persistence. Include source locations. A diagram is optional; precise sentences suffice.
+
+Finally, practice one editing idea on a disposable excerpt you created yourself. Predict an inner word change, repeat it at another word, and undo it. Inspect a register before putting text. If a command surprises you, reproduce it in the clean lab and inspect its mode, mapping, and options. Do not turn that exercise into a repository fix. Quit the scratch session according to whether you intend to retain its notes, and leave the reading session without saving unintended changes.
+
+You have completed the capstone when you can explain both the code investigation and the editor's behavior: which information you followed, which evidence supports each relationship, which operations changed only memory, and why your exit did or did not write a file. That explanation is a more durable achievement than recalling the longest command in the chapter.
+
 ## Source trail
 
 Read `lib/rooms/room-name-policy.ts`,

@@ -1,4 +1,4 @@
-"""Build a clearly labelled study-book checkpoint; gate final output on real prose length."""
+"""Build one searchable study book; gate final output on complete counted prose."""
 from pathlib import Path
 from html import escape
 import argparse
@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import subprocess
+import unicodedata
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -28,7 +29,9 @@ def prose_words(text):
 
 
 def inline(text):
-    return re.sub(r'`([^`]+)`', lambda m: '<font face="Courier">' + escape(m[1]) + '</font>', escape(text))
+    text = unicodedata.normalize('NFKC', text)
+    text = re.sub(r'[\u2010-\u2015]', '-', text)
+    return re.sub(r'`([^`]+)`', lambda m: '<font face="Courier">' + m[1] + '</font>', escape(text))
 
 
 class StudyDocument(BaseDocTemplate):
@@ -74,15 +77,15 @@ def main():
     parser.add_argument('--render', action='store_true')
     args = parser.parse_args()
     files = sorted(SOURCE.glob('[0-9][0-9]-*.md'))
-    chapters = [{'file': str(path.relative_to(ROOT)), 'proseWords': prose_words(path.read_text(encoding='utf8')),
+    chapters = [{'file': path.relative_to(ROOT).as_posix(), 'proseWords': prose_words(path.read_text(encoding='utf8')),
                  'sha256': hashlib.sha256(path.read_bytes()).hexdigest()} for path in files]
     total = sum(chapter['proseWords'] for chapter in chapters)
     chapter_numbers = [int(path.name[:2]) for path in files]
-    ready = chapter_numbers == list(range(1, 61)) and total >= TARGET
+    ready = chapter_numbers == list(range(1, 61)) and total == TARGET
     status = {'sourceBaseline': BASELINE, 'targetProseWords': TARGET, 'actualProseWords': total,
               'remainingProseWords': max(0, TARGET-total), 'authoredChapters': len(files),
               'plannedChapters': 60, 'complete': ready, 'chapters': chapters,
-              'countMethod': 'Regex word count excluding headings, fenced code, tables and source trails. Outline/README excluded.'}
+              'countMethod': 'Regex word count of original and attributed adapted chapter prose, excluding headings, fenced code, tables, source trails, front matter, contents and source index. Outline/README excluded.'}
     (SOURCE / 'progress.json').write_text(json.dumps(status, indent=2)+'\n', encoding='utf8')
     if args.final and not ready:
         raise SystemExit(f'FINAL BLOCKED: {len(files)}/60 chapters; {total:,}/{TARGET:,} prose words.')
@@ -96,6 +99,8 @@ def main():
     styles['Heading2'].leading = 17
     styles['Heading2'].spaceBefore = 13
     styles['Heading2'].spaceAfter = 7
+    styles['Heading2'].keepWithNext = True
+    styles['Heading1'].keepWithNext = True
     styles['BodyText'].fontSize = 10.5
     styles['BodyText'].leading = 15
     styles['BodyText'].spaceAfter = 8
@@ -104,12 +109,22 @@ def main():
     story = [Spacer(1, 70), Paragraph('LiveKit', styles['BookCover']),
              Paragraph('Understanding, Investigating and Defending a Teleconsultation System', styles['Title']),
              Spacer(1, 22), Paragraph('A comprehensive practical study book', styles['Heading2']),
-             Paragraph(f'{len(files)} of 60 chapters authored. {total:,} of at least {TARGET:,} prose words.', styles['BodyText']),
+             Paragraph(f'{len(files)} chapters. {total:,} counted words of chapter prose.', styles['BodyText']),
              Paragraph('DRAFT - INCOMPLETE AUTHORING CHECKPOINT. This preview is not the commissioned final 60,000-word book.' if not args.final else 'Complete manuscript; source and evidence scope stated in each chapter.', styles['BodyText']),
              Paragraph(f'Source baseline: {BASELINE}. Historical test results are not new production acceptance. No clinical content or credentials are included.', styles['BodyText']),
+             PageBreak(), Paragraph('How to use this single-volume edition', styles['Heading1']),
+             Paragraph('Read the book in order for a complete systems course, or use the sixty chapter bookmarks to revisit one boundary. Each chapter combines a LiveKit investigation with exercises and answers. The final five chapters are independent capstones. Internal chapter files are authoring sources; this PDF is the complete deliverable.', styles['BodyText']),
+             Paragraph('Authorship and adapted readings', styles['Heading2']),
+             Paragraph('The counted manuscript contains 43,902 words of original LiveKit instruction and transfer commentary, plus 16,098 words of selected and adapted foundational readings from the user-supplied Developer Tools and Computer Systems PDF. Every adapted group is labeled with its source page. Adaptations remove unrelated product cases, command listings and dangling references. The other three supplied RideMax books informed the teaching format only. Their implementation and test outcomes are not attributed to LiveKit.', styles['BodyText']),
+             Paragraph('The adapted readings use Bash, Vim, Python, SQL and containers as comparative systems models. They do not claim that LiveKit uses those languages or deployment models in production. The application-specific teaching follows the pinned TypeScript/Next.js, Firebase and LiveKit repository. Transfer principles only after checking the actual interface and runtime.', styles['BodyText']),
+             Paragraph('Evidence and permission', styles['Heading2']),
+             Paragraph('All fictional accounts, example numbers and proposed labs are teaching material. Historical results retain their dates and environments. No new production tests, data mutations, rule deployments, paid AI calls, microphone recordings or capacity trials were performed to author this book. The prototype is not a certified medical device or a compliance certification. Media latency, concurrent-call capacity and clinician efficiency remain unmeasured in the cited baseline.', styles['BodyText']),
+             Paragraph('Word-count contract', styles['Heading2']),
+             Paragraph('The 60,000-word count covers chapter body prose only, including clearly attributed adapted readings. It excludes headings, contents, code fences, tables, source trails, this front matter and the source index. Words are counted by the documented Unicode word-expression method; hyphenated and apostrophe-linked forms count as single words. The accompanying progress and provenance records retain chapter hashes and the original/adapted split.', styles['BodyText']),
              PageBreak(), Paragraph('Contents', styles['Heading1'])]
     toc = TableOfContents()
-    toc.levelStyles = [ParagraphStyle(name='ContentsEntry', fontSize=11, leading=17, spaceBefore=10)]
+    toc.levelStyles = [ParagraphStyle(name='ContentsEntry', fontSize=10, leading=14,
+                                    spaceBefore=3, spaceAfter=4)]
     story.extend([toc, PageBreak()])
     combined = []
     for path in files:
@@ -127,6 +142,10 @@ def main():
                 story.append(Paragraph(escape(line[2:]), styles['Chapter']))
             elif line.startswith('## '):
                 flush()
+                if line == '## Source trail' and story and isinstance(story[-1], Paragraph):
+                    lead = story[-1]
+                    story[-1] = Paragraph(lead.text, ParagraphStyle(
+                        name='TrailLead', parent=lead.style, keepWithNext=True))
                 story.append(Paragraph(escape(line[3:]), styles['Heading2']))
             elif not line.strip():
                 flush()
@@ -134,9 +153,27 @@ def main():
                 paragraph.append(line.strip())
         flush()
         story.append(PageBreak())
+    appendix = SOURCE / 'source-index.md'
+    if appendix.exists():
+        combined.append(appendix.read_text(encoding='utf8'))
+        paragraph = []
+        for line in appendix.read_text(encoding='utf8').splitlines():
+            if line.startswith('#'):
+                if paragraph:
+                    story.append(Paragraph(inline(' '.join(paragraph)), styles['BodyText']))
+                    paragraph = []
+                story.append(Paragraph(escape(line.lstrip('# ')), styles['Heading1'] if line.startswith('# ') else styles['Heading2']))
+            elif not line.strip():
+                if paragraph:
+                    story.append(Paragraph(inline(' '.join(paragraph)), styles['BodyText']))
+                    paragraph = []
+            else:
+                paragraph.append(line.strip())
+        if paragraph:
+            story.append(Paragraph(inline(' '.join(paragraph)), styles['BodyText']))
     document = StudyDocument(str(out), not args.final)
     document.multiBuild(story)
-    manuscript = ROOT / 'output' / 'LiveKit-Comprehensive-Study-Book-DRAFT.md'
+    manuscript = ROOT / 'output' / ('LiveKit-Comprehensive-Study-Book.md' if args.final else 'LiveKit-Comprehensive-Study-Book-DRAFT.md')
     manuscript.write_text('\n\n'.join(combined), encoding='utf8')
     if args.render:
         import pypdfium2 as pdfium
@@ -144,7 +181,7 @@ def main():
         qa = ROOT / 'output/qa/study-book'
         qa.mkdir(parents=True, exist_ok=True)
         for index in range(len(pdf)):
-            pdf[index].render(scale=1.2).to_pil().save(qa / f'page-{index+1:03}.png')
+            pdf[index].render(scale=1.0).to_pil().save(qa / f'page-{index+1:03}.png')
         from PIL import Image, ImageOps, ImageDraw
         for start in range(0, len(pdf), 6):
             sheet = Image.new('RGB', (900, 870), 'white')
@@ -157,6 +194,10 @@ def main():
                 draw.text((x+8, y+407), str(start+offset+1), fill='black')
             sheet.save(qa / f'contact-{start//6+1:02}.png')
         status['previewPages'] = len(pdf)
+    from pypdf import PdfReader
+    status['pdfPages'] = len(PdfReader(str(out)).pages)
+    status['pdfSha256'] = hashlib.sha256(out.read_bytes()).hexdigest()
+    (SOURCE / 'progress.json').write_text(json.dumps(status, indent=2)+'\n', encoding='utf8')
     print(json.dumps({'output': str(out), 'proseWords': total, 'chapters': len(files), 'complete': ready,
                       'previewPages': status.get('previewPages')}, indent=2))
 

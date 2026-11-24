@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-24",
+  "artifact": "output/pdf/LiveKit-Comprehensive-Study-Book.pdf",
+  "pdfSha256": "10c4274b82efa2ea7a73717bd7186be889ea82f90f33243b90b796609a791bcf",
+  "renderedPages": 167,
+  "reviewedPages": 167,
+  "method": "Rendered every page with PDFium at scale 1.0; inspected all 28 six-page contact sheets from the final render and full-size pages 2, 121, 166 and 167. Earlier full-size page 33 identified a stranded heading; heading keep-with-next and source-trail pagination were corrected and all contact sheets re-reviewed.",
+  "checks": {
+    "coverAndContents": "PASS",
+    "pageNumbersAndRunningFurniture": "PASS",
+    "chapterTransitions": "PASS",
+    "noVisibleClippingOverlapOrReplacementGlyphs": "PASS",
+    "sourceAttributionLegible": "PASS",
+    "bodyAndHeadingTypography": "PASS"
+  },
+  "scope": "Document rendering only, not application or production acceptance.",
+  "pass": true
+}

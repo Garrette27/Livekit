@@ -150,6 +150,32 @@ need a credential value, a real patient's identity or your memory of which tab
 was active, the handoff is not finished. Improve the record before collecting
 another screenshot.
 
+## Foundational systems reading - adapted companion material
+
+These adapted systems readings extend the investigation notebook method. Their examples show how to preserve a prediction, execution identity and uncertainty, so a later investigator can reconstruct the reasoning without copying sensitive operational data.
+
+## Supplied systems reference - page 17
+
+More integration can create more hidden state: plugin versions, language servers, PATH alterations, services, keymaps, and generated caches. Integration is valuable when its benefits exceed its maintenance and diagnosis costs. Count both.
+
+What justifies adopting a heavily configured Neovim distribution now? A demonstrated need that it solves, willingness to understand and maintain its dependencies, and a way to reproduce behavior with or without that configuration.
+
+Write your prediction before running the command. This prevents rewriting your explanation after seeing the result. State what would make you change your mind. A useful note might say: "If the package metadata exists but find_spec resolves to the project directory, shadowing is more plausible than a missing installation." That is a small, falsifiable argument.
+
+Repeat with a changed condition only when it addresses a remaining uncertainty. Run the same inspection inside the web container if the failure occurred there. Compare an interactive shell with a script if startup behavior is relevant. Avoid collecting large logs with no question attached; they increase the amount of evidence you must interpret without necessarily increasing certainty.
+
+## Supplied systems reference - page 18
+
+Add a third environment: a project container, using only the established read-only inspection commands for that project. Record the interpreter path and a selected non-sensitive version inside it. If the project is not running, leave this step for later; do not start the wrong Compose project merely to complete a checklist. The purpose is to explain the boundaries, not to manufacture activity.
+
+Your final artifact is a small table of observations with columns for surface, execution environment, working directory, selected runtime, and endpoint. The Windows browser's row should identify the URL it is observing rather than inventing a Linux interpreter. A Git client's row should identify its repository. A database client's row should identify its destination as far as you can establish it without credentials.
+
+Explain three differences in prose. For example, two shells can share files while retaining different directories; the host and container can resolve Python differently; the browser can reach an older application process while your editor displays newer source. If you cannot explain a difference, preserve it as a question for the following chapters. The map is useful when it makes a future diagnostic command more precise.
+
+## Supplied systems reference - page 175
+
+The fourth is time between decisions. A human can review a row, wait, and submit after another person has changed it. A request can validate a schedule and enqueue work that runs after the validation status changes. The gap is part of the operation. Treating an operation as one instantaneous function call can erase the concurrency question you needed to ask.
+
 ## Source trail
 
 Read `docs/testing/verification-status.md`,

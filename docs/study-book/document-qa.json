@@ -1,0 +1,18 @@
+{
+  "chapterCount": 60,
+  "chapterProseWords": 60000,
+  "provenanceWordSum": 60000,
+  "pdfPages": 167,
+  "chapterBookmarks": 60,
+  "searchablePages": 167,
+  "duplicateLongParagraphs": [],
+  "missingSourcePaths": [],
+  "pdfSha256": "10c4274b82efa2ea7a73717bd7186be889ea82f90f33243b90b796609a791bcf",
+  "replacementGlyphPages": [],
+  "suspectedCredentialOrPersonalEmailFiles": [],
+  "contentsLinks": 120,
+  "distinctContentsChapterDestinations": 60,
+  "bookmarksReachChapterStarts": true,
+  "scope": "Document verification only; not new application, production or clinical acceptance.",
+  "pass": true
+}
