@@ -4,6 +4,8 @@ Prepared 25 November 2026 (Asia/Singapore). Scope: minimally revise the supplied
 
 ## Send these first
 
+For direct browser downloads, use the [download index](DOWNLOADS.md) or [public-safe ZIP](TeleConsole-Public-Defense-Pack.zip). The ZIP uses the redacted manuscript and deliberately excludes the private submission copy and personal appendices.
+
 New waiting-queue/title supplement: [editable PowerPoint with speaker notes](TeleConsole-Waiting-Queue-and-Title-Defense.pptx), [offline slide handout](TeleConsole-Waiting-Queue-and-Title-Slides.pdf), [teammate teaching PDF](TeleConsole-Waiting-Queue-and-Title-Team-Guide.pdf), and [32 panel questions with answers](TeleConsole-Panel-Questions-and-Answers.pdf). The full sources are [queue/title guide](waiting-queue-and-title-defense.md), [panel answers](panel-questions-and-answers.md) and [slide content/notes](queue-title-slides.json). These are supplementary rehearsals; the official thesis title stays unchanged.
 
 1. [Messenger messages and three-writer briefing](messenger-and-three-writer-brief.md): quickest shared explanation, five-minute emergency version, speaker assignments and reading route.
