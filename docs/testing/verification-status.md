@@ -24,7 +24,29 @@ Never mark a test passed by relaxing an assertion, hiding a failing audit, or
 substituting HTTP timing for WebRTC timing. Use PASS, FAIL, BLOCKED, NOT TESTED,
 or HISTORICAL PASS, always with scope. New advisories can invalidate old scans.
 
-## Current checkpoint: 25 November 2026 - manuscript and bounded app hardening
+## Current follow-up: 25 November 2026 - waiting queue and title defense
+
+Source review is pinned to `9d53610`. No app behavior, rules, dependency, financial
+amount or survey-result changes are introduced. The official title stays intact.
+The new teaching guide, 32-question panel PDF, editable 14-slide PowerPoint with
+notes, offline handout and six manuscript corrections extend the existing pack.
+
+| Claim | Result | Evidence / limits |
+| --- | --- | --- |
+| Queue capacity pre-check interleaving | REPRODUCED GAP; hard-cap guarantee NOT PASSED | [Synthetic actual-source audit](../thesis-defense/evidence/queue-title-2026-11-25/source-audit.json): 9 initial rows, target 10, two distinct arrivals both reserve, final count 11; no production workload or overshoot bound |
+| Transactional invitation-use counter | Preserved in the same fixture | Two successful reservations increment the use count twice; this does not establish atomic waiting-slot accounting |
+| Queue policy/source description | Reviewed | [Queue/title guide](../thesis-defense/waiting-queue-and-title-defense.md): direct allowlist exception, manual oldest-arrival worklist, admitted versus connected, patient polling and doctor invalidation |
+| Manuscript document checks | PASS, 259 pages | [Current PDF report](../thesis-defense/evidence/queue-title-2026-11-25/pdf-verification.json); 38 edits on 31 pages, including six follow-up corrections; numbering/budget preserved |
+| App security and CI | Prior checkpoint retained, not expanded by these docs | The 62 regressions/14 emulator cases and successful source CI remain dated below; they do not prove the newly audited capacity invariant |
+| Complete unique-visit replay isolation, media maximum and clinician efficiency | UNRESOLVED / NOT TESTED | No new production acceptance, provider load, paid AI or clinical capture |
+
+Next: atomically owned waiting capacity with complete release/reconnect/expiry
+tests, immutable visit grants, hidden waiting-preflight review, then staged
+authenticated media/quality/load acceptance. A documentation correction is not
+an application fix. See the follow-up evidence index for artifact validation and
+the exact publication receipt when available.
+
+## Earlier checkpoint: 25 November 2026 - manuscript and bounded app hardening
 
 Fetched/fast-forwarded to `aa041fe`; preserved unrelated local AGENTS.md edits
 and untracked drafts/ZIPs. The publishable app snapshot was tested in a clean

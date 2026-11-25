@@ -4,6 +4,8 @@ Prepared 25 November 2026 (Asia/Singapore). Scope: minimally revise the supplied
 
 ## Send these first
 
+New waiting-queue/title supplement: [editable PowerPoint with speaker notes](TeleConsole-Waiting-Queue-and-Title-Defense.pptx), [offline slide handout](TeleConsole-Waiting-Queue-and-Title-Slides.pdf), [teammate teaching PDF](TeleConsole-Waiting-Queue-and-Title-Team-Guide.pdf), and [32 panel questions with answers](TeleConsole-Panel-Questions-and-Answers.pdf). The full sources are [queue/title guide](waiting-queue-and-title-defense.md), [panel answers](panel-questions-and-answers.md) and [slide content/notes](queue-title-slides.json). These are supplementary rehearsals; the official thesis title stays unchanged.
+
 1. [Messenger messages and three-writer briefing](messenger-and-three-writer-brief.md): quickest shared explanation, five-minute emergency version, speaker assignments and reading route.
 2. [Exact page-change register](page-change-register.md): printed and physical page numbers, preserved expense total, and separate public-copy privacy redactions.
 3. [Revised 259-page public-copy manuscript](TeleConsole-Revised-259-Pages.pdf): same physical page count and existing numbering; original remains untouched. CV images are omitted only in this GitHub copy. Obtain adviser/author approval for the actual academic submission, especially if personal appendices are required.
@@ -38,7 +40,9 @@ python scripts/thesis/defense-cost-model.py
 
 The scripts currently select Windows fonts and the original author's local optional PyMuPDF dependency directory. Install those packages in the interpreter or adjust that documented dependency path on another workstation. The source-inspection helper writes private extracts under `tmp/`; never publish those extracts. Running the revision script without `--public-copy` produces a private copy containing the original personal appendices; do not publish it by accident.
 
-PDF checks cover all 259 pages, extracted replacements, unchanged dimensions/labels/bookmarks, pixel-identical untouched pages, unchanged pixels outside approved regions and original-source integrity. They do not turn proposed load tests into results. Application commands and the clean validation snapshot are documented in the evidence index.
+PDF checks cover all 259 pages, extracted replacements, unchanged dimensions/labels/bookmarks, pixel-identical untouched pages, unchanged pixels outside approved regions and original-source integrity. The latest manuscript has 38 bounded substantive edits on 31 pages, including six queue-specific corrections. Its current report is [queue/title PDF verification](evidence/queue-title-2026-11-25/pdf-verification.json); the earlier 32-edit report is historical for the original published version. These checks do not turn proposed load tests into results. Application commands and the clean validation snapshot are documented in the evidence index.
+
+The queue follow-up locally reproduced a capacity pre-check race: nine initial waiting rows plus two concurrent arrivals can produce eleven for a configured target of ten. The hard atomic-capacity claim is NOT PASSED. This documentation change does not fix that app invariant or the earlier unique-visit replay gap. See [the source audit](evidence/queue-title-2026-11-25/source-audit.json).
 
 ## Maintenance and publication checklist
 

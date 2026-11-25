@@ -15,15 +15,17 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[2]
 PACK = ROOT / "docs/thesis-defense"
-report = json.loads((PACK / "evidence/pdf-verification.json").read_text(encoding="utf-8"))
+latest_report = PACK / "evidence/queue-title-2026-11-25/pdf-verification.json"
+report_path = latest_report if latest_report.exists() else PACK / "evidence/pdf-verification.json"
+report = json.loads(report_path.read_text(encoding="utf-8"))
 thesis = PACK / "TeleConsole-Revised-259-Pages.pdf"
 assert hashlib.sha256(thesis.read_bytes()).hexdigest() == report["output_sha256"]
 assert len(fitz.open(thesis)) == 259 and all(report["assertions"].values())
 assert report["public_copy"]
-assert len(report["edits"]) == 32
-assert len({edit["pdf_page"] for edit in report["edits"]}) == 25
 manifest = json.loads((PACK / "revision-manifest.json").read_text(encoding="utf-8"))
-assert len(manifest) == 32
+assert len(report["edits"]) == len(manifest)
+assert {edit["pdf_page"] for edit in report["edits"]} == {edit["page"] for edit in manifest}
+assert {edit["id"] for edit in report["edits"]} == {edit["id"] for edit in manifest}
 
 missing_links = []
 for source in PACK.glob("*.md"):
@@ -58,6 +60,6 @@ for start in range(0, len(tiles), 12):
     for offset, tile in enumerate(tiles[start:start + 12]):
         sheet.paste(tile, ((offset % 4) * 265, (offset // 4) * 372))
     sheet.save(qa / f"contact-{start + 1:02}.png")
-print(json.dumps({"thesis_pages": 259, "substantive_edits": 32, "substantive_pages": 25,
+print(json.dumps({"thesis_pages": 259, "substantive_edits": len(manifest), "substantive_pages": len({edit["page"] for edit in manifest}),
     "brief_pages": len(brief), "local_markdown_links_valid": True,
     "brief_text_within_margins": True, "thesis_sha256_matches_report": True}, indent=2))

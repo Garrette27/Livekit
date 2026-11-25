@@ -1,5 +1,6 @@
 """Render the researched team briefing with legible tables and active sources."""
 from html import escape
+import argparse
 from pathlib import Path
 import re
 
@@ -25,6 +26,8 @@ styles["Title"].alignment = TA_LEFT
 styles["Heading1"].fontSize, styles["Heading1"].leading = 15, 19
 styles["Heading1"].spaceBefore, styles["Heading1"].spaceAfter = 14, 8
 styles["Heading2"].fontSize, styles["Heading2"].leading = 11.5, 16
+styles["Heading1"].keepWithNext = True
+styles["Heading2"].keepWithNext = True
 styles["BodyText"].fontSize, styles["BodyText"].leading = 10, 14.4
 styles["BodyText"].spaceAfter = 8
 styles["BodyText"].allowWidows = styles["BodyText"].allowOrphans = 0
@@ -35,14 +38,27 @@ styles.add(ParagraphStyle("CellHead", parent=styles["Cell"], fontName="Brief-Bol
 def markup(raw):
     raw = raw.replace("\u2011", "-").replace("\u2013", "-").replace("\u2014", "-")
     value = escape(raw)
-    value = re.sub(r"\[([^\]]+)\]\((https?://[^)]+)\)", r'<link href="\2" color="#126b78"><u>\1</u></link>', value)
+    def link(match):
+        label, target = match.groups()
+        if not re.match(r"https?://", target):
+            relative = (source.parent / target).resolve().relative_to(ROOT).as_posix()
+            target = "https://github.com/Garrette27/Livekit/blob/main/" + relative
+        return f'<link href="{target}" color="#126b78"><u>{label}</u></link>'
+    value = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", link, value)
     value = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", value)
+    value = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<i>\1</i>", value)
     value = re.sub(r"`([^`]+)`", r"<font name='Brief'>\1</font>", value)
     return value
 
 
-source = ROOT / "docs/thesis-defense/capacity-quality-costs-and-team-scripts.md"
-output = ROOT / "output/pdf/TeleConsole-Capacity-Cost-and-Defense-Team-Brief.pdf"
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--source", default="docs/thesis-defense/capacity-quality-costs-and-team-scripts.md")
+parser.add_argument("--output", default="output/pdf/TeleConsole-Capacity-Cost-and-Defense-Team-Brief.pdf")
+parser.add_argument("--title", default="TeleConsole Capacity, Quality, Costs and Defense Brief")
+parser.add_argument("--footer", default="TeleConsole | Dated planning evidence, not measured capacity | 25 Nov 2026")
+args = parser.parse_args()
+source = ROOT / args.source
+output = ROOT / args.output
 lines = source.read_text(encoding="utf-8").splitlines()
 story = []
 width = A4[0] - 102
@@ -89,7 +105,7 @@ while i < len(lines):
         story.append(Paragraph(markup(line[4:]), styles["Heading2"]))
     else:
         chunks = [line]
-        while i + 1 < len(lines) and lines[i + 1].strip() and not lines[i + 1].startswith(("#", "|")):
+        while i + 1 < len(lines) and lines[i + 1].strip() and not lines[i + 1].startswith(("#", "|")) and not re.match(r"^(?:\d+[.)]|[-*])\s", lines[i + 1]):
             i += 1
             chunks.append(lines[i].strip())
         story.append(Paragraph(markup(" ".join(chunks)), styles["BodyText"]))
@@ -102,13 +118,13 @@ def furniture(canvas, doc):
     canvas.line(51, 43, A4[0] - 51, 43)
     canvas.setFont("Brief", 8)
     canvas.setFillColor(colors.HexColor("#4c6570"))
-    canvas.drawString(51, 30, "TeleConsole | Dated planning evidence, not measured capacity | 25 Nov 2026")
+    canvas.drawString(51, 30, args.footer)
     canvas.drawRightString(A4[0] - 51, 30, str(doc.page))
     canvas.restoreState()
 
 
 output.parent.mkdir(parents=True, exist_ok=True)
 SimpleDocTemplate(str(output), pagesize=A4, leftMargin=51, rightMargin=51, topMargin=48, bottomMargin=60,
-    title="TeleConsole Capacity, Quality, Costs and Defense Brief", author="TeleConsole thesis team").build(story, onFirstPage=furniture, onLaterPages=furniture)
+    title=args.title, author="TeleConsole thesis team").build(story, onFirstPage=furniture, onLaterPages=furniture)
 print(output)
 print(f"Source words: {len(source.read_text(encoding='utf-8').split())}")

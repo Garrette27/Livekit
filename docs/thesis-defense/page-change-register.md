@@ -2,7 +2,22 @@
 
 25 November 2026. Page numbers below are **printed manuscript numbers**; the second column is the PDF viewer's physical page. Physical page = printed page + 12 in these sections. No pages were inserted, removed or renumbered. Existing contents cross-references were not regenerated. The original development-cost heading is at printed 80 / PDF 92 even though its old contents entry points elsewhere; that pre-existing inconsistency needs adviser review.
 
-The revised public copy has **32 bounded substantive edits across 25 physical pages**. Exact original anchors, replacement text and reasons are reproducible from [revision-manifest.json](revision-manifest.json). [PDF verification](evidence/pdf-verification.json) records the selected rectangles, source/output hashes and all-page checks. Wording changes below do not create new research results.
+The revised public copy now has **38 bounded substantive edits across 31 physical pages**: the initial 32 edits plus six queue/title follow-up corrections. Exact original anchors, replacement text and reasons are reproducible from [revision-manifest.json](revision-manifest.json). [Current PDF verification](evidence/queue-title-2026-11-25/pdf-verification.json) records the selected rectangles, source/output hashes and all-page checks. The original [32-edit report](evidence/pdf-verification.json) remains historical for the artifact at commit `25cd516`. Wording changes do not create new research results.
+
+## Six new waiting-queue corrections
+
+The official title on physical page 1 stays unchanged. The [queue/title rationale](waiting-queue-and-title-defense.md) explains it without inventing an approval history or changing its claims into certification.
+
+| Printed page | PDF page | Follow-up correction |
+| --- | --- | --- |
+| 54 | 66 | Align doctor/queue actions with provisioned roles, direct-entry exception, disabled attachments and conditional summary generation. |
+| 73 | 85 | State that qualifying verified allowlisted patients can enter directly; not every valid invite holder waits. |
+| 74 | 86 | Locate queue actions in invitation/in-room surfaces rather than claiming the history dashboard manages them. |
+| 89 | 101 | Explain manual admission, oldest-arrival display, no automated FIFO/triage guarantee and admitted-versus-connected state. |
+| 90 | 102 | Correct patient three-second API polling versus doctor change invalidation/re-query; a spinner does not prove live media. |
+| 94 | 106 | Clarify per-invitation default waiting target, non-atomic capacity check and its possible overshoot, plus separate operational/clinical states. |
+
+## Initial corrections retained
 
 | Printed page | PDF page | Minimal substantive correction |
 | --- | --- | --- |
@@ -49,6 +64,6 @@ These are not evidence or research corrections. The supplied original is untouch
 
 ## What the automated document verification proves
 
-The page count is 259; page dimensions, labels and bookmarks are unchanged; every untouched page renders identically; changed pages render identically outside approved edit areas; each replacement can be extracted; source SHA-256 is unchanged. Changed pages were also visually inspected for layout. This proves bounded document editing, not clinical efficacy, privacy compliance, runtime correctness or load-test performance. Read the separate application evidence for its narrower claims.
+The page count is 259; page dimensions, labels and bookmarks are unchanged; every untouched page renders identically; changed pages render identically outside approved edit areas; each replacement can be extracted; source SHA-256 is unchanged. Changed pages were also visually inspected for layout. The queue/title source audit demonstrates an unresolved capacity race, not a newly passed load test. Document checks do not prove clinical efficacy, privacy compliance or runtime correctness. Read the separate application evidence for its narrower claims.
 
 The source appendix and diagrams remain historical because replacing/reflowing them wholesale would violate the minimal pagination-preserving scope. Their status is explained, not silently represented as current implementation. Resolve remaining source-document cross-references with the adviser before final submission.

@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-25",
+  "source_baseline": "9d53610",
+  "slide_count": 14,
+  "speaker_notes_verified": 14,
+  "editable_admission_connectors": 6,
+  "native_race_example_table_slide": 7,
+  "panel_question_count": 32,
+  "pdf_pages": {
+    "TeleConsole-Waiting-Queue-and-Title-Team-Guide.pdf": 6,
+    "TeleConsole-Panel-Questions-and-Answers.pdf": 5,
+    "TeleConsole-Waiting-Queue-and-Title-Slides.pdf": 14
+  },
+  "manuscript_pages": 259,
+  "substantive_edits": 38,
+  "substantive_pages": 31,
+  "official_title_unchanged": true,
+  "budget_amounts_unchanged": true,
+  "pdf_text_within_margins": true,
+  "first_party_pptx_reimport_passed": true,
+  "pptx_package_findings": 0,
+  "pptx_layout_findings": 0,
+  "sha256": {
+    "TeleConsole-Waiting-Queue-and-Title-Defense.pptx": "835eb37b0b7342a4a2f5c2bdd663e1c4d1612bd3018775729c6e6654bdc759e6",
+    "TeleConsole-Revised-259-Pages.pdf": "4b9bf83c737f93a2b2552ad4ccb73672f32d7c55bf3de37af2d6136e310f8477",
+    "TeleConsole-Waiting-Queue-and-Title-Team-Guide.pdf": "41253d4e066e636c92a8317f15605b5135d6a5460e66cd0611eb80f11721d3cc",
+    "TeleConsole-Panel-Questions-and-Answers.pdf": "dab2540e7a5c812d7e4d1e002e97832ef656ff3a64a128e1390aca6049f9e921",
+    "TeleConsole-Waiting-Queue-and-Title-Slides.pdf": "111907bff41d40895d63907433eb995e5b2d417072c78dd616cb4a22c1e83faa"
+  },
+  "native_powerpoint_application_opened": false,
+  "app_behavior_changes": false,
+  "hard_atomic_queue_capacity": "NOT PASSED",
+  "cloud_media_load": "NOT TESTED"
+}

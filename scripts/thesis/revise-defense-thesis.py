@@ -65,6 +65,7 @@ def main():
     parser.add_argument("manifest", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--public-copy", action="store_true", help="Redact demo identifiers and personal CV images before GitHub publication")
+    parser.add_argument("--baseline", default="aa041fe", help="Source-review checkpoint for this revision, not proof of active deployment")
     args = parser.parse_args()
     source_hash = hashlib.sha256(args.source.read_bytes()).hexdigest()
     original = fitz.open(args.source)
@@ -175,7 +176,7 @@ def main():
         if expected not in actual:
             raise ValueError(f"Replacement extraction verification failed: {edit['id']}")
     report = {"source_sha256": source_hash, "output_sha256": hashlib.sha256(args.output.read_bytes()).hexdigest(),
-              "baseline": "aa041fe", "date": "2026-11-25", "assertions": assertions,
+              "baseline": args.baseline, "date": "2026-11-25", "assertions": assertions,
               "edits": log, "changed_pages": [i + 1 for i in approved],
               "public_copy": args.public_copy, "privacy_redactions": privacy_redactions,
               "outside_differences": outside_differences,

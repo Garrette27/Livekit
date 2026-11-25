@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-25",
+  "environment": "local Node 22, actual source with synthetic transaction/query adapters",
+  "source_baseline": "9d53610855737c13914a86c02ee33a58b31cd15c",
+  "source_sha256": {
+    "lib/invitations/validate-service.ts": "ce721bb2aef3248852c4a39e38fd6c1892e82f235961f37c70a6463b6d20b36b",
+    "lib/invitations/invitation-use-reservation.ts": "9438c9272d9595fc4c8868c45e777af91e97bda0fdd78469455967a5f6eacca0"
+  },
+  "fixture": {
+    "initial_waiting": 9,
+    "configured_target": 10,
+    "distinct_arrivals": 2
+  },
+  "observed": {
+    "prechecks_allowed": 2,
+    "successful_reservations": 2,
+    "final_waiting": 11,
+    "invitation_use_increment": 2
+  },
+  "claim_status": "Hard atomic maxPatients guarantee NOT PASSED; configured target may overshoot under concurrent arrivals",
+  "authority": "Documentation audit only; no app fix, production data, real network throughput or cloud load"
+}

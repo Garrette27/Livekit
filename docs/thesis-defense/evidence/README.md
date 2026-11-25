@@ -6,7 +6,9 @@ App/artifact checkpoint `25cd516fff4cc81fd9b406745f6d7aad6f7c14f1` is on main. [
 
 `checksums.txt` fingerprints published **Git blobs**, excluding itself, rather than promising identical Windows working-copy line endings. Verify against the publication commit's blobs; CRLF conversion in a local checkout can legitimately change raw text-file bytes. The manuscript's separate SHA-256 check is on PDF file bytes.
 
-## Results
+The later [waiting-queue/title checkpoint](queue-title-2026-11-25/README.md) adds six manuscript corrections and documents the non-atomic waiting-capacity gap. Its report matches the current 38-edit manuscript. The table below preserves the initial `25cd516` evidence and does not relabel the capacity finding as passed.
+
+## Initial checkpoint results (`25cd516`)
 
 | Check | Result | Evidence and exact scope |
 | --- | --- | --- |
