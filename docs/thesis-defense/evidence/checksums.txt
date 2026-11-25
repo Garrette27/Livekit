@@ -4,7 +4,7 @@ bbb4c5fb291bf38a3aa9288d648246e1abb60edc5e69024f1c7181fae93890cf  app/room/[room
 b0420cc404cd75020eff8c523c76f99d1f361ee41b43d4d00cbe2ccda4348f8b  app/room/[room]/patient/page.tsx
 771e5043ce22a780fb999293b0141d330b0d95427e6bc08f89fe9ec82ed3deea  docs/access-control.md
 e960fa9e15d0625ddbb79b992a13ab090c4a8c81cd10eee7a563b48d1169bde3  docs/testing/evidence/2026-11-25-defense-planning/cost-model.json
-2cfe7d46c7f41c5347597b8a2bd011740f16e1dd92e168dcd24ecd0b718da981  docs/testing/verification-status.md
+5f31f487468459dfd61845eee26162038f69dd2eb66a1c8c2fdef2a1799289b3  docs/testing/verification-status.md
 0b6665b931838b1b2b28b116e83478a9cf858ffd7bbfe95e2cd17f48c1ea0e4e  docs/thesis-defense/README.md
 dab2540e7a5c812d7e4d1e002e97832ef656ff3a64a128e1390aca6049f9e921  docs/thesis-defense/TeleConsole-Panel-Questions-and-Answers.pdf
 4b9bf83c737f93a2b2552ad4ccb73672f32d7c55bf3de37af2d6136e310f8477  docs/thesis-defense/TeleConsole-Revised-259-Pages.pdf
@@ -19,10 +19,11 @@ c4820c1c81bbadc0a44924963ea62724f1943e225a4d4f6da24d38cd52312206  docs/thesis-de
 cd1090db7f3f98aa2fd2289d28657445949ee82106145562d7e5b338d00fb48b  docs/thesis-defense/evidence/initial-red.log
 f4b45ffcf66fd2e0611663bd619c6c6914a67fad3fdaf479414b8374ca815d6e  docs/thesis-defense/evidence/lint.log
 1bf21595f8d1339dcf36084ef0daff22b8945e3cedf00e964679cef1099e56e1  docs/thesis-defense/evidence/pdf-verification.json
-dcefe2a08b292c6fecdec7e905402983e5398043a70bbae80a0604b3a6d7d79d  docs/thesis-defense/evidence/queue-title-2026-11-25/README.md
+e7e68538e5cbe242a93e47f04db0a1676568d22f4759cf448aba41ed9d9b3321  docs/thesis-defense/evidence/queue-title-2026-11-25/README.md
 e7470c6e8078e135ac8bb7825a6718279d7dec9e636fda24f58555a42d83c09e  docs/thesis-defense/evidence/queue-title-2026-11-25/artifact-verification.json
 f4b45ffcf66fd2e0611663bd619c6c6914a67fad3fdaf479414b8374ca815d6e  docs/thesis-defense/evidence/queue-title-2026-11-25/lint.log
 884fa56614de08021476e250b018250ca5d0fb0101f98521b7cad45edaf6451a  docs/thesis-defense/evidence/queue-title-2026-11-25/pdf-verification.json
+36e818d926451a07989fcc67397f2ccca6faf1315a1832f1eb8334a4b67b20e4  docs/thesis-defense/evidence/queue-title-2026-11-25/remote-publication.json
 5def133b83065cfb91de25b6415fd7c65dac712a9f583ed6704908953c9c84a0  docs/thesis-defense/evidence/queue-title-2026-11-25/source-audit.json
 247d56797eed2e82b29c981f0abfd8572a546c924dc7dc6e9777c61165a65643  docs/thesis-defense/evidence/rate-red.log
 4fa31519bf39de599e00b473293827c72d66989cad931230351c933af3cea6a3  docs/thesis-defense/evidence/remote-publication.json
@@ -36,7 +37,7 @@ c41275f7c540faaac5d9573575f6155247850d7e79d961ddd04c82d69691e63d  docs/thesis-de
 0161d67ced0285b8aae667f830c0642e8a39ec83b334824789e13d80c74bb696  docs/thesis-defense/messenger-and-three-writer-brief.md
 56010a5cac637474849eb8930c3561c0e08845566d446b4cff334884667cd2f2  docs/thesis-defense/page-change-register.md
 6c4ddca39e6bf17712a260c7433d6e9830e806554cb6915870ba648362260c4b  docs/thesis-defense/panel-questions-and-answers.md
-efd5574c03101d2223415a14d598f77aaef9383e648febb018c323e600d0ead1  docs/thesis-defense/queue-title-followup-plan.md
+d54c657c3f37e5a4c2020225251115c49ce05b196e1d39968aba792542480a50  docs/thesis-defense/queue-title-followup-plan.md
 5c354e49795775af2515231367777bccd4f596e43fc9f1f11bbe98938a266901  docs/thesis-defense/queue-title-slides.json
 dc1dcd362a9ee3d92c11842f6bd969789cd9a9debf981543aa24d7b36ba97608  docs/thesis-defense/revision-manifest.json
 25bd6357672c211b4d61e1081136217e9f2394ec4858bfd17e84e07c40febab1  docs/thesis-defense/waiting-queue-and-title-defense.md

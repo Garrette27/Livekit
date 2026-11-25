@@ -1,0 +1,37 @@
+{
+  "observed_at": "2026-11-25T19:59:09+08:00",
+  "repository": "Garrette27/Livekit",
+  "branch": "main",
+  "artifact_commit": "bdae7aeec413c5ca20ab40668081caf8f2cbf092",
+  "application_source_baseline": "9d53610855737c13914a86c02ee33a58b31cd15c",
+  "application_rules_dependencies_and_existing_tests_unchanged": true,
+  "ci": {
+    "run_id": 45609162448,
+    "url": "https://github.com/Garrette27/Livekit/actions/runs/45609162448",
+    "status": "completed",
+    "conclusion": "success",
+    "jobs": {
+      "application": "success",
+      "application-dependency-audit": "success",
+      "firebase-functions": "success"
+    }
+  },
+  "github_reported_deployments": {
+    "livekit-frontend": {
+      "state": "success",
+      "url": "https://vercel.com/garrette27s-projects/livekit-frontend/E8PnbPYgfnjTPnbECLBbt42kjo5p"
+    },
+    "livekit": {
+      "state": "failure",
+      "url": "https://vercel.com/garrette27s-projects/livekit/AuGPXJw6qpfbfTpq5vqkwJ4PJdpA",
+      "cause": "Not investigated or changed by this documentation task"
+    }
+  },
+  "published_git_blob_fingerprints_verified": 58,
+  "hard_atomic_waiting_capacity": "NOT PASSED; synthetic actual-source interleaving reproduces overshoot",
+  "complete_unique_visit_replay_isolation": "UNRESOLVED release gate",
+  "cloud_media_load_and_clinician_efficiency": "NOT TESTED",
+  "authenticated_production_acceptance": "NOT TESTED",
+  "private_submission_copy": "Local only; original personal appendices not committed",
+  "later_receipt_commit": "Documentation/status only; no app or artifact changes"
+}

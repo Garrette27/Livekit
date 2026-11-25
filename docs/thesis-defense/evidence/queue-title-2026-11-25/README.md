@@ -50,6 +50,8 @@ All fourteen slide renders were inspected individually. The six new manuscript p
 
 ## Publication and continuation
 
+Artifact commit `bdae7aeec413c5ca20ab40668081caf8f2cbf092` is on main. [GitHub run 45609162448](https://github.com/Garrette27/Livekit/actions/runs/45609162448) passed in all three jobs. GitHub reports livekit-frontend deployment success and the separate livekit project's deployment failure. [Remote receipt](remote-publication.json) preserves those facts without claiming direct active-runtime inspection, authenticated acceptance or a passed hard queue cap. The later receipt commit changes documentation only. All 58 checkpoint Git-blob fingerprints were verified after the first publication.
+
 Publish this document set with its changed scripts, artifacts, source audit and verification ledger as one coherent direct-main checkpoint. Record the remote SHA/CI receipt separately after publication. A Ready deployment reported by the owner or GitHub is deployment evidence, not an application-load, privacy, clinical or complete-security acceptance result.
 
 Next unfinished app work: atomically enforced waiting capacity, immutable visit-bound grants, hidden waiting preflight/device review, bounded archive queries and authenticated staging acceptance before controlled paired-media trials. This task documents those boundaries and does not implement them.

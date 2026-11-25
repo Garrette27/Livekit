@@ -38,6 +38,7 @@ notes, offline handout and six manuscript corrections extend the existing pack.
 | Queue policy/source description | Reviewed | [Queue/title guide](../thesis-defense/waiting-queue-and-title-defense.md): direct allowlist exception, manual oldest-arrival worklist, admitted versus connected, patient polling and doctor invalidation |
 | Manuscript document checks | PASS, 259 pages | [Current PDF report](../thesis-defense/evidence/queue-title-2026-11-25/pdf-verification.json); 38 edits on 31 pages, including six follow-up corrections; numbering/budget preserved |
 | App security and CI | Prior checkpoint retained, not expanded by these docs | The 62 regressions/14 emulator cases and successful source CI remain dated below; they do not prove the newly audited capacity invariant |
+| Queue/title artifact publication CI | PASS for `bdae7ae` | [Run 45609162448](https://github.com/Garrette27/Livekit/actions/runs/45609162448), all three jobs; GitHub frontend deploy check success, separate livekit project failed; no direct authenticated runtime acceptance claim |
 | Complete unique-visit replay isolation, media maximum and clinician efficiency | UNRESOLVED / NOT TESTED | No new production acceptance, provider load, paid AI or clinical capture |
 
 Next: atomically owned waiting capacity with complete release/reconnect/expiry

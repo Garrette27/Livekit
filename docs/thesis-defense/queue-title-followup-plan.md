@@ -14,6 +14,8 @@ Files: `waiting-queue-and-title-defense.md`, `panel-questions-and-answers.md`, `
 - [x] Write the comprehensive rationale, short/team scripts, panel Q&A and slide notes. State capacity/replay/refresh limitations visibly.
 - [x] Apply bounded manuscript changes, regenerate public and private copies, verify 259 pages and all unchanged regions.
 - [x] Build and inspect every slide and PDF page; validate PPTX structure, editable content, notes, local links and PDF text fit.
-- [ ] Review scoped changes, push to main using the authenticated owner account, and distinguish CI/deployment reports from production acceptance.
+- [x] Review scoped changes, push to main using the authenticated owner account, and distinguish CI/deployment reports from production acceptance.
 
 Review focus: direct admission exception; sorted queue versus guaranteed FIFO; waiting versus granted versus connected; per-invitation target versus atomic/global capacity; doctor invalidation versus patient polling; preservation of private CV/source material and unchanged budget. Existing unique-visit replay isolation remains a release gate. A document correction is not a capacity fix.
+
+Published artifact checkpoint: `bdae7aeec413c5ca20ab40668081caf8f2cbf092`. All three jobs in GitHub run `45609162448` passed. GitHub reports livekit-frontend deployment success and the separate livekit project failure. The receipt in `evidence/queue-title-2026-11-25/remote-publication.json` records the exact scope. The later receipt-only commit changes no application code or artifact content. Next unfinished app work remains atomic queue capacity and immutable visit grants, not another repetition of this document task.
