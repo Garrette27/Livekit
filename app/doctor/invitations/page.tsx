@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { useEffect, useRef, useState } from 'react';
+import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import InvitationManager from '@/components/InvitationManager';
 import { Invitation } from '@/lib/types';
 import WaitingPatientsList from './components/WaitingPatientsList';
+import DoctorAppHeader from '@/components/doctor/DoctorAppHeader';
 import { useAuthSession } from '@/hooks/useAuthSession';
 import { copyTextToClipboard, fetchInvitationLink as getInvitationLink } from '@/lib/invitations/invitation-link-client';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
@@ -32,6 +33,16 @@ export default function DoctorInvitationsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<string>('');
   const [selectedInvitationId, setSelectedInvitationId] = useState<string | null>(null);
+  // The detail pane sits beside the list on wide screens (sticky, so it is in
+  // view wherever the doctor scrolled) and below it on narrow screens, where
+  // selecting an invitation scrolls the pane into view.
+  const detailPaneRef = useRef<HTMLDivElement | null>(null);
+  const toggleInvitationDetail = (invitationId: string) => {
+    setSelectedInvitationId((current) => (current === invitationId ? null : invitationId));
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
+      window.requestAnimationFrame(() => detailPaneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+  };
   const [invitationLinks, setInvitationLinks] = useState<Record<string, string>>({});
   const [loadingLinks, setLoadingLinks] = useState<Record<string, boolean>>({});
   const [linkErrors, setLinkErrors] = useState<Record<string, string>>({});
@@ -44,16 +55,6 @@ export default function DoctorInvitationsPage() {
   const [visibleInvitationLimit, setVisibleInvitationLimit] = useState(INVITATIONS_PER_PAGE);
   const requestedInvitationLinksRef = useRef<Set<string>>(new Set());
   const router = useRouter();
-
-  const navigateToConsultationHistory = useCallback(() => {
-    const doctorHistoryRoute = getDoctorHistoryRoute();
-    router.push(doctorHistoryRoute);
-    window.setTimeout(() => {
-      if (window.location.pathname !== doctorHistoryRoute) {
-        window.location.assign(doctorHistoryRoute);
-      }
-    }, 250);
-  }, [router]);
 
   useEffect(() => {
     if (!pendingRevokeId) {
@@ -337,52 +338,13 @@ export default function DoctorInvitationsPage() {
       backgroundColor: '#F9FAFB',
       padding: '2rem'
     }}>
-      {/* Header */}
-      <div style={{ 
-        backgroundColor: 'white', 
-        borderBottom: '1px solid #E5E7EB', 
-        padding: 'var(--header-padding)',
-        marginBottom: '2rem',
-        borderRadius: '0.75rem'
-      }}>
-        <div className="app-header-bar" style={{ maxWidth: '80rem', margin: '0 auto' }}>
-          <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>Invitation Management</h1>
-            <p style={{ color: '#4B5563' }}>Create and manage secure patient invitations</p>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            <button
-              type="button"
-              onClick={navigateToConsultationHistory}
-              style={{
-                backgroundColor: 'transparent',
-                border: 0,
-                padding: 0,
-                color: '#2563EB',
-                fontSize: '1.125rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                textDecoration: 'none',
-              }}
-            >
-              Consultation History
-            </button>
-            <button
-              onClick={() => auth && auth.signOut()}
-              style={{
-                backgroundColor: '#dc2626',
-                color: 'white',
-                padding: '0.5rem 1rem',
-                borderRadius: '0.375rem',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: '500'
-              }}
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
+      <div style={{ marginBottom: '2rem', borderRadius: '0.75rem', overflow: 'hidden' }}>
+        <DoctorAppHeader
+          title="Invitation Management"
+          subtitle="Create and manage secure patient invitations"
+          user={user}
+          navLink={{ href: getDoctorHistoryRoute(), label: 'Consultation History' }}
+        />
       </div>
 
       <div style={{ maxWidth: '80rem', margin: '0 auto' }}>
@@ -391,9 +353,6 @@ export default function DoctorInvitationsPage() {
           <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '1rem' }}>
             Create New Invitation
           </h2>
-          <p style={{ color: '#6B7280', marginBottom: '1rem' }}>
-            Create a secure invitation for a specific room
-          </p>
           
           {/* Collapsed by default: this is onboarding guidance, and a doctor who
               already knows the flow should not have to read past it every visit. */}
@@ -401,8 +360,8 @@ export default function DoctorInvitationsPage() {
             backgroundColor: '#f0f9ff',
             border: '1px solid #bae6fd',
             borderRadius: '0.5rem',
-            padding: '0.75rem 1rem',
-            marginBottom: '1.5rem'
+            padding: '0.5rem 0.875rem',
+            marginBottom: '1rem'
           }}>
             <summary style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1e40af', cursor: 'pointer' }}>
               How invitations work
@@ -415,29 +374,11 @@ export default function DoctorInvitationsPage() {
             </ul>
           </details>
           
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-              Room Name
-            </label>
-            <input
-              type="text"
-              value={selectedRoom}
-              onChange={(e) => setSelectedRoom(e.target.value)}
-              placeholder="Enter room name (e.g., dr-smith-aug15)"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #D1D5DB',
-                borderRadius: '0.5rem',
-                fontSize: '1rem'
-              }}
-            />
-          </div>
-
-          {selectedRoom && user && (
-            <InvitationManager 
-              user={user} 
+          {user && (
+            <InvitationManager
+              user={user}
               roomName={selectedRoom}
+              onRoomNameChange={setSelectedRoom}
               onInvitationCreated={(invitationId) => {
                 // After invitation is created, the real-time listener will update the list
                 // Optionally scroll to show the new invitation
@@ -700,9 +641,7 @@ export default function DoctorInvitationsPage() {
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <button
                         type="button"
-                        onClick={() => setSelectedInvitationId((current) => (
-                          current === invitation.id ? null : invitation.id
-                        ))}
+                        onClick={() => toggleInvitationDetail(invitation.id)}
                         aria-expanded={selectedInvitationId === invitation.id}
                         style={{
                           backgroundColor: selectedInvitationId === invitation.id ? '#1d4ed8' : '#ffffff',
@@ -715,7 +654,9 @@ export default function DoctorInvitationsPage() {
                           cursor: 'pointer',
                         }}
                       >
-                        {selectedInvitationId === invitation.id ? 'Hide queue' : 'View queue'}
+                        {getEffectiveStatus(invitation) === 'active'
+                          ? (selectedInvitationId === invitation.id ? 'Hide queue' : 'View queue')
+                          : (selectedInvitationId === invitation.id ? 'Hide details' : 'View details')}
                       </button>
                       {(() => {
                         const effectiveStatus = getEffectiveStatus(invitation);
@@ -790,12 +731,14 @@ export default function DoctorInvitationsPage() {
           </div>
 
           {/* Waiting Queue Room / Invitation Details */}
-          <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: 'var(--card-padding)', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
+          <div ref={detailPaneRef} className="invitation-detail-pane" style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #E5E7EB', padding: 'var(--card-padding)', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
             {selectedInvitationId ? (
               <>
                 {(() => {
                   const selectedInv = invitations.find(inv => inv.id === selectedInvitationId);
                   if (!selectedInv) return null;
+                  const selectedStatus = getEffectiveStatus(selectedInv);
+                  const queueIsLive = selectedStatus === 'active';
                   
                   return (
                     <>
@@ -845,16 +788,26 @@ export default function DoctorInvitationsPage() {
                         </p>
                         <p style={{ margin: '0 0 0.5rem 0' }}><strong>Created:</strong> {selectedInv.createdAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
                         <p style={{ margin: '0 0 0.5rem 0' }}><strong>Expires:</strong> {selectedInv.expiresAt?.toDate?.()?.toLocaleString() || 'Unknown'}</p>
-                        {selectedInv.waitingRoomEnabled && (
+                        {selectedInv.waitingRoomEnabled && queueIsLive && (
                           <p style={{ margin: '0', color: '#059669', fontWeight: '500' }}>
                             Waiting Room: {waitingPatientsCounts[selectedInv.id] ?? 0} / {selectedInv.maxPatients || 10} patients
                           </p>
                         )}
                       </div>
                       
-                      <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', marginBottom: '1rem' }}>
-                        Waiting Patients
-                      </h3>
+                      {queueIsLive ? (
+                        <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', marginBottom: '1rem' }}>
+                          Waiting Patients
+                        </h3>
+                      ) : (
+                        <div role="status" style={{ border: '1px solid #e5e7eb', background: '#f9fafb', borderRadius: '0.5rem', padding: '1rem', color: '#374151', fontSize: '0.875rem' }}>
+                          <strong style={{ display: 'block', marginBottom: '0.25rem' }}>
+                            Queue closed — this invitation is {selectedStatus}.
+                          </strong>
+                          Nobody can wait or join with this link any more, so there is no live queue to show.
+                          Past visits are in Consultation History. Create a new invitation to see patients again.
+                        </div>
+                      )}
                     </>
                   );
                 })()}
@@ -870,7 +823,10 @@ export default function DoctorInvitationsPage() {
               </>
             )}
 
-          {user ? (
+          {user && selectedInvitationId && (() => {
+            const selected = invitations.find((inv) => inv.id === selectedInvitationId);
+            return selected ? getEffectiveStatus(selected) !== 'active' : false;
+          })() ? null : user ? (
             <WaitingPatientsList
               user={user}
               invitations={invitations}
@@ -895,9 +851,18 @@ export default function DoctorInvitationsPage() {
           gap: 2rem;
         }
 
+        .invitation-detail-pane {
+          position: sticky;
+          top: 1rem;
+          align-self: start;
+        }
+
         @media (max-width: 900px) {
           .invitation-columns {
             grid-template-columns: 1fr;
+          }
+          .invitation-detail-pane {
+            position: static;
           }
         }
 

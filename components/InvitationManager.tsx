@@ -12,6 +12,8 @@ import { REUSABLE_INVITATION_MAX_USES } from '@/lib/invitations/invitation-use-r
 interface InvitationManagerProps {
   user: User;
   roomName: string;
+  /** Lets the room name be edited inside the compact form. */
+  onRoomNameChange?: (roomName: string) => void;
   onInvitationCreated?: (invitationId: string) => void;
 }
 
@@ -20,7 +22,7 @@ interface CreatedInvitationResult {
   inviteUrl: string;
 }
 
-export default function InvitationManager({ user, roomName, onInvitationCreated }: InvitationManagerProps) {
+export default function InvitationManager({ user, roomName, onRoomNameChange, onInvitationCreated }: InvitationManagerProps) {
   const { showToast } = useToast();
   const [createdInvitation, setCreatedInvitation] = useState<CreatedInvitationResult | null>(null);
 
@@ -161,6 +163,7 @@ export default function InvitationManager({ user, roomName, onInvitationCreated 
       ) : (
         <InvitationForm
           roomName={roomName}
+          onRoomNameChange={onRoomNameChange}
           onInvitationCreated={handleInvitationCreated}
         />
       )}
