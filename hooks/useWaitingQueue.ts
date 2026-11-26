@@ -38,8 +38,8 @@ interface UseWaitingQueueResult {
   rejectingId: string | null;
   lastUpdatedAtMs: number | null;
   refresh: (showLoading?: boolean) => Promise<void>;
-  admitPatient: (waitingPatientId: string, roomNameOverride?: string) => Promise<boolean>;
-  rejectPatient: (waitingPatientId: string) => Promise<boolean>;
+  admitPatient: (waitingPatientId: string, roomNameOverride?: string, expectedVisitId?: string) => Promise<boolean>;
+  rejectPatient: (waitingPatientId: string, expectedVisitId?: string) => Promise<boolean>;
 }
 
 const EMPTY_WAITING_PATIENTS: WaitingPatient[] = [];
@@ -231,7 +231,8 @@ export function useWaitingQueue({
   );
 
   const admitPatient = useCallback(
-    async (waitingPatientId: string, roomNameOverride?: string) => {
+    /** expectedVisitId: the row's currentVisitId as shown, so a changed visit is refused. */
+    async (waitingPatientId: string, roomNameOverride?: string, expectedVisitId?: string) => {
       const targetRoomName = roomNameOverride || roomName;
       if (!targetRoomName) {
         setError('Missing room name for admission');
@@ -242,7 +243,7 @@ export function useWaitingQueue({
       setError(null);
 
       try {
-        const result = await admitWaitingPatient(waitingPatientId, targetRoomName, doctorUserId);
+        const result = await admitWaitingPatient(waitingPatientId, targetRoomName, doctorUserId, expectedVisitId);
         if (!result.success) {
           setError(result.error || 'Failed to admit patient');
           return false;
@@ -262,12 +263,12 @@ export function useWaitingQueue({
   );
 
   const rejectPatient = useCallback(
-    async (waitingPatientId: string) => {
+    async (waitingPatientId: string, expectedVisitId?: string) => {
       setRejectingId(waitingPatientId);
       setError(null);
 
       try {
-        const result = await rejectWaitingPatient(waitingPatientId, doctorUserId);
+        const result = await rejectWaitingPatient(waitingPatientId, doctorUserId, expectedVisitId);
         if (!result.success) {
           setError(result.error || 'Failed to remove patient');
           return false;

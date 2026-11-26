@@ -51,7 +51,9 @@ assert.match(validationService, /networkHash: hashSecuritySignal\('ip'/);
 assert.doesNotMatch(validationService, /\nip: hashSecuritySignal\('ip'/);
 // Waiting-row creation, use counting and capacity share one transaction.
 assert.match(validationService, /reserveWaitingVisit\(/);
-assert.match(validationService, /recordExistingInvitationAccess/);
+// Reconnects reuse the open visit inside the reservation and spend no new use.
+const reservationSource = await read('lib/invitations/invitation-use-reservation.ts');
+assert.match(reservationSource, /plan\.startedNewVisit \? \{ currentUses: currentUses \+ 1 \}/);
 assert.doesNotMatch(validationService, /getGeolocationFromIP|generateDeviceFingerprintHash|Validation debug info/);
 assert.match(securitySignal, /SECURITY_SIGNAL_HASH_SECRET/);
 assert.match(securitySignal, /LIVEKIT_API_SECRET/);

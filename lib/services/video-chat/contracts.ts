@@ -101,4 +101,10 @@ export interface IssueRtcRoomTokenInput {
 export interface RtcTransportAdapter {
   issueRoomToken(input: IssueRtcRoomTokenInput): string;
   disconnectParticipant(input: { roomName: string; participantIdentity: string }): Promise<void>;
+  /**
+   * Whether a participant with this identity is connected to the room now.
+   * Optional so adapters without a room API stay valid; callers treat absence
+   * or failure as "unknown, not connected".
+   */
+  isParticipantConnected?(input: { roomName: string; participantIdentity: string }): Promise<boolean>;
 }

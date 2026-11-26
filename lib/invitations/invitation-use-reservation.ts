@@ -95,37 +95,76 @@ export async function reserveInvitationUse(
 /** Default waiting target when an invitation predates the maxPatients field. */
 export const DEFAULT_MAX_WAITING_PATIENTS = 10;
 
-/** Row states that end a visit; arriving on such a row starts a new visit. */
-const ENDED_VISIT_STATUSES = new Set(['left', 'rejected']);
-
 export type WaitingVisitReservation =
-  | { outcome: 'reserved'; visitId: string; startedNewVisit: boolean }
+  | {
+      outcome: 'reserved';
+      visitId: string;
+      startedNewVisit: boolean;
+      /** Status the entry holds after this arrival; may differ from the request. */
+      status: 'waiting' | 'admitted';
+    }
   /** The invitation's waiting target is already met by other visitors. */
   | { outcome: 'full'; maxPatients: number }
   /** Missing, revoked, expired or exhausted invitation. */
   | { outcome: 'unavailable' };
 
 /**
- * Atomically places one visitor on an invitation's queue entry: it consumes an
- * invitation use, writes the audit event, enforces the waiting target, and
- * decides which visit the entry now represents — all in one transaction.
+ * Decides what an arrival means for an existing queue entry. Pure, so the
+ * rules can be read (and tested) apart from the transaction that applies them.
  *
- * Capacity: a visitor who would add a `waiting` row is refused when the
+ * - No entry, or one whose visit ended by leaving: a new visit with the
+ *   requested status.
+ * - An entry the doctor rejected: a new visit that always waits. A rejection
+ *   is the doctor's decision about this person on this invitation, so even a
+ *   verified allowlisted account must be admitted by the doctor again.
+ * - An entry still waiting: the same visit, still waiting.
+ * - An entry already admitted: the same visit stays admitted when the entry
+ *   is keyed by a verified principal (`principalKeyed`); otherwise (a
+ *   device-keyed guest) the arrival starts a new waiting visit, so another
+ *   person behind the same network and browser cannot inherit the admission.
+ */
+export function planWaitingArrival(input: {
+  existingStatus: string | null;
+  requestedStatus: 'waiting' | 'admitted';
+  principalKeyed: boolean;
+}): { startedNewVisit: boolean; status: 'waiting' | 'admitted' } {
+  switch (input.existingStatus) {
+    case null:
+    case 'left':
+      return { startedNewVisit: true, status: input.requestedStatus };
+    case 'rejected':
+      return { startedNewVisit: true, status: 'waiting' };
+    case 'waiting':
+      return { startedNewVisit: false, status: 'waiting' };
+    case 'admitted':
+      return input.principalKeyed
+        ? { startedNewVisit: false, status: 'admitted' }
+        : { startedNewVisit: true, status: 'waiting' };
+    default:
+      return { startedNewVisit: true, status: 'waiting' };
+  }
+}
+
+/**
+ * Atomically places one visitor on an invitation's queue entry: it applies
+ * planWaitingArrival, enforces the waiting target, consumes an invitation use
+ * when (and only when) a new visit starts, and writes the audit event — all
+ * in one transaction.
+ *
+ * Capacity: an arrival that would add a `waiting` row is refused when the
  * invitation already has `maxPatients` waiting rows. The count is read inside
  * the same transaction that updates the invitation document, and every
  * reservation for an invitation writes that document, so two concurrent
- * arrivals conflict and one retries against the other's committed row. A
- * visitor already waiting, or arriving directly admitted, does not consume a
- * waiting place.
+ * arrivals conflict and one retries against the other's committed row.
  *
- * Visits: the entry id is stable per invitation and patient, so the same
- * document is reused when a person returns. A missing row, or one that ended
- * (`left`/`rejected`), starts a new visit: it receives `newVisitId`, a fresh
- * `joinedAt`, and its previous end markers are cleared, so a returning
- * visitor queues behind people already waiting instead of inheriting
- * yesterday's arrival time. Credentials carry the returned visitId, and
- * admission checks compare it with `currentVisitId`, so a credential from an
- * earlier visit cannot act on a later one.
+ * Uses: a reconnect to a visit that is still open does not spend another use
+ * and is not refused by an exhausted `maxUses`; only a new visit is.
+ *
+ * Visits: a new visit receives `newVisitId`, a fresh `joinedAt`, and cleared
+ * end markers, so a returning visitor queues behind people already waiting.
+ * Credentials carry the returned visitId, and admission checks compare it with
+ * `currentVisitId`, so a credential from an earlier visit cannot act on a
+ * later one.
  */
 export async function reserveWaitingVisit(
   db: any,
@@ -136,6 +175,8 @@ export async function reserveWaitingVisit(
     roomName: string;
     /** Row status this arrival requests: queued, or verified direct entry. */
     status: 'waiting' | 'admitted';
+    /** True when `id` was derived from a server-verified Firebase uid. */
+    principalKeyed: boolean;
     /** Fields written only when a new visit starts. */
     onNewVisit: Record<string, unknown>;
     /** Fields refreshed on every arrival. */
@@ -159,16 +200,24 @@ export async function reserveWaitingVisit(
     const existingRow = await transaction.get(waitingPatientRef);
 
     const latest = latestDocument.data() as Invitation;
-    const currentUses = latest.currentUses || 0;
-    if (!invitationIsActive(latest) || (latest.maxUses && currentUses >= latest.maxUses)) {
+    if (!invitationIsActive(latest)) {
       return { outcome: 'unavailable' };
     }
 
     const existing = existingRow?.exists ? existingRow.data() || {} : null;
-    const startedNewVisit = !existing || ENDED_VISIT_STATUSES.has(String(existing.status));
-    const addsWaitingRow = waitingPatient.status === 'waiting'
-      && (startedNewVisit || existing?.status !== 'waiting');
+    const plan = planWaitingArrival({
+      existingStatus: existing ? String(existing.status) : null,
+      requestedStatus: waitingPatient.status,
+      principalKeyed: waitingPatient.principalKeyed,
+    });
 
+    const currentUses = latest.currentUses || 0;
+    if (plan.startedNewVisit && latest.maxUses && currentUses >= latest.maxUses) {
+      return { outcome: 'unavailable' };
+    }
+
+    const addsWaitingRow = plan.status === 'waiting'
+      && (plan.startedNewVisit || existing?.status !== 'waiting');
     if (addsWaitingRow) {
       const maxPatients = latest.maxPatients || DEFAULT_MAX_WAITING_PATIENTS;
       const waitingRows = await transaction.get(
@@ -186,11 +235,11 @@ export async function reserveWaitingVisit(
 
     const existingVisitId = typeof existing?.currentVisitId === 'string' ? existing.currentVisitId : '';
     // Legacy rows created before visit binding receive an id on their next arrival.
-    const visitId = startedNewVisit || !existingVisitId ? waitingPatient.newVisitId : existingVisitId;
+    const visitId = plan.startedNewVisit || !existingVisitId ? waitingPatient.newVisitId : existingVisitId;
     const now = new Date();
 
     transaction.update(invitationRef, {
-      currentUses: currentUses + 1,
+      ...(plan.startedNewVisit ? { currentUses: currentUses + 1 } : {}),
       'audit.lastAccessed': now,
     });
     overflowEvents.forEach((eventDocument) => transaction.delete(eventDocument.ref));
@@ -198,17 +247,17 @@ export async function reserveWaitingVisit(
     transaction.set(
       waitingPatientRef,
       {
-        ...(startedNewVisit
+        ...(plan.startedNewVisit
           ? {
               ...waitingPatient.onNewVisit,
               joinedAt: now,
-              admittedAt: null,
+              admittedAt: plan.status === 'admitted' ? now : null,
               leftAt: null,
               rejectedAt: null,
             }
           : {}),
         ...waitingPatient.onEachVisit,
-        status: waitingPatient.status,
+        status: plan.status,
         currentVisitId: visitId,
       },
       { merge: true }
@@ -216,10 +265,10 @@ export async function reserveWaitingVisit(
     if (waitingPatient.visit) {
       transaction.set(
         waitingPatientRef.collection('visits').doc(),
-        { ...waitingPatient.visit, visitId, startedNewVisit }
+        { ...waitingPatient.visit, status: plan.status, visitId, startedNewVisit: plan.startedNewVisit }
       );
     }
-    return { outcome: 'reserved', visitId, startedNewVisit };
+    return { outcome: 'reserved', visitId, startedNewVisit: plan.startedNewVisit, status: plan.status };
   });
 }
 

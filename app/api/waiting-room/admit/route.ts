@@ -15,6 +15,7 @@ async function handlePOST(req: NextRequest) {
 
     const body: AdmitPatientRequest = await req.json();
     const { waitingPatientId, roomName } = body;
+    const expectedVisitId = typeof body.expectedVisitId === 'string' ? body.expectedVisitId.trim() || undefined : undefined;
     const doctorUserId = auth.data.userId;
 
     if (!waitingPatientId || !roomName) {
@@ -37,6 +38,7 @@ async function handlePOST(req: NextRequest) {
       waitingPatientId,
       roomName,
       doctorUserId,
+      expectedVisitId,
     });
 
     const response: AdmitPatientResponse = {

@@ -232,7 +232,7 @@ export default function WaitingRoomPanel({
                         {showAdmitControl && (
                           <button
                             onClick={async () => {
-                              const admitted = await admitPatient(patient.id);
+                              const admitted = await admitPatient(patient.id, undefined, patient.currentVisitId);
                               if (admitted) {
                                 showToast({
                                   kind: 'success',
@@ -270,7 +270,7 @@ export default function WaitingRoomPanel({
                                 return;
                               }
 
-                              const rejected = await rejectPatient(patient.id);
+                              const rejected = await rejectPatient(patient.id, patient.currentVisitId);
                               setPendingRejectId(null);
                               if (rejected) {
                                 showToast({
@@ -375,7 +375,7 @@ export default function WaitingRoomPanel({
                               return;
                             }
 
-                            const removed = await rejectPatient(patient.id);
+                            const removed = await rejectPatient(patient.id, patient.currentVisitId);
                             setPendingRemoveId(null);
                             if (removed) {
                               showToast({

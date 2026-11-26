@@ -21,6 +21,22 @@ export class LiveKitRtcTransportAdapter implements RtcTransportAdapter {
     return signLiveKitRoomToken(input);
   }
 
+  async isParticipantConnected(input: { roomName: string; participantIdentity: string }): Promise<boolean> {
+    const host = resolveLiveKitHttpHost();
+    const apiKey = process.env.LIVEKIT_API_KEY;
+    const apiSecret = process.env.LIVEKIT_API_SECRET;
+    if (!host || !apiKey || !apiSecret) {
+      return false;
+    }
+    try {
+      await new RoomServiceClient(host, apiKey, apiSecret).getParticipant(input.roomName, input.participantIdentity);
+      return true;
+    } catch {
+      // Not found (or the room is gone) means not connected.
+      return false;
+    }
+  }
+
   async disconnectParticipant(input: { roomName: string; participantIdentity: string }): Promise<void> {
     const host = resolveLiveKitHttpHost();
     const apiKey = process.env.LIVEKIT_API_KEY;

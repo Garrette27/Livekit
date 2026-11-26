@@ -446,7 +446,7 @@ test('waiting credentials cannot publish, subscribe or send data; consultation m
     assert.equal(tokens.verifyLiveKitRoomToken(token).identity, 'patient_invite-a_visit-a');
   }
   const source = readFileSync('lib/invitations/validate-service.ts', 'utf8');
-  assert.equal(source.match(/purpose: 'waiting'/g)?.length, 2, 'Both initial and reconnect waiting grants are media-disabled');
+  assert.equal(source.match(/purpose: 'waiting'/g)?.length, 1, 'First arrivals and reconnects share the single media-disabled waiting grant');
 });
 
 test('admission HTTP route rejects missing row/email lookup and another visit credential', async () => {
@@ -1020,10 +1020,10 @@ test('transcription retries at most twice and carries only bounded provider stat
 });
 
 /** Serialized-transaction fake: real Firestore makes one of two same-document writers retry. */
-function reservationFixture({ waitingRows = 0, maxPatients = 10 } = {}) {
+function reservationFixture({ waitingRows = 0, maxPatients = 10, maxUses = 999999 } = {}) {
   const { reserveWaitingVisit } = loadModule('lib/invitations/invitation-use-reservation.ts');
   const rows = new Map(Array.from({ length: waitingRows }, (_, i) => [`waitingPatients/old-${i}`, { status: 'waiting', roomName: 'room-a', invitationId: 'invite-a' }]));
-  let invitation = { status: 'active', expiresAt: new Date(Date.now() + 3600000), maxPatients, currentUses: 0, maxUses: 999999 };
+  let invitation = { status: 'active', expiresAt: new Date(Date.now() + 3600000), maxPatients, currentUses: 0, maxUses };
   let serial = Promise.resolve();
   let next = 0;
   const query = (filters = []) => ({
@@ -1048,8 +1048,8 @@ function reservationFixture({ waitingRows = 0, maxPatients = 10 } = {}) {
     serial = run.catch(() => {});
     return run;
   } };
-  const arrive = (id, status = 'waiting') => reserveWaitingVisit(db, 'invite-a', { synthetic: true }, {
-    id, roomName: 'room-a', status, newVisitId: `visit-${next++}`,
+  const arrive = (id, status = 'waiting', principalKeyed = true) => reserveWaitingVisit(db, 'invite-a', { synthetic: true }, {
+    id, roomName: 'room-a', status, principalKeyed, newVisitId: `visit-${next++}`,
     onNewVisit: { invitationId: 'invite-a' }, onEachVisit: { roomName: 'room-a', invitationId: 'invite-a' },
   });
   return { arrive, rows, waiting: () => [...rows.values()].filter(row => row.status === 'waiting').length, invitation: () => invitation };
@@ -1126,4 +1126,99 @@ test('the waiting page mounts no hidden LiveKit room or device preview', () => {
   const source = readFileSync('app/invite/[token]/page.tsx', 'utf8');
   assert.equal(source.match(/<PatientLiveKitRoom/g)?.length, 1, 'Only the visible post-admission room mounts media');
   assert.doesNotMatch(source, /display: 'none' }}>\s*<PatientLiveKitRoom/);
+});
+
+test('arrival plan: rejection is sticky, guests never inherit an admission, reconnects keep their visit', () => {
+  const { planWaitingArrival } = loadModule('lib/invitations/invitation-use-reservation.ts');
+  const plan = (existingStatus, requestedStatus, principalKeyed = true) => ({ ...planWaitingArrival({ existingStatus, requestedStatus, principalKeyed }) });
+  assert.deepEqual(plan(null, 'admitted'), { startedNewVisit: true, status: 'admitted' });
+  assert.deepEqual(plan('left', 'admitted'), { startedNewVisit: true, status: 'admitted' });
+  assert.deepEqual(plan('rejected', 'admitted'), { startedNewVisit: true, status: 'waiting' }, 'Doctor rejection outranks the allowlist');
+  assert.deepEqual(plan('waiting', 'admitted'), { startedNewVisit: false, status: 'waiting' });
+  assert.deepEqual(plan('admitted', 'waiting', true), { startedNewVisit: false, status: 'admitted' });
+  assert.deepEqual(plan('admitted', 'waiting', false), { startedNewVisit: true, status: 'waiting' }, 'Device-keyed guests start over');
+  assert.deepEqual(plan('unknown-legacy', 'admitted'), { startedNewVisit: true, status: 'waiting' });
+});
+
+test('a typed or link-carried email never selects another visitor\'s queue entry', () => {
+  const { resolveWaitingPatientId } = loadModule('lib/invitations/waiting-patient-key.ts', {
+    '../security/security-signal': { hashSecuritySignal: (label, value) => `${label}:${value}` },
+  });
+  const victim = resolveWaitingPatientId({ invitationId: 'inv', principalId: 'uid-victim', networkHash: 'n1', userAgentHash: 'u1' });
+  const attacker = resolveWaitingPatientId({ invitationId: 'inv', patientEmail: 'victim@example.test', networkHash: 'n2', userAgentHash: 'u2' });
+  const anonymousAccount = resolveWaitingPatientId({ invitationId: 'inv', principalId: 'uid-anon', networkHash: 'n2', userAgentHash: 'u2' });
+  assert.notEqual(attacker, victim);
+  assert.notEqual(anonymousAccount, attacker, 'A Firebase session outranks the device correlation key');
+  const source = readFileSync('lib/invitations/validate-service.ts', 'utf8');
+  const call = source.slice(source.indexOf('resolveWaitingPatientId({'), source.indexOf('});', source.indexOf('resolveWaitingPatientId({')));
+  assert.doesNotMatch(call, /mail/i, 'No email reaches the entry key');
+});
+
+test('a reconnect does not spend or get refused by an exhausted use limit; a new visit does', async () => {
+  const h = reservationFixture({ maxUses: 1 });
+  assert.equal((await h.arrive('patient-a')).outcome, 'reserved');
+  assert.equal((await h.arrive('patient-a')).outcome, 'reserved', 'Same open visit');
+  assert.equal(h.invitation().currentUses, 1);
+  assert.equal((await h.arrive('patient-b')).outcome, 'unavailable', 'New visit needs a use');
+});
+
+test('a rejected verified patient waits again instead of re-entering directly', async () => {
+  const h = reservationFixture();
+  await h.arrive('verified', 'admitted');
+  Object.assign(h.rows.get('waitingPatients/verified'), { status: 'rejected' });
+  const again = await h.arrive('verified', 'admitted');
+  assert.equal(again.status, 'waiting');
+  assert.equal(h.rows.get('waitingPatients/verified').status, 'waiting');
+});
+
+/** Core service over a mutable synthetic row, with an optional presence probe. */
+function departureHarness(row, connected = false) {
+  const documents = { 'waitingPatients/visit-a': { invitationId: 'invite-a', roomName: 'room-a', status: 'admitted', joinedAt: new Date(), ...row } };
+  const doc = id => ({ async get() { return { id, exists: true, data: () => documents[`waitingPatients/${id}`] }; },
+    async set(patch) { Object.assign(documents[`waitingPatients/${id}`], patch); } });
+  const { FirestoreInvitationAccessCore } = loadModule('lib/services/invitation-access/invitation-access-core.ts', {
+    '@/lib/invitations/validate-service': {}, '@/lib/consultations/identity-utils': {}, '@/lib/services/video-chat': {},
+  });
+  const core = new FirestoreInvitationAccessCore({ collection: () => ({ doc }) }, { async isParticipantConnected() { return connected; } }, {});
+  return { core, documents };
+}
+
+test('a late or duplicate LiveKit departure cannot close a newer visit or a still-connected patient', async () => {
+  const stale = departureHarness({});
+  const old = await stale.core.handleParticipantLeftWebhook({ waitingPatientId: 'visit-a', roomName: 'room-a', participantJoinedAt: new Date(Date.now() - 3600000) });
+  assert.equal(old.reason, 'earlier_visit_departure_ignored');
+  assert.equal(stale.documents['waitingPatients/visit-a'].status, 'admitted');
+  const twoDevices = departureHarness({ joinedAt: new Date(Date.now() - 60000) }, true);
+  assert.equal((await twoDevices.core.handleParticipantLeftWebhook({ waitingPatientId: 'visit-a', roomName: 'room-a', participantJoinedAt: new Date() })).reason, 'participant_still_connected');
+  const real = departureHarness({ joinedAt: new Date(Date.now() - 60000) });
+  assert.equal((await real.core.handleParticipantLeftWebhook({ waitingPatientId: 'visit-a', roomName: 'room-a', participantJoinedAt: new Date() })).status, 'left');
+});
+
+test('the doctor admits only the visit they reviewed, and legacy status-less invitations stay admittable', async () => {
+  const h = admissionHarness({ status: undefined }, { status: 'waiting', currentVisitId: 'visit-2' });
+  await assert.rejects(h.service.admitWaitingEntry({ ...admittingInput, expectedVisitId: 'visit-1' }), /new visit/);
+  assert.equal(h.documents['waitingPatients/visit-a'].status, 'waiting');
+  assert.equal((await h.service.admitWaitingEntry({ ...admittingInput, expectedVisitId: 'visit-2' })).roomName, 'room-a');
+});
+
+test('only an administrator-set claim makes an account a clinician; a profile can only say patient', async () => {
+  const profiles = { 'uid-legacy': { role: 'doctor' }, 'uid-patient': { role: 'patient' }, 'uid-claimed': { role: 'doctor' } };
+  const claims = { 'uid-legacy': {}, 'uid-patient': {}, 'uid-claimed': { role: 'doctor' } };
+  const { authorizeBearerRequest } = loadModule('lib/services/shared/request-auth.ts', {
+    '@/lib/firebase-admin': {
+      getFirebaseAdmin: () => ({}),
+      getFirebaseAdminAuth: () => ({ async verifyIdToken(token) { return { uid: token, email: `${token}@example.test`, email_verified: true, ...claims[token] }; } }),
+    },
+    '@/lib/auth/access-policy': loadModule('lib/auth/access-policy.ts'),
+    '@/lib/repositories/user-repository': { UserRepository: class { async getById(id) { return { exists: !!profiles[id], data: () => profiles[id] }; } } },
+    './request-logging': { recordAuthenticatedUser() {} },
+    './service-result': loadModule('lib/services/shared/service-result.ts'),
+  });
+  const call = (uid, permission = 'invitation:manage') => authorizeBearerRequest({ headers: new Headers({ authorization: `Bearer ${uid}` }) }, permission);
+  const legacy = await call('uid-legacy');
+  assert.equal(legacy.ok, false);
+  assert.equal(legacy.error.status, 403);
+  assert.equal(legacy.error.code, 'role_not_provisioned');
+  assert.equal((await call('uid-claimed')).ok, true);
+  assert.equal((await call('uid-patient', 'consultation:read-own')).data.role, 'patient');
 });

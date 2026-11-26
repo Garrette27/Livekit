@@ -291,3 +291,45 @@ Identity Platform's anonymous-account cleanup.
 - **Name the effect on everyone else.** Any access setting must state what
   happens to visitors it does not match, or it will be misread as stricter than
   it is.
+
+## Queue entries, visits and who may become a clinician (27 November 2026)
+
+**Pattern: stable entry + versioned visit (optimistic concurrency on a visit id).**
+A queue entry (`waitingPatients/{id}`) is reused when the same principal
+returns; `currentVisitId` names which visit it represents now. Every patient
+credential carries the visit id it was issued for, and the doctor's admit and
+remove commands send the visit id they saw. The server refuses a mismatch
+(`stale_visit` for the patient, `visit_changed` 409 for the doctor), the same
+expected-version technique used for shared editor writes. Tradeoff: an old
+browser tab must reopen the invitation after a visit ends; in exchange, a
+credential or a doctor click from an earlier visit cannot act on a later one.
+
+**Entry key comes only from an unforgeable principal.** The id is derived from
+the server-verified Firebase uid (anonymous or not), or — only when there is no
+Firebase session — from keyed network/browser hashes. It is never derived from
+an email. Before this change a guest who typed an admitted patient's email
+landed on that patient's entry and could obtain their consultation credential;
+the email is now only a displayed label with provenance. Tradeoff: two
+session-less guests behind the same network and browser still share an entry,
+so a device-keyed entry that is already admitted starts a new waiting visit
+instead of passing the admission on.
+
+**Arrival rules are one pure function** (`planWaitingArrival`), applied inside
+the reservation transaction: new or left → new visit; rejected → new visit that
+must wait (the doctor's rejection outranks the allowlist); waiting → same visit;
+admitted → same visit for a verified principal, a fresh waiting visit for a
+device-keyed guest. A use is spent, and `maxUses` checked, only when a new
+visit starts, so reconnects are never refused by a use limit.
+
+**LiveKit departures are checked against the visit.** A `participant_left`
+webhook is ignored when the connection joined before the entry's current visit
+began, or when the same identity is still connected (a second device replaced
+the first). Only then is the entry marked left.
+
+**Clinician roles come only from administrator-set custom claims.** Firestore
+rules already prevented a client from creating a doctor profile without a
+`role` claim; request authorization now also ignores a privileged role written
+in a profile without the claim (`role_not_provisioned`). Provision with
+`node scripts/admin/provision-role.mjs grant doctor <email> --apply`, audit with
+`... audit`. Run the audit and grant the real doctor accounts before deploying
+this change, or they will be refused.

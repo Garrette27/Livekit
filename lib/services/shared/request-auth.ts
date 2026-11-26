@@ -96,7 +96,15 @@ export async function authorizeBearerRequest(
       }
       throw error;
     }
-    role = profile.exists ? parseAppRole(profile.data()?.role) : null;
+    const profileRole = profile.exists ? parseAppRole(profile.data()?.role) : null;
+    // A profile document can only grant the self-service patient role. Doctor,
+    // reviewer and admin authority must come from a custom claim set by an
+    // administrator (scripts/admin/provision-role.mjs), so a legacy or
+    // hand-written profile cannot make someone a clinician.
+    role = profileRole === 'patient' ? 'patient' : null;
+    if (profileRole && profileRole !== 'patient') {
+      return serviceError(403, 'role_not_provisioned', 'This account has not been provisioned for this role. Ask the administrator.');
+    }
   }
 
   if (!role) {

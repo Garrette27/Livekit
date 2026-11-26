@@ -62,10 +62,13 @@ export interface InvitationAccessService {
     waitingPatientId: string;
     roomName: string;
     doctorUserId?: string;
+    /** currentVisitId the doctor saw; refused with 409 if the entry moved on. */
+    expectedVisitId?: string;
   }): Promise<{ liveKitToken: string; roomName: string; waitingPatientId: string }>;
   rejectWaitingEntry(input: {
     waitingPatientId: string;
     doctorUserId?: string;
+    expectedVisitId?: string;
   }): Promise<{ waitingPatientId: string; status: 'rejected' }>;
   /**
    * `credential` is present when a patient asks to leave; it must name the

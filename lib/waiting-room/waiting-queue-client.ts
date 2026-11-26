@@ -70,12 +70,13 @@ export async function listWaitingPatients({
 export async function admitWaitingPatient(
   waitingPatientId: string,
   roomName: string,
-  doctorUserId?: string
+  doctorUserId?: string,
+  expectedVisitId?: string
 ): Promise<AdmitPatientResponse> {
   const response = await authenticatedFetch('/api/waiting-room/admit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ waitingPatientId, roomName, doctorUserId }),
+    body: JSON.stringify({ waitingPatientId, roomName, doctorUserId, expectedVisitId }),
   });
 
   return parseJsonResponse<AdmitPatientResponse>(response);
@@ -83,12 +84,13 @@ export async function admitWaitingPatient(
 
 export async function rejectWaitingPatient(
   waitingPatientId: string,
-  doctorUserId?: string
+  doctorUserId?: string,
+  expectedVisitId?: string
 ): Promise<WaitingRoomMutationResponse> {
   const response = await authenticatedFetch('/api/waiting-room/reject', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ waitingPatientId, doctorUserId }),
+    body: JSON.stringify({ waitingPatientId, doctorUserId, expectedVisitId }),
   });
 
   return parseJsonResponse<WaitingRoomMutationResponse>(response);

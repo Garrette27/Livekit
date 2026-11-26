@@ -3,7 +3,7 @@
   "environment": "local Node 22, actual reservation source with synthetic serialized-transaction adapter",
   "source_baseline": "ed4f7a9 plus working-tree queue fix (see commit that adds this file)",
   "source_sha256": {
-    "lib/invitations/invitation-use-reservation.ts": "0391211ad5fb7bcaf8f3df636edb5f2122d064ef956f94bcecb84cd5980f7150"
+    "lib/invitations/invitation-use-reservation.ts": "7093fbaff4dd9f3456f2d3037659b858295e98cafd9dbc654367af2dd2152366"
   },
   "cases": {
     "concurrent_pair_at_9_of_10": {

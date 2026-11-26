@@ -13,6 +13,8 @@ interface LiveKitWebhookEvent {
   participant?: {
     identity?: string;
     metadata?: string | Record<string, unknown>;
+    /** Unix seconds when this connection joined, as LiveKit reports it. */
+    joinedAt?: string | number;
   };
 }
 
@@ -104,10 +106,16 @@ function resolveEventTimestamp(event: LiveKitWebhookEvent): Date {
   return new Date();
 }
 
+function resolveParticipantJoinedAt(event: LiveKitWebhookEvent): Date | null {
+  const seconds = Number(event.participant?.joinedAt);
+  return Number.isFinite(seconds) && seconds > 0 ? new Date(seconds * 1000) : null;
+}
+
 async function handleParticipantLeftWithWaitingEntry(input: {
   db: Firestore;
   waitingPatientId: string;
   roomName: string;
+  participantJoinedAt: Date | null;
 }): Promise<{
   handled: boolean;
   reason: string;
@@ -117,6 +125,7 @@ async function handleParticipantLeftWithWaitingEntry(input: {
   return invitationAccess.handleParticipantLeftWebhook({
     waitingPatientId: input.waitingPatientId,
     roomName: input.roomName,
+    participantJoinedAt: input.participantJoinedAt,
   });
 }
 
@@ -215,6 +224,7 @@ export async function processWebhookFinalizationFallback(
       db,
       waitingPatientId,
       roomName,
+      participantJoinedAt: resolveParticipantJoinedAt(event),
     });
     return {
       handled: waitingEntryResult.handled,

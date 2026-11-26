@@ -224,6 +224,8 @@ export interface WaitingPatient {
 export interface AdmitPatientRequest {
   waitingPatientId: string;
   roomName: string;
+  /** currentVisitId the doctor saw in the queue. */
+  expectedVisitId?: string;
 }
 
 export interface AdmitPatientResponse {
