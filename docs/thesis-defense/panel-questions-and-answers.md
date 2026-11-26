@@ -248,8 +248,32 @@ The survey evaluated perceived quality of the demonstrated build; the fixes hard
 ### 60. Which manuscript pages changed?
 37 physical pages, same 259 pages and numbering; the register lists each page, edit and reason. Objectives and Chapter IV numbers were not edited.
 
+### 61. Where is doctor and patient provisioning, and what pattern is it?
+Doctors: administrator provisioning with claims-based RBAC — an administrator grants a Firebase custom claim with `scripts/admin/provision-role.mjs`; the server (`request-auth.ts`) and Firestore rules accept a clinician role only from that claim. Registered patients: self-service just-in-time provisioning of the lowest role (always `patient`) plus versioned consent. Guests: a capability link plus doctor admission. No self-service path leads to a privileged role.
+
+### 62. Why didn't you add file attachments to chat?
+Attachments are a prepared but disabled capability. Before enabling them we require private storage, type and size limits, malware scanning, download authorization, retention and cross-session denial tests. Adding uploads untested would weaken the security claims and risk the working call. Chat itself is persisted per encounter, length-bounded, retry-safe and visible in history; it is not used as AI evidence.
+
+### 63. Is the chat used in the AI summary?
+No. The summary uses consented transcript evidence only. Chat is shown to the clinician in history. Using chat as evidence would need provenance and consent rules first.
+
+### 64. The summary editor showed risk "Low" for a consultation with no evidence. Is the AI inferring risk?
+No. The model returned Unknown; the editor's dropdown had no Unknown option, so the browser displayed the first option. We fixed the editor to show "Unknown (not established)". Risk is never inferred from missing evidence.
+
+### 65. What would most likely break during your demo, and what is your plan?
+Provisioning (doctor must hold the claim), venue network or camera permissions, AI availability, and a duplicate tab replacing a patient's connection. We freeze the build, test on a preview first, keep a one-click rollback to the previous production deployment, use a fresh invitation, and have a hotspot and screenshots as backup. If AI is unavailable, the call still works and the record says so.
+
+### 66. Is the production site running these fixes?
+Answer truthfully for the day: either "yes, merged at commit …, tested on preview first" or "the fixes are on our pull request preview; production runs the evaluated build". Do not claim a deployment you have not verified.
+
+### 67. What design patterns did you use?
+Deep modules behind small interfaces (invitation access service, queue coordinator); pure decision functions with IO adapters (admission policy, `planWaitingArrival`); transactions for coupled writes (use counting, capacity, queue row); expected-version checks (visit ids); Command/Fact separation for lifecycle; realtime as invalidation with authenticated re-query; adapter around LiveKit; claims-based RBAC.
+
+### 68. What were the architectural risks you found in your own design?
+Keys derived from self-asserted data (fixed), checks outside the transaction that protects them (fixed), stale events acting on newer state (fixed), and authority read from editable profile data (fixed). The general lesson: authority must come from verified, server-held facts and be checked where it is committed.
+
 ## Practice method for three writers
 
-Writer 1 answers title/contribution questions 1-6 and research-method questions 37-39 and 49-50. Writer 2 answers admission/security questions 7-15, 28-30, 33-36, 40-47 and 51-56. Writer 3 answers capacity/refresh questions 16-27, the page/evidence questions 31-32, 48 and 57-60. Rotate once so nobody knows only their own section. Give each answer in 20-40 seconds, then handle one follow-up.
+Writer 1 answers title/contribution questions 1-6 and research-method questions 37-39 and 49-50. Writer 2 answers admission/security questions 7-15, 28-30, 33-36, 40-47, 51-56 and 61-65. Writer 3 answers capacity/refresh questions 16-27, the page/evidence questions 31-32, 48, 57-60 and 66-68. Rotate once so nobody knows only their own section. Give each answer in 20-40 seconds, then handle one follow-up.
 
 Use the four-part response: state the current rule, explain its reason, name the evidence, and state the limitation. If a number appears, give its units and scope. Do not argue with a panelist by substituting a provider limit for a missing experiment. An accurate limitation and a concrete next test are valid engineering answers; they do not guarantee an examination outcome.

@@ -293,7 +293,7 @@ export default function DoctorDashboard() {
       keyPoints: summary.keyPoints || [],
       recommendations: summary.recommendations || [],
       followUpActions: summary.followUpActions || [],
-      riskLevel: summary.riskLevel || '',
+      riskLevel: ['Low', 'Medium', 'High'].includes(summary.riskLevel || '') ? summary.riskLevel : 'Unknown',
       category: summary.category || ''
     });
     setSaveError(null);
@@ -582,6 +582,10 @@ export default function DoctorDashboard() {
                     fontSize: '0.875rem'
                   }}
                 >
+                  {/* Unknown is a valid outcome: risk is never inferred from
+                      missing evidence, so the editor must not display "Low"
+                      for a summary whose risk was not established. */}
+                  <option value="Unknown">Unknown (not established)</option>
                   <option value="Low">Low</option>
                   <option value="Medium">Medium</option>
                   <option value="High">High</option>

@@ -1222,3 +1222,9 @@ test('only an administrator-set claim makes an account a clinician; a profile ca
   assert.equal((await call('uid-claimed')).ok, true);
   assert.equal((await call('uid-patient', 'consultation:read-own')).data.role, 'patient');
 });
+
+test('the summary editor shows Unknown instead of defaulting an unestablished risk to Low', () => {
+  const source = readFileSync('app/doctor/dashboard/page.tsx', 'utf8');
+  assert.match(source, /<option value="Unknown">/);
+  assert.match(source, /\['Low', 'Medium', 'High'\]\.includes\(summary\.riskLevel \|\| ''\) \? summary\.riskLevel : 'Unknown'/);
+});

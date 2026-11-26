@@ -1,7 +1,7 @@
 /**
  * Administrator tool: the only supported way to make someone a doctor.
  *
- *   node scripts/admin/provision-role.mjs audit
+ *   node --env-file=.env.local scripts/admin/provision-role.mjs audit
  *   node scripts/admin/provision-role.mjs grant  doctor someone@clinic.example [--apply]
  *   node scripts/admin/provision-role.mjs revoke someone@clinic.example        [--apply]
  *
@@ -19,7 +19,7 @@
  *        account has no matching claim (they cannot act as clinicians now).
  *        Prints counts and masked emails only.
  */
-import { initializeApp, applicationDefault, getApps } from 'firebase-admin/app';
+import { initializeApp, applicationDefault, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
@@ -35,7 +35,14 @@ function mask(email) {
 
 function init() {
   if (!getApps().length) {
-    initializeApp({ credential: applicationDefault(), projectId: process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT });
+    // Same variables the app uses (FIREBASE_PROJECT_ID / CLIENT_EMAIL / PRIVATE_KEY,
+    // e.g. after `vercel env pull .env.local` and `node --env-file=.env.local ...`),
+    // otherwise Application Default Credentials.
+    const { FIREBASE_PROJECT_ID: projectId, FIREBASE_CLIENT_EMAIL: clientEmail, FIREBASE_PRIVATE_KEY: key } = process.env;
+    const credential = projectId && clientEmail && key
+      ? cert({ projectId, clientEmail, privateKey: key.replace(/\\n/g, '\n') })
+      : applicationDefault();
+    initializeApp({ credential, projectId: projectId || process.env.GCLOUD_PROJECT });
   }
   return { auth: getAuth(), db: getFirestore() };
 }
