@@ -12,6 +12,7 @@ import {
   VideoConference,
   type LocalUserChoices,
 } from '@livekit/components-react';
+import { VideoPresets, type RoomOptions } from 'livekit-client';
 import LiveKitStyles from './LiveKitStyles';
 import SessionTranscriptionBridge from './SessionTranscriptionBridge';
 import { RoomControlsPolicy } from './room-controls-policy';
@@ -376,6 +377,29 @@ function ChatBehaviorBridge({
   return null;
 }
 
+
+/**
+ * Media quality settings, all standard LiveKit options:
+ * - adaptiveStream: each receiver subscribes to a video size that matches the
+ *   tile it renders and pauses video it cannot see;
+ * - dynacast: the sender stops encoding layers nobody is receiving;
+ * - simulcast (publish default): the sender offers several qualities so a weak
+ *   receiver gets a lower layer instead of freezing;
+ * - 720p capture target (the camera may deliver less; the receiver's delivered
+ *   resolution is what to measure);
+ * - browser echo cancellation, noise suppression and auto gain on the mic;
+ *   RED (redundant audio) and DTX keep speech intelligible on lossy links.
+ * None of these is a guaranteed quality level; they adapt to the network.
+ */
+const ROOM_MEDIA_OPTIONS: RoomOptions = {
+  adaptiveStream: true,
+  dynacast: true,
+  videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
+  audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  publishDefaults: { simulcast: true, red: true, dtx: true },
+};
+
+const SPEECH_PROCESSING = { echoCancellation: true, noiseSuppression: true, autoGainControl: true } as const;
 export default function RoomShell({
   token,
   onDisconnected,
@@ -469,7 +493,8 @@ export default function RoomShell({
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
         connect={true}
-        audio={userChoices.audioEnabled ? { deviceId: userChoices.audioDeviceId } : false}
+        options={ROOM_MEDIA_OPTIONS}
+        audio={userChoices.audioEnabled ? { deviceId: userChoices.audioDeviceId, ...SPEECH_PROCESSING } : false}
         video={userChoices.videoEnabled ? { deviceId: userChoices.videoDeviceId } : false}
         style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}
         onDisconnected={(reason) => onDisconnected(reason)}

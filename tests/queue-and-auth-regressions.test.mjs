@@ -1226,3 +1226,28 @@ test('the summary editor shows Unknown instead of defaulting an unestablished ri
   assert.match(source, /<option value="Unknown">/);
   assert.match(source, /\['Low', 'Medium', 'High'\]\.includes\(summary\.riskLevel \|\| ''\) \? summary\.riskLevel : 'Unknown'/);
 });
+
+test('role administration: super admin bootstrap, admins grant doctors only, nobody changes their own role', () => {
+  const { decideRoleChange, parseSuperAdminEmails, administratorLevel } = loadModule('lib/auth/role-administration.ts');
+  const supers = parseSuperAdminEmails(' Owner@Clinic.test, other@clinic.test ');
+  const superAdmin = { userId: 'u-super', email: 'owner@clinic.test', emailVerified: true, isAdminClaim: false };
+  const unverified = { ...superAdmin, emailVerified: false };
+  const admin = { userId: 'u-admin', email: 'a@clinic.test', emailVerified: true, isAdminClaim: true };
+  const doctor = { userId: 'u-doc', email: 'd@clinic.test', emailVerified: true, isAdminClaim: false };
+  assert.equal(administratorLevel(superAdmin, supers), 'super_admin');
+  assert.equal(administratorLevel(unverified, supers), null, 'An unverified email never bootstraps');
+  const decide = (caller, role, target = 'u-target') => decideRoleChange({ caller, superAdminEmails: supers, targetUserId: target, role, action: 'grant' }).allowed;
+  assert.equal(decide(superAdmin, 'admin'), true);
+  assert.equal(decide(admin, 'doctor'), true);
+  assert.equal(decide(admin, 'admin'), false);
+  assert.equal(decide(doctor, 'doctor'), false);
+  assert.equal(decide(superAdmin, 'doctor', 'u-super'), false, 'No self change');
+});
+
+test('room media uses adaptive stream, dynacast, simulcast and browser speech processing', () => {
+  const source = readFileSync('app/room/[room]/components/shared/RoomShell.tsx', 'utf8');
+  for (const option of ['adaptiveStream: true', 'dynacast: true', 'simulcast: true', 'echoCancellation: true', 'noiseSuppression: true']) {
+    assert.ok(source.includes(option), option);
+  }
+  assert.match(source, /options=\{ROOM_MEDIA_OPTIONS\}/);
+});

@@ -28,11 +28,15 @@ Proven practice: **feature freeze + canary (preview) + one-click rollback.** If 
 | 9 | Admit button returns "started a new visit" | Visit-checked admit (expected-version pattern) | Low | Refresh the queue and admit again — this is the protection working |
 | 10 | Summary editor showed "Low" for an unknown risk | Select had no Unknown option | Fixed on PR #9 | Merge, or avoid opening Edit on production |
 
+## Admin console setup (for the demo)
+
+Set `SUPER_ADMIN_EMAILS=<owner's verified email>` in Vercel → Settings → Environment Variables (Production), redeploy, sign in at `/doctor/login`, then open `/admin`. Without the variable the console says "Only an administrator can view this page" — expected, not a bug.
+
 ## Where provisioning lives, and the pattern
 
 | Who | How an account becomes that role | Code | Pattern |
 |---|---|---|---|
-| **Doctor / reviewer / admin** | An administrator grants a Firebase custom claim | `scripts/admin/provision-role.mjs` (grant/revoke/audit); enforced by `firestore.rules` (a client can create a doctor profile only with the claim) and read in `lib/services/shared/request-auth.ts` (claim first; legacy profile role honoured transitionally); login UI `app/doctor/login/page.tsx` | **Administrator provisioning + claims-based RBAC** (Firebase custom claims), least privilege, separation of duties: no self-service path to a privileged role |
+| **Doctor / reviewer / admin** | An administrator grants a Firebase custom claim | `/admin` console (`app/admin/page.tsx`, `app/api/admin/roles/route.ts`, policy `lib/auth/role-administration.ts`) and `scripts/admin/provision-role.mjs`; enforced by `firestore.rules` (a client can create a doctor profile only with the claim) and read in `lib/services/shared/request-auth.ts` (claim first; legacy profile role honoured transitionally); login UI `app/doctor/login/page.tsx` | **Administrator provisioning + claims-based RBAC** (Firebase custom claims), least privilege, separation of duties: no self-service path to a privileged role |
 | **Registered patient** | Signs in (Google/email) and accepts the versioned consent; profile role is always `patient` | `app/patient/login`, consent route `app/api/patient/consent/route.ts`, identity resolution in `lib/invitations/validate-service.ts` | **Self-service, just-in-time provisioning** of the lowest-privilege role |
 | **Guest patient** | No account; holds an invitation (bearer capability) and waits for the doctor | `app/invite/[token]`, `lib/invitations/*` | **Capability link + human admission** (guest pattern); optional Firebase anonymous session upgradeable later |
 

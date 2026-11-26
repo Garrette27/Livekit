@@ -29,6 +29,14 @@ Patient profiles can be created through a valid signed invitation. Doctor,
 faculty-reviewer, and admin profiles must be provisioned by a trusted
 administrator:
 
+Use the **/admin** console (server route `app/api/admin/roles`, policy
+`lib/auth/role-administration.ts`) or `scripts/admin/provision-role.mjs`. The
+first administrator is bootstrapped by the server-only `SUPER_ADMIN_EMAILS`
+setting (provider-verified emails). Super admins grant doctor and admin;
+admins grant doctor; nobody changes their own role; patient accounts are not
+converted. Each change writes `adminAuditEvents` (uids only) and revokes
+refresh tokens. Manual steps, equivalently:
+
 1. Create the Firebase Authentication account.
 2. Set the Firebase custom claim `role` to `doctor`, `faculty_reviewer`, or
    `admin`. Admin accounts should also set `admin: true`.
