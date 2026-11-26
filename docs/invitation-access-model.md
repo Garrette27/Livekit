@@ -328,8 +328,9 @@ the first). Only then is the entry marked left.
 
 **Clinician roles come only from administrator-set custom claims.** Firestore
 rules already prevented a client from creating a doctor profile without a
-`role` claim; request authorization now also ignores a privileged role written
-in a profile without the claim (`role_not_provisioned`). Provision with
-`node scripts/admin/provision-role.mjs grant doctor <email> --apply`, audit with
-`... audit`. Run the audit and grant the real doctor accounts before deploying
-this change, or they will be refused.
+`role` claim. New clinicians are provisioned with
+`node scripts/admin/provision-role.mjs grant doctor <email> --apply`. Existing
+doctor profiles that predate claims are still honoured (transitional fallback,
+logged per request) because enforcing claim-only on 27 November locked the
+production doctor out; `... audit` lists those accounts so each can be granted a
+claim, after which the fallback is removed.

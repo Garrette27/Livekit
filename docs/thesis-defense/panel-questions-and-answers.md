@@ -222,7 +222,7 @@ A staged acceptance run: deploy the fixed commit, run the two-account replay and
 Before the fix, yes: queue entries were keyed by email even when the visitor only typed it, so a guest typing an admitted patient's email could inherit that entry and its consultation credential. Now the entry key comes only from a server-verified Firebase uid (or device hashes when there is no session), and the email is only a displayed label with its provenance. A regression test pins it.
 
 ### 52. Can anyone sign up as a doctor?
-No. Signing in with Google creates at most a patient profile. Doctor, reviewer and admin roles come only from a custom claim that an administrator sets with `scripts/admin/provision-role.mjs`. Firestore rules refuse a client-created doctor profile, and since 27 November the server also refuses a doctor role written in a profile without the claim. Boundary: whoever holds the Firebase admin credential is trusted; protect it.
+No. Signing in with Google creates at most a patient profile. Doctor, reviewer and admin roles come only from a custom claim that an administrator sets with `scripts/admin/provision-role.mjs`. Firestore rules refuse a client-created doctor profile unless the account already holds the claim. Doctor accounts created before claims existed are still honoured, logged, and listed by the script's audit so each can be granted a claim; we tried claim-only enforcement on 27 November and it locked out our own doctor, so we kept a transitional fallback rather than break the working call. Boundary: whoever holds the Firebase admin credential is trusted; protect it.
 
 ### 53. How does a doctor assign a patient?
 The invitation is the assignment. It belongs to the doctor and one room; emails in "Patients who can join directly" let those verified accounts skip the queue. Everyone else with the link waits for that doctor. The encounter, summary and history are owned by that doctor; the patient sees only their own records. There is no scheduling module by design.
@@ -249,7 +249,7 @@ The survey evaluated perceived quality of the demonstrated build; the fixes hard
 37 physical pages, same 259 pages and numbering; the register lists each page, edit and reason. Objectives and Chapter IV numbers were not edited.
 
 ### 61. Where is doctor and patient provisioning, and what pattern is it?
-Doctors: administrator provisioning with claims-based RBAC — an administrator grants a Firebase custom claim with `scripts/admin/provision-role.mjs`; the server (`request-auth.ts`) and Firestore rules accept a clinician role only from that claim. Registered patients: self-service just-in-time provisioning of the lowest role (always `patient`) plus versioned consent. Guests: a capability link plus doctor admission. No self-service path leads to a privileged role.
+Doctors: administrator provisioning with claims-based RBAC — an administrator grants a Firebase custom claim with `scripts/admin/provision-role.mjs`; Firestore rules allow a doctor profile only for an account holding that claim, and the server reads the claim first (legacy doctor profiles are honoured transitionally and audited). Registered patients: self-service just-in-time provisioning of the lowest role (always `patient`) plus versioned consent. Guests: a capability link plus doctor admission. No self-service path leads to a privileged role.
 
 ### 62. Why didn't you add file attachments to chat?
 Attachments are a prepared but disabled capability. Before enabling them we require private storage, type and size limits, malware scanning, download authorization, retention and cross-session denial tests. Adding uploads untested would weaken the security claims and risk the working call. Chat itself is persisted per encounter, length-bounded, retry-safe and visible in history; it is not used as AI evidence.
@@ -272,8 +272,14 @@ Deep modules behind small interfaces (invitation access service, queue coordinat
 ### 68. What were the architectural risks you found in your own design?
 Keys derived from self-asserted data (fixed), checks outside the transaction that protects them (fixed), stale events acting on newer state (fixed), and authority read from editable profile data (fixed). The general lesson: authority must come from verified, server-held facts and be checked where it is committed.
 
+### 69. A patient wants to send a photo of their tooth or an X-ray. Why can't they attach it in chat?
+Because file attachments are a prepared but disabled capability, by design. A clinical image is sensitive personal information, and a safe upload path needs: private storage tied to one encounter, an allow-list of file types and a size limit, malware/content scanning, download only by the owning doctor and that patient, audit events, a retention and deletion rule, and tests proving another encounter cannot read the file. None of that is evaluated in this study, so we did not switch it on. Today the patient can show the tooth on camera or share their screen; the image is not stored. Attachments are listed as future work with those gates.
+
+### 70. Wouldn't attachments make your summaries better?
+Possibly, but only if the extracted content is trusted: the summary code is designed to accept attachment evidence only when an extraction is marked `ready` after scanning. Without that, an uploaded file could inject untrusted text into a clinical draft. So the evidence path exists in the design, and stays off until the safeguards are built and tested.
+
 ## Practice method for three writers
 
-Writer 1 answers title/contribution questions 1-6 and research-method questions 37-39 and 49-50. Writer 2 answers admission/security questions 7-15, 28-30, 33-36, 40-47, 51-56 and 61-65. Writer 3 answers capacity/refresh questions 16-27, the page/evidence questions 31-32, 48, 57-60 and 66-68. Rotate once so nobody knows only their own section. Give each answer in 20-40 seconds, then handle one follow-up.
+Writer 1 answers title/contribution questions 1-6 and research-method questions 37-39 and 49-50. Writer 2 answers admission/security questions 7-15, 28-30, 33-36, 40-47, 51-56, 61-65 and 69-70. Writer 3 answers capacity/refresh questions 16-27, the page/evidence questions 31-32, 48, 57-60 and 66-68. Rotate once so nobody knows only their own section. Give each answer in 20-40 seconds, then handle one follow-up.
 
 Use the four-part response: state the current rule, explain its reason, name the evidence, and state the limitation. If a number appears, give its units and scope. Do not argue with a panelist by substituting a provider limit for a missing experiment. An accurate limitation and a concrete next test are valid engineering answers; they do not guarantee an examination outcome.

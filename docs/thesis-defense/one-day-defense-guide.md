@@ -10,13 +10,13 @@ Use this to learn the system well enough to **teach it**, run the demo, and answ
 
 > Production (`livekit-frontend-tau.vercel.app`) still runs `main`. Read the [presentation risk register](presentation-risk-register.md) and decide: demo the PR #9 preview and merge after testing, or demo production as-is.
 
-1. **Provision the demo doctor.** Clinician access now comes only from an administrator-set claim:
+1. **Provision new doctors with the script** (existing doctor accounts keep working; granting them a claim is recommended but no longer required for the demo):
    ```bash
    vercel env pull .env.local
    node --env-file=.env.local scripts/admin/provision-role.mjs audit
    node --env-file=.env.local scripts/admin/provision-role.mjs grant doctor <demo-doctor-email> --apply
    ```
-   Sign the doctor out and back in. Without this the doctor sees "not provisioned".
+   Sign the doctor out and back in after a grant.
 2. **Deploy the branch** (merge PR #9 or use its Vercel preview). Note the commit SHA you demo.
 3. **Prepare three synthetic accounts:** Doctor (provisioned), Patient A (Google account, verified email), and a guest browser with no sign-in (incognito). Never use real patients.
 4. **Freeze.** No code changes after this point.

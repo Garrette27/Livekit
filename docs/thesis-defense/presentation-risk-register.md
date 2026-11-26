@@ -17,7 +17,7 @@ Proven practice: **feature freeze + canary (preview) + one-click rollback.** If 
 
 | # | Risk during the demo | Cause | Likelihood | Containment (pattern) |
 |---|---|---|---|---|
-| 1 | Doctor is refused ("not provisioned") after merge | Clinician roles now need an admin-set claim (least privilege / RBAC via identity-provider claims) | **High** if skipped | Today: `vercel env pull .env.local`, then `node --env-file=.env.local scripts/admin/provision-role.mjs audit` and `grant doctor <email> --apply`; doctor signs out/in |
+| 1 | Doctor was refused ("not provisioned") after the promotion on 27 Nov | Claim-only enforcement met a doctor account created before claims existed | **Happened — fixed** | Existing doctor profiles are honoured again (transitional, logged); grant claims with the script when you have credentials |
 | 2 | Old queue rows appear or count toward the limit | Rows created before 27 Nov were keyed by email; new rows are keyed by account | Medium | Create a **fresh invitation** for the demo (old ones are mostly expired anyway) |
 | 3 | Firestore quota exhausted (seen in earlier incidents) | History now loads twice (summaries first, then chat); polling; free tier is 50,000 reads/day | Low for one demo | Don't leave many doctor tabs open overnight; one dashboard tab during the demo |
 | 4 | AI summary missing | OpenAI credit/model availability; evidence gate | Medium | Expected behaviour: call still works; record says unavailable/insufficient evidence. Never fabricate |
@@ -32,7 +32,7 @@ Proven practice: **feature freeze + canary (preview) + one-click rollback.** If 
 
 | Who | How an account becomes that role | Code | Pattern |
 |---|---|---|---|
-| **Doctor / reviewer / admin** | An administrator grants a Firebase custom claim | `scripts/admin/provision-role.mjs` (grant/revoke/audit); enforced in `lib/services/shared/request-auth.ts` and `firestore.rules` (users create rule); login UI `app/doctor/login/page.tsx` | **Administrator provisioning + claims-based RBAC** (Firebase custom claims), least privilege, separation of duties: no self-service path to a privileged role |
+| **Doctor / reviewer / admin** | An administrator grants a Firebase custom claim | `scripts/admin/provision-role.mjs` (grant/revoke/audit); enforced by `firestore.rules` (a client can create a doctor profile only with the claim) and read in `lib/services/shared/request-auth.ts` (claim first; legacy profile role honoured transitionally); login UI `app/doctor/login/page.tsx` | **Administrator provisioning + claims-based RBAC** (Firebase custom claims), least privilege, separation of duties: no self-service path to a privileged role |
 | **Registered patient** | Signs in (Google/email) and accepts the versioned consent; profile role is always `patient` | `app/patient/login`, consent route `app/api/patient/consent/route.ts`, identity resolution in `lib/invitations/validate-service.ts` | **Self-service, just-in-time provisioning** of the lowest-privilege role |
 | **Guest patient** | No account; holds an invitation (bearer capability) and waits for the doctor | `app/invite/[token]`, `lib/invitations/*` | **Capability link + human admission** (guest pattern); optional Firebase anonymous session upgradeable later |
 

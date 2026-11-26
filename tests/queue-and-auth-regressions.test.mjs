@@ -1201,9 +1201,9 @@ test('the doctor admits only the visit they reviewed, and legacy status-less inv
   assert.equal((await h.service.admitWaitingEntry({ ...admittingInput, expectedVisitId: 'visit-2' })).roomName, 'room-a');
 });
 
-test('only an administrator-set claim makes an account a clinician; a profile can only say patient', async () => {
-  const profiles = { 'uid-legacy': { role: 'doctor' }, 'uid-patient': { role: 'patient' }, 'uid-claimed': { role: 'doctor' } };
-  const claims = { 'uid-legacy': {}, 'uid-patient': {}, 'uid-claimed': { role: 'doctor' } };
+test('clinician roles: claim accepted; legacy profile role honoured transitionally; unknown role refused', async () => {
+  const profiles = { 'uid-legacy': { role: 'doctor' }, 'uid-patient': { role: 'patient' }, 'uid-claimed': { role: 'doctor' }, 'uid-none': { role: 'bogus' } };
+  const claims = { 'uid-legacy': {}, 'uid-patient': {}, 'uid-claimed': { role: 'doctor' }, 'uid-none': {} };
   const { authorizeBearerRequest } = loadModule('lib/services/shared/request-auth.ts', {
     '@/lib/firebase-admin': {
       getFirebaseAdmin: () => ({}),
@@ -1215,12 +1215,10 @@ test('only an administrator-set claim makes an account a clinician; a profile ca
     './service-result': loadModule('lib/services/shared/service-result.ts'),
   });
   const call = (uid, permission = 'invitation:manage') => authorizeBearerRequest({ headers: new Headers({ authorization: `Bearer ${uid}` }) }, permission);
-  const legacy = await call('uid-legacy');
-  assert.equal(legacy.ok, false);
-  assert.equal(legacy.error.status, 403);
-  assert.equal(legacy.error.code, 'role_not_provisioned');
   assert.equal((await call('uid-claimed')).ok, true);
-  assert.equal((await call('uid-patient', 'consultation:read-own')).data.role, 'patient');
+  assert.equal((await call('uid-legacy')).ok, true, 'Existing doctor accounts keep working until granted a claim');
+  assert.equal((await call('uid-patient')).ok, false, 'A patient cannot manage invitations');
+  assert.equal((await call('uid-none')).error.code, 'role_required');
 });
 
 test('the summary editor shows Unknown instead of defaulting an unestablished risk to Low', () => {
