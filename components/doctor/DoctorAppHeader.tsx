@@ -61,7 +61,10 @@ export default function DoctorAppHeader({ title, subtitle, user, navLink }: Doct
           </span>
         </Link>
         <nav className="doctor-header-actions" aria-label="Doctor navigation">
-          <Link href={navLink.href} className="doctor-nav-link">{navLink.label}</Link>
+          {/* A full document navigation, not a client transition: the client
+              transition between the two doctor pages could stall on the
+              destination's auth initialisation (seen in production). */}
+          <a href={navLink.href} className="doctor-nav-link">{navLink.label}</a>
           <span className="doctor-account" title={account.secondary || account.primary}>
             <span className="doctor-avatar" aria-hidden="true">{account.initial}</span>
             <span className="doctor-account-text">

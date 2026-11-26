@@ -249,7 +249,7 @@ The survey evaluated perceived quality of the demonstrated build; the fixes hard
 37 physical pages, same 259 pages and numbering; the register lists each page, edit and reason. Objectives and Chapter IV numbers were not edited.
 
 ### 61. Where is doctor and patient provisioning, and what pattern is it?
-Doctors: administrator provisioning with claims-based RBAC — an administrator grants a Firebase custom claim with `scripts/admin/provision-role.mjs`; Firestore rules allow a doctor profile only for an account holding that claim, and the server reads the claim first (legacy doctor profiles are honoured transitionally and audited). Registered patients: self-service just-in-time provisioning of the lowest role (always `patient`) plus versioned consent. Guests: a capability link plus doctor admission. No self-service path leads to a privileged role.
+Doctors: administrator provisioning with claims-based RBAC — an administrator grants the role in the **/admin** console (or with `scripts/admin/provision-role.mjs`); Firestore rules allow a doctor profile only for an account holding that claim, and the server reads the claim first (legacy doctor profiles are honoured transitionally and audited). Registered patients: self-service just-in-time provisioning of the lowest role (always `patient`) plus versioned consent. Guests: a capability link plus doctor admission. No self-service path leads to a privileged role.
 
 ### 62. Why didn't you add file attachments to chat?
 Attachments are a prepared but disabled capability. Before enabling them we require private storage, type and size limits, malware scanning, download authorization, retention and cross-session denial tests. Adding uploads untested would weaken the security claims and risk the working call. Chat itself is persisted per encounter, length-bounded, retry-safe and visible in history; it is not used as AI evidence.
@@ -278,8 +278,26 @@ Because file attachments are a prepared but disabled capability, by design. A cl
 ### 70. Wouldn't attachments make your summaries better?
 Possibly, but only if the extracted content is trusted: the summary code is designed to accept attachment evidence only when an extraction is marked `ready` after scanning. Without that, an uploaded file could inject untrusted text into a clinical draft. So the evidence path exists in the design, and stays off until the safeguards are built and tested.
 
+### 71. Anyone with a link can create a patient account. Isn't that a security risk?
+No, because creating an account grants nothing clinical. Self-registration only ever produces the lowest role, `patient`, which can read that patient's own records and nothing else. Possessing a link still only lets someone *ask* to enter: they wait until the doctor admits them, unless their provider-verified account is on that invitation's list. This is the standard patient-portal pattern: open registration of a least-privilege role, with authorization checked per record and per encounter. What would be a risk — self-registering as a doctor — is impossible: clinician roles come only from an administrator.
+
+### 72. How is a doctor account created? Show us.
+An administrator opens **/admin**, enters the clinician's email (they must have signed in once) and grants "Doctor". The server re-checks that the caller is an administrator, sets the role claim, updates the profile, signs the account out of other sessions so the role applies at next sign-in, and records an audit event with user ids. Revoking reverses it. Pattern: administrator provisioning with claims-based role-based access control, least privilege and an audit trail.
+
+### 73. Who is the first administrator? Isn't that a chicken-and-egg problem?
+It is solved with a "break-glass" bootstrap: the server-only setting `SUPER_ADMIN_EMAILS` names the owner's provider-verified email. A super admin can grant doctors and administrators; an administrator can grant doctors only; nobody can change their own role, so one compromised account cannot escalate itself or lock everyone out. The setting lives in the hosting environment, not in the browser.
+
+### 74. A patient account wants to become a doctor. Can the admin convert it?
+No. Granting a clinician role to an existing patient account is refused; clinicians use a separate account. This keeps a person's own health history from mixing with clinician access.
+
+### 75. Did you do anything about video and audio quality?
+Yes, using standard LiveKit settings rather than custom code: adaptive streaming (each viewer receives a size that fits their screen), dynacast (the sender stops sending layers nobody watches), simulcast (several qualities so weak connections get a lower layer instead of freezing), a 720p capture target, browser echo cancellation, noise suppression and automatic gain, and redundant audio for lossy networks. These improve robustness; they do not guarantee a resolution. We have not measured delivered quality, so we describe the settings and the test we would run (receiver resolution, frames per second, packet loss, jitter, round-trip time).
+
+### 76. Could you add attachments on Firebase's free tier?
+Not on the free Spark plan: Cloud Storage for Firebase now requires the pay-as-you-go Blaze plan, which still includes a no-cost quota (about 5 GB stored and 1 GB downloaded per day). Putting images in Firestore documents is not a safe workaround. Our plan is in `attachment-plan.md`: private bucket, signed upload/download URLs issued after ownership checks, type and size limits, malware scanning before a file is usable, audit, retention, and cross-session denial tests.
+
 ## Practice method for three writers
 
-Writer 1 answers title/contribution questions 1-6 and research-method questions 37-39 and 49-50. Writer 2 answers admission/security questions 7-15, 28-30, 33-36, 40-47, 51-56, 61-65 and 69-70. Writer 3 answers capacity/refresh questions 16-27, the page/evidence questions 31-32, 48, 57-60 and 66-68. Rotate once so nobody knows only their own section. Give each answer in 20-40 seconds, then handle one follow-up.
+Writer 1 answers title/contribution questions 1-6 and research-method questions 37-39 and 49-50. Writer 2 answers admission/security questions 7-15, 28-30, 33-36, 40-47, 51-56, 61-65, 69-74 and 76. Writer 3 answers capacity/refresh questions 16-27, the page/evidence questions 31-32, 48, 57-60 and 66-68 and 75. Rotate once so nobody knows only their own section. Give each answer in 20-40 seconds, then handle one follow-up.
 
 Use the four-part response: state the current rule, explain its reason, name the evidence, and state the limitation. If a number appears, give its units and scope. Do not argue with a panelist by substituting a provider limit for a missing experiment. An accurate limitation and a concrete next test are valid engineering answers; they do not guarantee an examination outcome.
