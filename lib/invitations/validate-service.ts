@@ -5,7 +5,6 @@ import {
   InvitationToken,
   SecurityViolation,
   ValidateInvitationResponse,
-  WaitingPatient,
 } from '../types';
 import { signLiveKitRoomToken, verifyInvitationToken } from './token-utils';
 import { toDate } from './utils';
@@ -23,8 +22,9 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { hashSecuritySignal } from '../security/security-signal';
 import { resolveWaitingPatientId } from './waiting-patient-key';
 import {
-  recordExistingInvitationAccess,
   reserveInvitationUse,
+  reserveWaitingVisit,
+  type WaitingVisitReservation,
 } from './invitation-use-reservation';
 
 export interface ValidateInvitationContext {
@@ -129,20 +129,6 @@ function buildSecurityViolation(input: {
   };
 }
 
-function toMillis(value: any): number {
-  if (!value) {
-    return 0;
-  }
-  if (typeof value.toMillis === 'function') {
-    return value.toMillis();
-  }
-  if (value instanceof Date) {
-    return value.getTime();
-  }
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
-}
-
 function buildParticipantDisplayName(lookup: UserLookupContext): string {
   return (
     lookup.userProfile?.displayName
@@ -152,141 +138,88 @@ function buildParticipantDisplayName(lookup: UserLookupContext): string {
 }
 
 /**
- * Prior waiting-room entries for this patient on this invitation.
- *
- * `hasEndedVisit` means a visit has already finished — it exists to stop a
- * finished entry being handed back as if the patient were still in the room.
- * It is deliberately not a judgement about whether they may return: patients
- * close tabs constantly, and treating that as permanent would revoke the
- * doctor's skip-the-queue decision after one visit.
+ * Places a visitor on their queue entry for this invitation through the
+ * atomic reservation (capacity, use counting, visit binding, audit).
+ * `waitingPatientId` must come from resolveWaitingPatientId, and
+ * `principalKeyed` says whether it was derived from a verified Firebase uid.
  */
-async function lookupRegisteredAdmissionHistory(
-  db: any,
-  invitationId: string,
-  patientEmail: string
-): Promise<{ hasEndedVisit: boolean; latestAdmitted: WaitingPatient | null }> {
-  const existingPatientsQuery = await db.collection('waitingPatients')
-    .where('invitationId', '==', invitationId)
-    .where('patientEmail', '==', patientEmail)
-    .get();
-
-  if (existingPatientsQuery.empty) {
-    return { hasEndedVisit: false, latestAdmitted: null };
-  }
-
-  let hasEndedVisit = false;
-  let latestAdmitted: WaitingPatient | null = null;
-  let latestAdmittedTime = 0;
-
-  existingPatientsQuery.docs.forEach((doc: any) => {
-    const data = { id: doc.id, ...doc.data() } as WaitingPatient;
-
-    if (data.status === 'left' || data.status === 'rejected') {
-      hasEndedVisit = true;
-      return;
-    }
-
-    if (data.status === 'admitted') {
-      const joinedAtMillis = toMillis(data.joinedAt);
-      if (!latestAdmitted || joinedAtMillis >= latestAdmittedTime) {
-        latestAdmitted = data;
-        latestAdmittedTime = joinedAtMillis;
-      }
-    }
-  });
-
-  return { hasEndedVisit, latestAdmitted };
-}
-
 async function reserveWaitingPatient(
   db: any,
   input: {
     invitationId: string;
     roomName: string;
     doctorUserId: string;
+    waitingPatientId: string;
+    principalKeyed: boolean;
     identity: WaitingPatientIdentity;
-    status: WaitingPatient['status'];
-    clientIP: string;
-    userAgent: string;
-    admissionMode?: 'doctor-manual' | 'auto-email-match';
+    status: 'waiting' | 'admitted';
+    networkHash: string;
+    userAgentHash: string;
+    admissionMode: 'doctor-manual' | 'auto-email-match';
     riskSignals?: string[];
     accessAttemptData: Record<string, any>;
   }
-): Promise<string | null> {
+): Promise<WaitingVisitReservation> {
   const now = new Date();
-  const networkHash = hashSecuritySignal('ip', input.clientIP);
-  const userAgentHash = hashSecuritySignal('user-agent', input.userAgent);
-
-  // Keyed by invitation and patient, so returning to the same invitation
-  // updates the entry the patient already has rather than adding another.
-  const waitingPatientId = resolveWaitingPatientId({
+  const onNewVisit: Record<string, unknown> = {
+    id: input.waitingPatientId,
     invitationId: input.invitationId,
-    patientEmail: input.identity.patientEmail,
-    patientId: input.identity.patientId,
-    networkHash,
-    userAgentHash,
-  });
-
-  // Facts about the patient's first arrival. Keeping joinedAt stable is what
-  // makes "waiting for 11 minutes" mean the wait, not the last page load.
-  const onCreate: Record<string, unknown> = {
-    id: waitingPatientId,
-    invitationId: input.invitationId,
-    joinedAt: now,
   };
 
+  // The email shown to the doctor is a label with provenance
+  // (metadata.identitySource); it never selects which entry is used.
   const onEachVisit: Record<string, unknown> = {
     patientId: input.identity.patientId,
     patientName: input.identity.patientName,
     ...(input.identity.patientEmail && { patientEmail: input.identity.patientEmail }),
     roomName: input.roomName,
     doctorUserId: input.doctorUserId,
-    status: input.status,
     lastSeenAt: now,
     visitCount: FieldValue.increment(1),
     metadata: {
-      networkHash,
-      userAgentHash,
+      networkHash: input.networkHash,
+      userAgentHash: input.userAgentHash,
       lastAccessed: now,
-      ...(input.admissionMode && { admissionMode: input.admissionMode }),
+      admissionMode: input.admissionMode,
       isAnonymous: input.identity.isAnonymous,
-      // Recorded so the doctor's queue can show how the visitor's email was
-      // established rather than presenting every address with equal weight.
       identitySource: input.identity.identitySource,
-      ...(input.riskSignals && input.riskSignals.length > 0
-        ? { riskSignals: input.riskSignals }
-        : {}),
+      ...(input.riskSignals && input.riskSignals.length > 0 ? { riskSignals: input.riskSignals } : {}),
     },
   };
 
-  if (input.status === 'admitted') {
-    onEachVisit.admittedAt = now;
-  }
+  return reserveWaitingVisit(db, input.invitationId, input.accessAttemptData, {
+    id: input.waitingPatientId,
+    roomName: input.roomName,
+    status: input.status,
+    principalKeyed: input.principalKeyed,
+    onNewVisit,
+    onEachVisit,
+    // Each arrival is kept as its own immutable record, so the entry can be a
+    // single current state without losing its history.
+    visit: {
+      arrivedAt: now,
+      requestedStatus: input.status,
+      networkHash: input.networkHash,
+      userAgentHash: input.userAgentHash,
+      admissionMode: input.admissionMode,
+      ...(input.riskSignals && input.riskSignals.length > 0 ? { riskSignals: input.riskSignals } : {}),
+    },
+    newVisitId: globalThis.crypto.randomUUID(),
+  });
+}
 
-  const reserved = await reserveInvitationUse(
-    db,
-    input.invitationId,
-    input.accessAttemptData,
-    {
-      waitingPatient: {
-        id: waitingPatientId,
-        onCreate,
-        onEachVisit,
-        // Each arrival is kept as its own immutable record, so the entry can be
-        // a single current state without losing the history it used to encode
-        // by existing many times over.
-        visit: {
-          arrivedAt: now,
-          status: input.status,
-          networkHash,
-          userAgentHash,
-          ...(input.admissionMode && { admissionMode: input.admissionMode }),
-          ...(input.riskSignals && input.riskSignals.length > 0 ? { riskSignals: input.riskSignals } : {}),
-        },
-      },
-    }
-  );
-  return reserved ? waitingPatientId : null;
+/** Maps a refused reservation to the visitor-facing response. */
+function refusedReservationResult(reservation: WaitingVisitReservation): ValidateInvitationResult {
+  if (reservation.outcome === 'full') {
+    return result(403, {
+      success: false,
+      error: `Waiting room is full. Maximum ${reservation.maxPatients} patients allowed.`,
+    });
+  }
+  return result(409, {
+    success: false,
+    error: 'This invitation is no longer available. Ask the doctor for a new link.',
+  });
 }
 
 /**
@@ -400,36 +333,20 @@ async function recordAccessRisk(
   }
 }
 
-async function validateUsageLimits(
-  db: any,
+/**
+ * Fast refusal for an invitation that is visibly used up, so the visitor gets
+ * a clear message before identity work. Authoritative use and capacity limits
+ * are rechecked inside the reservation transactions.
+ */
+function validateUsageLimits(
   invitation: Invitation,
-  invitationId: string,
-  roomName: string,
   isWaitingRoomEnabled: boolean
-): Promise<ValidateInvitationResult | null> {
+): ValidateInvitationResult | null {
   if (isWaitingRoomEnabled) {
-    const maxPatients = invitation.maxPatients || 10;
-    const currentWaitingQuery = await db.collection('waitingPatients')
-      .where('roomName', '==', roomName)
-      .where('invitationId', '==', invitationId)
-      .where('status', '==', 'waiting')
-      .get();
-
-    if (currentWaitingQuery.size >= maxPatients) {
-      return result(403, {
-        success: false,
-        error: `Waiting room is full. Maximum ${maxPatients} patients allowed.`,
-      });
-    }
-
-    const currentUses = invitation.currentUses || 0;
-    if (invitation.maxUses && currentUses >= invitation.maxUses) {
-      return result(403, {
-        success: false,
-        error: 'Invitation has reached maximum number of uses.',
-      });
-    }
-
+    // Waiting target and use limit are enforced only inside
+    // reserveWaitingVisit. A check here would run outside that transaction and
+    // would also refuse a reconnect to a visit that is still open, which
+    // neither adds a waiting row nor spends a use.
     return null;
   }
 
@@ -443,77 +360,15 @@ async function validateUsageLimits(
   return null;
 }
 
-async function findExistingWaitingPatient(
-  db: any,
-  invitationId: string,
-  identity: WaitingPatientIdentity,
-  clientIP: string,
-  userAgent: string
-): Promise<WaitingPatient | null> {
-  const existingPatientsQuery = await db.collection('waitingPatients')
-    .where('invitationId', '==', invitationId)
-    .get();
-
-  if (existingPatientsQuery.empty) {
-    return null;
-  }
-
-  const waitingPatients: WaitingPatient[] = existingPatientsQuery.docs
-    .map((doc: any) => ({ id: doc.id, ...doc.data() } as WaitingPatient))
-    .filter((patient: WaitingPatient) => patient.status === 'waiting')
-    .sort((left: WaitingPatient, right: WaitingPatient) => toMillis(right.joinedAt) - toMillis(left.joinedAt));
-
-  if (identity.patientEmail) {
-    const normalizedIdentityEmail = normalizeEmail(identity.patientEmail);
-    const exactIdentityMatch = waitingPatients.find((patient: WaitingPatient) => {
-      const normalizedPatientEmail = normalizeEmail(patient.patientEmail);
-      if (normalizedPatientEmail && normalizedIdentityEmail && normalizedPatientEmail === normalizedIdentityEmail) {
-        return true;
-      }
-
-      if (identity.patientId && identity.patientId !== 'anonymous' && patient.patientId) {
-        return patient.patientId === identity.patientId;
-      }
-
-      return false;
-    });
-
-    return exactIdentityMatch || null;
-  }
-
-  const nowMs = Date.now();
-  const twoMinutesAgo = nowMs - (2 * 60 * 1000);
-  const networkHash = hashSecuritySignal('ip', clientIP);
-  const userAgentHash = hashSecuritySignal('user-agent', userAgent);
-  const anonymousCandidate = waitingPatients.find((patient: WaitingPatient) => {
-    const joinedTime = toMillis(patient.joinedAt);
-    if (joinedTime <= twoMinutesAgo) {
-      return false;
-    }
-
-    const patientEmail = normalizeEmail(patient.patientEmail);
-    if (patientEmail) {
-      return false;
-    }
-
-    const isAnonymousByMetadata = Boolean(patient.metadata?.isAnonymous);
-    if (!isAnonymousByMetadata && patient.patientName && patient.patientName !== 'Anonymous Patient') {
-      return false;
-    }
-
-    const matchesHashedSignals =
-      patient.metadata?.networkHash === networkHash
-      && patient.metadata?.userAgentHash === userAgentHash;
-    const matchesLegacySignals =
-      patient.metadata?.ip === clientIP
-      && patient.metadata?.userAgent === userAgent;
-
-    return matchesHashedSignals || matchesLegacySignals;
-  });
-
-  return anonymousCandidate || null;
-}
-
+/**
+ * Decides and issues the credential for a waiting-room invitation.
+ *
+ * Only a non-anonymous, provider-verified account on the allowlist may ask for
+ * direct entry; everyone else (and anyone the doctor rejected on this entry)
+ * receives a media-disabled waiting credential. Both paths go through the same
+ * atomic reservation, so reconnects reuse the open visit and every credential
+ * names that visit.
+ */
 async function handleWaitingRoomAccess(params: {
   db: any;
   tokenPayload: InvitationToken;
@@ -546,8 +401,6 @@ async function handleWaitingRoomAccess(params: {
   const doctorUserId = invitation.createdBy;
   if (!doctorUserId || doctorUserId === 'system') {
     console.error('CRITICAL: Cannot create waiting patient - doctorUserId is invalid:', {
-      doctorUserId,
-      invitationCreatedBy: invitation.createdBy,
       invitationId: tokenPayload.invitationId,
     });
     return result(500, {
@@ -580,161 +433,64 @@ async function handleWaitingRoomAccess(params: {
     ),
     riskSignals,
   });
+  const requestsDirectEntry = admission.admit === 'directly';
 
-  if (admission.admit === 'directly' && identity.patientEmail) {
-    const admissionHistory = await lookupRegisteredAdmissionHistory(
-      db,
-      tokenPayload.invitationId,
-      identity.patientEmail
-    );
+  const networkHash = hashSecuritySignal('ip', clientIP);
+  const userAgentHash = hashSecuritySignal('user-agent', userAgent);
+  const principalId = authenticatedVisitor?.userId?.trim() || null;
+  const waitingPatientId = resolveWaitingPatientId({
+    invitationId: tokenPayload.invitationId,
+    principalId,
+    networkHash,
+    userAgentHash,
+  });
 
-    // Rejoin an admission that is still open, so a refresh or a dropped
-    // connection returns to the same encounter instead of starting a second
-    // one. Once that visit has ended its entry is history and is not reused.
-    if (admissionHistory.latestAdmitted && !admissionHistory.hasEndedVisit) {
-      const accessRecorded = await recordExistingInvitationAccess(
-        db,
-        tokenPayload.invitationId,
-        accessAttemptData
-      );
-      if (!accessRecorded) {
-        return result(409, {
-          success: false,
-          error: 'This invitation is no longer available. Ask the doctor for a new link.',
-        });
-      }
+  const reservation = await reserveWaitingPatient(db, {
+    invitationId: tokenPayload.invitationId,
+    roomName: tokenPayload.roomName,
+    doctorUserId,
+    waitingPatientId,
+    principalKeyed: Boolean(principalId),
+    identity,
+    status: requestsDirectEntry ? 'admitted' : 'waiting',
+    networkHash,
+    userAgentHash,
+    admissionMode: requestsDirectEntry ? 'auto-email-match' : 'doctor-manual',
+    riskSignals,
+    accessAttemptData,
+  });
+  if (reservation.outcome !== 'reserved') {
+    return refusedReservationResult(reservation);
+  }
 
-      const admittedToken = signLiveKitRoomToken({
-        subject: `patient_${tokenPayload.invitationId}_${admissionHistory.latestAdmitted.id}`,
+  const subject = `patient_${tokenPayload.invitationId}_${waitingPatientId}`;
+  if (requestsDirectEntry && reservation.status === 'admitted') {
+    return result(200, {
+      success: true,
+      liveKitToken: signLiveKitRoomToken({
+        subject,
         patientUserId: lookup.userDocId,
+        visitId: reservation.visitId,
         roomName: tokenPayload.roomName,
         participantName: participantDisplayName,
         expiresIn: '2h',
-      });
-
-      return result(200, {
-        success: true,
-        liveKitToken: admittedToken,
-        roomName: tokenPayload.roomName,
-        waitingRoomToken: false,
-        waitingRoomEnabled: false,
-        invitationId: tokenPayload.invitationId,
-        waitingPatientId: admissionHistory.latestAdmitted.id,
-      });
-    }
-
-    // Otherwise admit afresh. A visit that already ended must not disqualify
-    // this one: closing the tab is something patients do constantly, and
-    // treating it as permanent would silently revoke the doctor's own
-    // skip-the-queue decision after a single visit.
-    const admittedWaitingPatientId = await reserveWaitingPatient(db, {
-      invitationId: tokenPayload.invitationId,
-      roomName: tokenPayload.roomName,
-      doctorUserId,
-      identity,
-      status: 'admitted',
-      clientIP,
-      userAgent,
-      admissionMode: 'auto-email-match',
-      riskSignals,
-      accessAttemptData,
-    });
-    if (!admittedWaitingPatientId) {
-      return result(409, {
-        success: false,
-        error: 'This invitation is no longer available. Ask the doctor for a new link.',
-      });
-    }
-
-    const admittedToken = signLiveKitRoomToken({
-      subject: `patient_${tokenPayload.invitationId}_${admittedWaitingPatientId}`,
-      patientUserId: lookup.userDocId,
-      roomName: tokenPayload.roomName,
-      participantName: participantDisplayName,
-      expiresIn: '2h',
-    });
-
-    return result(200, {
-      success: true,
-      liveKitToken: admittedToken,
+      }),
       roomName: tokenPayload.roomName,
       waitingRoomToken: false,
       waitingRoomEnabled: false,
       invitationId: tokenPayload.invitationId,
-      waitingPatientId: admittedWaitingPatientId,
+      waitingPatientId,
     });
   }
 
-  const existingWaitingPatient = await findExistingWaitingPatient(
-    db,
-    tokenPayload.invitationId,
-    identity,
-    clientIP,
-    userAgent
-  );
-
-  if (existingWaitingPatient) {
-    console.log('Existing waiting patient found, reusing instead of creating duplicate:', {
-      waitingPatientId: existingWaitingPatient.id,
-      invitationId: tokenPayload.invitationId,
-    });
-
-    const patch: Record<string, unknown> = {
-      'metadata.lastAccessed': new Date(),
-    };
-    if (!existingWaitingPatient.patientEmail && identity.patientEmail) {
-      patch.patientEmail = identity.patientEmail;
-    }
-    if (
-      (existingWaitingPatient.patientName === 'Anonymous Patient' || !existingWaitingPatient.patientName)
-      && identity.patientName
-      && identity.patientName !== 'Anonymous Patient'
-    ) {
-      patch.patientName = identity.patientName;
-      patch.patientId = identity.patientId;
-    }
-    await db.collection('waitingPatients').doc(existingWaitingPatient.id).update(patch);
-
-    return result(200, {
-      success: true,
-      liveKitToken: signLiveKitRoomToken({
-        subject: `patient_${tokenPayload.invitationId}_${existingWaitingPatient.id}`,
-        roomName: waitingRoomName,
-        purpose: 'waiting',
-        participantName: participantDisplayName,
-        expiresIn: '1h',
-      }),
-      roomName: waitingRoomName,
-      waitingRoomToken: true,
-      waitingRoomEnabled: true,
-      invitationId: tokenPayload.invitationId,
-      waitingPatientId: existingWaitingPatient.id,
-    });
-  }
-
-  const waitingPatientId = await reserveWaitingPatient(db, {
-    invitationId: tokenPayload.invitationId,
-    roomName: tokenPayload.roomName,
-    doctorUserId,
-    identity,
-    status: 'waiting',
-    clientIP,
-    userAgent,
-    admissionMode: 'doctor-manual',
-    riskSignals,
-    accessAttemptData,
-  });
-  if (!waitingPatientId) {
-    return result(409, {
-      success: false,
-      error: 'This invitation is no longer available. Ask the doctor for a new link.',
-    });
-  }
-
+  // Waiting credentials authorize admission polling only. A visitor whose
+  // open visit the doctor already admitted receives the consultation grant
+  // from that poll, after the server re-checks the visit.
   return result(200, {
     success: true,
     liveKitToken: signLiveKitRoomToken({
-      subject: `patient_${tokenPayload.invitationId}_${waitingPatientId}`,
+      subject,
+      visitId: reservation.visitId,
       roomName: waitingRoomName,
       purpose: 'waiting',
       participantName: participantDisplayName,
@@ -846,13 +602,7 @@ export async function validateInvitationAndIssueToken(
       await recordAccessRisk(db, tokenPayload.invitationId, accessAttempt, violations);
     }
 
-    const usageError = await validateUsageLimits(
-      db,
-      invitation,
-      tokenPayload.invitationId,
-      tokenPayload.roomName,
-      isWaitingRoomEnabled
-    );
+    const usageError = validateUsageLimits(invitation, isWaitingRoomEnabled);
     if (usageError) {
       return usageError;
     }

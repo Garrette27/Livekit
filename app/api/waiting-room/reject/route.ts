@@ -16,6 +16,8 @@ async function handlePOST(req: NextRequest) {
     const waitingPatientId =
       typeof body.waitingPatientId === 'string' ? body.waitingPatientId.trim() : '';
     const doctorUserId = auth.data.userId;
+    const expectedVisitId =
+      typeof body.expectedVisitId === 'string' ? body.expectedVisitId.trim() || undefined : undefined;
 
     if (!waitingPatientId) {
       return NextResponse.json(
@@ -36,6 +38,7 @@ async function handlePOST(req: NextRequest) {
     const rejectionResult = await invitationAccess.rejectWaitingEntry({
       waitingPatientId,
       doctorUserId,
+      expectedVisitId,
     });
 
     return NextResponse.json({

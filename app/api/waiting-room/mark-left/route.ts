@@ -54,7 +54,10 @@ async function handlePOST(req: NextRequest) {
     }
 
     const invitationAccess = new FirestoreInvitationAccessCore(db);
-    const result = await invitationAccess.markWaitingEntryLeft({ waitingPatientId });
+    const result = await invitationAccess.markWaitingEntryLeft({
+      waitingPatientId,
+      credential: { visitId: authorization.credential.visitId },
+    });
 
     return NextResponse.json({
       success: true,

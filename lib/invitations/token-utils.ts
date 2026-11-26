@@ -30,6 +30,8 @@ export interface VerifiedLiveKitRoomToken {
   identity: string;
   /** Firebase UID bound by the issuer; distinct from the transport identity. */
   patientUserId?: string;
+  /** Visit bound by the issuer; see WaitingPatient.currentVisitId. */
+  visitId?: string;
   participantName?: string;
   roomName: string;
   issuedAt?: number;
@@ -47,6 +49,7 @@ export function verifyLiveKitRoomToken(token: string): VerifiedLiveKitRoomToken 
   }) as jwt.JwtPayload & {
     name?: string;
     appPatientUserId?: string;
+    appVisitId?: string;
     video?: { roomJoin?: boolean; room?: string };
   };
 
@@ -63,6 +66,7 @@ export function verifyLiveKitRoomToken(token: string): VerifiedLiveKitRoomToken 
   return {
     identity: payload.sub,
     patientUserId: typeof payload.appPatientUserId === 'string' ? payload.appPatientUserId : undefined,
+    visitId: typeof payload.appVisitId === 'string' ? payload.appVisitId : undefined,
     participantName: typeof payload.name === 'string' ? payload.name : undefined,
     roomName: payload.video.room,
     issuedAt: payload.iat,
@@ -73,6 +77,8 @@ interface LiveKitTokenOptions {
   subject: string;
   /** Only server-verified admission identity may populate this signed claim. */
   patientUserId?: string;
+  /** Server-reserved visit this credential may act on; never caller-supplied. */
+  visitId?: string;
   roomName: string;
   participantName?: string;
   expiresIn?: jwt.SignOptions['expiresIn'];
@@ -83,6 +89,7 @@ interface LiveKitTokenOptions {
 export function signLiveKitRoomToken({
   subject,
   patientUserId,
+  visitId,
   roomName,
   participantName,
   expiresIn = '1h',
@@ -111,6 +118,9 @@ export function signLiveKitRoomToken({
   }
   if (patientUserId) {
     payload.appPatientUserId = patientUserId;
+  }
+  if (visitId) {
+    payload.appVisitId = visitId;
   }
 
   return jwt.sign(

@@ -92,8 +92,37 @@ function isWaitingRoomName(roomName: string): boolean {
   return roomName.trim().toLowerCase().endsWith('-waiting');
 }
 
+/** Tolerance between LiveKit's and Firestore's clocks when ordering a visit start. */
+const VISIT_START_CLOCK_SKEW_MS = 5_000;
+
 function buildParticipantIdentity(waitingPatient: WaitingPatient): string {
   return `patient_${waitingPatient.invitationId}_${waitingPatient.id}`;
+}
+
+/**
+ * A queue entry is reused when a person returns, so the entry id alone does
+ * not name one visit. Once an entry records its current visit, a patient
+ * credential must carry that same visit: a credential from an earlier visit
+ * (or one issued before visit binding, which carries none) is refused.
+ * Entries without a recorded visit are legacy rows and stay accepted until
+ * their next arrival assigns one.
+ */
+/**
+ * The doctor acts on the visit they saw in the queue. If the entry has since
+ * started a different visit (the person left and came back), the command is
+ * refused so the doctor re-reads the queue instead of admitting or removing a
+ * visit they never reviewed. Omitted by older clients; then not enforced.
+ */
+function assertDoctorActsOnShownVisit(waitingPatient: WaitingPatient, expectedVisitId?: string): void {
+  if (expectedVisitId && waitingPatient.currentVisitId && waitingPatient.currentVisitId !== expectedVisitId) {
+    throw new InvitationAccessError(409, 'visit_changed', 'This visitor started a new visit. Refresh the queue and review it again.');
+  }
+}
+
+function assertCredentialNamesCurrentVisit(waitingPatient: WaitingPatient, credentialVisitId?: string): void {
+  if (waitingPatient.currentVisitId && waitingPatient.currentVisitId !== credentialVisitId) {
+    throw new InvitationAccessError(403, 'stale_visit', 'This link was opened for an earlier visit. Reopen the invitation to continue.');
+  }
 }
 
 function normalizeKnownPatientUserId(value?: string): string | null {
@@ -109,8 +138,10 @@ function isInvitationActive(invitation: InvitationSnapshot | undefined, nowMs: n
     return false;
   }
 
+  // A missing status is a legacy active invitation, as validation and the
+  // reservation already treat it; otherwise it would be listed but unadmittable.
   const status = invitation.status?.trim().toLowerCase();
-  if (status !== 'active') {
+  if (status && status !== 'active') {
     return false;
   }
 
@@ -180,6 +211,7 @@ function mapWaitingDocToModel(input: { id: string; data: Record<string, unknown>
     admittedAt: input.data.admittedAt as WaitingPatient['admittedAt'],
     leftAt: (input.data as { leftAt?: WaitingPatient['leftAt'] }).leftAt,
     rejectedAt: input.data.rejectedAt as WaitingPatient['rejectedAt'],
+    currentVisitId: typeof input.data.currentVisitId === 'string' ? input.data.currentVisitId : undefined,
     metadata: (input.data.metadata as WaitingPatient['metadata']) || undefined,
   };
 }
@@ -241,6 +273,7 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
   private issueAdmissionToken(patient: WaitingPatient): string {
     return this.rtcAdapter.issueRoomToken({
       subject: buildParticipantIdentity(patient),
+      visitId: patient.currentVisitId,
       patientUserId: patient.metadata?.isAnonymous === false
         && patient.metadata?.identitySource === 'registered-profile'
         ? patient.patientId
@@ -512,6 +545,7 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
       ) {
         throw new InvitationAccessError(403, 'room_mismatch', 'Room credential does not match this visit');
       }
+      assertCredentialNamesCurrentVisit(waitingPatient, input.credentialVisitId);
 
       if (waitingPatient.status === 'admitted') {
         return {
@@ -555,6 +589,7 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
     waitingPatientId: string;
     roomName: string;
     doctorUserId?: string;
+    expectedVisitId?: string;
   }): Promise<{ liveKitToken: string; roomName: string; waitingPatientId: string }> {
     if (!input.waitingPatientId || !input.roomName) {
       throw new InvitationAccessError(
@@ -567,6 +602,7 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
     const { waitingPatient, alreadyAdmitted } = await this.db.runTransaction(async (transaction) => {
       const patient = await this.readCurrentWaitingVisit(transaction, input.waitingPatientId);
       assertDoctorScope(patient, input.doctorUserId);
+      assertDoctorActsOnShownVisit(patient, input.expectedVisitId);
       if (patient.roomName !== input.roomName) {
         throw new InvitationAccessError(400, 'room_mismatch', 'Room name mismatch');
       }
@@ -621,6 +657,7 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
   async rejectWaitingEntry(input: {
     waitingPatientId: string;
     doctorUserId?: string;
+    expectedVisitId?: string;
   }): Promise<{ waitingPatientId: string; status: 'rejected' }> {
     if (!input.waitingPatientId) {
       throw new InvitationAccessError(400, 'invalid_argument', 'waitingPatientId is required');
@@ -640,6 +677,7 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
       data: waitingDoc.data() as Record<string, unknown>,
     });
     assertDoctorScope(waitingPatient, input.doctorUserId);
+    assertDoctorActsOnShownVisit(waitingPatient, input.expectedVisitId);
 
     if (waitingPatient.status === 'rejected') {
       return {
@@ -689,6 +727,8 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
   async handleParticipantLeftWebhook(input: {
     waitingPatientId: string;
     roomName: string;
+    /** When the departing connection joined (LiveKit participant.joinedAt), if reported. */
+    participantJoinedAt?: Date | null;
   }): Promise<{
     handled: boolean;
     reason:
@@ -697,7 +737,9 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
       | 'waiting_entry_marked_rejected'
       | 'waiting_entry_already_left'
       | 'waiting_entry_already_rejected'
-      | 'waiting_room_departure_after_admission_ignored';
+      | 'waiting_room_departure_after_admission_ignored'
+      | 'earlier_visit_departure_ignored'
+      | 'participant_still_connected';
     status: 'left' | 'rejected' | null;
   }> {
     const waitingPatientId = input.waitingPatientId?.trim();
@@ -742,6 +784,24 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
       };
     }
 
+    // A departure belongs to the connection that joined at participantJoinedAt.
+    // If the entry's current visit began after that, the event is a late or
+    // duplicate report about an earlier visit and must not close this one.
+    const joinedAtMs = input.participantJoinedAt?.getTime() || 0;
+    if (joinedAtMs > 0 && toMillis(waitingPatient.joinedAt) > joinedAtMs + VISIT_START_CLOCK_SKEW_MS) {
+      return { handled: false, reason: 'earlier_visit_departure_ignored', status: null };
+    }
+
+    // The same identity may still be connected — e.g. the patient opened the
+    // call on a second device, which replaced the first connection.
+    const stillConnected = await this.rtcAdapter.isParticipantConnected?.({
+      roomName: input.roomName,
+      participantIdentity: buildParticipantIdentity(waitingPatient),
+    }).catch(() => false);
+    if (stillConnected) {
+      return { handled: false, reason: 'participant_still_connected', status: null };
+    }
+
     const result = await this.markWaitingEntryLeft({ waitingPatientId: waitingPatient.id });
     return {
       handled: true,
@@ -751,7 +811,7 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
   }
 
   async markWaitingEntryLeft(
-    input: { waitingPatientId: string }
+    input: { waitingPatientId: string; credential?: { visitId?: string } }
   ): Promise<{ waitingPatientId: string; status: 'left' | 'rejected' }> {
     if (!input.waitingPatientId) {
       throw new InvitationAccessError(400, 'invalid_argument', 'waitingPatientId is required');
@@ -770,6 +830,10 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
       id: waitingDoc.id,
       data: waitingDoc.data() as Record<string, unknown>,
     });
+    if (input.credential) {
+      // A departure beacon from an earlier visit must not close a later one.
+      assertCredentialNamesCurrentVisit(waitingPatient, input.credential.visitId);
+    }
     if (waitingPatient.status === 'rejected') {
       return {
         waitingPatientId: waitingPatient.id,

@@ -96,7 +96,21 @@ export async function authorizeBearerRequest(
       }
       throw error;
     }
-    role = profile.exists ? parseAppRole(profile.data()?.role) : null;
+    const profileRole = profile.exists ? parseAppRole(profile.data()?.role) : null;
+    // Transitional: a privileged role read from a profile is still honoured,
+    // because Firestore rules only let a client create a doctor profile when
+    // the account already holds the matching claim, and existing doctor
+    // accounts predate claims. New clinicians are provisioned with
+    // scripts/admin/provision-role.mjs; its `audit` lists profiles still
+    // relying on this fallback so they can be granted a claim and the fallback
+    // removed. Logged (uid prefix only) so the remaining set is visible.
+    if (profileRole && profileRole !== 'patient') {
+      console.warn('Privileged role served from profile without a claim', {
+        uidPrefix: authenticated.data.userId.slice(0, 6),
+        role: profileRole,
+      });
+    }
+    role = profileRole;
   }
 
   if (!role) {

@@ -303,7 +303,7 @@ export default function WaitingPatientsList({
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     onClick={async () => {
-                      const admitted = await admitPatient(patient.id, patient.roomName);
+                      const admitted = await admitPatient(patient.id, patient.roomName, patient.currentVisitId);
                       if (admitted) {
                         showToast({
                           kind: 'success',
@@ -339,7 +339,7 @@ export default function WaitingPatientsList({
                         return;
                       }
 
-                      const rejected = await rejectPatient(patient.id);
+                      const rejected = await rejectPatient(patient.id, patient.currentVisitId);
                       setPendingRejectId(null);
                       if (rejected) {
                         showToast({
@@ -445,7 +445,7 @@ export default function WaitingPatientsList({
                       return;
                     }
 
-                    const removed = await rejectPatient(patient.id);
+                    const removed = await rejectPatient(patient.id, patient.currentVisitId);
                     setPendingRejectId(null);
                     if (removed) {
                       showToast({

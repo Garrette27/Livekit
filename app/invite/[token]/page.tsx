@@ -861,19 +861,13 @@ function InvitePageContent() {
               setError={setError}
             />
 
-            {/* Hidden LiveKit connection for waiting room - patients can see each other */}
-            {allowLiveKitMount && (
-              <div style={{ display: 'none' }}>
-                <PatientLiveKitRoom
-                  token={validationResult.liveKitToken}
-                  consultationSessionId={null}
-                  onDisconnected={handleRoomDisconnect}
-                  onError={(error) => {
-                    console.error('Waiting room error:', error);
-                  }}
-                />
-              </div>
-            )}
+            {/*
+              No LiveKit room is mounted while waiting. The waiting credential
+              is media-disabled and admission arrives by polling, so a hidden
+              room would only run the pre-join device preview (camera/mic)
+              unseen. Devices are requested on the visible preflight after
+              admission.
+            */}
             {disableLiveKitForE2E && (
               <p
                 data-testid="e2e-livekit-disabled"

@@ -197,6 +197,13 @@ export interface WaitingPatient {
   admittedAt?: Timestamp | Date | any;
   leftAt?: Timestamp | Date | any;
   rejectedAt?: Timestamp | Date | any;
+  /**
+   * Opaque id of the visit this entry currently represents. The entry id is
+   * reused when a person returns; this changes on each new visit, and patient
+   * credentials must carry the same value to act on the entry. Absent on
+   * legacy rows until their next arrival.
+   */
+  currentVisitId?: string;
   metadata?: {
     deviceFingerprint?: string;
     deviceFingerprintHash?: string;
@@ -217,6 +224,8 @@ export interface WaitingPatient {
 export interface AdmitPatientRequest {
   waitingPatientId: string;
   roomName: string;
+  /** currentVisitId the doctor saw in the queue. */
+  expectedVisitId?: string;
 }
 
 export interface AdmitPatientResponse {

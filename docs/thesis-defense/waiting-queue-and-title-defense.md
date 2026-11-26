@@ -2,6 +2,8 @@
 
 25 November 2026, Asia/Singapore. Reviewed source: `9d53610`. This is a supplement to the existing defense pack, not a new clinical validation study. It introduces no application behavior change and does not establish a maximum concurrent workload. The accompanying slides and panel answers use synthetic examples only.
 
+> **Update, 27 November 2026.** Three findings in this guide were fixed in code afterwards; where the text below says otherwise, this note wins. (1) The per-invitation waiting target is now enforced inside the reservation transaction — the "9 + 2 = 11" race no longer reproduces, and a Firestore emulator run kept 25 simultaneous arrivals to exactly 10 (`evidence/queue-capacity-fix-2026-11-27/`). A full queue no longer refuses a verified direct entry or someone already waiting. (2) Queue credentials carry a signed visit id; a credential from an earlier visit on the same entry cannot poll admission or mark the current visit as left, and a returning visitor gets a new arrival time. (3) The waiting page no longer mounts a hidden LiveKit pre-join screen. The slides and PDFs generated on 25 November still describe the earlier state. See [panel-questions-and-answers.md](panel-questions-and-answers.md) for the updated answers.
+
 ## The official title, exactly as submitted
 
 **TeleConsole: Design and Development of a Secure Telehealth Video Communication System Using LiveKit with AI Summarization and Flexible User Access Design**

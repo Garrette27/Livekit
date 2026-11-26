@@ -2,7 +2,7 @@
 import './globals.css';
 import '@livekit/components-styles';
 import { ReactNode } from 'react';
-import type { Viewport } from 'next';
+import type { Metadata, Viewport } from 'next';
 import AppProviders from './providers';
 
 /**
@@ -14,6 +14,13 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+};
+
+/** Browser tab name and icon (app/icon.svg) instead of the framework default. */
+export const metadata: Metadata = {
+  title: 'TeleConsole',
+  description: 'Secure dental teleconsultation (thesis prototype).',
+  icons: { icon: '/teleconsole-logo.svg' },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -1,8 +1,7 @@
 'use client';
+import DoctorAppHeader from '@/components/doctor/DoctorAppHeader';
 import { useCallback, useEffect, useState } from 'react';
-import { auth } from '@/lib/firebase';
 import { Timestamp } from 'firebase/firestore';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthSession } from '@/hooks/useAuthSession';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
@@ -248,26 +247,38 @@ export default function DoctorDashboard() {
     }
 
     setLoading(true);
-    try {
+    // Two phases: the summaries render first; chat transcripts (one extra
+    // Firestore query per consultation) are merged in when they arrive, so
+    // the slowest part no longer blocks the whole list.
+    const fetchHistory = async (includeChatHistory: boolean): Promise<DoctorHistoryResponseItem[]> => {
       const idToken = await user.getIdToken();
-      const response = await fetch('/api/doctor/history?includeChatHistory=true', {
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-        },
+      const response = await fetch(`/api/doctor/history${includeChatHistory ? '?includeChatHistory=true' : ''}`, {
+        headers: { Authorization: `Bearer ${idToken}` },
         cache: 'no-store',
       });
       const data = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to fetch doctor consultation history');
       }
-
-      const records = Array.isArray(data.summaries) ? (data.summaries as DoctorHistoryResponseItem[]) : [];
-      setSummaries(records.map(mapHistoryRecordToSummary));
+      return Array.isArray(data.summaries) ? (data.summaries as DoctorHistoryResponseItem[]) : [];
+    };
+    try {
+      setSummaries((await fetchHistory(false)).map(mapHistoryRecordToSummary));
     } catch (error) {
       console.error('Error fetching summaries:', error);
       setSummaries([]);
-    } finally {
       setLoading(false);
+      return;
+    }
+    setLoading(false);
+    try {
+      const withChat = new Map((await fetchHistory(true)).map((record) => [record.id, record.chatHistory]));
+      setSummaries((current) => current.map((summary) => (
+        withChat.get(summary.id) ? { ...summary, chatHistory: withChat.get(summary.id) } : summary
+      )));
+    } catch (error) {
+      // Chat transcripts are supplementary; the summaries are already shown.
+      console.warn('Chat transcripts could not be loaded:', error);
     }
   }, [isAuthorized, user]);
 
@@ -282,7 +293,7 @@ export default function DoctorDashboard() {
       keyPoints: summary.keyPoints || [],
       recommendations: summary.recommendations || [],
       followUpActions: summary.followUpActions || [],
-      riskLevel: summary.riskLevel || '',
+      riskLevel: ['Low', 'Medium', 'High'].includes(summary.riskLevel || '') ? summary.riskLevel : 'Unknown',
       category: summary.category || ''
     });
     setSaveError(null);
@@ -427,43 +438,12 @@ export default function DoctorDashboard() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
-      {/* Header */}
-      <header style={{
-        backgroundColor: 'white',
-        borderBottom: '1px solid #e5e7eb',
-        padding: 'var(--header-padding)',
-        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-      }}>
-        <div className="app-header-bar" style={{ maxWidth: '80rem', margin: '0 auto' }}>
-          <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
-              Doctor Dashboard
-            </h1>
-            <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
-              Welcome, {user?.displayName || user?.email}
-            </p>
-          </div>
-          <nav style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-            <Link href="/doctor/invitations" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: '500' }}>
-              Invitations
-            </Link>
-            <button
-              onClick={() => auth && auth.signOut()}
-              style={{
-                backgroundColor: '#dc2626',
-                color: 'white',
-                padding: '0.5rem 1rem',
-                borderRadius: '0.375rem',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: '500'
-              }}
-            >
-              Sign Out
-            </button>
-          </nav>
-        </div>
-      </header>
+      <DoctorAppHeader
+        title="Doctor Dashboard"
+        subtitle="Consultation history and draft summaries"
+        user={user}
+        navLink={{ href: '/doctor/invitations', label: 'Invitations' }}
+      />
 
       {/* Main Content */}
       <main style={{ maxWidth: '80rem', margin: '0 auto', padding: 'var(--page-padding)' }}>
@@ -602,6 +582,10 @@ export default function DoctorDashboard() {
                     fontSize: '0.875rem'
                   }}
                 >
+                  {/* Unknown is a valid outcome: risk is never inferred from
+                      missing evidence, so the editor must not display "Low"
+                      for a summary whose risk was not established. */}
+                  <option value="Unknown">Unknown (not established)</option>
                   <option value="Low">Low</option>
                   <option value="Medium">Medium</option>
                   <option value="High">High</option>

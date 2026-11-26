@@ -18,7 +18,9 @@ import pymupdf as fitz
 from PIL import Image, ImageChops, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[2]
-FONT = Path("C:/Windows/Fonts/times.ttf")
+# Same Times face on Windows or from WSL; the font must match the source's.
+FONT = next((p for p in (Path("C:/Windows/Fonts/times.ttf"), Path("/mnt/c/Windows/Fonts/times.ttf")) if p.exists()),
+            Path("C:/Windows/Fonts/times.ttf"))
 
 
 def normalized(value):
@@ -65,6 +67,7 @@ def main():
     parser.add_argument("manifest", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--public-copy", action="store_true", help="Redact demo identifiers and personal CV images before GitHub publication")
+    parser.add_argument("--date", default="2026-11-27", help="Revision date recorded in the verification report")
     parser.add_argument("--baseline", default="aa041fe", help="Source-review checkpoint for this revision, not proof of active deployment")
     args = parser.parse_args()
     source_hash = hashlib.sha256(args.source.read_bytes()).hexdigest()
@@ -176,7 +179,7 @@ def main():
         if expected not in actual:
             raise ValueError(f"Replacement extraction verification failed: {edit['id']}")
     report = {"source_sha256": source_hash, "output_sha256": hashlib.sha256(args.output.read_bytes()).hexdigest(),
-              "baseline": args.baseline, "date": "2026-11-25", "assertions": assertions,
+              "baseline": args.baseline, "date": args.date, "assertions": assertions,
               "edits": log, "changed_pages": [i + 1 for i in approved],
               "public_copy": args.public_copy, "privacy_redactions": privacy_redactions,
               "outside_differences": outside_differences,

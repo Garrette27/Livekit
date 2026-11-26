@@ -215,6 +215,43 @@ evidence are equal; old consent is not current consent) and
 `scripts/regression-security-contracts.mjs` (one validation request, which
 sends the token; the consent route stores nothing but the agreement).
 
+## Queue capacity and visit binding (2026-11-27)
+
+Two invariants are owned by `reserveWaitingVisit` in
+`lib/invitations/invitation-use-reservation.ts`, so no route has to remember
+them.
+
+**1. The per-invitation waiting target is a transactional invariant.**
+*Pattern:* check-and-act inside one serializable transaction (the same idea as
+a database `CHECK`/conditional write, rather than a precheck followed by a
+write). The reservation counts `waiting` rows for the invitation inside the
+transaction that also writes the invitation document. Because every
+reservation writes that one document, Firestore lets only one of two
+concurrent reservations commit; the other retries, re-counts and sees the
+first person's row. *Tradeoff:* all arrivals for one invitation serialize on
+one document (fine at clinic scale — Firestore sustains roughly one write per
+second per document — but not a design for thousands of simultaneous arrivals
+on one link). A visitor already waiting, or a verified allowlisted visitor
+entering directly, adds no waiting row and is not refused by a full queue.
+*Evidence:* `tests/queue-and-auth-regressions.test.mjs` and a Firestore
+emulator run (`docs/thesis-defense/evidence/queue-capacity-fix-2026-11-27/`):
+25 simultaneous arrivals into a target of 10 left exactly 10 waiting.
+
+**2. Queue credentials name one visit, not just one entry.**
+*Pattern:* an epoch/fencing token. The entry id is stable per invitation and
+patient (so refreshes do not duplicate rows), therefore it cannot by itself
+tell an earlier visit from a later one. Each new visit (first arrival, or
+arriving on a `left`/`rejected` entry) gets a random `currentVisitId`, a fresh
+`joinedAt`, and cleared end markers. Waiting and admission credentials carry
+it as the signed `appVisitId` claim. `checkAdmission` and the patient
+`mark-left` route refuse a credential whose visit is not the entry's current
+visit. *Tradeoff:* a person who reopens the link after leaving queues again
+behind people already waiting; that is the intended order. Legacy entries
+without `currentVisitId` stay accepted until their next arrival assigns one, so
+the change needs no migration. *Boundary:* LiveKit cannot revoke a JWT it has
+already accepted; an issued consultation credential remains valid until it
+expires (two hours) and the doctor's remove action disconnects the participant.
+
 ## Anonymous patients and account upgrade
 
 Patients are never forced to register before a consultation. The intended
@@ -254,3 +291,46 @@ Identity Platform's anonymous-account cleanup.
 - **Name the effect on everyone else.** Any access setting must state what
   happens to visitors it does not match, or it will be misread as stricter than
   it is.
+
+## Queue entries, visits and who may become a clinician (27 November 2026)
+
+**Pattern: stable entry + versioned visit (optimistic concurrency on a visit id).**
+A queue entry (`waitingPatients/{id}`) is reused when the same principal
+returns; `currentVisitId` names which visit it represents now. Every patient
+credential carries the visit id it was issued for, and the doctor's admit and
+remove commands send the visit id they saw. The server refuses a mismatch
+(`stale_visit` for the patient, `visit_changed` 409 for the doctor), the same
+expected-version technique used for shared editor writes. Tradeoff: an old
+browser tab must reopen the invitation after a visit ends; in exchange, a
+credential or a doctor click from an earlier visit cannot act on a later one.
+
+**Entry key comes only from an unforgeable principal.** The id is derived from
+the server-verified Firebase uid (anonymous or not), or — only when there is no
+Firebase session — from keyed network/browser hashes. It is never derived from
+an email. Before this change a guest who typed an admitted patient's email
+landed on that patient's entry and could obtain their consultation credential;
+the email is now only a displayed label with provenance. Tradeoff: two
+session-less guests behind the same network and browser still share an entry,
+so a device-keyed entry that is already admitted starts a new waiting visit
+instead of passing the admission on.
+
+**Arrival rules are one pure function** (`planWaitingArrival`), applied inside
+the reservation transaction: new or left → new visit; rejected → new visit that
+must wait (the doctor's rejection outranks the allowlist); waiting → same visit;
+admitted → same visit for a verified principal, a fresh waiting visit for a
+device-keyed guest. A use is spent, and `maxUses` checked, only when a new
+visit starts, so reconnects are never refused by a use limit.
+
+**LiveKit departures are checked against the visit.** A `participant_left`
+webhook is ignored when the connection joined before the entry's current visit
+began, or when the same identity is still connected (a second device replaced
+the first). Only then is the entry marked left.
+
+**Clinician roles come only from administrator-set custom claims.** Firestore
+rules already prevented a client from creating a doctor profile without a
+`role` claim. New clinicians are provisioned with
+`node scripts/admin/provision-role.mjs grant doctor <email> --apply`. Existing
+doctor profiles that predate claims are still honoured (transitional fallback,
+logged per request) because enforcing claim-only on 27 November locked the
+production doctor out; `... audit` lists those accounts so each can be granted a
+claim, after which the fallback is removed.

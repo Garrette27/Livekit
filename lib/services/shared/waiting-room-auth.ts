@@ -3,6 +3,8 @@ import { verifyLiveKitRoomToken } from '@/lib/invitations/token-utils';
 export interface WaitingRoomCredential {
   identity: string;
   roomName: string;
+  /** Visit the credential was issued for; absent on pre-binding credentials. */
+  visitId?: string;
 }
 
 export interface WaitingRoomAuthorization {
@@ -55,6 +57,7 @@ export function authorizeWaitingRoomRequest(input: {
     credential: {
       identity: participant.identity,
       roomName: participant.roomName,
+      visitId: participant.visitId,
     },
   };
 }
