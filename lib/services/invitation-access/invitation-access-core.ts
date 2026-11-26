@@ -664,40 +664,30 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
     }
 
     const waitingRef = this.db.collection('waitingPatients').doc(input.waitingPatientId);
-    const waitingDoc = await waitingRef.get();
-    if (!waitingDoc.exists) {
-      return {
-        waitingPatientId: input.waitingPatientId,
-        status: 'rejected',
-      };
-    }
-
-    const waitingPatient = mapWaitingDocToModel({
-      id: waitingDoc.id,
-      data: waitingDoc.data() as Record<string, unknown>,
-    });
-    assertDoctorScope(waitingPatient, input.doctorUserId);
-    assertDoctorActsOnShownVisit(waitingPatient, input.expectedVisitId);
-
-    if (waitingPatient.status === 'rejected') {
-      return {
-        waitingPatientId: waitingPatient.id,
-        status: 'rejected',
-      };
-    }
-
-    await waitingRef.set(
-      {
+    // Read and write in one transaction so a reload that starts a new visit at
+    // the same moment cannot overwrite (or be overwritten by) the rejection.
+    const outcome = await this.db.runTransaction(async (transaction) => {
+      const waitingDoc = await transaction.get(waitingRef);
+      if (!waitingDoc.exists) {
+        return { waitingPatient: null, alreadyRejected: true };
+      }
+      const current = mapWaitingDocToModel({ id: waitingDoc.id, data: waitingDoc.data() as Record<string, unknown> });
+      assertDoctorScope(current, input.doctorUserId);
+      assertDoctorActsOnShownVisit(current, input.expectedVisitId);
+      if (current.status === 'rejected') {
+        return { waitingPatient: current, alreadyRejected: true };
+      }
+      transaction.set(waitingRef, {
         status: 'rejected',
         rejectedAt: new Date(),
-        metadata: {
-          ...(waitingPatient.metadata || {}),
-          lastAccessed: new Date(),
-          rejectedByDoctor: true,
-        },
-      },
-      { merge: true }
-    );
+        metadata: { ...(current.metadata || {}), lastAccessed: new Date(), rejectedByDoctor: true },
+      }, { merge: true });
+      return { waitingPatient: current, alreadyRejected: false };
+    });
+    const waitingPatient = outcome.waitingPatient;
+    if (!waitingPatient || outcome.alreadyRejected) {
+      return { waitingPatientId: input.waitingPatientId, status: 'rejected' };
+    }
 
     const participantIdentity = buildParticipantIdentity(waitingPatient);
     const candidateRooms = new Set<string>([waitingPatient.roomName, `${waitingPatient.roomName}-waiting`]);
@@ -818,54 +808,28 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
     }
 
     const waitingRef = this.db.collection('waitingPatients').doc(input.waitingPatientId);
-    const waitingDoc = await waitingRef.get();
-    if (!waitingDoc.exists) {
-      return {
-        waitingPatientId: input.waitingPatientId,
-        status: 'left',
-      };
-    }
-
-    const waitingPatient = mapWaitingDocToModel({
-      id: waitingDoc.id,
-      data: waitingDoc.data() as Record<string, unknown>,
-    });
-    if (input.credential) {
-      // A departure beacon from an earlier visit must not close a later one.
-      assertCredentialNamesCurrentVisit(waitingPatient, input.credential.visitId);
-    }
-    if (waitingPatient.status === 'rejected') {
-      return {
-        waitingPatientId: waitingPatient.id,
-        status: 'rejected',
-      };
-    }
-    if (waitingPatient.status === 'left') {
-      return {
-        waitingPatientId: waitingPatient.id,
-        status: 'left',
-      };
-    }
-
-    await waitingRef.set(
-      {
+    return this.db.runTransaction(async (transaction) => {
+      const waitingDoc = await transaction.get(waitingRef);
+      if (!waitingDoc.exists) {
+        return { waitingPatientId: input.waitingPatientId, status: 'left' as const };
+      }
+      const waitingPatient = mapWaitingDocToModel({ id: waitingDoc.id, data: waitingDoc.data() as Record<string, unknown> });
+      if (input.credential) {
+        // A departure beacon from an earlier visit must not close a later one.
+        assertCredentialNamesCurrentVisit(waitingPatient, input.credential.visitId);
+      }
+      if (waitingPatient.status === 'rejected' || waitingPatient.status === 'left') {
+        return { waitingPatientId: waitingPatient.id, status: waitingPatient.status };
+      }
+      transaction.set(waitingRef, {
         status: 'left',
         leftAt: new Date(),
-        metadata: {
-          ...(waitingPatient.metadata || {}),
-          lastAccessed: new Date(),
-        },
-      },
-      { merge: true }
-    );
-
-    // The separate authenticated track-leave carries the encounter id. This
-    // operational queue notification must not overwrite a later clinical visit.
-
-    return {
-      waitingPatientId: waitingPatient.id,
-      status: 'left',
-    };
+        metadata: { ...(waitingPatient.metadata || {}), lastAccessed: new Date() },
+      }, { merge: true });
+      return { waitingPatientId: waitingPatient.id, status: 'left' as const };
+    });
+    // The separate authenticated track-leave carries the encounter id; this
+    // operational queue notification never touches a clinical visit.
   }
 }
 

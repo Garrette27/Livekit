@@ -8,6 +8,13 @@
  * non-anonymous account). Super admins may grant/revoke doctor and admin;
  * admins (custom claim `admin: true`) may grant/revoke doctor only. Nobody may
  * change their own role, so a single account cannot escalate or lock itself out.
+ *
+ * Tenancy (small-clinic business model): every clinician and administrator
+ * belongs to one clinic (`clinicId` claim). A super admin (the platform
+ * operator) creates clinic administrators; a clinic administrator manages
+ * doctors only inside their own clinic — delegated, tenant-scoped
+ * administration. Clinical records stay owned by the doctor who created the
+ * invitation; the clinic scope bounds who may administer whom.
  */
 export type ManagedRole = 'doctor' | 'admin';
 export type RoleAction = 'grant' | 'revoke';
@@ -17,6 +24,17 @@ export interface RoleAdministrator {
   email?: string | null;
   emailVerified: boolean;
   isAdminClaim: boolean;
+  /** Clinic named in the caller's claims (clinic administrators). */
+  clinicId?: string | null;
+}
+
+const CLINIC_ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,39}$/;
+
+/** Lower-case slug such as "henry-cheung-dental"; null when invalid. */
+export function normalizeClinicId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const slug = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return CLINIC_ID_PATTERN.test(slug) ? slug : null;
 }
 
 export function parseSuperAdminEmails(raw: string | undefined): Set<string> {
@@ -42,7 +60,15 @@ export function decideRoleChange(input: {
   targetUserId: string;
   role: ManagedRole;
   action: RoleAction;
-}): { allowed: true } | { allowed: false; status: number; code: string; message: string } {
+  /** Clinic requested for a grant. */
+  clinicId?: string | null;
+  /** Clinic the target already belongs to (from claims or profile). */
+  targetClinicId?: string | null;
+  /** Target currently holds the administrator claim. */
+  targetIsAdmin?: boolean;
+}):
+  | { allowed: true; clinicId: string | null }
+  | { allowed: false; status: number; code: string; message: string } {
   const level = administratorLevel(input.caller, input.superAdminEmails);
   if (!level) {
     return { allowed: false, status: 403, code: 'not_administrator', message: 'Only an administrator can change roles.' };
@@ -56,5 +82,29 @@ export function decideRoleChange(input: {
   if (input.targetUserId === input.caller.userId) {
     return { allowed: false, status: 409, code: 'self_change', message: 'You cannot change your own role.' };
   }
-  return { allowed: true };
+  if (input.targetIsAdmin && level !== 'super_admin') {
+    return { allowed: false, status: 403, code: 'super_admin_required', message: 'Only a super admin can change an administrator account.' };
+  }
+
+  if (level === 'admin') {
+    const ownClinic = normalizeClinicId(input.caller.clinicId);
+    if (!ownClinic) {
+      return { allowed: false, status: 403, code: 'clinic_required', message: 'Your administrator account is not assigned to a clinic.' };
+    }
+    const requested = input.action === 'grant' ? normalizeClinicId(input.clinicId) ?? ownClinic : ownClinic;
+    const target = normalizeClinicId(input.targetClinicId);
+    if (requested !== ownClinic || (target && target !== ownClinic) || (input.action === 'revoke' && target !== ownClinic)) {
+      return { allowed: false, status: 403, code: 'other_clinic', message: 'You can only manage accounts in your own clinic.' };
+    }
+    return { allowed: true, clinicId: ownClinic };
+  }
+
+  if (input.action === 'grant') {
+    const clinicId = normalizeClinicId(input.clinicId);
+    if (!clinicId) {
+      return { allowed: false, status: 400, code: 'clinic_required', message: 'Choose the clinic this account belongs to (e.g. henry-cheung-dental).' };
+    }
+    return { allowed: true, clinicId };
+  }
+  return { allowed: true, clinicId: normalizeClinicId(input.targetClinicId) };
 }

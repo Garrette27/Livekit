@@ -177,6 +177,8 @@ export async function reserveWaitingVisit(
     status: 'waiting' | 'admitted';
     /** True when `id` was derived from a server-verified Firebase uid. */
     principalKeyed: boolean;
+    /** How the visitor was identified, for the invitation's visit breakdown. */
+    visitorKind?: 'verifiedAccounts' | 'unverifiedAccounts' | 'guests';
     /** Fields written only when a new visit starts. */
     onNewVisit: Record<string, unknown>;
     /** Fields refreshed on every arrival. */
@@ -238,8 +240,16 @@ export async function reserveWaitingVisit(
     const visitId = plan.startedNewVisit || !existingVisitId ? waitingPatient.newVisitId : existingVisitId;
     const now = new Date();
 
+    const stats = (latest as Invitation & { visitStats?: Record<string, number> }).visitStats || {};
+    const kind = waitingPatient.visitorKind || 'guests';
     transaction.update(invitationRef, {
-      ...(plan.startedNewVisit ? { currentUses: currentUses + 1 } : {}),
+      ...(plan.startedNewVisit
+        ? {
+            currentUses: currentUses + 1,
+            'visitStats.total': (stats.total || 0) + 1,
+            [`visitStats.${kind}`]: (stats[kind] || 0) + 1,
+          }
+        : {}),
       'audit.lastAccessed': now,
     });
     overflowEvents.forEach((eventDocument) => transaction.delete(eventDocument.ref));

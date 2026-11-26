@@ -490,7 +490,7 @@ function invitationEffect(marker, globals) {
   const exports = {};
   runInNewContext(ts.transpileModule(`export const effect = ${callback};`, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-  }).outputText, { exports, AbortController, console: { error() {}, log() {} }, ...globals });
+  }).outputText, { exports, AbortController, console: { error() {}, log() {} }, getBrowserSessionId: () => 'synthetic-tab-id', ...globals });
   return exports.effect();
 }
 
@@ -1116,7 +1116,10 @@ test('an earlier-visit credential cannot poll admission or close the current vis
   const { FirestoreInvitationAccessCore } = loadModule('lib/services/invitation-access/invitation-access-core.ts', {
     '@/lib/invitations/validate-service': {}, '@/lib/consultations/identity-utils': {}, '@/lib/services/video-chat': {},
   });
-  const core = new FirestoreInvitationAccessCore({ collection: () => ({ doc }) }, {}, {});
+  const fakeDb = { collection: () => ({ doc }), async runTransaction(callback) {
+    return callback({ get: (ref) => ref.get(), set: (ref, patch) => ref.set(patch) });
+  } };
+  const core = new FirestoreInvitationAccessCore(fakeDb, {}, {});
   await assert.rejects(core.markWaitingEntryLeft({ waitingPatientId: 'visit-a', credential: { visitId: 'visit-1' } }), /earlier visit/);
   assert.equal(documents['waitingPatients/visit-a'].status, 'waiting');
   assert.equal((await core.markWaitingEntryLeft({ waitingPatientId: 'visit-a', credential: { visitId: 'visit-2' } })).status, 'left');
@@ -1179,7 +1182,10 @@ function departureHarness(row, connected = false) {
   const { FirestoreInvitationAccessCore } = loadModule('lib/services/invitation-access/invitation-access-core.ts', {
     '@/lib/invitations/validate-service': {}, '@/lib/consultations/identity-utils': {}, '@/lib/services/video-chat': {},
   });
-  const core = new FirestoreInvitationAccessCore({ collection: () => ({ doc }) }, { async isParticipantConnected() { return connected; } }, {});
+  const fakeDb = { collection: () => ({ doc }), async runTransaction(callback) {
+    return callback({ get: (ref) => ref.get(), set: (ref, patch) => ref.set(patch) });
+  } };
+  const core = new FirestoreInvitationAccessCore(fakeDb, { async isParticipantConnected() { return connected; } }, {});
   return { core, documents };
 }
 
@@ -1227,21 +1233,48 @@ test('the summary editor shows Unknown instead of defaulting an unestablished ri
   assert.match(source, /\['Low', 'Medium', 'High'\]\.includes\(summary\.riskLevel \|\| ''\) \? summary\.riskLevel : 'Unknown'/);
 });
 
-test('role administration: super admin bootstrap, admins grant doctors only, nobody changes their own role', () => {
-  const { decideRoleChange, parseSuperAdminEmails, administratorLevel } = loadModule('lib/auth/role-administration.ts');
+test('role administration: super admin bootstrap, clinic-scoped admins, nobody changes their own role', () => {
+  const { decideRoleChange, parseSuperAdminEmails, administratorLevel, normalizeClinicId } = loadModule('lib/auth/role-administration.ts');
   const supers = parseSuperAdminEmails(' Owner@Clinic.test, other@clinic.test ');
   const superAdmin = { userId: 'u-super', email: 'owner@clinic.test', emailVerified: true, isAdminClaim: false };
   const unverified = { ...superAdmin, emailVerified: false };
-  const admin = { userId: 'u-admin', email: 'a@clinic.test', emailVerified: true, isAdminClaim: true };
+  const clinicAdmin = { userId: 'u-admin', email: 'a@clinic.test', emailVerified: true, isAdminClaim: true, clinicId: 'north-dental' };
   const doctor = { userId: 'u-doc', email: 'd@clinic.test', emailVerified: true, isAdminClaim: false };
   assert.equal(administratorLevel(superAdmin, supers), 'super_admin');
   assert.equal(administratorLevel(unverified, supers), null, 'An unverified email never bootstraps');
-  const decide = (caller, role, target = 'u-target') => decideRoleChange({ caller, superAdminEmails: supers, targetUserId: target, role, action: 'grant' }).allowed;
-  assert.equal(decide(superAdmin, 'admin'), true);
-  assert.equal(decide(admin, 'doctor'), true);
-  assert.equal(decide(admin, 'admin'), false);
-  assert.equal(decide(doctor, 'doctor'), false);
-  assert.equal(decide(superAdmin, 'doctor', 'u-super'), false, 'No self change');
+  assert.equal(normalizeClinicId(' Henry Cheung Dental '), 'henry-cheung-dental');
+  const decide = (caller, role, extra = {}) => decideRoleChange({ caller, superAdminEmails: supers, targetUserId: 'u-target', role, action: 'grant', ...extra });
+  assert.equal(decide(superAdmin, 'admin', { clinicId: 'north-dental' }).allowed, true);
+  assert.equal(decide(superAdmin, 'doctor').allowed, false, 'Every grant names a clinic');
+  assert.equal(decide(clinicAdmin, 'doctor').clinicId, 'north-dental', 'Clinic admin grants into own clinic');
+  assert.equal(decide(clinicAdmin, 'doctor', { clinicId: 'south-dental' }).allowed, false, 'Not into another clinic');
+  assert.equal(decide(clinicAdmin, 'doctor', { targetClinicId: 'south-dental' }).allowed, false, 'Not a doctor of another clinic');
+  assert.equal(decideRoleChange({ caller: clinicAdmin, superAdminEmails: supers, targetUserId: 'u-target', role: 'doctor', action: 'revoke', targetClinicId: 'south-dental' }).allowed, false);
+  assert.equal(decide(clinicAdmin, 'admin', { clinicId: 'north-dental' }).allowed, false);
+  assert.equal(decide(doctor, 'doctor', { clinicId: 'north-dental' }).allowed, false);
+  assert.equal(decideRoleChange({ caller: superAdmin, superAdminEmails: supers, targetUserId: 'u-super', role: 'doctor', action: 'grant', clinicId: 'x-clinic' }).allowed, false, 'No self change');
+});
+
+test('visits are counted by identification kind, once per new visit', async () => {
+  const h = reservationFixture();
+  await h.arrive('guest-1');
+  await h.arrive('guest-1');
+  assert.equal(h.invitation()['visitStats.total'], 1, 'Reconnect is not a new visit');
+  assert.equal(h.invitation()['visitStats.guests'], 1);
+  const { formatVisitBreakdown } = loadModule('lib/invitations/invitation-presentation.ts', {
+    '@/lib/invitations/invitation-use-reservation': { REUSABLE_INVITATION_MAX_USES: 999999 },
+  });
+  assert.equal(formatVisitBreakdown({ total: 3, verifiedAccounts: 1, guests: 2 }), '3 visits · 1 verified account · 2 guests');
+  assert.equal(formatVisitBreakdown({}), null);
+});
+
+test('waiting limit changes are owner-only, clamped 1-100, and only on active waiting-room invitations', () => {
+  const source = readFileSync('app/api/invite/limit/route.ts', 'utf8');
+  assert.match(source, /authorizeBearerRequest\(req, 'invitation:manage'\)/);
+  assert.match(source, /createdBy !== auth\.data\.userId/);
+  assert.match(source, /Math\.min\(MAX_WAITING_LIMIT, Math\.max\(MIN_WAITING_LIMIT, requested\)\)/);
+  assert.match(source, /runTransaction/);
+  assert.doesNotMatch(source, /^export const (MIN|MAX)/m, 'Route modules export only handlers');
 });
 
 test('room media uses adaptive stream, dynacast, simulcast and browser speech processing', () => {
@@ -1250,4 +1283,28 @@ test('room media uses adaptive stream, dynacast, simulcast and browser speech pr
     assert.ok(source.includes(option), option);
   }
   assert.match(source, /options=\{ROOM_MEDIA_OPTIONS\}/);
+});
+
+test('two guests on the same network and browser get separate entries via the per-tab id', () => {
+  const { resolveWaitingPatientId } = loadModule('lib/invitations/waiting-patient-key.ts', {
+    '../security/security-signal': { hashSecuritySignal: (label, value) => `${label}:${value}` },
+  });
+  const tab = (browserSessionHash) => resolveWaitingPatientId({ invitationId: 'inv', networkHash: 'n', userAgentHash: 'u', browserSessionHash });
+  assert.notEqual(tab('tab-a'), tab('tab-b'));
+  assert.equal(tab('tab-a'), tab('tab-a'), 'A reload in the same tab keeps its entry');
+});
+
+test('only a super admin can change an administrator account; grants never sign anyone out', () => {
+  const { decideRoleChange } = loadModule('lib/auth/role-administration.ts');
+  const clinicAdmin = { userId: 'u-admin', email: 'a@x.test', emailVerified: true, isAdminClaim: true, clinicId: 'north-dental' };
+  const result = decideRoleChange({ caller: clinicAdmin, superAdminEmails: new Set(), targetUserId: 'u-other-admin', role: 'doctor', action: 'revoke', targetClinicId: 'north-dental', targetIsAdmin: true });
+  assert.equal(result.allowed, false);
+  const route = readFileSync('app/api/admin/roles/route.ts', 'utf8');
+  assert.match(route, /if \(action === 'revoke'\) \{[\s\S]*revokeRefreshTokens/);
+  assert.match(route, /claims\.role = 'doctor';/, 'Admins stay clinicians so they can still sign in');
+});
+
+test('every new invitation uses the waiting room, and stale doctor tokens are not reused', () => {
+  assert.match(readFileSync('app/api/invite/create/route.ts', 'utf8'), /const isWaitingRoomEnabled = true;/);
+  assert.match(readFileSync('app/room/[room]/doctor/hooks/useDoctorToken.ts', 'utf8'), /isUsableDoctorToken\(savedToken, user\?\.uid\)/);
 });

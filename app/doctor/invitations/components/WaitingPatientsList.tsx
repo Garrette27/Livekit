@@ -89,7 +89,8 @@ function describeRiskSignals(patient: { metadata?: Record<string, unknown> }): s
 }
 
 function isActiveInvitation(invitation: Invitation, nowMs: number): boolean {
-  if (invitation.status !== 'active') {
+  // A missing status is a legacy active invitation, as the server treats it.
+  if (invitation.status && invitation.status !== 'active') {
     return false;
   }
 

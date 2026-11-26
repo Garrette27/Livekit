@@ -18,6 +18,18 @@ interface DoctorTokenArgs {
   user: User | null;
 }
 
+/** Decodes (does not verify) a LiveKit JWT to check expiry and owner. */
+function isUsableDoctorToken(token: string, uid: string | undefined): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    const fresh = typeof payload.exp === 'number' && payload.exp * 1000 > Date.now() + 5 * 60 * 1000;
+    const owned = !uid || (typeof payload.sub === 'string' && payload.sub.includes(uid));
+    return fresh && owned;
+  } catch {
+    return false;
+  }
+}
+
 export function useDoctorToken({ roomName, doctorName, user }: DoctorTokenArgs): DoctorTokenState {
   const [token, setToken] = useState<string | null>(null);
   const [isJoining, setIsJoining] = useState(false);
@@ -25,13 +37,17 @@ export function useDoctorToken({ roomName, doctorName, user }: DoctorTokenArgs):
 
   // Load persisted token
   useEffect(() => {
-    const savedToken = typeof window !== 'undefined'
-      ? localStorage.getItem(`doctorToken_${roomName}`)
-      : null;
-    if (savedToken) {
+    const key = `doctorToken_${roomName}`;
+    const savedToken = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+    // A saved token is reused only if it is unexpired (with a 5-minute margin)
+    // and was issued to the account signed in now; otherwise it is dropped and
+    // a fresh one is requested, instead of failing with "Connection error".
+    if (savedToken && isUsableDoctorToken(savedToken, user?.uid)) {
       setToken(savedToken);
+    } else if (savedToken) {
+      localStorage.removeItem(key);
     }
-  }, [roomName]);
+  }, [roomName, user?.uid]);
 
   const generateDoctorToken = useCallback(async () => {
     if (!doctorName.trim()) {

@@ -38,6 +38,9 @@ async function handlePOST(req: NextRequest) {
   const result = await invitationAccess.validateInvite({
     token: body.token,
     userEmail: body.userEmail,
+    browserSessionId: typeof body.browserSessionId === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(body.browserSessionId)
+      ? body.browserSessionId
+      : undefined,
     clientIP: getClientIP(req),
     userAgent: req.headers.get('user-agent') || '',
     authenticatedVisitor: await verifyVisitorIdentity(req),

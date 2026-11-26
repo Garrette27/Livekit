@@ -25,12 +25,18 @@ export function resolveWaitingPatientId(input: {
   /** Keyed hashes already computed for this request. */
   networkHash: string;
   userAgentHash: string;
+  /** Keyed hash of a per-tab browser id, when the page sent one. */
+  browserSessionHash?: string;
 }): string {
   const principalId = input.principalId?.trim();
   if (principalId) {
     return `waiting_${input.invitationId}_${hashSecuritySignal('account', principalId).slice(0, 24)}`;
   }
 
-  const deviceKey = `${input.networkHash}:${input.userAgentHash}`;
+  // A per-tab id keeps two guests on one network and browser apart; without
+  // it (older pages) the network and browser hashes alone are used.
+  const deviceKey = input.browserSessionHash
+    ? `${input.networkHash}:${input.userAgentHash}:${input.browserSessionHash}`
+    : `${input.networkHash}:${input.userAgentHash}`;
   return `waiting_${input.invitationId}_anon_${hashSecuritySignal('device', deviceKey).slice(0, 24)}`;
 }

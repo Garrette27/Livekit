@@ -133,7 +133,11 @@ async function handlePOST(req: NextRequest) {
     const invitationId = `invite_${randomUUID()}`;
 
     // Determine waiting room settings
-    const isWaitingRoomEnabled = waitingRoomEnabled === true;
+    // Every invitation uses the waiting room: only a verified allowlisted
+    // account may skip it (AGENTS.md invitation contract). A client asking for
+    // `waitingRoomEnabled: false` no longer creates a link that admits anyone.
+    void waitingRoomEnabled;
+    const isWaitingRoomEnabled = true;
     const requestedMaxUses = Number(maxUses);
     const requestedMaxPatients = Number(maxPatients);
     const finalMaxUses = Number.isFinite(requestedMaxUses) && requestedMaxUses > 0
