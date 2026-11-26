@@ -21,6 +21,8 @@ export interface AuthenticatedRequester {
   emailVerified: boolean;
   claimedRole?: AppRole;
   isAdminClaim: boolean;
+  /** Clinic (tenant) named by an administrator-set claim. */
+  clinicId?: string;
 }
 
 export interface AuthorizedRequester extends AuthenticatedRequester {
@@ -55,6 +57,7 @@ export async function authenticateBearerToken(
       emailVerified: decoded.email_verified === true,
       claimedRole: parseAppRole(decoded.role) || undefined,
       isAdminClaim: decoded.admin === true,
+      ...(typeof decoded.clinicId === 'string' ? { clinicId: decoded.clinicId } : {}),
     });
   } catch (error) {
     console.error('Token verification error:', error);

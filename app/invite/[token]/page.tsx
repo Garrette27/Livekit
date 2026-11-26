@@ -251,6 +251,7 @@ function InvitePageContent() {
 
         const request: ValidateInvitationRequest = {
           token,
+          browserSessionId: getBrowserSessionId(),
           ...(user?.email ? { userEmail: user.email.toLowerCase() } : {}),
         };
 
@@ -1045,6 +1046,25 @@ function InvitePageContent() {
       </div>
     </div>
   );
+}
+
+/**
+ * A random id per browser tab (sessionStorage), sent with validation so two
+ * guests behind the same network and browser get separate queue entries. It
+ * is a correlation signal only and never admits anyone.
+ */
+function getBrowserSessionId(): string | undefined {
+  try {
+    const key = 'teleconsole:browser-session';
+    let id = window.sessionStorage.getItem(key);
+    if (!id) {
+      id = crypto.randomUUID();
+      window.sessionStorage.setItem(key, id);
+    }
+    return id;
+  } catch {
+    return undefined;
+  }
 }
 
 export default function InvitePage() {

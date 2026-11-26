@@ -43,7 +43,7 @@ function resolveSecuritySignalKey(): string | Buffer {
  * value under two kinds never collides — an email and an account id that
  * happen to match still produce different correlation values.
  */
-export type SecuritySignalKind = 'ip' | 'user-agent' | 'email' | 'account' | 'device';
+export type SecuritySignalKind = 'ip' | 'user-agent' | 'email' | 'account' | 'device' | 'browser-session';
 
 export function hashSecuritySignal(label: SecuritySignalKind, value: string): string {
   return createHmac('sha256', resolveSecuritySignalKey())

@@ -31,6 +31,8 @@ export interface ValidateInvitationContext {
   token: string;
   /** Email the visitor typed. Self-asserted, so it never grants admission. */
   userEmail?: string;
+  /** Per-tab browser id; separates guests sharing a network and browser. */
+  browserSessionId?: string;
   clientIP: string;
   userAgent: string;
   /**
@@ -153,6 +155,7 @@ async function reserveWaitingPatient(
     principalKeyed: boolean;
     identity: WaitingPatientIdentity;
     status: 'waiting' | 'admitted';
+    visitorKind: 'verifiedAccounts' | 'unverifiedAccounts' | 'guests';
     networkHash: string;
     userAgentHash: string;
     admissionMode: 'doctor-manual' | 'auto-email-match';
@@ -192,6 +195,7 @@ async function reserveWaitingPatient(
     roomName: input.roomName,
     status: input.status,
     principalKeyed: input.principalKeyed,
+    visitorKind: input.visitorKind,
     onNewVisit,
     onEachVisit,
     // Each arrival is kept as its own immutable record, so the entry can be a
@@ -382,6 +386,7 @@ async function handleWaitingRoomAccess(params: {
   waitingRoomName: string;
   clientIP: string;
   userAgent: string;
+  browserSessionId?: string;
 }): Promise<ValidateInvitationResult> {
   const {
     db,
@@ -396,6 +401,7 @@ async function handleWaitingRoomAccess(params: {
     waitingRoomName,
     clientIP,
     userAgent,
+    browserSessionId,
   } = params;
 
   const doctorUserId = invitation.createdBy;
@@ -443,6 +449,7 @@ async function handleWaitingRoomAccess(params: {
     principalId,
     networkHash,
     userAgentHash,
+    browserSessionHash: browserSessionId ? hashSecuritySignal('browser-session', browserSessionId) : undefined,
   });
 
   const reservation = await reserveWaitingPatient(db, {
@@ -453,6 +460,9 @@ async function handleWaitingRoomAccess(params: {
     principalKeyed: Boolean(principalId),
     identity,
     status: requestsDirectEntry ? 'admitted' : 'waiting',
+    visitorKind: authenticatedVisitor?.userId && !authenticatedVisitor.isAnonymousAccount
+      ? (authenticatedVisitor.emailVerified ? 'verifiedAccounts' : 'unverifiedAccounts')
+      : 'guests',
     networkHash,
     userAgentHash,
     admissionMode: requestsDirectEntry ? 'auto-email-match' : 'doctor-manual',
@@ -627,6 +637,7 @@ export async function validateInvitationAndIssueToken(
         waitingRoomName,
         clientIP: context.clientIP,
         userAgent: context.userAgent,
+        browserSessionId: context.browserSessionId,
       });
     }
 

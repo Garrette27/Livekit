@@ -47,6 +47,11 @@ export interface Consultation {
 
 // New invitation system types
 export interface Invitation {
+  /**
+   * Visits started with this link, by how the visitor was identified. Counted
+   * inside the reservation transaction; absent on invitations created earlier.
+   */
+  visitStats?: { total?: number; verifiedAccounts?: number; unverifiedAccounts?: number; guests?: number };
   id: string;
   roomName: string;
   /** Legacy plaintext allowlist field. New writes use keyed email hashes. */
@@ -154,6 +159,8 @@ export interface CreateInvitationResponse {
 
 export interface ValidateInvitationRequest {
   token: string;
+  /** Random id kept per browser tab; separates guests who share a network and browser. */
+  browserSessionId?: string;
   /**
    * Self-declared, so it only labels a guest for the doctor. A signed-in
    * visitor is identified by the ID token in the Authorization header instead.

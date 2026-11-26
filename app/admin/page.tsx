@@ -11,6 +11,7 @@ interface Account {
   email: string | null;
   name: string | null;
   role: string;
+  clinicId: string | null;
   provisioned: boolean;
   disabled: boolean;
 }
@@ -28,6 +29,8 @@ export default function AdminPage() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [level, setLevel] = useState<'super_admin' | 'admin' | null>(null);
   const [callerUid, setCallerUid] = useState('');
+  const [callerClinic, setCallerClinic] = useState<string | null>(null);
+  const [clinicId, setClinicId] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
@@ -47,6 +50,7 @@ export default function AdminPage() {
     }
     setLevel(data.level);
     setCallerUid(data.callerUid);
+    setCallerClinic(data.clinicId);
     setAccounts(data.accounts);
   }, []);
 
@@ -54,14 +58,14 @@ export default function AdminPage() {
     if (user) void load();
   }, [user, load]);
 
-  const change = async (targetEmail: string, targetRole: 'doctor' | 'admin', action: 'grant' | 'revoke') => {
+  const change = async (targetEmail: string, targetRole: 'doctor' | 'admin', action: 'grant' | 'revoke', targetClinic?: string | null) => {
     setBusy(`${action}:${targetEmail}`);
     setFeedback(null);
     try {
       const response = await authenticatedFetch('/api/admin/roles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: targetEmail, role: targetRole, action }),
+        body: JSON.stringify({ email: targetEmail, role: targetRole, action, clinicId: targetClinic ?? clinicId }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) {
@@ -70,7 +74,7 @@ export default function AdminPage() {
       }
       setFeedback({
         tone: 'ok',
-        text: `${action === 'grant' ? 'Granted' : 'Revoked'} ${targetRole} for ${targetEmail}. It applies the next time they sign in.`,
+        text: `${action === 'grant' ? 'Granted' : 'Revoked'} ${targetRole} for ${targetEmail}. Granted roles apply at their next sign-in or within an hour; revoked roles end their other sessions.`,
       });
       if (action === 'grant') setEmail('');
       await load();
@@ -109,18 +113,29 @@ export default function AdminPage() {
               <h2>Grant a role</h2>
               <p className="muted">
                 The clinician must have signed in once (Google or email) so the account exists. Patient accounts
-                cannot be converted; clinicians use a separate account.
+                cannot be converted; clinicians use a separate account.{' '}
+                {level === 'super_admin'
+                  ? 'As super admin you choose the clinic; grant "Administrator" to create a clinic admin.'
+                  : `You manage doctors in your clinic${callerClinic ? ` (${callerClinic})` : ''} only.`}
               </p>
               <form
                 className="grant-row"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  if (email.trim()) void change(email.trim().toLowerCase(), role, 'grant');
+                  if (email.trim()) void change(email.trim().toLowerCase(), role, 'grant', level === 'super_admin' ? clinicId : callerClinic);
                 }}
               >
                 <label>
                   <span>Account email</span>
                   <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="doctor@clinic.example" />
+                </label>
+                <label>
+                  <span>Clinic</span>
+                  {level === 'super_admin' ? (
+                    <input required value={clinicId} onChange={(e) => setClinicId(e.target.value)} placeholder="henry-cheung-dental" />
+                  ) : (
+                    <input value={callerClinic || '(not assigned)'} readOnly aria-readonly="true" />
+                  )}
                 </label>
                 <label>
                   <span>Role</span>
@@ -149,17 +164,18 @@ export default function AdminPage() {
                         <span className="muted">{account.email}</span>
                       </div>
                       <span className="badge">{account.role}</span>
+                      <span className="badge">{account.clinicId || 'no clinic'}</span>
                       <span className={account.provisioned ? 'badge ok-badge' : 'badge warn-badge'}>
                         {account.provisioned ? 'Provisioned' : 'Legacy profile — grant to provision'}
                       </span>
                       <div className="actions">
                         {!account.provisioned && account.email && (
-                          <button type="button" disabled={Boolean(busy)} onClick={() => change(account.email!, account.role as 'doctor' | 'admin', 'grant')}>
+                          <button type="button" disabled={Boolean(busy)} onClick={() => change(account.email!, account.role as 'doctor' | 'admin', 'grant', account.clinicId || (level === 'super_admin' ? clinicId : callerClinic))}>
                             Provision
                           </button>
                         )}
                         {account.email && account.uid !== callerUid && (account.role === 'doctor' || level === 'super_admin') && (
-                          <button type="button" className="danger" disabled={Boolean(busy)} onClick={() => change(account.email!, account.role as 'doctor' | 'admin', 'revoke')}>
+                          <button type="button" className="danger" disabled={Boolean(busy)} onClick={() => change(account.email!, account.role as 'doctor' | 'admin', 'revoke', account.clinicId)}>
                             Revoke
                           </button>
                         )}
@@ -176,7 +192,7 @@ export default function AdminPage() {
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 1.25rem 1.5rem; }
         h2 { font-size: 1.125rem; font-weight: 700; margin: 0 0 0.5rem; color: #111827; }
         .muted { color: #6b7280; font-size: 0.8125rem; }
-        .grant-row { display: grid; grid-template-columns: minmax(14rem, 1fr) 11rem auto; gap: 0.75rem; align-items: end; margin-top: 0.75rem; }
+        .grant-row { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 12rem) 9rem auto; gap: 0.75rem; align-items: end; margin-top: 0.75rem; }
         label { display: grid; gap: 0.3rem; font-size: 0.8125rem; font-weight: 600; color: #374151; }
         input, select { padding: 0.55rem 0.7rem; border: 1px solid #d1d5db; border-radius: 0.5rem; font-size: 0.9375rem; }
         button { padding: 0.55rem 1rem; border-radius: 0.5rem; border: 1px solid #0f766e; background: #0f766e; color: #fff; font-weight: 600; cursor: pointer; }

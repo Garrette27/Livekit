@@ -2,6 +2,16 @@
 
 Prepared 25 November 2026 (Asia/Singapore). Scope: minimally revise the supplied thesis and give three writers a coherent, reproducible explanation of capacity, costs, quality, security and remaining limitations. No examination outcome is guaranteed.
 
+## Latest (27 November 2026) — start here
+
+1. **[PANEL-QA-LATEST.md](PANEL-QA-LATEST.md)** — panel-style questions in the order panels ask, each with the demo moment that proves it.
+2. [One-day guide](one-day-defense-guide.md) — schedule, five-box explanation, objectives→evidence, demo script, slide plan, CCTV answer.
+3. [Presentation risk register](presentation-risk-register.md) — what could break the demo and the fallback.
+4. [Page changes 27 Nov](page-changes-2026-11-27.md) — manuscript pages changed (same 259 pages).
+5. [Full Q&A Q1–Q76](panel-questions-and-answers.md) and [attachment plan](attachment-plan.md).
+
+The PDFs and slides listed below are from 25 November and predate the 27 November fixes.
+
 ## Send these first
 
 For direct browser downloads, use the [download index](DOWNLOADS.md) or [public-safe ZIP](TeleConsole-Public-Defense-Pack.zip). The ZIP uses the redacted manuscript and deliberately excludes the private submission copy and personal appendices.

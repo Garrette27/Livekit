@@ -88,6 +88,28 @@ export function formatInvitationUsage(input: {
   return `${used} of ${maximum} use${maximum === 1 ? '' : 's'}`;
 }
 
+/**
+ * "5 visits · 2 verified accounts · 3 guests" — how the people who used this
+ * link were identified (guests include anonymous sessions and typed emails).
+ * Null for invitations created before the breakdown was recorded.
+ */
+export function formatVisitBreakdown(stats?: {
+  total?: number;
+  verifiedAccounts?: number;
+  unverifiedAccounts?: number;
+  guests?: number;
+}): string | null {
+  if (!stats || !stats.total) return null;
+  const parts = [`${stats.total} visit${stats.total === 1 ? '' : 's'}`];
+  const add = (count: number | undefined, label: string) => {
+    if (count) parts.push(`${count} ${label}${count === 1 ? '' : 's'}`);
+  };
+  add(stats.verifiedAccounts, 'verified account');
+  add(stats.unverifiedAccounts, 'unverified account');
+  add(stats.guests, 'guest');
+  return parts.join(' · ');
+}
+
 /** Admission policy in language the doctor can verify before sharing. */
 export function describeInvitationAudience(emailCount: number): string {
   return emailCount > 0

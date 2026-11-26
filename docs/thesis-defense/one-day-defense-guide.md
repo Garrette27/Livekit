@@ -74,24 +74,23 @@ The results answer the objectives **as written**: build (1, 2, 3) and evaluate p
 
 ---
 
-## 4. Demo script (≈6 minutes, W2 drives, W1 narrates)
+## 4. Demo script (≈7 minutes) — each step answers a panel question
 
-| # | Do | Say | What the panel should notice |
+| # | Panel question it answers | Do | Say |
 |---|---|---|---|
-| 1 | Open the app; point at the tab icon and header | "TeleConsole. The header shows who is signed in — here the doctor's name and email." | Account chip, logo |
-| 2 | Doctor → Invitations. Type room `demo-nov27`, leave 24 h and limit 10, add Patient A's email as a chip | "Room, expiry and waiting limit on one line. Patient A is assigned to enter directly; the preview says everyone else waits." | Access preview sentence |
-| 3 | Create link → Copy | "This is a signed key. Forwarding it doesn't let anyone skip the queue." | |
-| 4 | Incognito guest opens the link, types Patient A's email | "A typed email is not proof. This guest waits." | Guest lands in the waiting room |
-| 5 | Doctor clicks **View queue** | "The doctor sees the guest, oldest first, with how the identity was established." | Provenance label, Admitted vs Waiting |
-| 6 | Patient A (signed in with Google) opens the same link | "Verified account on the list — enters directly." | Goes to preflight, not waiting |
-| 7 | Doctor removes the guest; guest reopens the link | "Rejection is a decision about this person; they're back in line and the doctor decides again." | Guest waits again |
-| 8 | Doctor and Patient A talk 30 seconds with transcription on (consented) | "Each participant opts in. The call works with it off." | |
-| 9 | Patient leaves → Doctor Dashboard | "Summaries appear first; chat loads after. The draft is labelled for review and can be edited." | "AI draft · review required" |
-| 10 | Invitations → filter **Expired** → View details | "Expired links show 'Queue closed' — nobody can wait on them." | Closed state |
+| 1 | "Who are you signed in as?" | Show header (logo, name + email) | "The header always shows the signed-in account." |
+| 2 | "Can anyone become a doctor?" / "Business for clinics?" | Open `/admin`: grant Doctor to a test account in clinic `henry-cheung-dental` | "Only an administrator grants doctor roles, per clinic, and it's audited. Clinic admins manage only their own clinic." |
+| 3 | "How does the doctor assign a patient?" | Invitations: room `demo-nov27`, limit **2**, add Patient A's email chip → Create → Copy | "Patient A is assigned to enter directly; everyone else waits. The preview says so." |
+| 4 | "What if the link is forwarded?" | Guest 1 (incognito) opens link, types Patient A's email | "A typed email isn't proof — the guest waits." |
+| 5 | "What's the waiting limit?" | Guest 2 joins (2/2); Guest 3 joins → "Waiting room is full" | "The limit is enforced atomically." Then **Save limit = 3** and Guest 3 retries → waits. "Raising it applies to the next arrival; lowering never removes anyone." |
+| 6 | "How many joined, anonymous or not?" | View queue → **Visits:** line | "3 visits · 0 verified accounts · 3 guests — and each row shows how identity was established." |
+| 7 | "Who skips the queue?" | Patient A (Google) opens link | "Verified and on the list — direct entry." |
+| 8 | "Removed patient returns?" | Remove Guest 1; Guest 1 reopens | "Back in line; the doctor decides again." |
+| 9 | "Does the AI diagnose? Consent?" | 30-s call with transcription consented; leave | "Each person opts in; the call works without it." |
+| 10 | "Show the summary." | Dashboard → card "AI draft · review required" → Edit (Risk "Unknown") | "Draft only; the dentist reviews. Unknown is never turned into Low." |
+| 11 | "Expired link?" | Invitations → Expired → View details | "Queue closed." |
 
-**If something fails:** say what failed and which box owns it ("LiveKit media didn't connect; the access decision already succeeded"). Never bypass admission to keep the demo moving. Backup: screenshots of each step.
-
----
+**If something fails:** name the box that failed (§2) and continue. Never bypass admission. Backup: screenshots.
 
 ## 5. PowerPoint plan (10 slides; ~12 minutes)
 

@@ -39,20 +39,26 @@ async function handleGET(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'Service unavailable' }, { status: 503 });
   }
   const snapshot = await db.collection('users').where('role', 'in', PRIVILEGED_PROFILE_ROLES).limit(200).get();
-  const accounts = await Promise.all(snapshot.docs.map(async (doc) => {
-    const profile = doc.data() as { email?: string; role?: string; doctorName?: string };
+  // A clinic administrator sees only their own clinic's accounts.
+  const scopedDocs = level === 'super_admin'
+    ? snapshot.docs
+    : snapshot.docs.filter((doc) => caller.data.clinicId && doc.data().clinicId === caller.data.clinicId);
+  const accounts = await Promise.all(scopedDocs.map(async (doc) => {
+    const profile = doc.data() as { email?: string; role?: string; doctorName?: string; clinicId?: string };
     const user = await auth.getUser(doc.id).catch(() => null);
-    const claimRole = user?.customClaims?.admin === true ? 'admin' : (user?.customClaims?.role as string | undefined);
+    const claimRole = user?.customClaims?.role as string | undefined;
+    const isAdmin = user?.customClaims?.admin === true;
     return {
       uid: doc.id,
       email: profile.email || user?.email || null,
       name: profile.doctorName || user?.displayName || null,
-      role: profile.role,
-      provisioned: claimRole === profile.role,
+      role: isAdmin ? 'admin' : profile.role,
+      clinicId: profile.clinicId || (user?.customClaims?.clinicId as string | undefined) || null,
+      provisioned: claimRole === profile.role || (isAdmin && claimRole === 'doctor'),
       disabled: user?.disabled === true,
     };
   }));
-  return NextResponse.json({ success: true, level, callerUid: caller.data.userId, accounts });
+  return NextResponse.json({ success: true, level, callerUid: caller.data.userId, clinicId: caller.data.clinicId || null, accounts });
 }
 
 async function handlePOST(req: NextRequest) {
@@ -79,46 +85,69 @@ async function handlePOST(req: NextRequest) {
   if (!target) {
     return NextResponse.json({ success: false, code: 'account_not_found', error: 'No account uses that email. Ask the clinician to sign in once first.' }, { status: 404 });
   }
-  const decision = decideRoleChange({ caller: caller.data, superAdminEmails: superAdmins(), targetUserId: target.uid, role, action });
-  if (!decision.allowed) {
-    return NextResponse.json({ success: false, code: decision.code, error: decision.message }, { status: decision.status });
-  }
-
   const profileRef = db.collection('users').doc(target.uid);
   const profile = await profileRef.get();
   const profileRole = profile.exists ? (profile.data()?.role as string | undefined) : undefined;
+  const targetClinicId = (target.customClaims?.clinicId as string | undefined) || (profile.data()?.clinicId as string | undefined) || null;
+  const decision = decideRoleChange({
+    caller: caller.data,
+    superAdminEmails: superAdmins(),
+    targetUserId: target.uid,
+    role,
+    action,
+    clinicId: body.clinicId,
+    targetClinicId,
+    targetIsAdmin: target.customClaims?.admin === true,
+  });
+  if (!decision.allowed) {
+    return NextResponse.json({ success: false, code: decision.code, error: decision.message }, { status: decision.status });
+  }
   if (action === 'grant' && profileRole === 'patient') {
     // Separate identities: a patient account keeps its own health history.
     return NextResponse.json({ success: false, code: 'patient_account', error: 'This email belongs to a patient account. Provision a separate clinician account.' }, { status: 409 });
   }
 
+  // Clinic administrators are clinicians too (a small clinic's owner): an
+  // admin grant keeps or sets the doctor role, so the account can still sign
+  // in to the doctor pages. Revoking "admin" removes only the admin flag;
+  // revoking "doctor" removes clinician access entirely.
   const claims = { ...(target.customClaims || {}) } as Record<string, unknown>;
+  const now = new Date();
   if (action === 'grant') {
-    claims.role = role;
+    claims.role = 'doctor';
+    claims.clinicId = decision.clinicId;
     if (role === 'admin') claims.admin = true;
+  } else if (role === 'admin') {
+    delete claims.admin;
   } else {
     delete claims.role;
     delete claims.admin;
+    delete claims.clinicId;
   }
   await auth.setCustomUserClaims(target.uid, claims);
-  const now = new Date();
   if (action === 'grant') {
-    await profileRef.set({ email, role, provisionedAt: now, ...(profile.exists ? {} : { registeredAt: now }) }, { merge: true });
-  } else if (profileRole && PRIVILEGED_PROFILE_ROLES.includes(profileRole)) {
+    await profileRef.set({ email, role: 'doctor', clinicId: decision.clinicId, provisionedAt: now, ...(profile.exists ? {} : { registeredAt: now }) }, { merge: true });
+  } else if (role === 'doctor' && profileRole && PRIVILEGED_PROFILE_ROLES.includes(profileRole)) {
     // Keep the profile (history stays attributable) but stop the legacy
     // profile-role fallback from honouring it.
     await profileRef.set({ role: 'revoked', revokedRole: profileRole, revokedAt: now }, { merge: true });
   }
-  await auth.revokeRefreshTokens(target.uid);
+  if (action === 'revoke') {
+    // Ends other sessions so removed access cannot be refreshed. Not done on
+    // grant: a grant only adds access, and revoking would sign the person out
+    // (possibly mid-consultation).
+    await auth.revokeRefreshTokens(target.uid);
+  }
   await db.collection('adminAuditEvents').add({
     action: `role_${action}`,
     role,
+    clinicId: decision.clinicId,
     targetUid: target.uid,
     actorUid: caller.data.userId,
     at: now,
   });
 
-  return NextResponse.json({ success: true, uid: target.uid, role, action });
+  return NextResponse.json({ success: true, uid: target.uid, role, action, clinicId: decision.clinicId });
 }
 
 export const GET = withRequestLogging(handleGET);

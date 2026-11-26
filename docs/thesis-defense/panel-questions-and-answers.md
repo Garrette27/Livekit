@@ -296,6 +296,21 @@ Yes, using standard LiveKit settings rather than custom code: adaptive streaming
 ### 76. Could you add attachments on Firebase's free tier?
 Not on the free Spark plan: Cloud Storage for Firebase now requires the pay-as-you-go Blaze plan, which still includes a no-cost quota (about 5 GB stored and 1 GB downloaded per day). Putting images in Firestore documents is not a safe workaround. Our plan is in `attachment-plan.md`: private bucket, signed upload/download URLs issued after ownership checks, type and size limits, malware scanning before a file is usable, audit, retention, and cross-session denial tests.
 
+### 77. How many patients used a link, and were they anonymous?
+Each invitation records its visits by identification kind inside the same transaction that admits the visit: verified accounts, unverified accounts and guests (anonymous sessions or typed emails). The card shows e.g. "5 visits · 2 verified accounts · 3 guests"; reconnects are not counted twice. Invitations created before 27 November show only their join count.
+
+### 78. What happens if the doctor raises or lowers the waiting limit?
+The owning doctor can change it on a live invitation (1–100). The reservation reads the limit inside its transaction, so the change applies to the next arrival. Raising it lets more people wait at once; lowering it removes no one — new arrivals are refused until the queue is below the new limit.
+
+### 79. If you sold this to several small clinics, how would accounts be provisioned?
+Delegated, tenant-scoped administration: the platform super admin creates a clinic administrator per clinic; each clinic admin grants doctor accounts only within their clinic (claims carry `clinicId`; the server refuses cross-clinic grants and revocations); doctors invite their own patients; patients self-register only as patients. Doctors in different areas cannot see each other's patients because records are owned by the inviting doctor. Before a commercial launch we would add clinic-level record sharing, billing, DPA/RA 10173 compliance work, backups, monitoring and an independent security test.
+
+### 80. If an administrator revokes a doctor, is access cut immediately?
+New sessions are cut immediately (their refresh tokens are revoked, and the role claim is removed). An ID token already issued stays valid for up to one hour, so the server could still accept it during that window; checking revocation on every request is a one-line change we deferred because it adds a network call to every API request. We state the window rather than claim instant revocation.
+
+### 81. Two guests use the same clinic Wi-Fi and the same browser. Do they get mixed up?
+Not any more. A guest's queue entry is keyed by their Firebase session if they have one, otherwise by network, browser and a random per-tab id, so two tabs or two devices are separate visitors. A reload in the same tab keeps its place. None of these signals admits anyone; they only keep entries apart.
+
 ## Practice method for three writers
 
 Writer 1 answers title/contribution questions 1-6 and research-method questions 37-39 and 49-50. Writer 2 answers admission/security questions 7-15, 28-30, 33-36, 40-47, 51-56, 61-65, 69-74 and 76. Writer 3 answers capacity/refresh questions 16-27, the page/evidence questions 31-32, 48, 57-60 and 66-68 and 75. Rotate once so nobody knows only their own section. Give each answer in 20-40 seconds, then handle one follow-up.

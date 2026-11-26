@@ -3,6 +3,8 @@ import type { ValidateInvitationResponse, WaitingPatient } from '@/lib/types';
 export interface ValidateInviteContext {
   token: string;
   userEmail?: string;
+  /** Validated per-tab id from the browser; correlation only. */
+  browserSessionId?: string;
   clientIP: string;
   userAgent: string;
   /** Identity from a verified Firebase token; absent for visitors with no account. */

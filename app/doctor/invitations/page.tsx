@@ -8,6 +8,7 @@ import InvitationManager from '@/components/InvitationManager';
 import { Invitation } from '@/lib/types';
 import WaitingPatientsList from './components/WaitingPatientsList';
 import DoctorAppHeader from '@/components/doctor/DoctorAppHeader';
+import WaitingLimitEditor from '@/components/doctor/WaitingLimitEditor';
 import { useAuthSession } from '@/hooks/useAuthSession';
 import { copyTextToClipboard, fetchInvitationLink as getInvitationLink } from '@/lib/invitations/invitation-link-client';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
@@ -19,6 +20,7 @@ import {
   describeInvitationAudience,
   formatExpiryCountdown,
   formatInvitationUsage,
+  formatVisitBreakdown,
   resolveInvitationStatusPresentation,
 } from '@/lib/invitations/invitation-presentation';
 
@@ -537,6 +539,11 @@ export default function DoctorInvitationsPage() {
                           usagePolicy: invitation.metadata?.security?.usagePolicy,
                         })}
                       </p>
+                      {formatVisitBreakdown(invitation.visitStats) && (
+                        <p style={{ margin: '0 0 0.25rem', color: '#374151' }}>
+                          {formatVisitBreakdown(invitation.visitStats)}
+                        </p>
+                      )}
 
                       {/* Invitation Link Section */}
                       {getEffectiveStatus(invitation) === 'active' && (
@@ -792,6 +799,12 @@ export default function DoctorInvitationsPage() {
                           <p style={{ margin: '0', color: '#059669', fontWeight: '500' }}>
                             Waiting Room: {waitingPatientsCounts[selectedInv.id] ?? 0} / {selectedInv.maxPatients || 10} patients
                           </p>
+                        )}
+                        {formatVisitBreakdown(selectedInv.visitStats) && (
+                          <p style={{ margin: '0.5rem 0 0' }}><strong>Visits:</strong> {formatVisitBreakdown(selectedInv.visitStats)}</p>
+                        )}
+                        {selectedInv.waitingRoomEnabled && queueIsLive && (
+                          <WaitingLimitEditor invitationId={selectedInv.id} current={selectedInv.maxPatients || 10} />
                         )}
                       </div>
                       
