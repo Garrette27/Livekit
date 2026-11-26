@@ -1,6 +1,6 @@
 # Panel rehearsal: title, waiting queue and system boundaries
 
-Updated 27 November 2026 (first written 25 November). Use these as practice answers, not a script for hiding defects or a guarantee of a passing grade. Source baseline: `ed4f7a9` plus the 27 November queue fix (atomic waiting target, visit-bound queue credentials, no hidden waiting-room media). Evidence is local: a synthetic source audit and a Firestore **emulator** run, not production load. Answers 4, 8, 9, 12, 14, 16–19, 21, 29, 30 and 32 changed because the code changed; questions 33–50 are new. The [complete queue/title guide](waiting-queue-and-title-defense.md) supplies implementation references and teaching detail. Each writer should answer in their own words, then state the boundary without prompting.
+Updated 27 November 2026 (first written 25 November). Use these as practice answers, not a script for hiding defects or a guarantee of a passing grade. Source baseline: `ed4f7a9` plus the 27 November queue fix (atomic waiting target, visit-bound queue credentials, no hidden waiting-room media). Evidence is local: a synthetic source audit and a Firestore **emulator** run, not production load. Answers 4, 8, 9, 12, 14, 16–19, 21, 29, 30 and 32 changed because the code changed; questions 33–50 are new. Later the same day (PR #9) a review found more queue bugs; they were fixed and answers 40 and 42 changed, with questions 51–60 added. See also the [one-day guide](one-day-defense-guide.md). The [complete queue/title guide](waiting-queue-and-title-defense.md) supplies implementation references and teaching detail. Each writer should answer in their own words, then state the boundary without prompting.
 
 ## Title and contribution
 
@@ -174,7 +174,7 @@ The design followed the beneficiary clinic's workflow; the evaluation added outs
 
 ### 40. A doctor rejects a visitor. What stops them reopening the link and queueing again?
 
-Nothing automatic: rejection is a decision about that visit. Reopening starts a new visit at the back of the queue, and the doctor sees them again and can reject again. To stop the link entirely, the doctor revokes the invitation, which every token request rechecks. We chose this so one mistaken click does not permanently lock out a real patient.
+Reopening starts a new visit at the back of the queue, and it always waits — even for a verified account on the direct-join list, because the doctor's rejection outranks the list. The doctor sees them again and can reject again. To stop the link entirely, the doctor revokes the invitation, which every token request rechecks. We chose this so one mistaken click does not permanently lock out a real patient, while a removed person can never walk straight back in.
 
 ### 41. Two patients share one invitation link. Can they see each other?
 
@@ -182,7 +182,7 @@ Not while waiting: waiting credentials cannot publish or subscribe to media, and
 
 ### 42. If a guest has no account, how is their queue entry kept across a refresh?
 
-Through a keyed hash of their network and browser, used only to recognise a reload as the same entry. It is not identity and grants nothing; two guests behind the same office network and browser could share an entry, which is one reason guests always wait for the doctor.
+By their Firebase session (anonymous or signed in) when they have one; only with no session at all, by a keyed hash of network and browser. Neither is identity, and an email is never used — a typed email used to be part of the key, which let one guest land on another patient's entry; that was fixed. Two session-less guests behind the same network and browser could still share an entry, so such an entry that is already admitted starts a fresh waiting visit instead of passing the admission on.
 
 ### 43. What if the patient's phone dies after being admitted?
 
@@ -216,8 +216,40 @@ In practice we iterated inside the implementation and testing phases. Say that h
 
 A staged acceptance run: deploy the fixed commit, run the two-account replay and cross-doctor tests, then paired-call trials at 1, 3 and 5 simultaneous pairs with receiver statistics. Then clinician review of AI summary accuracy. Each produces a measurement we currently do not have.
 
+## Questions from the second review (27 November, PR #9)
+
+### 51. Could a guest take over another patient's admission by typing their email?
+Before the fix, yes: queue entries were keyed by email even when the visitor only typed it, so a guest typing an admitted patient's email could inherit that entry and its consultation credential. Now the entry key comes only from a server-verified Firebase uid (or device hashes when there is no session), and the email is only a displayed label with its provenance. A regression test pins it.
+
+### 52. Can anyone sign up as a doctor?
+No. Signing in with Google creates at most a patient profile. Doctor, reviewer and admin roles come only from a custom claim that an administrator sets with `scripts/admin/provision-role.mjs`. Firestore rules refuse a client-created doctor profile, and since 27 November the server also refuses a doctor role written in a profile without the claim. Boundary: whoever holds the Firebase admin credential is trusted; protect it.
+
+### 53. How does a doctor assign a patient?
+The invitation is the assignment. It belongs to the doctor and one room; emails in "Patients who can join directly" let those verified accounts skip the queue. Everyone else with the link waits for that doctor. The encounter, summary and history are owned by that doctor; the patient sees only their own records. There is no scheduling module by design.
+
+### 54. If the patient refreshes, do they use up another invitation use?
+No. A reconnect to a visit that is still open reuses it and spends no use, and an exhausted use limit no longer refuses it. Only a new visit spends a use.
+
+### 55. The patient opened the call on a second device. Does the queue think they left?
+LiveKit disconnects the first device and reports it left. The server now checks whether the same identity is still connected, and whether the departing connection belongs to an earlier visit, before marking the entry left.
+
+### 56. The doctor clicked Admit on an old screen after the patient left and came back. What happens?
+The admit command carries the visit the doctor saw. If the entry has since started a new visit, the server returns a conflict and asks the doctor to refresh and review again.
+
+### 57. Why does consultation history take a while to load?
+Each consultation's chat transcript is a separate Firestore query, so a doctor with ~50 consultations triggered ~50 extra reads before anything showed, plus a serverless cold start. The dashboard now shows the summaries first and adds chat transcripts when they arrive. A paginated history endpoint and measured timings are the next step; we have not published a latency figure.
+
+### 58. Why did View queue show patients for an expired invitation?
+It showed an empty live-queue panel for a closed link, and on narrow screens the panel sat below a long list. Expired or revoked invitations now show "Queue closed" details, and the panel stays in view (sticky on wide screens, scrolled into view on phones).
+
+### 59. Why so many fixes the week of the defense — doesn't that undermine your results?
+The survey evaluated perceived quality of the demonstrated build; the fixes harden edge cases found by our own review and do not change the evaluated workflow or the objectives. Every fix has a regression test, and the manuscript states the current behaviour on the same pages.
+
+### 60. Which manuscript pages changed?
+37 physical pages, same 259 pages and numbering; the register lists each page, edit and reason. Objectives and Chapter IV numbers were not edited.
+
 ## Practice method for three writers
 
-Writer 1 answers title/contribution questions 1-6 and research-method questions 37-39 and 49-50. Writer 2 answers admission/security questions 7-15, 28-30, 33-36 and 40-47. Writer 3 answers capacity/refresh questions 16-27, the page/evidence questions 31-32 and 48. Rotate once so nobody knows only their own section. Give each answer in 20-40 seconds, then handle one follow-up.
+Writer 1 answers title/contribution questions 1-6 and research-method questions 37-39 and 49-50. Writer 2 answers admission/security questions 7-15, 28-30, 33-36, 40-47 and 51-56. Writer 3 answers capacity/refresh questions 16-27, the page/evidence questions 31-32, 48 and 57-60. Rotate once so nobody knows only their own section. Give each answer in 20-40 seconds, then handle one follow-up.
 
 Use the four-part response: state the current rule, explain its reason, name the evidence, and state the limitation. If a number appears, give its units and scope. Do not argue with a panelist by substituting a provider limit for a missing experiment. An accurate limitation and a concrete next test are valid engineering answers; they do not guarantee an examination outcome.
