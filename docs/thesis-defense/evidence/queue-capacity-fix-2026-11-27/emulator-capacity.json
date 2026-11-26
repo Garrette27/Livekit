@@ -1,0 +1,25 @@
+{
+  "run_at_utc": "2026-11-26T22:10:25.536Z",
+  "environment": "Firestore emulator (firebase-tools), Node v20.20.2, synthetic ids, single machine",
+  "results": {
+    "pair_at_9_of_10": {
+      "initialWaiting": 9,
+      "maxPatients": 10,
+      "concurrentArrivals": 2,
+      "reserved": 1,
+      "refusedFull": 1,
+      "finalWaiting": 10,
+      "invitationUses": 1
+    },
+    "burst_25_into_10": {
+      "initialWaiting": 0,
+      "maxPatients": 10,
+      "concurrentArrivals": 25,
+      "reserved": 10,
+      "refusedFull": 15,
+      "finalWaiting": 10,
+      "invitationUses": 10
+    }
+  },
+  "claim_status": "Per-invitation waiting target held under concurrent transactions in the emulator. Not a production or cloud load measurement."
+}

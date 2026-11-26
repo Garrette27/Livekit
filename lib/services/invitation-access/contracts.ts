@@ -39,6 +39,8 @@ export interface CheckAdmissionInput {
   waitingPatientId: string;
   /** Verified room grant from the caller's signed waiting/consultation credential. */
   credentialRoomName: string;
+  /** Visit named by the same signed credential; must match the entry's current visit. */
+  credentialVisitId?: string;
 }
 
 export interface CheckAdmissionResult {
@@ -65,7 +67,11 @@ export interface InvitationAccessService {
     waitingPatientId: string;
     doctorUserId?: string;
   }): Promise<{ waitingPatientId: string; status: 'rejected' }>;
+  /**
+   * `credential` is present when a patient asks to leave; it must name the
+   * entry's current visit. The verified LiveKit webhook calls without it.
+   */
   markWaitingEntryLeft(
-    input: { waitingPatientId: string }
+    input: { waitingPatientId: string; credential?: { visitId?: string } }
   ): Promise<{ waitingPatientId: string; status: 'left' | 'rejected' }>;
 }

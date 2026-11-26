@@ -72,7 +72,8 @@ test('duplicate-identity replacement detaches the old page without closing the c
   assert.equal(notices, 1);
   exports.disconnect(DisconnectReason.CLIENT_INITIATED);
   assert.equal(leaves, 1, 'Ordinary disconnect still follows the normal exit path');
-  assert.equal(sourceText.match(/onDisconnected=\{handleRoomDisconnect\}/g)?.length, 2);
+  // Only the visible consultation room mounts media; the waiting page has none.
+  assert.equal(sourceText.match(/onDisconnected=\{handleRoomDisconnect\}/g)?.length, 1);
 
   // The legacy room route must honor the same transport-vs-visit distinction.
   const legacyPath = 'app/room/[room]/patient/page.tsx';
@@ -1016,4 +1017,113 @@ test('transcription retries at most twice and carries only bounded provider stat
   const bridge = readFileSync('app/room/[room]/components/shared/SessionTranscriptionBridge.tsx', 'utf8');
   assert.match(bridge, /\[401, 403, 404, 503\]/);
   assert.match(bridge, /Transcription paused/);
+});
+
+/** Serialized-transaction fake: real Firestore makes one of two same-document writers retry. */
+function reservationFixture({ waitingRows = 0, maxPatients = 10 } = {}) {
+  const { reserveWaitingVisit } = loadModule('lib/invitations/invitation-use-reservation.ts');
+  const rows = new Map(Array.from({ length: waitingRows }, (_, i) => [`waitingPatients/old-${i}`, { status: 'waiting', roomName: 'room-a', invitationId: 'invite-a' }]));
+  let invitation = { status: 'active', expiresAt: new Date(Date.now() + 3600000), maxPatients, currentUses: 0, maxUses: 999999 };
+  let serial = Promise.resolve();
+  let next = 0;
+  const query = (filters = []) => ({
+    query: true, filters, where: (field, _op, value) => query([...filters, [field, value]]),
+    orderBy() { return this; }, offset() { return this; }, limit() { return this; },
+  });
+  const ref = path => ({ path, collection: name => collection(`${path}/${name}`) });
+  const collection = path => ({ ...query(), doc: id => ref(`${path}/${id || `auto-${next++}`}`) });
+  const db = { collection, runTransaction(callback) {
+    const run = serial.then(() => callback({
+      async get(target) {
+        if (target.query) {
+          return { size: target.filters.length ? [...rows.values()].filter(row => target.filters.every(([f, v]) => row[f] === v)).length : 0, docs: [] };
+        }
+        if (target.path === 'invitations/invite-a') return { exists: true, data: () => invitation };
+        return rows.has(target.path) ? { exists: true, data: () => rows.get(target.path) } : { exists: false };
+      },
+      update(target, value) { if (target.path === 'invitations/invite-a') invitation = { ...invitation, ...value }; },
+      set(target, value) { if (/^waitingPatients\/[^/]+$/.test(target.path)) rows.set(target.path, { ...(rows.get(target.path) || {}), ...value }); },
+      delete() {},
+    }));
+    serial = run.catch(() => {});
+    return run;
+  } };
+  const arrive = (id, status = 'waiting') => reserveWaitingVisit(db, 'invite-a', { synthetic: true }, {
+    id, roomName: 'room-a', status, newVisitId: `visit-${next++}`,
+    onNewVisit: { invitationId: 'invite-a' }, onEachVisit: { roomName: 'room-a', invitationId: 'invite-a' },
+  });
+  return { arrive, rows, waiting: () => [...rows.values()].filter(row => row.status === 'waiting').length, invitation: () => invitation };
+}
+
+test('waiting target is enforced inside the reservation transaction under concurrent arrivals', async () => {
+  const pair = reservationFixture({ waitingRows: 9 });
+  const outcomes = await Promise.all([pair.arrive('new-a'), pair.arrive('new-b')]);
+  assert.deepEqual(outcomes.map(o => o.outcome).sort(), ['full', 'reserved']);
+  assert.equal(pair.waiting(), 10);
+  assert.equal(pair.invitation().currentUses, 1, 'A refused arrival consumes no invitation use');
+  const burst = reservationFixture({ maxPatients: 3 });
+  await Promise.all(Array.from({ length: 10 }, (_, i) => burst.arrive(`burst-${i}`)));
+  assert.equal(burst.waiting(), 3);
+});
+
+test('a full queue still admits a reconnect and verified direct entry, which add no waiting row', async () => {
+  const full = reservationFixture({ waitingRows: 10 });
+  assert.equal((await full.arrive('old-0')).outcome, 'reserved');
+  assert.equal((await full.arrive('verified', 'admitted')).outcome, 'reserved');
+  assert.equal(full.waiting(), 10);
+  const source = readFileSync('lib/invitations/validate-service.ts', 'utf8');
+  const precheck = source.slice(source.indexOf('function validateUsageLimits'), source.indexOf('async function findExistingWaitingPatient'));
+  assert.doesNotMatch(precheck, /waitingPatients/, 'No capacity count outside the reservation transaction');
+});
+
+test('a returning visitor starts a new visit at the back of the queue; a reconnect keeps its visit', async () => {
+  const h = reservationFixture();
+  const first = await h.arrive('returning');
+  const firstJoined = h.rows.get('waitingPatients/returning').joinedAt;
+  const reconnect = await h.arrive('returning');
+  assert.equal(reconnect.visitId, first.visitId);
+  assert.equal(reconnect.startedNewVisit, false);
+  Object.assign(h.rows.get('waitingPatients/returning'), { status: 'rejected', rejectedAt: new Date(0) });
+  await new Promise(resolve => setTimeout(resolve, 2));
+  const second = await h.arrive('returning');
+  const row = h.rows.get('waitingPatients/returning');
+  assert.notEqual(second.visitId, first.visitId);
+  assert.equal(row.currentVisitId, second.visitId);
+  assert.equal(row.rejectedAt, null, 'Previous end markers are cleared');
+  assert.ok(row.joinedAt > firstJoined, 'Oldest-first order reflects this visit, not the earlier one');
+});
+
+test('room credentials carry the signed visit id', () => {
+  const tokens = tokenModule();
+  const token = tokens.signLiveKitRoomToken({ subject: 'patient_invite-a_visit-a', roomName: 'room-a-waiting', purpose: 'waiting', visitId: 'visit-1' });
+  assert.equal(tokens.verifyLiveKitRoomToken(token).visitId, 'visit-1');
+  assert.equal(tokens.verifyLiveKitRoomToken(tokens.signLiveKitRoomToken({ subject: 'patient_x_y', roomName: 'r' })).visitId, undefined);
+});
+
+test('an earlier-visit credential cannot poll admission or close the current visit', async () => {
+  const h = admissionHarness({}, { currentVisitId: 'visit-2' });
+  for (const credentialVisitId of [undefined, 'visit-1']) {
+    await assert.rejects(h.service.checkAdmission({ ...pollingInput, credentialVisitId }), /earlier visit/);
+  }
+  assert.equal(h.counts().tokens, 0);
+  const admitted = await h.service.checkAdmission({ ...pollingInput, credentialVisitId: 'visit-2' });
+  assert.equal(admitted.admitted, true);
+  assert.equal(h.issued[0].visitId, 'visit-2', 'Admission token stays bound to the same visit');
+
+  const documents = { 'waitingPatients/visit-a': { invitationId: 'invite-a', roomName: 'room-a', status: 'waiting', joinedAt: new Date(), currentVisitId: 'visit-2' } };
+  const doc = id => ({ async get() { return { id, exists: !!documents[`waitingPatients/${id}`], data: () => documents[`waitingPatients/${id}`] }; },
+    async set(patch) { Object.assign(documents[`waitingPatients/${id}`], patch); } });
+  const { FirestoreInvitationAccessCore } = loadModule('lib/services/invitation-access/invitation-access-core.ts', {
+    '@/lib/invitations/validate-service': {}, '@/lib/consultations/identity-utils': {}, '@/lib/services/video-chat': {},
+  });
+  const core = new FirestoreInvitationAccessCore({ collection: () => ({ doc }) }, {}, {});
+  await assert.rejects(core.markWaitingEntryLeft({ waitingPatientId: 'visit-a', credential: { visitId: 'visit-1' } }), /earlier visit/);
+  assert.equal(documents['waitingPatients/visit-a'].status, 'waiting');
+  assert.equal((await core.markWaitingEntryLeft({ waitingPatientId: 'visit-a', credential: { visitId: 'visit-2' } })).status, 'left');
+});
+
+test('the waiting page mounts no hidden LiveKit room or device preview', () => {
+  const source = readFileSync('app/invite/[token]/page.tsx', 'utf8');
+  assert.equal(source.match(/<PatientLiveKitRoom/g)?.length, 1, 'Only the visible post-admission room mounts media');
+  assert.doesNotMatch(source, /display: 'none' }}>\s*<PatientLiveKitRoom/);
 });

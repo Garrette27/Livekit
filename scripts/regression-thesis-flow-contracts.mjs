@@ -49,7 +49,8 @@ assert.doesNotMatch(invitePage, /DeviceFingerprint|navigator\.platform|screenRes
 assert.match(validationService, /hashSecuritySignal\('ip', clientIP\)/);
 assert.match(validationService, /networkHash: hashSecuritySignal\('ip'/);
 assert.doesNotMatch(validationService, /\nip: hashSecuritySignal\('ip'/);
-assert.match(validationService, /waitingPatient:\s*\{/);
+// Waiting-row creation, use counting and capacity share one transaction.
+assert.match(validationService, /reserveWaitingVisit\(/);
 assert.match(validationService, /recordExistingInvitationAccess/);
 assert.doesNotMatch(validationService, /getGeolocationFromIP|generateDeviceFingerprintHash|Validation debug info/);
 assert.match(securitySignal, /SECURITY_SIGNAL_HASH_SECRET/);

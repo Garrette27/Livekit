@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-27",
+  "environment": "local Node 22, actual reservation source with synthetic serialized-transaction adapter",
+  "source_baseline": "ed4f7a9 plus working-tree queue fix (see commit that adds this file)",
+  "source_sha256": {
+    "lib/invitations/invitation-use-reservation.ts": "0391211ad5fb7bcaf8f3df636edb5f2122d064ef956f94bcecb84cd5980f7150"
+  },
+  "cases": {
+    "concurrent_pair_at_9_of_10": {
+      "outcomes": [
+        "reserved",
+        "full"
+      ],
+      "final_waiting": 10
+    },
+    "ten_concurrent_into_target_3": {
+      "reserved": 3,
+      "final_waiting": 3
+    },
+    "full_queue_reconnect_and_direct_entry": "both reserved; waiting stays 10",
+    "visit_binding": "reconnect keeps visit id; return after leaving receives a new one"
+  },
+  "claim_status": "Atomic per-invitation waiting target PASSED in the local synthetic model. Not a cloud benchmark; deployed Firestore contention behavior still needs an emulator or staging check.",
+  "supersedes": "docs/thesis-defense/evidence/queue-title-2026-11-25/source-audit.json (kept as the historical failing result)"
+}

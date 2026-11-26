@@ -91,6 +91,8 @@ export interface IssueRtcRoomTokenInput {
   subject: string;
   /** Registered Firebase UID established by admission, never a typed email. */
   patientUserId?: string;
+  /** Queue visit the credential is bound to (WaitingPatient.currentVisitId). */
+  visitId?: string;
   roomName: string;
   participantName: string;
   expiresIn: SignOptions['expiresIn'];

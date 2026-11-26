@@ -215,6 +215,43 @@ evidence are equal; old consent is not current consent) and
 `scripts/regression-security-contracts.mjs` (one validation request, which
 sends the token; the consent route stores nothing but the agreement).
 
+## Queue capacity and visit binding (2026-11-27)
+
+Two invariants are owned by `reserveWaitingVisit` in
+`lib/invitations/invitation-use-reservation.ts`, so no route has to remember
+them.
+
+**1. The per-invitation waiting target is a transactional invariant.**
+*Pattern:* check-and-act inside one serializable transaction (the same idea as
+a database `CHECK`/conditional write, rather than a precheck followed by a
+write). The reservation counts `waiting` rows for the invitation inside the
+transaction that also writes the invitation document. Because every
+reservation writes that one document, Firestore lets only one of two
+concurrent reservations commit; the other retries, re-counts and sees the
+first person's row. *Tradeoff:* all arrivals for one invitation serialize on
+one document (fine at clinic scale — Firestore sustains roughly one write per
+second per document — but not a design for thousands of simultaneous arrivals
+on one link). A visitor already waiting, or a verified allowlisted visitor
+entering directly, adds no waiting row and is not refused by a full queue.
+*Evidence:* `tests/queue-and-auth-regressions.test.mjs` and a Firestore
+emulator run (`docs/thesis-defense/evidence/queue-capacity-fix-2026-11-27/`):
+25 simultaneous arrivals into a target of 10 left exactly 10 waiting.
+
+**2. Queue credentials name one visit, not just one entry.**
+*Pattern:* an epoch/fencing token. The entry id is stable per invitation and
+patient (so refreshes do not duplicate rows), therefore it cannot by itself
+tell an earlier visit from a later one. Each new visit (first arrival, or
+arriving on a `left`/`rejected` entry) gets a random `currentVisitId`, a fresh
+`joinedAt`, and cleared end markers. Waiting and admission credentials carry
+it as the signed `appVisitId` claim. `checkAdmission` and the patient
+`mark-left` route refuse a credential whose visit is not the entry's current
+visit. *Tradeoff:* a person who reopens the link after leaving queues again
+behind people already waiting; that is the intended order. Legacy entries
+without `currentVisitId` stay accepted until their next arrival assigns one, so
+the change needs no migration. *Boundary:* LiveKit cannot revoke a JWT it has
+already accepted; an issued consultation credential remains valid until it
+expires (two hours) and the doctor's remove action disconnects the participant.
+
 ## Anonymous patients and account upgrade
 
 Patients are never forced to register before a consultation. The intended

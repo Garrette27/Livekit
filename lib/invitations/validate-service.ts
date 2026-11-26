@@ -25,6 +25,8 @@ import { resolveWaitingPatientId } from './waiting-patient-key';
 import {
   recordExistingInvitationAccess,
   reserveInvitationUse,
+  reserveWaitingVisit,
+  type WaitingVisitReservation,
 } from './invitation-use-reservation';
 
 export interface ValidateInvitationContext {
@@ -212,7 +214,7 @@ async function reserveWaitingPatient(
     riskSignals?: string[];
     accessAttemptData: Record<string, any>;
   }
-): Promise<string | null> {
+): Promise<{ waitingPatientId: string; reservation: WaitingVisitReservation }> {
   const now = new Date();
   const networkHash = hashSecuritySignal('ip', input.clientIP);
   const userAgentHash = hashSecuritySignal('user-agent', input.userAgent);
@@ -227,12 +229,12 @@ async function reserveWaitingPatient(
     userAgentHash,
   });
 
-  // Facts about the patient's first arrival. Keeping joinedAt stable is what
-  // makes "waiting for 11 minutes" mean the wait, not the last page load.
-  const onCreate: Record<string, unknown> = {
+  // Facts fixed for the length of one visit. The reservation sets joinedAt
+  // when a visit starts, so "waiting for 11 minutes" measures this wait — not
+  // the last page load, and not an earlier visit on the same entry.
+  const onNewVisit: Record<string, unknown> = {
     id: waitingPatientId,
     invitationId: input.invitationId,
-    joinedAt: now,
   };
 
   const onEachVisit: Record<string, unknown> = {
@@ -241,7 +243,6 @@ async function reserveWaitingPatient(
     ...(input.identity.patientEmail && { patientEmail: input.identity.patientEmail }),
     roomName: input.roomName,
     doctorUserId: input.doctorUserId,
-    status: input.status,
     lastSeenAt: now,
     visitCount: FieldValue.increment(1),
     metadata: {
@@ -263,30 +264,45 @@ async function reserveWaitingPatient(
     onEachVisit.admittedAt = now;
   }
 
-  const reserved = await reserveInvitationUse(
+  const reservation = await reserveWaitingVisit(
     db,
     input.invitationId,
     input.accessAttemptData,
     {
-      waitingPatient: {
-        id: waitingPatientId,
-        onCreate,
-        onEachVisit,
-        // Each arrival is kept as its own immutable record, so the entry can be
-        // a single current state without losing the history it used to encode
-        // by existing many times over.
-        visit: {
-          arrivedAt: now,
-          status: input.status,
-          networkHash,
-          userAgentHash,
-          ...(input.admissionMode && { admissionMode: input.admissionMode }),
-          ...(input.riskSignals && input.riskSignals.length > 0 ? { riskSignals: input.riskSignals } : {}),
-        },
+      id: waitingPatientId,
+      roomName: input.roomName,
+      status: input.status === 'admitted' ? 'admitted' : 'waiting',
+      onNewVisit,
+      onEachVisit,
+      // Each arrival is kept as its own immutable record, so the entry can be
+      // a single current state without losing the history it used to encode
+      // by existing many times over.
+      visit: {
+        arrivedAt: now,
+        status: input.status,
+        networkHash,
+        userAgentHash,
+        ...(input.admissionMode && { admissionMode: input.admissionMode }),
+        ...(input.riskSignals && input.riskSignals.length > 0 ? { riskSignals: input.riskSignals } : {}),
       },
+      newVisitId: globalThis.crypto.randomUUID(),
     }
   );
-  return reserved ? waitingPatientId : null;
+  return { waitingPatientId, reservation };
+}
+
+/** Maps a refused reservation to the visitor-facing response. */
+function refusedReservationResult(reservation: WaitingVisitReservation): ValidateInvitationResult {
+  if (reservation.outcome === 'full') {
+    return result(403, {
+      success: false,
+      error: `Waiting room is full. Maximum ${reservation.maxPatients} patients allowed.`,
+    });
+  }
+  return result(409, {
+    success: false,
+    error: 'This invitation is no longer available. Ask the doctor for a new link.',
+  });
 }
 
 /**
@@ -400,28 +416,20 @@ async function recordAccessRisk(
   }
 }
 
-async function validateUsageLimits(
-  db: any,
+/**
+ * Fast refusal for an invitation that is visibly used up, so the visitor gets
+ * a clear message before identity work. Authoritative use and capacity limits
+ * are rechecked inside the reservation transactions.
+ */
+function validateUsageLimits(
   invitation: Invitation,
-  invitationId: string,
-  roomName: string,
   isWaitingRoomEnabled: boolean
-): Promise<ValidateInvitationResult | null> {
+): ValidateInvitationResult | null {
   if (isWaitingRoomEnabled) {
-    const maxPatients = invitation.maxPatients || 10;
-    const currentWaitingQuery = await db.collection('waitingPatients')
-      .where('roomName', '==', roomName)
-      .where('invitationId', '==', invitationId)
-      .where('status', '==', 'waiting')
-      .get();
-
-    if (currentWaitingQuery.size >= maxPatients) {
-      return result(403, {
-        success: false,
-        error: `Waiting room is full. Maximum ${maxPatients} patients allowed.`,
-      });
-    }
-
+    // The waiting target is enforced only inside reserveWaitingVisit. A count
+    // here would run outside the reservation transaction (concurrent arrivals
+    // could both pass it) and would also refuse a visitor who already holds a
+    // place or who may enter directly, neither of whom adds a waiting row.
     const currentUses = invitation.currentUses || 0;
     if (invitation.maxUses && currentUses >= invitation.maxUses) {
       return result(403, {
@@ -607,6 +615,7 @@ async function handleWaitingRoomAccess(params: {
       const admittedToken = signLiveKitRoomToken({
         subject: `patient_${tokenPayload.invitationId}_${admissionHistory.latestAdmitted.id}`,
         patientUserId: lookup.userDocId,
+        visitId: admissionHistory.latestAdmitted.currentVisitId,
         roomName: tokenPayload.roomName,
         participantName: participantDisplayName,
         expiresIn: '2h',
@@ -627,7 +636,7 @@ async function handleWaitingRoomAccess(params: {
     // this one: closing the tab is something patients do constantly, and
     // treating it as permanent would silently revoke the doctor's own
     // skip-the-queue decision after a single visit.
-    const admittedWaitingPatientId = await reserveWaitingPatient(db, {
+    const admitted = await reserveWaitingPatient(db, {
       invitationId: tokenPayload.invitationId,
       roomName: tokenPayload.roomName,
       doctorUserId,
@@ -639,16 +648,15 @@ async function handleWaitingRoomAccess(params: {
       riskSignals,
       accessAttemptData,
     });
-    if (!admittedWaitingPatientId) {
-      return result(409, {
-        success: false,
-        error: 'This invitation is no longer available. Ask the doctor for a new link.',
-      });
+    if (admitted.reservation.outcome !== 'reserved') {
+      return refusedReservationResult(admitted.reservation);
     }
+    const admittedWaitingPatientId = admitted.waitingPatientId;
 
     const admittedToken = signLiveKitRoomToken({
       subject: `patient_${tokenPayload.invitationId}_${admittedWaitingPatientId}`,
       patientUserId: lookup.userDocId,
+      visitId: admitted.reservation.visitId,
       roomName: tokenPayload.roomName,
       participantName: participantDisplayName,
       expiresIn: '2h',
@@ -699,6 +707,7 @@ async function handleWaitingRoomAccess(params: {
       success: true,
       liveKitToken: signLiveKitRoomToken({
         subject: `patient_${tokenPayload.invitationId}_${existingWaitingPatient.id}`,
+        visitId: existingWaitingPatient.currentVisitId,
         roomName: waitingRoomName,
         purpose: 'waiting',
         participantName: participantDisplayName,
@@ -712,7 +721,7 @@ async function handleWaitingRoomAccess(params: {
     });
   }
 
-  const waitingPatientId = await reserveWaitingPatient(db, {
+  const queued = await reserveWaitingPatient(db, {
     invitationId: tokenPayload.invitationId,
     roomName: tokenPayload.roomName,
     doctorUserId,
@@ -724,17 +733,16 @@ async function handleWaitingRoomAccess(params: {
     riskSignals,
     accessAttemptData,
   });
-  if (!waitingPatientId) {
-    return result(409, {
-      success: false,
-      error: 'This invitation is no longer available. Ask the doctor for a new link.',
-    });
+  if (queued.reservation.outcome !== 'reserved') {
+    return refusedReservationResult(queued.reservation);
   }
+  const { waitingPatientId } = queued;
 
   return result(200, {
     success: true,
     liveKitToken: signLiveKitRoomToken({
       subject: `patient_${tokenPayload.invitationId}_${waitingPatientId}`,
+      visitId: queued.reservation.visitId,
       roomName: waitingRoomName,
       purpose: 'waiting',
       participantName: participantDisplayName,
@@ -846,13 +854,7 @@ export async function validateInvitationAndIssueToken(
       await recordAccessRisk(db, tokenPayload.invitationId, accessAttempt, violations);
     }
 
-    const usageError = await validateUsageLimits(
-      db,
-      invitation,
-      tokenPayload.invitationId,
-      tokenPayload.roomName,
-      isWaitingRoomEnabled
-    );
+    const usageError = validateUsageLimits(invitation, isWaitingRoomEnabled);
     if (usageError) {
       return usageError;
     }

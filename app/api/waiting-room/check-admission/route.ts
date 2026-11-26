@@ -43,6 +43,7 @@ async function handlePOST(req: NextRequest) {
       invitationId,
       waitingPatientId,
       credentialRoomName: authorization.credential.roomName,
+      credentialVisitId: authorization.credential.visitId,
     });
 
     return NextResponse.json(admissionResult);
