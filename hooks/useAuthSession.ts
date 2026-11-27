@@ -5,6 +5,7 @@ import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getUserRole } from '@/lib/auth-utils';
 import type { AppRole } from '@/lib/auth/access-policy';
+import { fetchWorkspaceAccess } from '@/lib/auth/workspace-client';
 
 type UserRole = AppRole | null;
 
@@ -76,8 +77,19 @@ export function useAuthSession({
       }
 
       let role: UserRole = null;
+      let doctorAccess = true;
       try {
-        if (resolveRole) {
+        // A cached profile may predate a platform-owner configuration change.
+        // Re-query authority before opening clinician subscriptions or screens.
+        if (requiredRole === 'doctor') {
+          doctorAccess = false;
+          const access = await fetchWorkspaceAccess(user);
+          doctorAccess = access.doctorAccess;
+          role = doctorAccess ? 'doctor' : null;
+          if (requestId === requestIdRef.current && access.administratorLevel) {
+            window.location.replace('/admin');
+          }
+        } else if (resolveRole) {
           role = await resolveUserRole(user);
         }
       } catch (error) {
@@ -88,7 +100,7 @@ export function useAuthSession({
         return;
       }
 
-      const isAuthorized = requiredRole ? role === requiredRole : true;
+      const isAuthorized = requiredRole ? role === requiredRole && doctorAccess : true;
       setState({
         user,
         role,
@@ -97,7 +109,7 @@ export function useAuthSession({
         isLoading: false,
       });
 
-      if (onAuthenticated) {
+      if (onAuthenticated && isAuthorized) {
         void Promise.resolve(onAuthenticated(user)).catch((error) => {
           console.error('Error in onAuthenticated callback:', error);
         });

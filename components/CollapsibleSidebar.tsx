@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useIsCompactViewport } from '@/hooks/useIsCompactViewport';
 
 const SIDEBAR_Z_INDEX = 10020;
@@ -39,7 +39,14 @@ export default function CollapsibleSidebar({
   style = {}
 }: CollapsibleSidebarProps) {
   const isCompact = useIsCompactViewport();
-  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+  const [isCollapsed, setIsCollapsed] = useState(isCompact || defaultCollapsed);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  const closePanel = () => {
+    setIsCollapsed(true);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  };
 
   // A sheet covering the video is never the right thing to restore on rotation
   // or when a phone becomes the active layout, so entering compact mode closes
@@ -49,6 +56,10 @@ export default function CollapsibleSidebar({
       setIsCollapsed(true);
     }
   }, [isCompact]);
+
+  useEffect(() => {
+    if (isCompact && !isCollapsed) closeRef.current?.focus();
+  }, [isCompact, isCollapsed]);
 
   const accentColor = position === 'left' ? '#059669' : '#3b82f6';
 
@@ -85,9 +96,11 @@ export default function CollapsibleSidebar({
     if (isCollapsed) {
       return (
         <button
+          ref={triggerRef}
           className={className}
           onClick={() => setIsCollapsed(false)}
           aria-expanded={false}
+          aria-label={`Open ${title}`}
           style={{
             position: 'fixed',
             bottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))',
@@ -104,6 +117,7 @@ export default function CollapsibleSidebar({
             color: '#ffffff',
             fontSize: '0.8125rem',
             fontWeight: 600,
+            maxWidth: 'calc(50vw - 1rem)',
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.28)',
             cursor: 'pointer',
           }}
@@ -118,7 +132,7 @@ export default function CollapsibleSidebar({
       <>
         {/* Tapping the video dismisses the sheet, the expected way out. */}
         <div
-          onClick={() => setIsCollapsed(true)}
+          onClick={closePanel}
           aria-hidden="true"
           style={{
             position: 'fixed',
@@ -130,12 +144,15 @@ export default function CollapsibleSidebar({
         <section
           className={className}
           aria-label={title}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') closePanel();
+          }}
           style={{
             position: 'fixed',
             left: 0,
             right: 0,
             bottom: 0,
-            maxHeight: '78vh',
+            maxHeight: '78dvh',
             zIndex: SIDEBAR_Z_INDEX + 1,
             backgroundColor: '#ffffff',
             borderTopLeftRadius: '1rem',
@@ -152,11 +169,11 @@ export default function CollapsibleSidebar({
               <span aria-hidden="true">{icon}</span>
               {title}
             </span>
-            <button onClick={() => setIsCollapsed(true)} style={closeButtonStyle} aria-label={`Close ${title}`}>
+            <button ref={closeRef} onClick={closePanel} style={closeButtonStyle} aria-label={`Close ${title}`}>
               ✕
             </button>
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowWrap: 'anywhere', padding: '1rem', WebkitOverflowScrolling: 'touch' }}>
             {children}
           </div>
         </section>
@@ -169,14 +186,14 @@ export default function CollapsibleSidebar({
     <div
       className={`collapsible-sidebar ${className}`}
       style={{
-        position: 'fixed',
-        top: style.top || '20px',
-        [position]: '20px',
+        position: 'relative',
+        order: position === 'left' ? 1 : 3,
+        flexShrink: 0,
         width: isCollapsed ? collapsedWidth : width,
-        height: 'calc(100vh - 40px)',
+        height: '100dvh',
         backgroundColor: '#ffffff',
         border: `2px solid ${accentColor}`,
-        borderRadius: '0.75rem',
+        borderRadius: '0.5rem',
         zIndex: SIDEBAR_Z_INDEX,
         boxShadow: '0 8px 25px rgba(0, 0, 0, 0.12)',
         transition: 'width 0.25s ease',
@@ -201,7 +218,7 @@ export default function CollapsibleSidebar({
               event.stopPropagation();
               setIsCollapsed(true);
             }}
-            style={{ ...closeButtonStyle, minWidth: '2rem', minHeight: '2rem' }}
+            style={closeButtonStyle}
             title={`Collapse ${title}`}
             aria-label={`Collapse ${title}`}
           >
@@ -210,7 +227,7 @@ export default function CollapsibleSidebar({
         )}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: isCollapsed ? 0 : '1rem', display: isCollapsed ? 'none' : 'block' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowWrap: 'anywhere', padding: isCollapsed ? 0 : '0.75rem', display: isCollapsed ? 'none' : 'block' }}>
         {children}
       </div>
 

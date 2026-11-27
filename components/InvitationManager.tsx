@@ -32,7 +32,7 @@ export default function InvitationManager({ user, roomName, onRoomNameChange, on
         new Set(
           [ ...(formData.emailAllowlist || []), ...(formData.emailAllowed ? [formData.emailAllowed] : []) ]
             .map((email) => (typeof email === 'string' ? email.toLowerCase().trim() : ''))
-            .filter((email) => email.length > 0)
+            .filter((email) => email.length > 0 && email !== user.email?.toLowerCase().trim())
         )
       );
       const primaryEmail = normalizedAllowlist[0];

@@ -7,7 +7,9 @@ const { logInfo, logWarn, logError } = require('./structured-logger');
 admin.initializeApp();
 
 const DEFAULT_SUMMARY_RETENTION_DAYS = 30;
-const MAX_RETENTION_BATCH_SIZE = 400;
+// Each summary also deletes its schedule: 200 records use 400 write operations,
+// leaving headroom below Firestore's 500-operation batch limit.
+const MAX_RETENTION_BATCH_SIZE = 200;
 
 /**
  * Resolve the deployment's explicit summary-retention policy. Destructive

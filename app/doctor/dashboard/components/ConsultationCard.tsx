@@ -8,10 +8,10 @@ import {
   resolveConsultationStatus,
   resolveRiskPresentation,
 } from '@/lib/consultations/history-presentation';
-import { SUMMARY_RETENTION_DAYS } from '@/lib/consultations/retention-policy';
 
 export interface ConsultationCardRecord {
   id: string;
+  encounterStatus?: 'active' | 'completed';
   roomName: string;
   hasGeneratedSummary: boolean;
   summary: string;
@@ -98,11 +98,14 @@ function parseIso(value: string | null): Date | null {
  */
 export default function ConsultationCard({ record, isGenerating, onEdit, onGenerate }: ConsultationCardProps) {
   const status = resolveConsultationStatus(record);
+  const isOpen = status.status === 'not-finalized';
   const risk = status.status === 'summarized' ? resolveRiskPresentation(record.riskLevel) : null;
   // An unattended consultation has a factual record, not a clinical one, so
   // there is nothing for the doctor to edit.
   const isUnattended = status.status === 'no-show' || status.status === 'not-admitted';
-  const attendee = resolveAttendeeLabel(record);
+  const attendee = isOpen && !record.patientEmail
+    ? 'Open consultation'
+    : resolveAttendeeLabel(record);
   const hasDetail =
     record.keyPoints.length > 0 ||
     record.recommendations.length > 0 ||
@@ -133,7 +136,9 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
             {attendee}
           </h3>
           <p className="app-wrap-anywhere" style={{ fontSize: '0.8125rem', color: '#6b7280', margin: '0.25rem 0 0' }}>
-            {formatTimeOfDay(record.startedAt)} · {formatDuration(record.duration)} · Room {record.roomName}
+            {formatTimeOfDay(record.startedAt)}
+            {!isOpen && <> · {formatDuration(record.duration)}</>}
+            {' · '}Room {record.roomName}
             {record.isEdited && <span style={{ color: '#059669' }}> · Edited</span>}
           </p>
         </div>
@@ -144,7 +149,7 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
               {record.riskLevel} risk
             </span>
           )}
-          {record.hasGeneratedSummary && record.requiresClinicianReview && !record.isEdited && (
+          {!isOpen && record.hasGeneratedSummary && record.requiresClinicianReview && !record.isEdited && (
             <span style={{ ...chipStyle, color: '#92400e', backgroundColor: '#fef3c7' }}>
               AI draft · review required
             </span>
@@ -175,7 +180,7 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
               {isGenerating ? 'Generating…' : 'Generate summary'}
             </button>
           )}
-          {record.hasGeneratedSummary && !isUnattended && (
+          {record.hasGeneratedSummary && !isUnattended && !isOpen && (
             <button
               onClick={() => onEdit(record)}
               style={{
@@ -208,11 +213,13 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
           maxWidth: '68ch',
         }}
       >
-        {record.hasGeneratedSummary
-          ? record.summary
-          : status.status === 'summary-expired'
-            ? `The AI summary for this consultation was permanently deleted under the ${SUMMARY_RETENTION_DAYS}-day retention policy. The consultation record itself is kept.`
-            : 'No summary has been generated for this consultation yet.'}
+        {isOpen
+          ? 'This encounter has not been finalized. Summary generation can start after it ends.'
+          : record.hasGeneratedSummary
+            ? record.summary
+            : status.status === 'summary-unavailable'
+              ? 'No summary is available for this older consultation. Retention deletion has not been verified; the consultation record is kept.'
+              : 'No summary has been generated for this consultation yet.'}
       </p>
 
       {hasDetail && (

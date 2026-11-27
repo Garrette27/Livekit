@@ -40,6 +40,8 @@ export interface HistoryChatRecord {
 export interface HistoryRecord {
   id: string;
   roomName: string;
+  /** Authoritative session state when a session snapshot exists; absent on legacy summary-only rows. */
+  encounterStatus?: 'active' | 'completed';
   createdAt: string | null;
   startedAt?: string | null;
   endedAt?: string | null;

@@ -197,7 +197,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
 
   if (token) {
     return (
-      <>
+      <div style={{ display: 'flex', width: '100%', minWidth: 0, height: '100dvh', overflow: 'hidden', backgroundColor: '#000' }}>
         <DoctorSessionPanel
           roomName={roomName}
           user={user!}
@@ -222,7 +222,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
         />
 
         <ErrorToast error={pageError} onDismiss={() => setPageError(null)} />
-      </>
+      </div>
     );
   }
 

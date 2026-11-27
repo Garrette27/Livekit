@@ -62,7 +62,9 @@ export function resolveWorkspaceAccess(
 ) {
   const level = administratorLevel(caller, superAdminEmails);
   const role = caller.claimedRole || legacyProfileRole;
-  const doctorAccess = caller.isAdminClaim || role === 'doctor' || role === 'admin';
+  // Platform ownership is deliberately non-clinical, even if an older account
+  // still carries clinician claims. No profile migration is needed to deny it.
+  const doctorAccess = !level && role === 'doctor';
   return {
     administratorLevel: level,
     clinicId: normalizeClinicId(caller.clinicId),

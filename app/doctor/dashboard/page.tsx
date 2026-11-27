@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 
 interface CallSummary {
   id: string;
+  encounterStatus?: 'active' | 'completed';
   hasGeneratedSummary: boolean;
   roomName: string;
   summary: string;
@@ -81,6 +82,7 @@ interface CallSummary {
 
 interface DoctorHistoryResponseItem {
   id: string;
+  encounterStatus?: 'active' | 'completed';
   roomName?: string;
   createdAt?: string | null;
   startedAt?: string | null;
@@ -145,6 +147,7 @@ function toTimestamp(value?: string | null): Timestamp {
   return Timestamp.fromDate(parsedDate);
 }
 
+/** Preserve encounter state separately from whether optional summary content exists. */
 function mapHistoryRecordToSummary(record: DoctorHistoryResponseItem): CallSummary {
   const generatedSummary = typeof record.summary === 'string' ? record.summary.trim() : '';
   const hasUsableSummary = record.summaryStatus === 'failed' || record.summaryStatus === 'unavailable'
@@ -152,6 +155,7 @@ function mapHistoryRecordToSummary(record: DoctorHistoryResponseItem): CallSumma
     : generatedSummary.length > 0;
   return {
     id: record.id,
+    encounterStatus: record.encounterStatus,
     hasGeneratedSummary: hasUsableSummary,
     roomName: record.roomName || 'Unknown Room',
     summary: generatedSummary || 'This completed consultation does not have a summary yet.',
@@ -186,6 +190,7 @@ function toDateOrNull(value?: Timestamp): Date | null {
 function toCardRecord(summary: CallSummary): ConsultationCardRecord {
   return {
     id: summary.id,
+    encounterStatus: summary.encounterStatus,
     roomName: summary.roomName,
     hasGeneratedSummary: summary.hasGeneratedSummary,
     summary: summary.summary,

@@ -10,15 +10,15 @@ import {
   type ConsultationSortOrder,
   type ConsultationStatus,
 } from '@/lib/consultations/history-presentation';
-import { SUMMARY_RETENTION_DAYS } from '@/lib/consultations/retention-policy';
 
 type StatusFilter = 'all' | ConsultationStatus;
 
 const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'All' },
+  { value: 'not-finalized', label: 'Not finalized' },
   { value: 'summarized', label: 'Summarized' },
   { value: 'awaiting-summary', label: 'Awaiting summary' },
-  { value: 'summary-expired', label: 'Summary expired' },
+  { value: 'summary-unavailable', label: 'Older summary unavailable' },
   { value: 'not-admitted', label: 'Not admitted' },
   { value: 'no-show', label: 'No-shows' },
 ];
@@ -52,12 +52,13 @@ export default function ConsultationHistoryView({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const counts = useMemo(() => {
-    const tally = { total: records.length, summarized: 0, awaiting: 0, expired: 0, notAdmitted: 0, noShow: 0 };
+    const tally = { total: records.length, open: 0, summarized: 0, awaiting: 0, unavailable: 0, notAdmitted: 0, noShow: 0 };
     for (const record of records) {
       const { status } = resolveConsultationStatus(record);
-      if (status === 'summarized') tally.summarized += 1;
+      if (status === 'not-finalized') tally.open += 1;
+      else if (status === 'summarized') tally.summarized += 1;
       else if (status === 'awaiting-summary') tally.awaiting += 1;
-      else if (status === 'summary-expired') tally.expired += 1;
+      else if (status === 'summary-unavailable') tally.unavailable += 1;
       else if (status === 'not-admitted') tally.notAdmitted += 1;
       else tally.noShow += 1;
     }
@@ -129,16 +130,22 @@ export default function ConsultationHistoryView({
         }}
       >
         <StatTile label="Consultations" value={counts.total} />
+        <StatTile label="Not finalized" value={counts.open} accent="#1d4ed8" />
         <StatTile label="Summarized" value={counts.summarized} accent="#059669" />
         <StatTile label="Awaiting summary" value={counts.awaiting} accent="#b45309" />
         <StatTile
-          label={`Summary expired (${SUMMARY_RETENTION_DAYS}d)`}
-          value={counts.expired}
+          label="Older summary unavailable"
+          value={counts.unavailable}
           accent="#6b7280"
         />
         <StatTile label="Patient not admitted" value={counts.notAdmitted} accent="#b45309" />
         <StatTile label="No-shows" value={counts.noShow} accent="#6b7280" />
       </div>
+
+      <p style={{ color: '#6b7280', fontSize: '0.8125rem', lineHeight: 1.5, margin: '0 0 1.25rem' }}>
+        Each row is a separate encounter, not an invitation. The last doctor leaving ends an encounter;
+        opening the invitation again can create another row.
+      </p>
 
       <div
         style={{

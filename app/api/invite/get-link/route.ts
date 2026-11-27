@@ -8,6 +8,7 @@ import { finalizeConsultationForRoom } from '../../../../lib/services/consultati
 import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
 import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
 import { serviceResultToResponse, unexpectedErrorResponse } from '@/lib/services/shared/http';
+import { countDirectAdmissionIdentities } from '@/lib/invitations/invitation-presentation';
 
 function isExpiredInvitation(invitation: any): boolean {
   const expiresAtDate = invitation?.expiresAt
@@ -185,6 +186,9 @@ async function handleGET(req: NextRequest) {
 
     // Generate invite URL
     const inviteUrl = buildInviteUrl(inviteToken);
+    // This owner-only projection explains admission without returning the
+    // allowlist's raw addresses or keyed equality hashes to the call surface.
+    const createdAt = toDate(invitation.createdAt, new Date(0));
 
     return NextResponse.json({
       success: true,
@@ -192,6 +196,12 @@ async function handleGET(req: NextRequest) {
       invitationId: invitationDoc.id,
       roomName: invitation.roomName,
       expiresAt: expiresAtDate.toISOString(),
+      invitationContext: {
+        directAdmissionEmailCount: countDirectAdmissionIdentities(invitation),
+        waitingCapacity: invitation.waitingRoomEnabled ? (invitation.maxPatients || 10) : null,
+        createdAt: createdAt.getTime() > 0 ? createdAt.toISOString() : null,
+        expiresAt: expiresAtDate.toISOString(),
+      },
     });
 
   } catch (error) {

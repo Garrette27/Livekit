@@ -116,6 +116,7 @@ export default function AdminPage() {
         title="Administration"
         subtitle={level === 'super_admin' ? 'Platform administrator · clinician accounts' : `Clinic administrator${callerClinic ? ` · ${callerClinic}` : ''}`}
         user={user}
+        doctorAccess={false}
         navLink={{ href: '/doctor/invitations', label: 'Invitations' }}
       />
       <main style={{ maxWidth: '60rem', margin: '0 auto', padding: 'var(--page-padding)', display: 'grid', gap: '1.5rem' }}>
@@ -164,7 +165,7 @@ export default function AdminPage() {
                 </label>
                 <button type="submit" disabled={Boolean(busy)}>{busy?.startsWith('grant') ? 'Granting…' : 'Grant role'}</button>
               </form>
-              <p className="muted grant-preview">{role === 'admin' ? 'Administrator grants clinic staff-management access and clinician access. Only a platform administrator can grant it.' : 'Doctor grants clinician access only. It does not grant clinic administration.'}</p>
+              <p className="muted grant-preview">{role === 'admin' ? 'Administrator grants clinic staff-management access only, not doctor access. Use a separate provisioned identity for consultations.' : 'Doctor grants clinician access only. It does not grant clinic administration.'}</p>
               {feedback && (
                 <p role="status" className={feedback.tone === 'ok' ? 'ok' : 'error'}>{feedback.text}</p>
               )}

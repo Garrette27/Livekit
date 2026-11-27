@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-27",
+  "parent_source": "691f687c64eba19310977758fca909fb19ad762c",
+  "environment": "Local WSL Node 22.23.0; isolated Chromium and local Firestore emulator; synthetic data only",
+  "regression_tests": {"passed": 118, "failed": 0},
+  "responsive_browser_test": {"passed": 1, "viewports": [[320,568],[390,844],[768,1024],[820,1180],[1024,768],[1280,800]], "real_device_media_acceptance": false},
+  "admin_form_fixture": {"widths": [320,700,1000], "overflow": false, "long_header_widths": [320,700]},
+  "typecheck": "passed",
+  "lint": "passed",
+  "production_build": "passed",
+  "security_script": "passed in isolated snapshot with tracked AGENTS.md; root guard rejects unrelated user-owned AGENTS.md content",
+  "firestore_rules_emulator": {"baseline_combined_admin_read": 200, "updated_combined_admin_read": 403, "updated_admin_room_create": 403, "doctor_read_and_create": 200, "unrelated_and_unauthenticated_denied": true, "production_deployed": false},
+  "retention": {"enabled_in_production_verified": false, "opt_in_preserved": true, "summary_page_size": 200, "delete_operations_per_page": 400, "complete_clinical_data_purge": false},
+  "signed_in_production_acceptance": "not performed",
+  "cloud_media_maximum": "not measured",
+  "historical_records_or_production_roles_modified": false
+}

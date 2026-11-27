@@ -53,7 +53,7 @@ async function handlePOST(req: NextRequest) {
 
   const status = typeof session.status === 'string' ? session.status.trim().toLowerCase() : '';
   const hasEndedAt = Boolean(session.sessionEndedAt || metadata.sessionEndedAt);
-  if (status !== 'completed' && !hasEndedAt) {
+  if (status === 'active' || (status !== 'completed' && !hasEndedAt)) {
     return serviceResultToResponse(
       serviceError(409, 'consultation_active', 'A consultation must end before its summary is generated')
     );

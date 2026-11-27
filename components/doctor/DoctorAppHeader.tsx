@@ -31,13 +31,15 @@ interface DoctorAppHeaderProps {
   user: User | null | undefined;
   /** The other doctor page, e.g. Invitations <-> Consultation History. */
   navLink: { href: string; label: string };
+  /** Administration already knows its effective level; avoid a clinical-link flash. */
+  doctorAccess?: boolean;
 }
 
 /**
  * Shared top app bar for clinician pages: brand + page title (one clickable
  * box) on the left, navigation and the signed-in account on the right.
  */
-export default function DoctorAppHeader({ title, subtitle, user, navLink }: DoctorAppHeaderProps) {
+export default function DoctorAppHeader({ title, subtitle, user, navLink, doctorAccess }: DoctorAppHeaderProps) {
   const pathname = usePathname();
   const account = accountLabel(user);
   const [access, setAccess] = useState<WorkspaceAccess | null>(null);
@@ -64,7 +66,7 @@ export default function DoctorAppHeader({ title, subtitle, user, navLink }: Doct
           {/* A full document navigation, not a client transition: the client
               transition between the two doctor pages could stall on the
               destination's auth initialisation (seen in production). */}
-          <a href={navLink.href} className="doctor-nav-link">{navLink.label}</a>
+          {(doctorAccess ?? access?.doctorAccess) === true && <a href={navLink.href} className="doctor-nav-link">{navLink.label}</a>}
           {access?.administratorLevel && pathname !== '/admin' && <a href="/admin" className="doctor-nav-link">Administration</a>}
           <span className="doctor-account" title={account.secondary || account.primary}>
             <span className="doctor-avatar" aria-hidden="true">{account.initial}</span>
@@ -132,7 +134,16 @@ export default function DoctorAppHeader({ title, subtitle, user, navLink }: Doct
           color: #0f766e;
           font-weight: 600;
           text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          min-height: 2.75rem;
+          padding: .5rem .75rem;
+          border: 1px solid transparent;
+          border-radius: .5rem;
+          transition: background-color 120ms, border-color 120ms;
         }
+        :global(.doctor-nav-link:hover) { background: #f0fdfa; border-color: #99f6e4; }
+        :global(.doctor-nav-link:focus-visible) { outline: 3px solid #14b8a6; outline-offset: 2px; }
         .doctor-account {
           display: inline-flex;
           align-items: center;

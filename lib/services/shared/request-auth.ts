@@ -6,6 +6,7 @@ import {
   type AppRole,
 } from '@/lib/auth/access-policy';
 import { UserRepository } from '@/lib/repositories/user-repository';
+import { administratorLevel, parseSuperAdminEmails } from '@/lib/auth/role-administration';
 import { recordAuthenticatedUser } from './request-logging';
 import { serviceError, serviceOk, type ServiceResult } from './service-result';
 import {
@@ -77,6 +78,14 @@ export async function authorizeBearerRequest(
   const authenticated = await authenticateBearerToken(req);
   if (!authenticated.ok) {
     return authenticated;
+  }
+
+  // All permissions accepted here are clinical. Platform provisioning uses
+  // authenticateBearerToken plus its separate administrator policy instead.
+  // Check live server configuration before claims/profile fallback so an old
+  // doctor claim cannot bypass the platform owner's non-clinical boundary.
+  if (administratorLevel(authenticated.data, parseSuperAdminEmails(process.env.SUPER_ADMIN_EMAILS)) || authenticated.data.claimedRole === 'admin') {
+    return serviceError(403, 'administration_only', 'Administrators manage access only. Use a separate provisioned clinician account for consultations.');
   }
 
   const db = getFirebaseAdmin();

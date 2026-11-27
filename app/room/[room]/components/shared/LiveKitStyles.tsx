@@ -141,8 +141,10 @@ export default function LiveKitStyles({
       .lk-stage,
       .lk-grid-layout,
       .lk-focus-layout {
-        width: 100vw !important;
-        height: 100vh !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
         background-color: #000000 !important;
       }
 
@@ -166,7 +168,7 @@ export default function LiveKitStyles({
       }
 
       .lk-control-bar {
-        position: fixed !important;
+        position: absolute !important;
         left: 50% !important;
         bottom: 20px !important;
         transform: translateX(-50%) !important;
@@ -178,6 +180,8 @@ export default function LiveKitStyles({
         display: flex !important;
         align-items: center !important;
         gap: 0.5rem !important;
+        max-width: calc(100% - 16px) !important;
+        overflow-x: auto !important;
       }
 
       .lk-chat,
@@ -187,11 +191,11 @@ export default function LiveKitStyles({
       }
 
       .lk-chat {
-        position: fixed !important;
+        position: absolute !important;
         right: 16px !important;
         bottom: 86px !important;
         top: auto !important;
-        width: min(360px, calc(100vw - 24px)) !important;
+        width: min(360px, calc(100% - 24px)) !important;
         max-height: min(60vh, 520px) !important;
         background-color: #ffffff !important;
         color: #111827 !important;
@@ -256,7 +260,7 @@ export default function LiveKitStyles({
         }
 
         .lk-control-bar {
-          width: min(96vw, 720px) !important;
+          width: min(calc(100% - 16px), 720px) !important;
           overflow-x: auto !important;
           gap: 0.375rem !important;
           padding: 0.5rem !important;

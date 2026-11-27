@@ -1,20 +1,16 @@
 /**
  * Summary retention policy.
  *
- * The `autoDeleteSummaries` Cloud Function (functions/index.js) permanently
- * deletes call summaries older than this window, while the consultation
- * sessions themselves are kept. Anything older therefore has no summary by
- * design — the UI reads this to tell "the summary was deleted on purpose"
- * apart from "a summary was never produced", which are very different things
- * to show a doctor.
- *
- * Keep this in step with the retention window in functions/index.js.
+ * This is the default policy window, not proof of a deployed deletion. The
+ * Cloud Function is explicitly opt-in and its window is configurable; it ages
+ * summaries from their creation time, not the consultation's start time.
+ * Missing content needs a deletion receipt before a UI can claim it was erased.
  */
 export const SUMMARY_RETENTION_DAYS = 30;
 
 const MILLISECONDS_PER_DAY = 86_400_000;
 
-/** True when a consultation is old enough that retention has removed its summary. */
+/** Age hint only; never use this as evidence that a retention worker deleted content. */
 export function isBeyondSummaryRetention(consultationDate: Date | null, now: Date = new Date()): boolean {
   if (!consultationDate || Number.isNaN(consultationDate.getTime()) || consultationDate.getTime() <= 0) {
     return false;

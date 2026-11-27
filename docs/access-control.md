@@ -102,3 +102,11 @@ verified Firebase tokens plus the server-side user profile.
 - Treat compliance certification, retention policy approval, incident response,
   backups, and LiveKit E2EE as separate deployment decisions; the repository
   alone does not certify them.
+# Administrator/clinician separation — 27 November 2026 follow-up
+
+This section supersedes earlier combined administrator/doctor examples. Platform owners and clinic administrators manage staff access only; clinical work requires a separate provisioned doctor identity. The server checks administrator authority before clinician claims or legacy profile fallback. Workspace navigation follows the same projection. New Administrator grants write `role: admin`, not `role: doctor`; removal must not reactivate a legacy clinician profile. No production account is silently migrated by these changes.
+
+Direct Firestore client rules also deny clinical access for admin claims/profile roles, including historical `role: doctor, admin: true` tokens. The rules must be deployed separately from the Vercel frontend. Server-only bootstrap email configuration is not visible to Firestore Rules: an environment-only platform owner with historical doctor claims needs an explicitly approved claim/profile migration before real-clinic use. Existing LiveKit credentials have a separate expiry/revocation lifecycle. Do not claim universal instantaneous revocation.
+
+Pattern and tradeoff: separation of duties keeps administrative identity distinct from clinical ownership. It costs an additional provisioned sign-in for a person performing both jobs, but prevents a staff-management grant from implicitly authorizing consultations. Historical clinical records remain attributable and are not deleted or reassigned.
+

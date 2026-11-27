@@ -2,9 +2,19 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Administrative claims never confer clinical access, including older
+    // combined doctor/admin tokens. Bootstrap email configuration is server-only;
+    // its historical claims must be separately migrated before real-clinic use.
+    function clinicalClientAllowed() {
+      return request.auth != null &&
+        request.auth.token.get('admin', false) != true &&
+        request.auth.token.get('role', '') != 'admin' &&
+        (!exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') != 'admin');
+    }
     // Helper function to check if user owns the resource
     function isOwner(resource) {
-      return request.auth != null && 
+      return clinicalClientAllowed() && 
         (resource.data.createdBy == request.auth.uid || 
          resource.data.metadata.createdBy == request.auth.uid);
     }
@@ -14,11 +24,10 @@ service cloud.firestore {
     // (trusted claim or server-provisioned profile) may claim a name, so a
     // patient account cannot squat a doctor's room name.
     function isClinician() {
-      return request.auth != null && (
-        request.auth.token.get('role', '') in ['doctor', 'admin'] ||
-        request.auth.token.get('admin', false) == true ||
+      return clinicalClientAllowed() && (
+        request.auth.token.get('role', '') == 'doctor' ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'admin'])
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor')
       );
     }
 
@@ -68,7 +77,7 @@ service cloud.firestore {
     // earlier holder loses access to the new consultation.
     function isCallBufferTakeover(callId) {
       let data = request.resource.data;
-      return request.auth != null && ownsRoom(callId) &&
+      return clinicalClientAllowed() && ownsRoom(callId) &&
         data.get('createdBy', '') == request.auth.uid &&
         data.get('metadata', {}).get('createdBy', request.auth.uid) == request.auth.uid &&
         data.get('transcription', []).size() == 0 &&
@@ -101,7 +110,7 @@ service cloud.firestore {
       }
       
       // Allow read if user is the creator, patient, or in visibleToUsers
-      allow read: if request.auth != null && (
+      allow read: if clinicalClientAllowed() && (
         resource.data.createdBy == request.auth.uid ||
         resource.data.patientUserId == request.auth.uid ||
         isParticipant(resource)
@@ -220,7 +229,7 @@ service cloud.firestore {
     // nested security events go through server routes so a client cannot mint,
     // reactivate, or rewrite an invitation outside the domain policy.
     match /invitations/{invitationId} {
-      allow read: if request.auth != null &&
+      allow read: if isClinician() &&
         resource.data.createdBy == request.auth.uid;
       allow write: if false;
 
@@ -233,7 +242,7 @@ service cloud.firestore {
     match /waitingPatients/{waitingPatientId} {
       // Allow read if the doctor's user ID matches the waiting patient's doctorUserId
       // This is simpler and more efficient than checking the invitation document
-      allow read: if request.auth != null && 
+      allow read: if isClinician() && 
         resource.data.doctorUserId == request.auth.uid;
       // Only server can write (via admin SDK)
       allow write: if false;

@@ -544,6 +544,12 @@ export async function validateInvitationAndIssueToken(
       return result(401, { success: false, error: 'Invalid invitation room binding' });
     }
 
+    // Identity, not a typed email, separates the host from patient attendance.
+    // Reject before any reservation/counter update so host previews add no visit.
+    if (context.authenticatedVisitor?.userId === invitation.createdBy) {
+      return result(403, { success: false, error: 'Use Join as Doctor for your invitation. The host is not a patient visit.' });
+    }
+
     const expiresAtDate = toDate(invitation.expiresAt, new Date());
     const expiredByTime = new Date() > expiresAtDate;
     if ((invitation.status === 'active' || !invitation.status) && expiredByTime) {

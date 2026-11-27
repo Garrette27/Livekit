@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { copyTextToClipboard, fetchInvitationLink } from '@/lib/invitations/invitation-link-client';
+import { copyTextToClipboard, fetchInvitationLink, type FetchInvitationLinkResult, type InvitationLinkContext } from '@/lib/invitations/invitation-link-client';
 import { compactInvitationUrl } from '@/lib/invitations/invitation-link-display';
 import { useToast } from '@/components/ui/feedback/ToastProvider';
 import type { SpeechStatus } from '../hooks/useSpeechCapture';
@@ -22,12 +22,6 @@ interface DoctorControlsPanelProps {
   onStopSpeechCapture: () => void;
 }
 
-interface InvitationLinkResponse {
-  success: boolean;
-  inviteUrl?: string;
-  error?: string;
-}
-
 export default function DoctorControlsPanel({
   doctorName,
   roomName,
@@ -44,6 +38,7 @@ export default function DoctorControlsPanel({
 }: DoctorControlsPanelProps) {
   const { showToast } = useToast();
   const [invitationLink, setInvitationLink] = useState<string | null>(null);
+  const [invitationContext, setInvitationContext] = useState<InvitationLinkContext | null>(null);
   const [loadingLink, setLoadingLink] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -55,22 +50,25 @@ export default function DoctorControlsPanel({
       setLinkError(null);
 
       try {
-        const result: InvitationLinkResponse = await fetchInvitationLink({
+        const result: FetchInvitationLinkResult = await fetchInvitationLink({
           roomName,
           forceRefresh,
         });
 
         if (result.success && result.inviteUrl) {
           setInvitationLink(result.inviteUrl);
+          setInvitationContext(result.invitationContext ?? null);
           return;
         }
 
         setLinkError(result.error || 'No active invitation found');
         setInvitationLink(null);
+        setInvitationContext(null);
       } catch (fetchError) {
         console.error('Error fetching invitation link:', fetchError);
         setLinkError('Failed to load invitation link');
         setInvitationLink(null);
+        setInvitationContext(null);
       } finally {
         setLoadingLink(false);
       }
@@ -278,6 +276,24 @@ export default function DoctorControlsPanel({
           >
             {compactInvitationUrl(invitationLink)}
           </p>
+        )}
+
+        {invitationContext && (
+          <details style={{ margin: '0 0 0.75rem', fontSize: '0.75rem', color: '#374151' }}>
+            <summary style={{ cursor: 'pointer', padding: '0.5rem 0', fontWeight: 600 }}>Invitation context</summary>
+            <p style={{ margin: '0.25rem 0' }}>
+              {invitationContext.directAdmissionEmailCount} invited email{invitationContext.directAdmissionEmailCount === 1 ? '' : 's'} eligible for direct admission with a verified account.
+              {' '}This is not a count of patients who have joined.
+            </p>
+            <p style={{ margin: '0.5rem 0' }}>
+              {invitationContext.waitingCapacity === null
+                ? 'Single-use invitation.'
+                : `Waiting capacity: ${invitationContext.waitingCapacity} visitors for this invitation, not the whole room.`}
+            </p>
+            <p style={{ margin: '0.5rem 0' }}>Created: {invitationContext.createdAt ? new Date(invitationContext.createdAt).toLocaleString() : 'Unknown'}</p>
+            <p style={{ margin: '0.5rem 0' }}>Expires: {new Date(invitationContext.expiresAt).toLocaleString()}</p>
+            <Link href="/doctor/invitations" target="_blank" rel="noopener noreferrer">Manage invitations in a new tab</Link>
+          </details>
         )}
 
         {showCopyInvitationLinkControl && (

@@ -24,6 +24,35 @@ function getDisplayName(patient: WaitingPatient): string {
   return patient.patientEmail || 'Anonymous Patient';
 }
 
+/** Labels identity evidence separately from the doctor's admission decision. */
+function PatientVisitDetails({ patient }: { patient: WaitingPatient }) {
+  const source = patient.metadata?.identitySource;
+  const label = patient.metadata?.admissionMode === 'auto-email-match'
+    ? 'Verified allowlist match'
+    : source === 'registered-profile'
+      ? 'Registered account'
+      : source === 'invitation-token'
+        ? 'From invitation link'
+        : source === 'self-declared' || patient.patientEmail
+          ? 'Unverified'
+          : 'Unidentified guest';
+  const events = [
+    ['Arrived', patient.joinedAt], ['Admitted', patient.admittedAt],
+    ['Left', patient.leftAt], ['Removed', patient.rejectedAt],
+  ] as const;
+
+  return (
+    <details style={{ marginTop: '0.4rem', fontSize: '0.75rem', color: '#475569' }}>
+      <summary style={{ cursor: 'pointer', padding: '0.4rem 0' }}>{label} · Visit details</summary>
+      <p style={{ margin: '0.25rem 0' }}>Account or email evidence does not confirm the person’s legal identity. Confirm who is present before care.</p>
+      {events.map(([name, value]) => {
+        const date = dateValueToDate(value);
+        return date ? <p key={name} style={{ margin: '0.25rem 0' }}>{name}: <time dateTime={date.toISOString()}>{date.toLocaleString()}</time></p> : null;
+      })}
+    </details>
+  );
+}
+
 export default function WaitingRoomPanel({
   roomName,
   doctorUserId,
@@ -49,7 +78,7 @@ export default function WaitingRoomPanel({
   } = useWaitingQueue({
     roomName,
     doctorUserId,
-    statuses: ['waiting', 'admitted'],
+    statuses: ['waiting', 'admitted', 'left', 'rejected'],
     autoRefresh,
     pollIntervalMs,
   });
@@ -63,6 +92,7 @@ export default function WaitingRoomPanel({
     () => waitingPatients.filter((patient) => patient.status === 'admitted'),
     [waitingPatients]
   );
+  const endedVisits = waitingPatients.filter((patient) => patient.status === 'left' || patient.status === 'rejected');
 
   useEffect(() => {
     if (!pendingRejectId) {
@@ -86,6 +116,7 @@ export default function WaitingRoomPanel({
     <div
       style={{
         padding: '1rem',
+        overflowWrap: 'anywhere',
         backgroundColor: '#ffffff',
         borderRadius: '0.5rem',
       }}
@@ -180,7 +211,7 @@ export default function WaitingRoomPanel({
                 {waitingOnly.map((patient) => {
                   const joinedAt = dateValueToDate(patient.joinedAt);
                   const waitTimeMinutes = joinedAt
-                    ? Math.floor((Date.now() - joinedAt.getTime()) / 1000 / 60)
+                    ? Math.max(0, Math.floor((Date.now() - joinedAt.getTime()) / 1000 / 60))
                     : null;
                   const displayName = getDisplayName(patient);
 
@@ -227,6 +258,7 @@ export default function WaitingRoomPanel({
                             ? 'Waiting time unavailable'
                             : `Waiting for ${waitTimeMinutes} minute${waitTimeMinutes !== 1 ? 's' : ''}`}
                         </p>
+                        <PatientVisitDetails patient={patient} />
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         {showAdmitControl && (
@@ -361,6 +393,7 @@ export default function WaitingRoomPanel({
                             ? 'Admission time unavailable'
                             : `Admitted ${admittedMinutes} minute${admittedMinutes !== 1 ? 's' : ''} ago`}
                         </p>
+                        <PatientVisitDetails patient={patient} />
                       </div>
                       {showRemoveControl && (
                         <button
@@ -412,6 +445,19 @@ export default function WaitingRoomPanel({
             )}
           </div>
         </>
+      )}
+
+      {endedVisits.length > 0 && (
+        <details style={{ marginTop: '1rem', fontSize: '0.8rem', color: '#475569' }}>
+          <summary style={{ cursor: 'pointer', padding: '0.5rem 0' }}>Latest ended queue visits ({endedVisits.length})</summary>
+          {endedVisits.slice(0, 10).map((patient) => (
+            <div key={patient.id} style={{ padding: '0.5rem 0', borderBottom: '1px solid #e5e7eb' }}>
+              <strong>{getDisplayName(patient)}</strong> · {patient.status === 'left' ? 'Left' : 'Removed'}
+              <PatientVisitDetails patient={patient} />
+            </div>
+          ))}
+          <p>These are the latest queue states for active invitations, not a complete consultation history.</p>
+        </details>
       )}
 
       <div

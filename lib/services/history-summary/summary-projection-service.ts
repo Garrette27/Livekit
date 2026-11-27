@@ -87,7 +87,7 @@ function mergeHistoryRecords(existing: HistoryRecord, incoming: HistoryRecord): 
     roomName: incoming.roomName || existing.roomName,
     createdAt: incoming.createdAt || existing.createdAt,
     startedAt: incoming.startedAt || existing.startedAt || null,
-    endedAt: incoming.endedAt || existing.endedAt || null,
+    endedAt: incoming.encounterStatus === 'active' ? null : incoming.endedAt || existing.endedAt || null,
     duration: Math.max(existing.duration, incoming.duration),
     doctorEmail: incoming.doctorEmail || existing.doctorEmail,
     patientEmail: incoming.patientEmail || existing.patientEmail,
@@ -118,8 +118,12 @@ function mergeHistoryRecords(existing: HistoryRecord, incoming: HistoryRecord): 
   };
 }
 
+/** Explicit lifecycle state outranks legacy timestamps; never summarize an open encounter. */
 function isCompletedSession(sessionData: Record<string, unknown>): boolean {
   const status = typeof sessionData.status === 'string' ? sessionData.status.trim().toLowerCase() : '';
+  if (status === 'active') {
+    return false;
+  }
   if (status === 'completed') {
     return true;
   }
@@ -445,6 +449,7 @@ async function loadSessionChatHistory(
 export class FirestoreSummaryProjectionService implements SummaryProjectionService {
   constructor(private readonly db: Firestore) {}
 
+  /** Rebuild only completed encounter evidence, including calls made by background workers. */
   async buildSummary(input: {
     consultationSessionId: string;
     regenerate?: boolean;
@@ -460,6 +465,9 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
     }
 
     const sessionData = sessionDoc.data() as Record<string, unknown>;
+    if (!isCompletedSession(sessionData)) {
+      throw new Error('A consultation must end before its summary is generated');
+    }
     const summaryRepo = new CallSummaryRepository(this.db);
     const existingSummaryDoc = await summaryRepo.getById(consultationSessionId);
 
@@ -508,6 +516,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
     };
   }
 
+  /** Show each encounter's own lifecycle without merging separate openings of a reused room. */
   async buildDoctorHistory(input: {
     doctorUserId: string;
     includeChatHistory?: boolean;
@@ -583,7 +592,9 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
 
     for (const sessionDoc of sessionDocs) {
       const sessionData = sessionDoc.data() as Record<string, unknown>;
-      if (!isCompletedSession(sessionData)) {
+      const completed = isCompletedSession(sessionData);
+      const status = typeof sessionData.status === 'string' ? sessionData.status.trim().toLowerCase() : '';
+      if (!completed && status !== 'active') {
         continue;
       }
       const sessionId =
@@ -608,9 +619,10 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
       const record: HistoryRecord = {
         id: sessionId,
         roomName: (sessionData.roomName as string) || 'Unknown Room',
+        encounterStatus: completed ? 'completed' : 'active',
         createdAt: startedAt,
         startedAt,
-        endedAt,
+        endedAt: completed ? endedAt : null,
         duration: durationFromSessionData(sessionData),
         doctorEmail,
         patientEmail: patientEmail || undefined,

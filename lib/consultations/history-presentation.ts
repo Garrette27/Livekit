@@ -7,12 +7,13 @@
  * view components stay declarative and the rules live in one testable place.
  */
 
-import { isBeyondSummaryRetention, SUMMARY_RETENTION_DAYS } from './retention-policy';
+import { isBeyondSummaryRetention } from './retention-policy';
 
 export type ConsultationStatus =
+  | 'not-finalized'
   | 'summarized'
   | 'awaiting-summary'
-  | 'summary-expired'
+  | 'summary-unavailable'
   | 'not-admitted'
   | 'no-show';
 
@@ -53,9 +54,10 @@ export interface ConsultationStatusPresentation {
 }
 
 const STATUS_PRESENTATION: Record<ConsultationStatus, Omit<ConsultationStatusPresentation, 'status'>> = {
+  'not-finalized': { label: 'Not finalized', color: '#1d4ed8', background: '#dbeafe' },
   summarized: { label: 'Summarized', color: '#065f46', background: '#d1fae5' },
   'awaiting-summary': { label: 'Awaiting summary', color: '#92400e', background: '#fef3c7' },
-  'summary-expired': { label: `Summary deleted after ${SUMMARY_RETENTION_DAYS} days`, color: '#4b5563', background: '#f3f4f6' },
+  'summary-unavailable': { label: 'Older summary unavailable', color: '#4b5563', background: '#f3f4f6' },
   // Amber, not grey: a patient who waited and was never let in is an action for
   // the practice, unlike a patient who simply never arrived.
   'not-admitted': { label: 'Patient not admitted', color: '#b45309', background: '#fef3c7' },
@@ -63,28 +65,26 @@ const STATUS_PRESENTATION: Record<ConsultationStatus, Omit<ConsultationStatusPre
 };
 
 /**
- * A consultation past the retention window has no summary because the
- * retention job deleted it, not because one is pending — presenting that as
- * "awaiting summary" would invite the doctor to regenerate records the policy
- * deliberately removed.
+ * Open encounters are not summary work. A missing older summary is unavailable,
+ * but age alone cannot establish that the opt-in retention job deleted it.
+ * Legacy rows without an explicit encounter state keep their existing display.
  */
 export function resolveConsultationStatus(
   record: {
     hasGeneratedSummary: boolean;
+    encounterStatus?: 'active' | 'completed';
     category?: string;
     startedAt?: Date | null;
   },
   now: Date = new Date()
 ): ConsultationStatusPresentation {
-  const status: ConsultationStatus = record.category === 'Not Admitted'
-    ? 'not-admitted'
-    : record.category === 'No-Show'
-      ? 'no-show'
-      : record.hasGeneratedSummary
-        ? 'summarized'
-        : isBeyondSummaryRetention(record.startedAt ?? null, now)
-          ? 'summary-expired'
-          : 'awaiting-summary';
+  let status: ConsultationStatus;
+  if (record.encounterStatus === 'active') status = 'not-finalized';
+  else if (record.category === 'Not Admitted') status = 'not-admitted';
+  else if (record.category === 'No-Show') status = 'no-show';
+  else if (record.hasGeneratedSummary) status = 'summarized';
+  else if (isBeyondSummaryRetention(record.startedAt ?? null, now)) status = 'summary-unavailable';
+  else status = 'awaiting-summary';
 
   return { status, ...STATUS_PRESENTATION[status] };
 }

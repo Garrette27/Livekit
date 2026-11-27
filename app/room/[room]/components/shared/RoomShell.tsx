@@ -61,7 +61,7 @@ function ConnectionStatusBanner() {
       role="status"
       aria-live="polite"
       style={{
-        position: 'fixed',
+        position: 'absolute',
         top: '0.75rem',
         left: '50%',
         transform: 'translateX(-50%)',
@@ -426,7 +426,13 @@ export default function RoomShell({
       <main
         data-lk-theme="default"
         style={{
-          minHeight: '100vh',
+          minHeight: '100dvh',
+          height: '100dvh',
+          overflowY: 'auto',
+          minWidth: 0,
+          width: '100%',
+          flex: 1,
+          order: 2,
           display: 'grid',
           placeItems: 'center',
           padding: '1rem',
@@ -469,6 +475,7 @@ export default function RoomShell({
             <span>
               Allow my microphone audio to be transcribed for the AI consultation summary.
               This is optional; the call still works when it is off, and audio is discarded after transcription.
+              We ask again when you rejoin; a previous room visit does not authorize a new recording.
             </span>
           </label>
           <PreJoin
@@ -488,7 +495,7 @@ export default function RoomShell({
   }
 
   return (
-    <div ref={roomScopeRef} style={{ width: '100vw', height: '100vh', position: 'relative' }}>
+    <div ref={roomScopeRef} style={{ width: '100%', minWidth: 0, height: '100dvh', position: 'relative', flex: 1, order: 2 }}>
       <LiveKitRoom
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
@@ -496,7 +503,7 @@ export default function RoomShell({
         options={ROOM_MEDIA_OPTIONS}
         audio={userChoices.audioEnabled ? { deviceId: userChoices.audioDeviceId, ...SPEECH_PROCESSING } : false}
         video={userChoices.videoEnabled ? { deviceId: userChoices.videoDeviceId } : false}
-        style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}
+        style={{ width: '100%', height: '100%', backgroundColor: '#000' }}
         onDisconnected={(reason) => onDisconnected(reason)}
         onError={onError}
       >

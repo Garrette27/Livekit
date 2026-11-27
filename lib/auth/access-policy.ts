@@ -39,17 +39,8 @@ const ROLE_PERMISSIONS: Record<AppRole, ReadonlySet<AppPermission>> = {
     'summary:delete-own',
   ]),
   faculty_reviewer: new Set(['consultation:review-assigned']),
-  admin: new Set([
-    'consultation:link-own',
-    'consultation:read-own',
-    'consultation:review-assigned',
-    'invitation:manage',
-    'room:join-doctor',
-    'room:join-patient',
-    'summary:delete-own',
-    'summary:manage-own',
-    'waiting-room:manage',
-  ]),
+  // Staff administration has its own policy; it grants no clinical permission.
+  admin: new Set(),
 };
 
 /** Converts untrusted profile/claim data into a known role or null. */

@@ -99,7 +99,9 @@ async function handlePOST(req: NextRequest) {
     const sanitizedRoomName = sanitizeInput(roomName);
     const sanitizedEmailAllowlist = Array.from(
       new Set(normalizedEmailCandidates.map((email) => sanitizeInput(email)))
-    );
+    ).filter((email) => email !== doctorEmail?.trim().toLowerCase());
+    // The owning clinician enters through doctor access, never as an invited
+    // patient. Filtering before hashing keeps both policy and counts accurate.
     const emailHashes = sanitizedEmailAllowlist.map((email) => hashSecuritySignal('email', email));
 
     // Validate expiration time (1-168 hours = 1 hour to 1 week)

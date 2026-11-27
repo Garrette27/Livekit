@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
-/** Phones and small tablets in portrait. Matches the room's other breakpoints. */
-const COMPACT_VIEWPORT_QUERY = '(max-width: 768px)';
+/** Below this width two panels leave too little space for the consultation. */
+const COMPACT_VIEWPORT_QUERY = '(max-width: 1200px)';
 
 /**
  * Whether the viewport is too narrow for side-docked panels.
@@ -13,11 +13,11 @@ const COMPACT_VIEWPORT_QUERY = '(max-width: 768px)';
  * handset. Components read this to choose an arrangement rather than to scale
  * one down.
  *
- * Returns false during server rendering and the first paint, so the desktop
- * arrangement is the default and mobile is applied once the width is known.
+ * Starts compact until the viewport is known, so hydration never opens two
+ * desktop panels over a phone's video or device preflight.
  */
 export function useIsCompactViewport(): boolean {
-  const [isCompact, setIsCompact] = useState(false);
+  const [isCompact, setIsCompact] = useState(true);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) {

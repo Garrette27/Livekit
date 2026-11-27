@@ -1,13 +1,23 @@
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 
+/** Owner-visible policy counts and dates; never contains allowlist identities. */
+export interface InvitationLinkContext {
+  directAdmissionEmailCount: number;
+  waitingCapacity: number | null;
+  createdAt: string | null;
+  expiresAt: string;
+}
+
 interface InvitationLinkResponse {
   success: boolean;
   inviteUrl?: string;
+  invitationContext?: InvitationLinkContext;
   error?: string;
 }
 
 interface CachedInvitationLink {
   inviteUrl: string;
+  invitationContext?: InvitationLinkContext;
   fetchedAtMs: number;
 }
 
@@ -21,6 +31,7 @@ interface FetchInvitationLinkArgs {
 export interface FetchInvitationLinkResult {
   success: boolean;
   inviteUrl?: string;
+  invitationContext?: InvitationLinkContext;
   error?: string;
 }
 
@@ -37,7 +48,7 @@ function resolveCacheKey({ invitationId, roomName }: FetchInvitationLinkArgs): s
   throw new Error('Either invitationId or roomName is required');
 }
 
-function getCachedInvitationLink(cacheKey: string, cacheTtlMs: number): string | null {
+function getCachedInvitationLink(cacheKey: string, cacheTtlMs: number): CachedInvitationLink | null {
   const cached = invitationLinkCache.get(cacheKey);
   if (!cached) {
     return null;
@@ -48,7 +59,7 @@ function getCachedInvitationLink(cacheKey: string, cacheTtlMs: number): string |
     return null;
   }
 
-  return cached.inviteUrl;
+  return cached;
 }
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
@@ -70,7 +81,7 @@ export async function fetchInvitationLink({
   if (!forceRefresh) {
     const cachedLink = getCachedInvitationLink(cacheKey, cacheTtlMs);
     if (cachedLink) {
-      return { success: true, inviteUrl: cachedLink };
+      return { success: true, inviteUrl: cachedLink.inviteUrl, invitationContext: cachedLink.invitationContext };
     }
   }
 
@@ -92,10 +103,11 @@ export async function fetchInvitationLink({
     };
   }
 
-  invitationLinkCache.set(cacheKey, { inviteUrl: result.inviteUrl, fetchedAtMs: Date.now() });
+  invitationLinkCache.set(cacheKey, { inviteUrl: result.inviteUrl, invitationContext: result.invitationContext, fetchedAtMs: Date.now() });
   return {
     success: true,
     inviteUrl: result.inviteUrl,
+    invitationContext: result.invitationContext,
   };
 }
 

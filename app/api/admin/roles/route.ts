@@ -109,7 +109,7 @@ async function handlePOST(req: NextRequest) {
     action,
     clinicId: body.clinicId,
     targetClinicId,
-    targetIsAdmin: target.customClaims?.admin === true,
+    targetIsAdmin: target.customClaims?.admin === true || target.customClaims?.role === 'admin' || profileRole === 'admin',
     targetIsSuperAdmin: administratorLevel({ userId: target.uid, email: target.email, emailVerified: target.emailVerified, isAdminClaim: false }, superAdmins()) === 'super_admin',
   });
   if (!decision.allowed) {
@@ -120,18 +120,22 @@ async function handlePOST(req: NextRequest) {
     return NextResponse.json({ success: false, code: 'patient_account', error: 'This email belongs to a patient account. Provision a separate clinician account.' }, { status: 409 });
   }
 
-  // Clinic administrators are clinicians too (a small clinic's owner): an
-  // admin grant keeps or sets the doctor role, so the account can still sign
-  // in to the doctor pages. Revoking "admin" removes only the admin flag;
-  // revoking "doctor" removes clinician access entirely.
+  // Administrative identities are not clinicians. Switching to Doctor is an
+  // explicit owner-approved role change, never a side effect of revocation.
   const claims = { ...(target.customClaims || {}) } as Record<string, unknown>;
   const now = new Date();
+  const wasAdministrator = claims.admin === true || claims.role === 'admin' || profileRole === 'admin';
   if (action === 'grant') {
-    claims.role = 'doctor';
+    claims.role = role;
     claims.clinicId = decision.clinicId;
     if (role === 'admin') claims.admin = true;
+    else delete claims.admin;
   } else if (role === 'admin') {
     delete claims.admin;
+    if (wasAdministrator) {
+      delete claims.role;
+      delete claims.clinicId;
+    }
   } else {
     delete claims.role;
     delete claims.admin;
@@ -139,8 +143,8 @@ async function handlePOST(req: NextRequest) {
   }
   await auth.setCustomUserClaims(target.uid, claims);
   if (action === 'grant') {
-    await profileRef.set({ email, role: 'doctor', clinicId: decision.clinicId, provisionedAt: now, ...(profile.exists ? {} : { registeredAt: now }) }, { merge: true });
-  } else if (role === 'doctor' && profileRole && PRIVILEGED_PROFILE_ROLES.includes(profileRole)) {
+    await profileRef.set({ email, role, clinicId: decision.clinicId, provisionedAt: now, ...(profile.exists ? {} : { registeredAt: now }) }, { merge: true });
+  } else if ((role === 'doctor' || wasAdministrator) && profileRole && PRIVILEGED_PROFILE_ROLES.includes(profileRole)) {
     // Keep the profile (history stays attributable) but stop the legacy
     // profile-role fallback from honouring it.
     await profileRef.set({ role: 'revoked', revokedRole: profileRole, revokedAt: now }, { merge: true });

@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { createPortal } from 'react-dom';
 import CollapsibleSidebar from '@/components/CollapsibleSidebar';
 
 interface SidebarPortalProps {
@@ -23,7 +22,9 @@ export default function SidebarPortal({
   collapsedWidth = 60,
   children,
 }: SidebarPortalProps) {
-  return createPortal(
+  // Keep desktop panels in the room workspace so they reserve video space.
+  // The sidebar itself owns fixed positioning only for compact sheets.
+  return (
     <CollapsibleSidebar
       title={title}
       icon={icon}
@@ -33,7 +34,6 @@ export default function SidebarPortal({
       collapsedWidth={collapsedWidth}
     >
       {children}
-    </CollapsibleSidebar>,
-    typeof window !== 'undefined' ? document.body : ({} as never)
+    </CollapsibleSidebar>
   );
 }

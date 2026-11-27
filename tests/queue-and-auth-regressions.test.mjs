@@ -221,6 +221,38 @@ test('direct invitation issuance binds the authenticated UID rather than the dec
   });
   assert.equal(result.status, 200);
   assert.equal(tokens.verifyLiveKitRoomToken(result.body.liveKitToken).patientUserId, 'patient-1');
+  const ownerResult = await validateInvitationAndIssueToken({
+    token: tokens.signInvitationToken({ invitationId: 'invite-a', roomName: 'room-a' }),
+    clientIP: 'synthetic-signal', userAgent: 'synthetic-agent',
+    authenticatedVisitor: { userId: 'doctor-1', authenticatedEmail: 'doctor@example.test', isAnonymousAccount: false },
+  });
+  assert.equal(ownerResult.status, 403, 'The owning doctor cannot consume a patient visit');
+});
+
+test('invitation creation excludes the owning clinician from the patient direct-entry audience', async () => {
+  let persisted;
+  const response = { json: (body, init = {}) => ({ body, status: init.status || 200 }) };
+  const { POST } = loadModule('app/api/invite/create/route.ts', {
+    '@/lib/services/shared/request-logging': { withRequestLogging: (fn) => fn },
+    'node:crypto': { randomUUID: () => 'synthetic-invitation' },
+    'next/server': { NextResponse: response },
+    '../../../../lib/firebase-admin': { getFirebaseAdmin: () => ({}) },
+    '@/lib/services/shared/request-auth': { authorizeBearerRequest: async () => ({ ok: true, data: { userId: 'doctor-1', email: 'doctor@example.test' } }) },
+    '@/lib/services/shared/http': {},
+    '@/lib/services/room-access': { DoctorRoomAccess: class { async claimInvitationRoom() { return { ok: true }; } } },
+    '../../../../lib/repositories/invitation-repository': { InvitationRepository: class { async create(_id, value) { persisted = value; } } },
+    '../../../../lib/rate-limit': { enforceRateLimit: async () => null, RateLimitConfigs: { TOKEN_GENERATION: {} } },
+    '../../../../lib/validation': { validateEmail: () => true, validateRoomName: () => true, sanitizeInput: (v) => v },
+    '../../../../lib/invitations/token-utils': { signInvitationToken: () => 'synthetic-token' },
+    '../../../../lib/invitations/utils': { buildInviteUrl: () => 'https://example.test/invite/synthetic-token' },
+    '../../../../lib/security/security-signal': { hashSecuritySignal: (_kind, value) => `hash:${value}` },
+    '../../../../lib/events/event-schema': { EVENT_DOMAINS: { INVITATION_AUDIT: 'invitation' } },
+    '@/lib/invitations/invitation-use-reservation': { REUSABLE_INVITATION_MAX_USES: 999999 },
+  });
+  const result = await POST({ json: async () => ({ roomName: 'room-a', emailAllowlist: [' Doctor@Example.Test ', 'patient@example.test'] }) });
+  assert.equal(result.status, 200);
+  assert.equal(persisted.metadata.constraints.allowlistCount, 1);
+  assert.deepEqual(Array.from(persisted.metadata.constraints.emailHashes), ['hash:patient@example.test']);
 });
 
 test('admission binds history to the registered patient and never to a guest’s declared email', async () => {
@@ -1216,10 +1248,11 @@ test('clinician roles: claim accepted; legacy profile role honoured transitional
       getFirebaseAdminAuth: () => ({ async verifyIdToken(token) { return { uid: token, email: `${token}@example.test`, email_verified: true, ...claims[token] }; } }),
     },
     '@/lib/auth/access-policy': loadModule('lib/auth/access-policy.ts'),
+    '@/lib/auth/role-administration': loadModule('lib/auth/role-administration.ts'),
     '@/lib/repositories/user-repository': { UserRepository: class { async getById(id) { return { exists: !!profiles[id], data: () => profiles[id] }; } } },
     './request-logging': { recordAuthenticatedUser() {} },
     './service-result': loadModule('lib/services/shared/service-result.ts'),
-  });
+  }, { process: { env: {} } });
   const call = (uid, permission = 'invitation:manage') => authorizeBearerRequest({ headers: new Headers({ authorization: `Bearer ${uid}` }) }, permission);
   assert.equal((await call('uid-claimed')).ok, true);
   assert.equal((await call('uid-legacy')).ok, true, 'Existing doctor accounts keep working until granted a claim');
@@ -1301,7 +1334,7 @@ test('only a super admin can change an administrator account; grants never sign 
   assert.equal(result.allowed, false);
   const route = readFileSync('app/api/admin/roles/route.ts', 'utf8');
   assert.match(route, /if \(action === 'revoke'\) \{[\s\S]*revokeRefreshTokens/);
-  assert.match(route, /claims\.role = 'doctor';/, 'Admins stay clinicians so they can still sign in');
+  assert.match(route, /claims\.role = role;/, 'Administrator grants must not silently grant Doctor');
 });
 
 test('every new invitation uses the waiting room, and stale doctor tokens are not reused', () => {
