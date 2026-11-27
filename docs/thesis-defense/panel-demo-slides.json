@@ -1,0 +1,289 @@
+{
+  "official_title": "TeleConsole: Design and Development of a Secure Telehealth Video Communication System Using LiveKit with AI Summarization and Flexible User Access Design",
+  "date": "27 November 2026",
+  "baseline": "ec6803a",
+  "slides": [
+    {
+      "kind": "cover",
+      "subtitle": "Panel questions and an evidence-grounded demo",
+      "notes": "Introduce the original official title without renaming it. This supplement helps three writers explain scope and demonstrate the workflow; it does not replace the full methodology/results defense. The manuscript remains 259 pages with unchanged objectives, survey figures and project expense amounts. The source checkpoint is ec6803a. State the actual deployed commit used in the demonstration, separately from local source. Sources: docs/thesis-defense/panel-questions-and-answers.md; revision-manifest.json."
+    },
+    {
+      "title": "Contribution and evidence boundaries",
+      "rows": [
+        [
+          "Our contribution",
+          "An integrated consultation and access workflow"
+        ],
+        [
+          "LiveKit",
+          "Existing WebRTC media transport"
+        ],
+        [
+          "AI assistance",
+          "A draft that the clinician must review"
+        ],
+        [
+          "Study evidence",
+          "Perceived quality and scoped engineering tests"
+        ]
+      ],
+      "bottom": "No measured maximum call load, clinical efficacy or security certification",
+      "notes": "Answer priority questions 1-7 before feature details. We did not invent WebRTC or a diagnostic model. The published survey describes the selected respondents and the evaluated build; later admin changes do not retroactively become survey results. A passing regression is narrower evidence than a real clinic acceptance trial. Source: docs/thesis-defense/panel-questions-and-answers.md, priority Q1-Q7."
+    },
+    {
+      "title": "Account identity and administrator authority",
+      "rows": [
+        [
+          "Platform owner",
+          "Staff access only, no clinical API permissions"
+        ],
+        [
+          "Clinic administrator",
+          "Staff access in one clinic, no doctor access"
+        ],
+        [
+          "Doctor",
+          "Separate provisioned identity for consultations"
+        ],
+        [
+          "Patient or guest",
+          "Identity and admission rules apply"
+        ]
+      ],
+      "bottom": "Account creation and staff permission are separate decisions",
+      "notes": "Use /admin/login for administration. Signup creates identity only. New Administrator grants write an admin role, not Doctor, and revocation does not restore a legacy doctor profile. Existing combined claims are blocked by clinical APIs. Proposed Firestore rules deny administrator clinical reads and room creation in local emulator cases but require separate deployment. Environment-only bootstrap owners still need an approved historical-claim migration for the direct Firestore boundary. Existing media credentials have their own lifecycle. Do not claim instant universal revocation. Sources: docs/access-control.md; lib/auth/role-administration.ts; app/api/admin/roles/route.ts; scripts/thesis/emulator-administrator-separation.mjs."
+    },
+    {
+      "kind": "flow",
+      "title": "Patient admission flow",
+      "bottom": "Valid invitation and verified identity have different roles",
+      "notes": "Explain the signed invitation, persisted state, room binding, expiry and use checks. A verified allowlisted identity may receive direct admission. Other accepted visitors wait for a clinician decision. A new waiting place is reserved transactionally; an existing visit reconnect or direct admission is not another waiting place. Admission then leads to visible preflight and Join. Sources: lib/invitations/validate-service.ts; invitation-use-reservation.ts; invitation-access-core.ts."
+    },
+    {
+      "title": "Waiting, admitted, connected and completed",
+      "rows": [
+        [
+          "Waiting",
+          "Awaiting the doctor's decision"
+        ],
+        [
+          "Admitted",
+          "Permission to enter has been granted"
+        ],
+        [
+          "Connected",
+          "A media endpoint established transport"
+        ],
+        [
+          "Completed",
+          "The encounter lifecycle recorded completion"
+        ]
+      ],
+      "bottom": "The queue is a manual admission worklist, not medical triage",
+      "notes": "Oldest-first display does not enforce FIFO treatment. The doctor must review the correct current visit; stale commands conflict rather than acting on a newer visit. Waiting pages mount no hidden room. Do not equate the admitted count with attendance or treat a disconnect as proof of sufficient summary evidence. Sources: app/invite/[token]/page.tsx; lib/services/invitation-access/invitation-access-core.ts."
+    },
+    {
+      "kind": "number",
+      "title": "Waiting limit and media capacity",
+      "number": "10",
+      "label": "Default waiting target for one invitation",
+      "rows": [
+        [
+          "Editable range",
+          "1-100 on an active owned invitation"
+        ],
+        [
+          "Lowering the limit",
+          "Keeps existing visitors, blocks additional waiting places"
+        ],
+        [
+          "Media maximum",
+          "Still unmeasured in this study"
+        ]
+      ],
+      "bottom": "A queue rule and a provider allowance are not a measured call limit",
+      "notes": "For the demo, set the target to 2 and open separate synthetic visitor contexts. Show the third visitor refused, then raise to 3 and retry. Do not lower the target and claim the current count instantly shrinks. Do not admit several unrelated patients into one clinical room; the evaluated encounter is one doctor and one patient. Sources: app/api/invite/limit/route.ts; reservation policy; the waiting-limit questions."
+    },
+    {
+      "kind": "race",
+      "title": "Local capacity evidence and its limits",
+      "table": [
+        [
+          "Case",
+          "Arrivals",
+          "Result / evidence scope"
+        ],
+        [
+          "Nine already waiting",
+          "2 concurrent",
+          "10 waiting; 1 refused in emulator"
+        ],
+        [
+          "Empty target of ten",
+          "25 concurrent",
+          "10 waiting; 15 refused in emulator"
+        ],
+        [
+          "Cloud media maximum",
+          "Not measured",
+          "No paired-media capacity result"
+        ],
+        [
+          "Clinical accuracy",
+          "Not measured",
+          "Acceptability scores are a different measure"
+        ]
+      ],
+      "bottom": "Dated emulator evidence: 27 November 2026; not a production load trial",
+      "notes": "The historical 25 November audit reproduced an overshoot. The 27 November implementation counts capacity inside the transaction, and the dated emulator receipt reports the two cases shown. No new media benchmark or language accuracy dataset is implied. A transaction's contention/retry behavior must still be measured under the intended deployment workload. Source: docs/thesis-defense/evidence/queue-capacity-fix-2026-11-27/emulator-capacity.json."
+    },
+    {
+      "title": "Administrator demo and failure recovery",
+      "rows": [
+        [
+          "Signed out",
+          "Administrator sign in preserves /admin destination"
+        ],
+        [
+          "Unapproved account",
+          "Pending guidance; no self-assigned role"
+        ],
+        [
+          "Granted Doctor",
+          "Clinician access only"
+        ],
+        [
+          "Granted Administrator",
+          "Refresh claims, then open clinic administration"
+        ]
+      ],
+      "bottom": "API ownership and clinic checks remain authoritative",
+      "notes": "Show the chosen role and server-confirmed result. An old ID token may not contain newly granted claims; Check access again explicitly refreshes. A screenshot saying Granted doctor does not establish an admin grant. Auth lookup outages now produce retryable errors rather than false deleted-account labels. No real account changes are part of the rehearsal; use approved synthetic identities. Firebase claims reference: https://firebase.google.com/docs/auth/admin/custom-claims ."
+    },
+    {
+      "title": "Filipino, Taglish and English summaries",
+      "rows": [
+        [
+          "Speech-note selection",
+          "fil-PH or en-US for browser recognition"
+        ],
+        [
+          "Current summary prompt",
+          "English output with uncertain source terms preserved"
+        ],
+        [
+          "Evidence gates",
+          "Sparse or garbled capture can be insufficient"
+        ],
+        [
+          "Required review",
+          "Clinician checks the draft against the source"
+        ]
+      ],
+      "bottom": "No measured bilingual recognition or clinical translation accuracy",
+      "notes": "The setting configures browser speech recognition, not a promise that every browser supports accurate Taglish. Recognition and summarization are distinct failure points. Negation, duration, dose, names and medicines deserve explicit checking. Use synthetic bilingual scripts for future evaluation, record omissions/unsupported facts and involve a clinician plus bilingual reviewer. Sources: DoctorControlsPanel.tsx; useSpeechCapture.ts; summary-generator.ts buildPrompt; the language questions."
+    },
+    {
+      "title": "Encounter, consent and retention lifecycle",
+      "rows": [
+        [
+          "Active encounter",
+          "Not finalized, generation blocked"
+        ],
+        [
+          "Rejoin",
+          "May create a new encounter, fresh consent"
+        ],
+        [
+          "AI draft",
+          "Usable evidence, then clinician review"
+        ],
+        [
+          "Retention",
+          "Opt-in Firebase worker, 30-day default cutoff"
+        ]
+      ],
+      "bottom": "One invitation may host several distinct encounter records",
+      "notes": "The last doctor leaving ends an encounter; invitation revocation is not the only completion event. Never merge records by reused room name. The call works without transcription and a fresh entry starts unchecked. Chat is history, not current clinical summary evidence. Missing evidence may yield a deterministic nonclinical record without an AI call. The Firebase retention worker now processes at most 200 summaries plus 200 schedule entries per run; Vercel's cron retries summaries, not deletion. Other text copies/backups are not fully purged and age is not a deletion receipt. Future attachment cleanup needs its own approved policy and storage reconciliation. Scheduling remains disabled: the selected next design separates appointment planning from encounter evidence. Sources: functions/index.js; history-presentation.ts; docs/superpowers/specs/2026-11-27-doctor-booked-appointments-design.md."
+    },
+    {
+      "title": "The answer to the CCTV capacity question",
+      "lead": "We must give units, scope, conditions and evidence",
+      "rows": [
+        [
+          "Intended encounter",
+          "One doctor and one patient"
+        ],
+        [
+          "Concurrent pairs",
+          "Maximum has not been measured"
+        ],
+        [
+          "Next experiment",
+          "Controlled 1, 3 and 5 simultaneous pairs"
+        ]
+      ],
+      "bottom": "Measure receiver quality, failures, database/API operations and provider usage",
+      "notes": "A provider's connection ceiling is not proof of a safe number of consultations. Measure delivered video resolution/fps, packet loss, jitter, RTT, recovery and evidence isolation. State device/network/duration and acceptance thresholds before running the trial. Run controlled staging, not uncontrolled production stress. The current media options include adaptive stream, dynacast and simulcast, but settings are not results. Sources: RoomShell.tsx; capacity-quality-costs-and-team-scripts.md; priority Q1."
+    },
+    {
+      "title": "What the evidence establishes",
+      "rows": [
+        [
+          "Survey",
+          "Perceived quality of the evaluated build"
+        ],
+        [
+          "Regressions",
+          "118 local cases with synthetic IO adapters"
+        ],
+        [
+          "Browser sizing",
+          "Six phone, tablet and desktop viewports"
+        ],
+        [
+          "Still required",
+          "Signed-in acceptance and real-device media trials"
+        ]
+      ],
+      "bottom": "Local checks do not establish production capacity or clinical accuracy",
+      "notes": "Source checkpoint ec6803a passed 118 local regressions, typecheck, lint and a production build. A separate Chromium test covered 320,390,768,820,1024 and1280px widths with synthetic media. Local Firestore rule cases denied combined/admin identities and retained doctor ownership access. This is not real iPad/Safari audio-video acceptance, production load or language accuracy. The root scope guard rejects unrelated user AGENTS.md content; the full security command passed in an isolated snapshot with tracked instructions. Do not attribute later maintenance to the survey respondents. Source: docs/testing/evidence/2026-11-27-clinical-separation/verification.json."
+    },
+    {
+      "title": "Three-writer panel rehearsal",
+      "rows": [
+        [
+          "Writer 1",
+          "Contribution, objectives and study limitations"
+        ],
+        [
+          "Writer 2",
+          "Identity, roles, admission and privacy"
+        ],
+        [
+          "Writer 3",
+          "Capacity units, AI/language limits and recovery"
+        ],
+        [
+          "Everyone",
+          "Priority questions 1-25, then one follow-up"
+        ]
+      ],
+      "bottom": "Current rule, reason, specific evidence, limitation",
+      "notes": "Use the 97-question prioritized bank. All prior 81 topics remain, with a stable-id number map and 16 additions. Ranking is preparation judgment, not measured panel frequency. Retention is priority20, encounter lifecycle24 and scheduling25. Scheduling is not live: describe the selected doctor-booked design and its acceptance gates. Keep a five-minute version on slides2,3,4,7,10 and11. Sources: PANEL-QA-LATEST.md; panel-question-number-map.md."
+    },
+    {
+      "title": "A bounded demonstration sequence",
+      "steps": [
+        "1. Administrator entry and correctly scoped staff grant",
+        "2. New invitation with a waiting limit of two",
+        "3. Third visitor refused; raise the limit and retry",
+        "4. Manual admission or verified allowlist direct entry",
+        "5. One synthetic patient call with optional consented notes",
+        "6. Encounter evidence, AI draft and clinician review"
+      ],
+      "notes": "Prepare separate approved synthetic browser profiles; a shared Firebase uid is still one principal. The queue example demonstrates waiting admission, not a group clinical workflow. If network or AI fails, show the actual retry/unavailable state and use labeled offline evidence without pretending the live step succeeded. Freeze the demonstrated commit and confirm it before the defense. Preserve the original title, 259-page pagination and financial amounts; the private copy retains appendices and must not be placed in the public repository. Sources: one-day-defense-guide.md; admin-entry-findings-and-claude-handoff.md."
+    }
+  ]
+}

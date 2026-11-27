@@ -16,7 +16,7 @@ const { finalizePresentation } = await import(pathToFileURL(path.join(SKILL, 'co
 const build = path.join(ROOT, 'tmp/queue-title-deck');
 const output = path.join(ROOT, 'docs/thesis-defense/TeleConsole-Waiting-Queue-and-Title-Defense.pptx');
 await fs.mkdir(build, { recursive: true });
-const content = JSON.parse(await fs.readFile(path.join(ROOT, 'docs/thesis-defense/queue-title-slides.json'), 'utf8'));
+const content = JSON.parse(await fs.readFile(path.join(ROOT, 'docs/thesis-defense/panel-demo-slides.json'), 'utf8'));
 const deck = Presentation.create({ slideSize: { width: 1280, height: 720 } });
 const ink = '#173141', teal = '#126B78', muted = '#4C6570', light = '#EAF2F3';
 
@@ -66,13 +66,7 @@ for (const [index, item] of content.slides.entries()) {
       link(slide, a, b); link(slide, b, c); link(slide, b, d, 'bottom', 'top');
       link(slide, d, e); link(slide, c, f, 'right', 'top'); link(slide, e, f, 'right', 'bottom');
     } else if (item.kind === 'race') {
-      const values = [
-        ['Stage', 'Waiting count', 'Decision'],
-        ['Initial state', '9 of target 10', 'One apparent remaining place'],
-        ['Visitor A pre-check', 'Sees 9', 'Allowed before reservation'],
-        ['Visitor B pre-check', 'Also sees 9', 'Allowed before reservation'],
-        ['Both reservations', '11', 'Use counter commits, capacity overshoots'],
-      ];
+      const values = item.table;
       const table = slide.tables.add({ rows: values.length, columns: 3, left: 72, top: 190,
         width: 1136, height: 365, columnWidths: [285, 245, 606], values });
       for (let r = 0; r < values.length; r++) for (let c = 0; c < 3; c++) {

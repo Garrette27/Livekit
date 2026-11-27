@@ -1,69 +1,16 @@
-# Exact page-change register
+# Exact same-page manuscript changes
 
-25 November 2026. Page numbers below are **printed manuscript numbers**; the second column is the PDF viewer's physical page. Physical page = printed page + 12 in these sections. No pages were inserted, removed or renumbered. Existing contents cross-references were not regenerated. The original development-cost heading is at printed 80 / PDF 92 even though its old contents entry points elsewhere; that pre-existing inconsistency needs adviser review.
+27 November 2026. The manuscript remains **259 physical pages**, with the original title, page sizes, numbering, objectives, survey figures and expense amounts unchanged. This register records **45 bounded substantive edits across 37 physical pages**. Printed chapter page = PDF page minus 12. This is an editorial supplement, not new study results.
 
-The revised public copy now has **38 bounded substantive edits across 31 physical pages**: the initial 32 edits plus six queue/title follow-up corrections. Exact original anchors, replacement text and reasons are reproducible from [revision-manifest.json](revision-manifest.json). [Current PDF verification](evidence/queue-title-2026-11-25/pdf-verification.json) records the selected rectangles, source/output hashes and all-page checks. The original [32-edit report](evidence/pdf-verification.json) remains historical for the artifact at commit `25cd516`. Wording changes do not create new research results.
+This follow-up revises PDF **66, 71, 75 and 106** / printed **54, 59, 63 and 94**: administrator separation; opt-in retention and future attachment cleanup; encounter finalization; responsive consultation context and consent. Retention also remains qualified at PDF **105** / printed **93**. Scheduling remains disabled, as stated at PDF66 and111; the selected doctor-booked design is future work until implementation and testing.
 
-## Six new waiting-queue corrections
+All substantive PDF pages: 15, 22, 27, 35, 54, 64, 66, 68, 70, 71, 74, 75, 77, 81, 82, 83, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 98, 101, 102, 103, 104, 105, 106, 111, 173, 193.
 
-The official title on physical page 1 stays unchanged. The [queue/title rationale](waiting-queue-and-title-defense.md) explains it without inventing an approval history or changing its claims into certification.
 
-| Printed page | PDF page | Follow-up correction |
-| --- | --- | --- |
-| 54 | 66 | Align doctor/queue actions with provisioned roles, direct-entry exception, disabled attachments and conditional summary generation. |
-| 73 | 85 | State that qualifying verified allowlisted patients can enter directly; not every valid invite holder waits. |
-| 74 | 86 | Locate queue actions in invitation/in-room surfaces rather than claiming the history dashboard manages them. |
-| 89 | 101 | Explain manual admission, oldest-arrival display, no automated FIFO/triage guarantee and admitted-versus-connected state. |
-| 90 | 102 | Correct patient three-second API polling versus doctor change invalidation/re-query; a spinner does not prove live media. |
-| 94 | 106 | Clarify per-invitation default waiting target, non-atomic capacity check and its possible overshoot, plus separate operational/clinical states. |
+See the [complete exact table](page-changes-2026-11-27.md), [replacement manifest](revision-manifest.json) and [current all-page verification](evidence/admin-defense-2026-11-27/pdf-verification.json).
 
-## Initial corrections retained
+## Verification and privacy
 
-| Printed page | PDF page | Minimal substantive correction |
-| --- | --- | --- |
-| 10 | 22 | Define intended one-doctor/one-patient encounter; concurrent maximum remains unmeasured. |
-| 52 | 64 | Distinguish published LiveKit plan ceilings from measured application capacity. |
-| 56 | 68 | Remove claims that disabled attachments or geolocation are active identity controls. |
-| 58 | 70 | Describe verified allowlist or doctor admission, not device/location identity proof. |
-| 59 | 71 | Separate clinician drafts from patient history; clarify transcript evidence, disabled attachments, consent, retention and logical stores. |
-| 62 | 74 | Describe architecture safeguards without claiming unlimited scale or compliance certification. |
-| 63 | 75 | Separate summary lifecycle triggers from evidence/eligibility gates. |
-| 65 | 77 | Clarify direct admission, disabled uploads and lifecycle behavior. |
-| 69 | 81 | Explain that logical ERD relationships do not make Firestore enforce SQL foreign keys or cascades. |
-| 70 | 82 | Explain that LiveKit carries media; Firestore/Vercel are not the video archive; uploads are disabled and E2EE is not established. |
-| 71 | 83 | Clarify persistent text versus media storage and inactive geolocation. |
-| 75 | 87 | Do not equate room transport features with a validated multi-patient clinical workflow. |
-| 76 | 88 | Correct framework version description to the current source dependency inventory, not a verified deployment. |
-| 77 | 89 | Label prepared-but-disabled attachment/geolocation features honestly. |
-| 78 | 90 | Align stack descriptions with active scope rather than disabled-feature/compliance promises. |
-| 79 | 91 | Continue stack/scope clarification without a new operational guarantee. |
-| 80 | 92 | Correct dependency version labels in the cost inventory; preserve every expense amount. |
-| 81 | 93 | Label the old geolocation item inactive; retain its reported amount. |
-| 82 | 94 | Clarify bounded prototype allowances and project-development expenses versus a separate recurring clinic budget. All amounts and total retained. |
-| 83 | 95 | Change the AI expense classification from a measured productivity benefit to a cost; productivity/time benefit is unmeasured. Amount retained. |
-| 92 | 104 | Invitation links are signed bearer capabilities, not encrypted identity proof. |
-| 93 | 105 | Historical retention screenshot does not establish current enabled retention enforcement. |
-| 99 | 111 | State enabled scope and deployment prerequisites instead of blanket readiness. |
-| 161 | 173 | Add a proposed paired-call evaluation protocol and distinguish it from executed results. |
-| 181 | 193 | Label historical source appendix excerpts as non-authoritative for the current deployment, including old fingerprint/location handling. |
+The [current PDF verification](evidence/admin-defense-2026-11-27/pdf-verification.json) records exact selected rectangles, hashes and all-page checks. The manifest contains every replacement. Historical reports are retained under their original dated folders; their artifact hashes are not current.
 
-## Pricing deliberately preserved
-
-The reported project amounts remain PHP 356.69 AI integration/demonstration, PHP 3,000 project internet, PHP 2,000 documentation/printing/binding/questionnaires, PHP 1,500 clinic coordination/travel and PHP 1,000 contingency: **PHP 7,856.69 total**. Existing zero-cost table amounts remain unchanged. These are project estimates, not independently audited receipts or a guaranteed clinic subscription price.
-
-Current USD provider scenarios are in the separate researched brief, with assumptions/exclusions. They were not substituted for the thesis's real non-cloud expenses. No surveyed response, sample size, weighted mean, Chapter IV numerical finding or measured load result was invented or recalculated.
-
-## Additional privacy changes in the GitHub copy only
-
-| Printed pages | PDF pages | Public-copy redaction |
-| --- | --- | --- |
-| 87, 89, 92, 93 | 99, 101, 104, 105 | Mask demo-account identifiers and invitation/link details in screenshot regions. |
-| 237-247 | 249-259 | Omit personal CV images containing contact/background information; keep each physical page and a short omission notice. |
-
-These are not evidence or research corrections. The supplied original is untouched. For an academic submission that requires the personal appendices, obtain the authors'/adviser's approval and use the authorized original/private workflow. The repository copy intentionally does not publish those personal details. It is not claimed to be a complete professional de-identification assessment of every image in the historical manuscript.
-
-## What the automated document verification proves
-
-The page count is 259; page dimensions, labels and bookmarks are unchanged; every untouched page renders identically; changed pages render identically outside approved edit areas; each replacement can be extracted; source SHA-256 is unchanged. Changed pages were also visually inspected for layout. The queue/title source audit demonstrates an unresolved capacity race, not a newly passed load test. Document checks do not prove clinical efficacy, privacy compliance or runtime correctness. Read the separate application evidence for its narrower claims.
-
-The source appendix and diagrams remain historical because replacing/reflowing them wholesale would violate the minimal pagination-preserving scope. Their status is explained, not silently represented as current implementation. Resolve remaining source-document cross-references with the adviser before final submission.
+Public-copy identifier masks and CV image omissions are additional privacy edits, not changes to the private academic submission. The public copy omits CV images on PDF249-259 and masks selected screenshot identifiers. The private copy remains local. Both retain259 pages. Expense total7,856.69 and its component amounts remain unchanged at PDF94 / printed82. No objective or ChapterIV survey value is replaced. Advisers/authors must approve the final academic submission.

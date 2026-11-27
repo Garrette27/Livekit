@@ -51,7 +51,7 @@
     "page": 71,
     "start": "The fourth process, Perform Audit",
     "end": "summaries according to the implemented retention policy.",
-    "replacement": "The fourth process supports audit logging and optional summary retention. Scheduled summary deletion runs only when retention enforcement is explicitly enabled; its default interval is 30 days. This is not a complete purge of sessions, transcripts, messages, or backups. A clinic-wide retention and deletion policy remains a deployment prerequisite.",
+    "replacement": "The fourth process supports audits and opt-in summary retention. Firebase's daily deletion worker defaults to a 30-day cutoff; Vercel's separate cron retries summary processing. Neither age nor a missing summary proves deletion. Sessions, transcripts, messages, other copies and backups are not fully purged. Future attachments need a separate approved expiry policy, bounded storage/metadata cleanup, and retry reconciliation; uploads remain disabled.",
     "reason": "Do not promise enabled or complete 30-day deletion."
   },
   {
@@ -75,7 +75,7 @@
     "page": 75,
     "start": "During the consultation, the platform",
     "end": "retention management of consultation records.",
-    "replacement": "During a consultation, the platform supports audio, video, chat, and screen sharing. Patient departure, encounter finalization, revocation, or verified lifecycle events can request summary processing. A request does not guarantee an AI call: evidence, availability, revision, and clinician-review guards apply. Missing evidence produces a deterministic nonclinical record. Background retention is optional and does not erase every encounter-related document.",
+    "replacement": "During consultation, audio, video, chat and screen sharing are available. An invitation is reusable access policy; each room opening may create a distinct encounter. Active encounters are not finalized and cannot generate a summary. Leaving or lifecycle events may finalize an encounter without revoking its invitation. Finalized processing still requires consent, usable evidence, availability and revision guards; reviewed output is preserved. Doctor-only openings are nonclinical records, not diagnoses.",
     "reason": "Clarify triggers versus eligibility and provider invocation."
   },
   {
@@ -337,7 +337,7 @@
     "page": 66,
     "start": "Concurrently, the Doctor actor initiates authentication",
     "end": "backend generation of an AI-assisted clinical summary.",
-    "replacement": "The Doctor actor signs in with a provisioned clinician account, manages invitations, and admits or rejects visitors through the server-owned waiting worklist. Verified allowlisted patients may enter directly; other accepted visitors wait. The doctor conducts the consultation and reviews encounter evidence and draft summaries. Attachments remain disabled. Ending an encounter can request finalization, but eligibility and evidence-quality gates decide whether AI generation occurs. Admission grants access; it does not prove a media connection or a completed clinical encounter.",
+    "replacement": "Staff identities use Firebase Authentication; signup alone grants no administrative role. Platform and clinic administrators manage staff access, without clinician API permissions even with old combined claims. Clinic administrators provision doctors within their clinic; legacy clinician profiles remain transitional. A separate doctor account manages invitations, admits visitors, conducts calls and reviews drafts. Verified allowlisted patients may enter directly. Admission is permission, not attendance; the host is not a patient visit. Attachments and scheduling remain disabled. Summary processing requires finalization, consent and usable evidence. Administrative metadata is separate from clinical record ownership.",
     "reason": "Align the actor description with verified direct entry, clinician admission, disabled attachments and conditional AI finalization."
   },
   {
@@ -380,7 +380,7 @@
     "page": 106,
     "start": "The interface is flanked by two functional side panels designed for workflow",
     "end": "or exiting the session.",
-    "replacement": "The left Waiting Queue panel lists waiting and admitted visits with admit and remove controls; each action applies only to the visit the doctor saw, and a removed visitor must be admitted again. Oldest-first display is not FIFO treatment or triage. Admitted means permission to join, not confirmed media. The default ten-visitor waiting target applies per invitation and is enforced atomically; it is not a measured call capacity. The right Doctor Session Panel provides room details, optional consented speech notes, invitation copying and Leave Call; these controls do not prove clinical completion or AI summarization.",
+    "replacement": "The Waiting Queue lists visits with admission controls; expanded details show captured identity provenance and arrival/admission/departure times. Admission is permission, not confirmed media or triage. The default ten-visitor waiting target is enforced atomically per invitation, not measured call capacity. Compact phone/tablet layouts expose on-demand panels; wider layouts reserve panel space. Room details show minimal audience/count context, not a duplicate invitation manager. Optional transcription starts unchecked on each new entry; reusing a room does not carry consent into another encounter. Real-device media acceptance remains separate from viewport checks.",
     "reason": "Explain the queue's actual purpose, operational states, per-invitation target and verified non-atomic capacity limitation. Updated 27 Nov 2026: the per-invitation target is now enforced atomically (emulator evidence), so the earlier race disclaimer was removed."
   },
   {

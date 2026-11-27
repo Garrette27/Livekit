@@ -1,14 +1,15 @@
-# Manuscript pages changed (same 259 pages, same numbering)
+# Exact same-page manuscript changes
 
-Physical PDF page = page in the PDF viewer. Printed page = number at the bottom of the page.
-Printed page = physical page − 12 for Chapters I–V (the front matter uses roman numerals).
+27 November 2026. The manuscript remains **259 physical pages**, with the original title, page sizes, numbering, objectives, survey figures and expense amounts unchanged. This register records **45 bounded substantive edits across 37 physical pages**. Printed chapter page = PDF page minus 12. This is an editorial supplement, not new study results.
 
-Rebuilt 27 November 2026 from the original submission with `scripts/thesis/revise-defense-thesis.py`;
-all 259 page sizes, labels and bookmarks are unchanged and every page outside the edited boxes is
-pixel-identical to the original. Objectives (printed pages 7–8) and Chapter IV survey numbers are not edited.
+This follow-up revises PDF **66, 71, 75 and 106** / printed **54, 59, 63 and 94**: administrator separation; opt-in retention and future attachment cleanup; encounter finalization; responsive consultation context and consent. Retention also remains qualified at PDF **105** / printed **93**. Scheduling remains disabled, as stated at PDF66 and111; the selected doctor-booked design is future work until implementation and testing.
 
-| PDF page | Printed page | Edit id | What changed and why |
-|---|---|---|---|
+All substantive PDF pages: 15, 22, 27, 35, 54, 64, 66, 68, 70, 71, 74, 75, 77, 81, 82, 83, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 98, 101, 102, 103, 104, 105, 106, 111, 173, 193.
+
+## Exact edits
+
+| PDF page | Printed page | Stable edit id | Reason |
+| --- | --- | --- | --- |
 | 15 | 3 | `intro-current-admission` | The implemented admission never used device, browser or location validation; describe the actual verified-account or doctor-admission policy. Objectives unchanged. |
 | 22 | 10 | `capacity-scope` | State an intended encounter size without inventing a concurrent-call result. |
 | 27 | 15 | `rrl-bandarra-storage` | Summaries are not ephemeral or patient-restricted; they are stored clinician-reviewed drafts bound to one encounter. |
@@ -27,15 +28,15 @@ pixel-identical to the original. Objectives (printed pages 7–8) and Chapter IV
 | 77 | 65 | `flow-disabled-attachments` | Correct disabled files, direct admission, and lifecycle trigger description. |
 | 81 | 69 | `erd-no-cascade` | Explain document relationships and lack of automatic relational cascade. |
 | 82 | 70 | `network-sdk-boundaries` | Correct media topology and disabled direct uploads without claiming a fixed TLS version or E2EE. |
-| 83 | 71 | `network-storage` | Distinguish stored records from transported video and inactive storage. |
 | 83 | 71 | `network-geolocation` | Preserve figure context while clearly disabling the legacy branch. |
+| 83 | 71 | `network-storage` | Distinguish stored records from transported video and inactive storage. |
 | 85 | 73 | `queue-invite-direct-exception` | Do not imply every valid invitation holder must wait. |
 | 86 | 74 | `queue-clinician-navigation` | Describe the actual dashboard and locate queue actions in the invitation and room surfaces. |
 | 87 | 75 | `room-features` | Do not advertise disabled uploads or validated group consultations. |
 | 88 | 76 | `version-next-materials` | Match the current package manifest major/minor without claiming the deployed runtime. |
 | 88 | 76 | `version-react-materials` | Match the current source dependency range. |
-| 89 | 77 | `storage-table` | Correct the capability-status table. |
 | 89 | 77 | `geolocation-table` | Remove geolocation as an active security mechanism. |
+| 89 | 77 | `storage-table` | Correct the capability-status table. |
 | 90 | 78 | `persistence-stack` | Remove unsupported compliance implications and inactive uploads; preserve next-page continuation. |
 | 91 | 79 | `stack-no-compliance-guarantee` | Remove an explicit unsupported compliance/high-performance guarantee. |
 | 92 | 80 | `version-next-budget` | Align the budget inventory with the current manifest. |
@@ -55,8 +56,8 @@ pixel-identical to the original. Objectives (printed pages 7–8) and Chapter IV
 | 173 | 161 | `test-recommendation-specific` | Give a reproducible next test without inserting fabricated Chapter IV results. |
 | 193 | 181 | `appendix-historical-status` | Explicitly disclose stale security-sensitive appendix code without rewriting or repaginating the appendix. |
 
-Public copy only (not in the private submission): PDF page 99 (demo identifiers masked) and
-PDF pages 249–259 (curriculum vitae images omitted).
+## Verification and privacy
 
-Files: private `output/pdf/TeleConsole-Revised-259-Pages-Private-Submission.pdf` (not committed),
-public `docs/thesis-defense/TeleConsole-Revised-259-Pages.pdf`.
+The [current PDF verification](evidence/admin-defense-2026-11-27/pdf-verification.json) records exact selected rectangles, hashes and all-page checks. The manifest contains every replacement. Historical reports are retained under their original dated folders; their artifact hashes are not current.
+
+Public-copy identifier masks and CV image omissions are additional privacy edits, not changes to the private academic submission. The public copy omits CV images on PDF249-259 and masks selected screenshot identifiers. The private copy remains local. Both retain259 pages. Expense total7,856.69 and its component amounts remain unchanged at PDF94 / printed82. No objective or ChapterIV survey value is replaced. Advisers/authors must approve the final academic submission.

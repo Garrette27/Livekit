@@ -1,118 +1,103 @@
-# TeleConsole — panel Q&A (LATEST, 27 November 2026)
+# Panel Q&A: start here
 
-**This is the file to study.** It is the short, panel-style version, in the order panels usually ask, with the demo moment that proves each answer. Long-form answers with sources and edge cases: [panel-questions-and-answers.md](panel-questions-and-answers.md) (Q1–Q76, numbers in brackets below). Demo script: [one-day-defense-guide.md §4](one-day-defense-guide.md). Live site: `livekit-frontend-tau.vercel.app` (production = `main`).
+27 November 2026. Source: `ec6803a`. This is the short rehearsal route; the [complete priority bank](panel-questions-and-answers.md) contains **97 questions**, retaining all 81 earlier topics and 16 additions. [Old-to-new number map](panel-question-number-map.md). Ranking reflects preparation risk and engineering judgment, not measured panel-question frequency or a guarantee of passing.
 
-How to answer every question (20–40 s): **rule → reason → evidence (show it) → limit.** Never claim more than the objectives and Chapter IV support.
+## First five answers everyone must know
 
----
+### 1. How many consultations can the system handle at once?
 
-## A. The opening questions (Chair / adviser)
+One doctor and one patient is the intended encounter. The maximum number of simultaneous pairs has not been measured. A waiting limit and a provider connection allowance are different quantities. Our next experiment is controlled 1, 3 and 5 simultaneous pairs, with receiver quality, failures and service usage measured. Do not present that proposed experiment as a passed result.
 
-**"In one sentence, what did you build?"**
-A web teleconsultation system for a dental clinic: the doctor sends a secure link, the server decides who enters, LiveKit carries the video, and AI drafts a summary that the dentist reviews. *Demo: steps 1–3.* [Q3]
+### 2. What did you contribute if LiveKit already handles video?
 
-**"What is your contribution if LiveKit already does video?"**
-The integration and its rules: server-signed invitations, doctor-controlled admission, provisioned doctor roles, visit-bound access, consented transcription, evidence-gated AI drafts. We did not invent WebRTC. [Q3, Q67]
+The integrated workflow: server-owned invitation policy, clinician-controlled admission, encounter ownership, consented evidence and clinician-reviewed AI drafts. We did not invent WebRTC, an SFU or a diagnostic model. Show one complete synthetic patient journey.
 
-**"Did you meet your objectives?"** (Objectives are unchanged — printed pages 7–8.)
-1. Platform with LiveKit and layered security — built; shown live; 78 automated regression tests.
-2. AI summarization — built; draft labelled "review required"; insufficient-evidence records instead of invented content.
-3. User-centred flexible access + ISO/IEC 25010 evaluation — built; 30 respondents, all groups "Highly Acceptable" (3.51–3.94).
-Limit: perceived quality, not measured performance or clinical accuracy. [Guide §3]
+### 3. Why does the title say secure?
 
-**"Why 'secure' in your title?"**
-It names the design goal backed by specific controls and tests, not a certification. We found and fixed our own weaknesses this week and kept tests for each. [Q4]
+It names the design goal and implemented controls, not a certification. Name a tested authorization or transaction case and its environment. We still require signed-in staging acceptance, broader adversarial testing and operational/privacy work before real-clinic release.
 
----
+### 4. Does AI diagnose or prescribe?
 
-## B. Security (IT panelist — expect the hardest follow-ups here)
+No. It drafts from usable consented transcript evidence; the clinician must verify and edit it. Missing evidence can yield a deterministic insufficient-evidence record without a model call. Unknown risk is valid. A successful example does not establish clinical accuracy.
 
-**"What if someone forwards the link?"**
-The link is a key, not an identity. Anyone holding it can only knock; they wait until the doctor admits them. *Demo: guest in incognito waits.* [Q7]
+### 5. What can your evidence actually prove?
 
-**"Who skips the waiting room?"**
-Only a signed-in, provider-verified account whose email the doctor put on that invitation. A typed email never counts. *Demo: verified patient enters directly; guest typing the same email waits.* [Q8, Q51]
+The survey describes perceived quality of the evaluated build. The latest follow-up passed 118 local regressions, a synthetic Chromium test across six phone/tablet/desktop sizes and local Firestore rule cases. The previous administrator-entry checkpoint had three signed-out browser checks. None measures a safe production call maximum or bilingual clinical accuracy. State the actual deployed commit and the build respondents evaluated if recorded.
 
-**"Anyone can create a patient account — isn't that a risk?"**
-No. Sign-up only creates the lowest role, which sees only that patient's own records; access to a consultation still needs the doctor's admission. That is the standard patient-portal pattern. [Q71]
+## Access and administration demo
 
-**"Can anyone sign up as a doctor?"**
-No. Doctor roles come only from an administrator. *Demo: /admin — grant a doctor role; show the audit-safe flow.* [Q52, Q72]
+### Who grants staff access?
 
-**"What if you revoke a doctor?"**
-Their role is removed and other sessions end; a token already issued can last up to an hour — we say so honestly. [Q80]
+The provider-verified platform owner grants clinic administrators; they manage doctors only within their clinic. Both kinds of administrator are non-clinical and need a separate provisioned doctor identity for consultations. New Administrator grants no longer write Doctor authority. Existing combined claims are denied by clinical APIs and by the proposed Firestore rules once deployed. Environment-only bootstrap identities still need historical-claim migration for the direct Firestore boundary. Existing media credentials have a separate lifecycle. Patient accounts are not converted to clinicians.
 
-**"Can another doctor see or admit my patients?"**
-No. Every server action checks the acting doctor owns the invitation; a doctor id sent by the browser is ignored. [Q13]
+### Why did administrator sign-in open Invitations?
 
-**"What if a removed patient comes back?"**
-They wait again — even if they are on the direct-join list — because the doctor's rejection outranks the list. [Q40]
+The old entry linked to doctor login, whose successful paths always opened Invitations. Dedicated `/admin/login` now preserves administrator intent. The server access projection routes an authorized administrator to `/admin`; the UI cannot grant the role.
 
-**"Is the video end-to-end encrypted?"**
-Encrypted in transit (TLS and WebRTC DTLS-SRTP); end-to-end encryption is available in LiveKit but not enabled. We say so in Chapter II. [Q35]
+### Can anyone use administrator signup to become an admin?
 
-**"Did you do penetration testing?"**
-No. We ran automated regression and emulator tests and an internal review; an independent penetration test is a recommendation (Chapter V). [Q48]
+No. `/admin/signup` creates a sign-in identity only. The owner must separately grant Administrator. An unapproved account receives pending-access guidance, not permission. Do not demonstrate self-promotion as a shortcut.
 
----
+### Why did a granted account still behave like a doctor?
 
-## C. The waiting room and numbers (often asked by the statistician or IT)
+Check the selected role and the confirmed result. Doctor grants clinician access only; Administrator is a separate owner-only grant. Refresh the recipient's ID token with Check access again or sign in again after the correct grant. No live role is silently changed by a UI repair.
 
-**"How many patients joined, and were they anonymous?"**
-Each invitation now shows its visits by identification: e.g. "5 visits · 2 verified accounts · 3 guests". Guests include anonymous sessions and typed emails; the doctor's queue also shows how each person's identity was established. History labels unidentified visits "Unidentified patient". *Demo: View queue → Visits line.*
+### Why did the owner show as a legacy doctor?
 
-**"What is the waiting limit? What if the doctor raises it?"**
-Default 10 per invitation, 1–100. The doctor can change it on a live invitation ("Save limit"); it applies to the next arrival. Lowering it never removes anyone already waiting — it only blocks new arrivals. It is enforced inside a database transaction (25 simultaneous arrivals into 10 places → exactly 10 in the emulator). *Demo: change 10 → 2, open a third guest, see "Waiting room is full".* [Q16–Q19]
+The old list conflated doctor provisioning with bootstrap authority. Effective Super administrator / Server bootstrap labeling now uses the verified Auth identity and server configuration. A historical doctor profile can still exist; that is a different fact. A profile email alone cannot bootstrap authority.
 
-**"Two guests on the same Wi-Fi — mixed up?"**
-No: each tab/device is its own visitor (session, or network + browser + per-tab id). [Q81]
+## Admission, AI and language follow-ups
 
-**"Is the queue first-come-first-served?"**
-It displays oldest first, but the doctor chooses whom to admit; it is not triage. [Q9–Q10]
+### Is the waiting limit the call limit?
 
-**"How many consultations can it handle at once?" (the CCTV question)**
-Designed for one doctor and one patient per encounter. We did not measure a maximum, so we don't claim one. The 10 is a waiting rule; LiveKit's free plan allows 100 connections — a provider ceiling, not our result. Next test: 1, 3, then 5 simultaneous pairs on separate devices. [Q27, Guide §6]
+No. The default ten, editable from 1-100, is a per-invitation waiting rule. It is checked transactionally; the dated emulator report shows 25 arrivals into ten places ending at ten waiting with fifteen refused. Lowering a limit does not remove existing visitors. This does not validate a multi-patient clinical room or a global clinic cap.
 
-**"Why only 5 dentists? Is 3.51 meaningful?"**
-Descriptive for the selected respondents; purposive sample; no dispersion or reliability coefficient reported. Chapter V limits the conclusion accordingly. [Q38]
+### Does everyone wait, and is the queue FIFO?
 
----
+Verified allowlisted accounts may enter directly; other accepted visitors need the doctor's decision. The list displays oldest first but the doctor selects whom to admit. It performs no clinical triage. Admitted means permission, not confirmed connection or completed care.
 
-## D. AI (adviser / clinician-minded panelist)
+### Can two tabs represent different patients?
 
-**"Does the AI diagnose?"**
-No. It drafts from consented transcript evidence; the dentist reviews and edits. Too little speech → an "insufficient evidence" record, risk "Unknown", never invented findings. *Demo: dashboard card "AI draft · review required"; Edit shows Risk "Unknown (not established)".* [Q5, Q64]
+Distinct unauthenticated per-tab ids separate the fallback case, but a shared Firebase uid remains one principal and duplicated tabs can copy state. Use separate synthetic browser profiles/accounts for a repeatable multi-person demo. Typed email and network signals never establish patient identity.
 
-**"What if the patient refuses recording?"**
-The call still works; each participant opts in separately. [Q44]
+### Is Tagalog/Taglish supported and validated?
 
-**"Is chat used in the summary?"**
-No — chat is shown in history but is not AI evidence. [Q63]
+The speech-note selector includes Filipino/Tagalog and English settings passed to browser recognition. Actual support and accuracy depend on browser/provider and environment. The current summary prompt requests English and preserves uncertain source terms. We have not measured bilingual error rates or clinical translation safety. Review negation, doses, names and durations against the source.
 
-**"Can the patient send an X-ray or photo?"**
-Not yet, by design. Attachments need private storage, file checks, malware scanning, permission-checked downloads, retention and isolation tests; on Firebase it also needs the Blaze plan. Today the patient shows it on camera or shares the screen. Plan: `attachment-plan.md`. [Q69, Q70, Q76]
+### Does chat enter the AI prompt?
 
----
+No, not in the current active summary path. Chat is encounter history. Consented transcript evidence feeds the current summary path; attachments remain disabled. A rendered history chat panel is not proof of prompt provenance.
 
-## E. "Can this become a business for small clinics?" (very common closing question)
+### Does revoking a role instantly stop all access?
 
-**Answer:** "Yes, the access model is ready for it, and we would add two things before selling it."
-- **Provisioning (already built):** a platform super admin creates a **clinic administrator** for each clinic; each clinic admin grants **doctor** accounts only inside their own clinic; doctors invite their own patients; patients self-register only as patients. Every grant is server-checked, recorded in an audit log, and nobody can change their own role. Pattern: **delegated, tenant-scoped administration with claims-based RBAC.** *Demo: /admin — clinic field and "manage only your own clinic".*
-- **Per-area staff:** a doctor's patients are bound to that doctor's invitations, and each clinic admin only sees their own clinic's staff — a doctor in one area cannot see another area's list.
-- **Before commercial use (honest gaps):** clinic-level record sharing and billing, data-privacy registration and processor agreements (RA 10173), paid hosting tiers, backups/restore tests, monitoring, an independent security test, and measured call capacity. [Q52, Q61, Q72–Q74; capacity-quality-costs brief]
+No. Refresh tokens and claims change, but an already-issued Firebase ID token can remain accepted until expiry under ordinary verification. Existing LiveKit tokens have a separate lifecycle. A reviewed immediate-revocation policy needs end-to-end tests, not an untested one-line edit.
 
-**"How much would it cost a small clinic?"**
-Modeled ≈ USD 70/month for ~440 twenty-minute visits (LiveKit Ship + Vercel Pro), excluding AI, backups, support and taxes. Planning estimate, not a quote. [brief]
+## History, consent, retention and responsive design
 
----
+An invitation is reusable access policy, not one immutable encounter. Leaving and reopening can produce separate session records, including doctor-only openings. Do not merge by room name. Active encounters say **Not finalized** and cannot generate a summary; revocation is not the only completion event. No patient joined is a factual operational outcome, not a clinical diagnosis or proof of a scheduled no-show.
 
-## F. Process questions
+Each new entry starts transcription unchecked. Device preflight and fresh optional consent are intentional; reusing a room name must not silently restart capture. The call works without transcription.
 
-**"You used Waterfall but changed code this week?"**
-Iteration inside implementation and testing; fixes are documented with dated evidence. [Q49]
+The Firebase daily deletion worker is **opt-in**, defaulting to a 30-day cutoff. The corrected bounded page is 200 summaries plus 200 schedule entries. The Vercel daily cron retries summary work; it does not delete summaries. Other session/transcript/chat copies and backups are not fully purged. Age alone cannot prove deletion; the history label now says an older summary is unavailable. Production enablement and successful runs are unverified. Future attachments could reuse the bounded, idempotent worker pattern only after separate expiry, storage deletion and reconciliation tests; uploads remain disabled.
 
-**"What would you do with one more month?"**
-Staged acceptance tests, measured paired-call capacity, clinician review of AI accuracy, then attachments behind the safeguards. [Q50]
+The compact call layout uses on-demand panels, with reserved panel space on wider screens. Expand participant details for captured arrival/admission/departure times and identity provenance; a self-declared email is not verified identity. Hashed invitation addresses cannot be recovered for display. Report viewport checks separately from real iPad/Safari media acceptance. The host is excluded from new direct-entry audience counts and cannot reserve a patient visit on the host account.
 
-**"What did you change in the manuscript?"**
-Same 259 pages and numbering; corrections on 37 pages; objectives and Chapter IV untouched. Register: `page-changes-2026-11-27.md`. [Q60]
+Scheduling remains disabled. The user selected doctor-booked appointments as the next bounded feature, with separate appointment records, timezone-aware times, overlap prevention and cancellation/rescheduling. An appointment must not grant consultation access or create clinical evidence. The design is not an implemented or surveyed result. See the [proposed design](../superpowers/specs/2026-11-27-doctor-booked-appointments-design.md).
+
+## Demo sequence tied to questions
+
+1. Open administrator entry with an approved synthetic account; show its effective authority and lack of clinical Invitations access.
+2. Demonstrate the distinction between Doctor and Administrator grants, clinic scope and refreshed access. Do not alter real accounts during rehearsal.
+3. Create a fresh invitation with a waiting target of two. Use separate synthetic visitor contexts; show a third new waiting arrival refused.
+4. Raise the limit to three and retry. Explain that lowering it never evicts existing waiting visitors.
+5. Admit one reviewed visitor, or show verified allowlist entry. Explain waiting/admitted/connected separately.
+6. Conduct one synthetic patient encounter. Demonstrate optional consented speech notes and the language setting without claiming measured accuracy.
+7. Show **Not finalized**, then end the encounter and show available evidence and draft/review state. If AI is unavailable, explain the actual state rather than pretending a live generation succeeded. Resize to phone/tablet and open/close the panels. Explain retention from the policy; do not run destructive cleanup during the demo.
+
+For a five-minute team briefing use slides 2, 3, 4, 7, 9 and 11. Writer 1 covers scope/evidence, writer 2 access/queue, writer 3 numbers/AI/recovery; rotate once. The supplement does not replace institutional methodology and results slides.
+
+## Manuscript and deployment boundaries
+
+The manuscript remains **259 pages** with unchanged official title, numbering, objectives, survey data and project expenses. This follow-up updates printed **54, 59, 63 and 94** / PDF **66, 71, 75 and 106** for role separation, retention/future attachments, encounters and responsive call context. The historical consent qualifier remains printed **93** / PDF **105**. See the [exact page register](page-change-register.md). Public privacy masks and private submission boundaries remain separate.
+
+A Ready deployment means a build/release event. Verify the actual frontend commit and signed-in behavior separately. The new administrator pages have not yet had signed-in production acceptance in this checkpoint. Do not claim the entire system is commercially ready or that other theses failed for a single universal reason. Remaining work and a bounded Claude prompt are in [the handoff](admin-entry-findings-and-claude-handoff.md).

@@ -4,19 +4,19 @@ Prepared 25 November 2026 (Asia/Singapore). Scope: minimally revise the supplied
 
 ## Latest (27 November 2026) — start here
 
-1. **[PANEL-QA-LATEST.md](PANEL-QA-LATEST.md)** — panel-style questions in the order panels ask, each with the demo moment that proves it.
+1. **[PANEL-QA-LATEST.md](PANEL-QA-LATEST.md)** — short rehearsal route, evidence boundaries and current demo. Priority is preparation judgment, not measured panel-question frequency.
 2. [One-day guide](one-day-defense-guide.md) — schedule, five-box explanation, objectives→evidence, demo script, slide plan, CCTV answer.
 3. [Presentation risk register](presentation-risk-register.md) — what could break the demo and the fallback.
 4. [Page changes 27 Nov](page-changes-2026-11-27.md) — manuscript pages changed (same 259 pages).
-5. [Full Q&A Q1–Q76](panel-questions-and-answers.md) and [attachment plan](attachment-plan.md).
+5. [Full ranked Q&A Q1–Q97](panel-questions-and-answers.md), [number map](panel-question-number-map.md), [current findings/Claude prompt](admin-entry-findings-and-claude-handoff.md) and [attachment plan](attachment-plan.md).
 
-The PDFs and slides listed below are from 25 November and predate the 27 November fixes.
+The manuscript, ranked Q&A PDFs and 14-slide panel/demo deck are rebuilt for this follow-up. The capacity/cost research brief is dated 25 November; do not read historical race findings as the current tested implementation. The newest role boundary is platform administration only: the configured owner uses a separate provisioned identity for doctor work.
 
 ## Send these first
 
 For direct browser downloads, use the [download index](DOWNLOADS.md) or [public-safe ZIP](TeleConsole-Public-Defense-Pack.zip). The ZIP uses the redacted manuscript and deliberately excludes the private submission copy and personal appendices.
 
-New waiting-queue/title supplement: [editable PowerPoint with speaker notes](TeleConsole-Waiting-Queue-and-Title-Defense.pptx), [offline slide handout](TeleConsole-Waiting-Queue-and-Title-Slides.pdf), [teammate teaching PDF](TeleConsole-Waiting-Queue-and-Title-Team-Guide.pdf), and [32 panel questions with answers](TeleConsole-Panel-Questions-and-Answers.pdf). The full sources are [queue/title guide](waiting-queue-and-title-defense.md), [panel answers](panel-questions-and-answers.md) and [slide content/notes](queue-title-slides.json). These are supplementary rehearsals; the official thesis title stays unchanged.
+Current panel/demo supplement: [editable PowerPoint with speaker notes](TeleConsole-Waiting-Queue-and-Title-Defense.pptx), [offline slide handout](TeleConsole-Waiting-Queue-and-Title-Slides.pdf), [teammate teaching PDF](TeleConsole-Waiting-Queue-and-Title-Team-Guide.pdf), [97 ranked panel answers](TeleConsole-Panel-Questions-and-Answers.pdf) and [quick answers](TeleConsole-Panel-Quick-Answers.pdf). Current slide content is [panel-demo-slides.json](panel-demo-slides.json); `queue-title-slides.json` remains a historical source. The official thesis title stays unchanged.
 
 1. [Messenger messages and three-writer briefing](messenger-and-three-writer-brief.md): quickest shared explanation, five-minute emergency version, speaker assignments and reading route.
 2. [Exact page-change register](page-change-register.md): printed and physical page numbers, preserved expense total, and separate public-copy privacy redactions.

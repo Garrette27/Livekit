@@ -1,5 +1,7 @@
 # TeleConsole — one-day defense guide
 
+Current follow-up: `ec6803a`, 27 November 2026. Use the [97 ranked answers](panel-questions-and-answers.md), [quick rehearsal route](PANEL-QA-LATEST.md), current 14-slide panel/demo deck and [verified checkpoint record](../testing/evidence/2026-11-27-clinical-separation/verification.json). All administrators are non-clinical; switch to a separate provisioned doctor identity for the call. Scheduling remains disabled while the selected doctor-booked design awaits implementation and testing. Older question references below use the [stable-id map](panel-question-number-map.md).
+
 27 November 2026 · code at branch `fix/atomic-queue-capacity-visit-binding` (PR #9) · manuscript: same 259 pages, see [page-changes-2026-11-27.md](page-changes-2026-11-27.md).
 
 Use this to learn the system well enough to **teach it**, run the demo, and answer the panel. Practice answers are in [panel-questions-and-answers.md](panel-questions-and-answers.md). Nothing here is a new clinical, security-certification or capacity result.
@@ -79,20 +81,20 @@ The results answer the objectives **as written**: build (1, 2, 3) and evaluate p
 | # | Panel question it answers | Do | Say |
 |---|---|---|---|
 | 1 | "Who are you signed in as?" | Show header (logo, name + email) | "The header always shows the signed-in account." |
-| 2 | "Can anyone become a doctor?" / "Business for clinics?" | Open `/admin`: grant Doctor to a test account in clinic `henry-cheung-dental` | "Only an administrator grants doctor roles, per clinic, and it's audited. Clinic admins manage only their own clinic." |
+| 2 | "Can anyone become a doctor?" / "Business for clinics?" | Open `/admin/login` with approved synthetic admin, then show a confirmed Doctor grant. Switch to the separate doctor identity. | "Administrators manage access only. Clinic admins are limited to their own clinic. Creating an identity grants no role." |
 | 3 | "How does the doctor assign a patient?" | Invitations: room `demo-nov27`, limit **2**, add Patient A's email chip → Create → Copy | "Patient A is assigned to enter directly; everyone else waits. The preview says so." |
 | 4 | "What if the link is forwarded?" | Guest 1 (incognito) opens link, types Patient A's email | "A typed email isn't proof — the guest waits." |
 | 5 | "What's the waiting limit?" | Guest 2 joins (2/2); Guest 3 joins → "Waiting room is full" | "The limit is enforced atomically." Then **Save limit = 3** and Guest 3 retries → waits. "Raising it applies to the next arrival; lowering never removes anyone." |
 | 6 | "How many joined, anonymous or not?" | View queue → **Visits:** line | "3 visits · 0 verified accounts · 3 guests — and each row shows how identity was established." |
 | 7 | "Who skips the queue?" | Patient A (Google) opens link | "Verified and on the list — direct entry." |
 | 8 | "Removed patient returns?" | Remove Guest 1; Guest 1 reopens | "Back in line; the doctor decides again." |
-| 9 | "Does the AI diagnose? Consent?" | 30-s call with transcription consented; leave | "Each person opts in; the call works without it." |
+| 9 | "Does the AI diagnose? Consent?" | Synthetic call with explicit optional consent; resize to phone/tablet and use the on-demand panel. Show Not finalized before leaving. | "Each person opts in. Rejoining begins unchecked; the call works without transcription. Viewport tests are not real iPad media tests." |
 | 10 | "Show the summary." | Dashboard → card "AI draft · review required" → Edit (Risk "Unknown") | "Draft only; the dentist reviews. Unknown is never turned into Low." |
-| 11 | "Expired link?" | Invitations → Expired → View details | "Queue closed." |
+| 11 | "Multiple rows for one link? Retention? Scheduling?" | Compare invitation lifecycle with distinct encounter records; show the policy explanation without deleting data. | "A reusable invitation can host separate encounters. Firebase deletion is opt-in, not the Vercel retry cron. Scheduling is a separate future appointment workflow." |
 
 **If something fails:** name the box that failed (§2) and continue. Never bypass admission. Backup: screenshots.
 
-## 5. PowerPoint plan (10 slides; ~12 minutes)
+## 5. Core research presentation and current demo supplement
 
 | Slide | Title (one claim per slide) | Content | Speaker |
 |---|---|---|---|
@@ -107,7 +109,7 @@ The results answer the objectives **as written**: build (1, 2, 3) and evaluate p
 | 9 | Capacity: what we can and cannot say | §6 table; provider ceiling ≠ our capacity; next test 1/3/5 pairs | W3 |
 | 10 | Conclusions, limits, next steps | Objectives met as written; limits; staged acceptance + paired-call trials + AI accuracy study | W1 |
 
-Put the live demo between slides 5 and 6. Keep the existing waiting-queue supplement deck as backup only; its 25 November race slide now has a "fixed 27 November" follow-up (use §6/Q17).
+The table above is an outline for the institution's core research presentation, not the current supplement's slide index. Replace its historical test count with the dated evidence actually presented. The rebuilt supplement has 14 slides with speaker notes: scope, roles, admission, state distinctions, waiting limits, local capacity evidence, admin entry, language, encounter/consent/retention, the CCTV capacity answer, evidence, writer assignments and the demo sequence. It does not replace the original methodology/results slides.
 
 ---
 

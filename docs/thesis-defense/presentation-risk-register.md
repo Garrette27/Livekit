@@ -1,45 +1,23 @@
-# Presentation risk register (defense day, 28 November 2026)
+# Current defense demonstration risks
 
-What could break the live demo, why (architecturally), and the proven practice that contains it. Read with the [one-day guide](one-day-defense-guide.md).
+27 November 2026, source `ec6803a`. Read the [quick answers](PANEL-QA-LATEST.md) and [dated verification](../testing/evidence/2026-11-27-clinical-separation/verification.json). Earlier PR9-only deployment advice is superseded; the relevant main-branch changes are already merged. Check the exact deployed frontend commit before rehearsal.
 
-## The most important fact
+| Risk | Containment and honest boundary |
+| --- | --- |
+| Administrator opens doctor tools | Both platform and clinic administrators are non-clinical. Use separate approved synthetic doctor and administrator identities. APIs deny combined old admin/doctor claims. |
+| Frontend succeeds but Firebase differs | Vercel does not deploy Firestore Rules or Firebase Functions. Local rules passed emulator cases; production deployment must be separately verified. Environment-only bootstrap owners need approved historical-claim migration. |
+| Old token retains access | Refresh grants explicitly. Existing Firebase/LiveKit credentials have separate expiry/revocation behavior; do not promise immediate universal revocation. |
+| Queue demo identities collapse | Use distinct synthetic browser profiles. Shared Firebase uid is still one principal. Test a fresh invitation with waiting limit2, then raise to3. |
+| Tablet panels cover video | Compact layouts use on-demand panels through1200px; desktop panels reserve space. Six Chromium viewport checks passed, not actual iPad/Safari media acceptance. |
+| AI unavailable or insufficient evidence | Keep the call working. Show the real unavailable/insufficient state. Never manufacture a successful live generation. |
+| Active room shows no draft | Not finalized is intentional. Summary generation requires completion plus evidence/consent gates. A reusable invitation may have several distinct encounter records. |
+| Consent appears again | New entry starts unchecked. Do not carry transcription consent across a reused room name. Device preflight is intentional. |
+| Older summary missing | Say unavailable unless deletion is independently confirmed. Firebase retention is opt-in; Vercel's cron retries summary work. Do not run destructive cleanup for a demo. |
+| Microphone, camera or venue network fails | Run device preflight at the venue, keep audio-only and a backup network available. Use clearly labeled offline evidence if needed. |
+| Panel asks about scheduling/uploads | Both remain disabled. Explain the separate doctor-booked appointment design and attachment safety gates as future work, not evaluated features. |
 
-**`livekit-frontend-tau.vercel.app` still runs `main` (commit `ed4f7a9`).** Everything fixed on 27 November is on PR #9 and its Vercel *preview* URLs only. Your screenshots of the old form, old header and "Low" risk are production. Pick one before tomorrow:
+## Release and rehearsal discipline
 
-| Option | Do | Risk |
-|---|---|---|
-| **A. Demo the fixes (recommended if you test today)** | Provision the doctor (below) → open the PR #9 preview URL → run the whole demo script on it → if it passes, merge PR #9 **from GitHub as Garrette27** (Vercel warns that `drakesteritdept-sketch` is not a team member; a merge by the team owner avoids a blocked production build) | New code not yet clicked through in a browser |
-| B. Demo current production | Change nothing | Shows the old UI and contains the bugs you will describe as fixed — say so honestly if asked |
+Freeze the source used in the demonstration. Run signed-in acceptance with synthetic accounts before presenting new role behavior as production-tested. Do not change production roles, retention settings or historical records to make the demonstration look successful. Keep a known-good deployment available, but inspect the actual target before promotion/rollback; do not blindly promote an obsolete commit.
 
-Proven practice: **feature freeze + canary (preview) + one-click rollback.** If production misbehaves after merge, Vercel → Deployments → `ed4f7a9` → *Promote to Production* (instant rollback, no rebuild).
-
-## Risk register
-
-| # | Risk during the demo | Cause | Likelihood | Containment (pattern) |
-|---|---|---|---|---|
-| 1 | Doctor was refused ("not provisioned") after the promotion on 27 Nov | Claim-only enforcement met a doctor account created before claims existed | **Happened — fixed** | Existing doctor profiles are honoured again (transitional, logged); grant claims with the script when you have credentials |
-| 2 | Old queue rows appear or count toward the limit | Rows created before 27 Nov were keyed by email; new rows are keyed by account | Medium | Create a **fresh invitation** for the demo (old ones are mostly expired anyway) |
-| 3 | Firestore quota exhausted (seen in earlier incidents) | History now loads twice (summaries first, then chat); polling; free tier is 50,000 reads/day | Low for one demo | Don't leave many doctor tabs open overnight; one dashboard tab during the demo |
-| 4 | AI summary missing | OpenAI credit/model availability; evidence gate | Medium | Expected behaviour: call still works; record says unavailable/insufficient evidence. Never fabricate |
-| 5 | Patient's first device drops when they open a second tab | LiveKit replaces a duplicate identity | Medium | One device per person in the demo; explain it as designed |
-| 6 | Patient who closed the tab still shows "waiting" | Departure beacon may not fire on a killed mobile browser; waiting page no longer holds a LiveKit connection | Low | Doctor removes the row; it is an operational list, not attendance |
-| 7 | Camera/mic fails | Permission denied, device used by another app, venue Wi-Fi | Medium | Close Zoom/Teams; allow permissions beforehand; phone hotspot as backup; audio-only still works |
-| 8 | Venue network blocks WebRTC | Corporate/school firewall | Low–Medium | Test at the venue; hotspot; screenshots/recording as backup |
-| 9 | Admit button returns "started a new visit" | Visit-checked admit (expected-version pattern) | Low | Refresh the queue and admit again — this is the protection working |
-| 10 | Summary editor showed "Low" for an unknown risk | Select had no Unknown option | Fixed on PR #9 | Merge, or avoid opening Edit on production |
-
-## Admin console setup (for the demo)
-
-Set `SUPER_ADMIN_EMAILS=<owner's verified email>` in Vercel → Settings → Environment Variables (Production), redeploy, sign in at `/doctor/login`, then open `/admin`. Without the variable the console says "Only an administrator can view this page" — expected, not a bug.
-
-## Where provisioning lives, and the pattern
-
-| Who | How an account becomes that role | Code | Pattern |
-|---|---|---|---|
-| **Doctor / reviewer / admin** | An administrator grants a Firebase custom claim | `/admin` console (`app/admin/page.tsx`, `app/api/admin/roles/route.ts`, policy `lib/auth/role-administration.ts`) and `scripts/admin/provision-role.mjs`; enforced by `firestore.rules` (a client can create a doctor profile only with the claim) and read in `lib/services/shared/request-auth.ts` (claim first; legacy profile role honoured transitionally); login UI `app/doctor/login/page.tsx` | **Administrator provisioning + claims-based RBAC** (Firebase custom claims), least privilege, separation of duties: no self-service path to a privileged role |
-| **Registered patient** | Signs in (Google/email) and accepts the versioned consent; profile role is always `patient` | `app/patient/login`, consent route `app/api/patient/consent/route.ts`, identity resolution in `lib/invitations/validate-service.ts` | **Self-service, just-in-time provisioning** of the lowest-privilege role |
-| **Guest patient** | No account; holds an invitation (bearer capability) and waits for the doctor | `app/invite/[token]`, `lib/invitations/*` | **Capability link + human admission** (guest pattern); optional Firebase anonymous session upgradeable later |
-
-## Chat and attachments: do nothing new for tomorrow
-
-Chat is already server-persisted per encounter, length-bounded, retry-safe (hashed idempotency key), shown in history, and deliberately **not** fed to the AI. Attachments exist as a disabled capability (`ENABLE_FILE_ATTACHMENTS`, no UI). Shipping uploads overnight would require private storage, type/size allowlist, malware scanning, download authorization, retention and cross-session denial tests (AGENTS.md "Prepared but disabled capabilities"). Adding it the night before risks the working call and would be untested — exactly what the panel would ask about. Present it as future work.
+Source scanning and regressions do not establish a bug-free app, regulatory compliance, clinical accuracy or a safe maximum number of simultaneous calls. The remaining acceptance work is in the [finding register and Claude handoff](admin-entry-findings-and-claude-handoff.md).

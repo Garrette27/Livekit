@@ -36,6 +36,7 @@ styles.add(ParagraphStyle("CellHead", parent=styles["Cell"], fontName="Brief-Bol
 
 
 def markup(raw):
+    raw = re.sub(r"<!--.*?-->", "", raw)
     raw = raw.replace("\u2011", "-").replace("\u2013", "-").replace("\u2014", "-")
     value = escape(raw)
     def link(match):
@@ -65,7 +66,7 @@ width = A4[0] - 102
 i = 0
 while i < len(lines):
     line = lines[i].strip()
-    if not line:
+    if not line or line.startswith("<!--"):
         i += 1
         continue
     if line.startswith("|"):
