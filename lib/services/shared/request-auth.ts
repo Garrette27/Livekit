@@ -50,7 +50,12 @@ export async function authenticateBearerToken(
   }
 
   try {
-    const decoded = await auth.verifyIdToken(authHeader.substring(7));
+    // checkRevoked: when an administrator revokes a role the route revokes the
+    // user's refresh tokens; checking revocation here makes every protected
+    // API refuse that user's existing ID token on the next request instead of
+    // honouring it until its one-hour expiry (Firebase's documented pattern
+    // for immediate session revocation; costs one Auth lookup per request).
+    const decoded = await auth.verifyIdToken(authHeader.substring(7), true);
     recordAuthenticatedUser(decoded.uid);
     return serviceOk({
       userId: decoded.uid,
@@ -61,7 +66,11 @@ export async function authenticateBearerToken(
       ...(typeof decoded.clinicId === 'string' ? { clinicId: decoded.clinicId } : {}),
     });
   } catch (error) {
-    console.error('Token verification error:', error);
+    const code = (error as { code?: string })?.code;
+    if (code === 'auth/id-token-revoked' || code === 'auth/user-disabled') {
+      return serviceError(401, 'session_revoked', 'Your access has changed. Please sign in again.');
+    }
+    console.error('Token verification error:', code || 'unknown');
     return serviceError(401, 'invalid_token', 'Invalid or expired token');
   }
 }

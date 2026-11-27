@@ -13,6 +13,7 @@ import {
   type LocalUserChoices,
 } from '@livekit/components-react';
 import { VideoPresets, type RoomOptions } from 'livekit-client';
+import CallQualityMeter from './CallQualityMeter';
 import LiveKitStyles from './LiveKitStyles';
 import SessionTranscriptionBridge from './SessionTranscriptionBridge';
 import { RoomControlsPolicy } from './room-controls-policy';
@@ -510,6 +511,7 @@ export default function RoomShell({
         <ParticipantCountBridge onCountChange={handleParticipantCountChange} />
         <ConnectionStatusBanner />
         <ConnectionStateToast />
+        <CallQualityMeter />
         <ChatBehaviorBridge
           enabled={chatEnabled}
           defaultOpen={chatDefaultOpen}

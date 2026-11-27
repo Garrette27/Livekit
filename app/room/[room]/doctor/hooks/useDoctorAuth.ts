@@ -8,6 +8,10 @@ import { useAuthSession } from '@/hooks/useAuthSession';
 interface DoctorAuthState {
   user: User | null;
   isAuthenticated: boolean;
+  /** True until Firebase has restored (or ruled out) a saved session. */
+  isAuthLoading: boolean;
+  /** Server-confirmed clinician access for this account. */
+  isAuthorized: boolean;
   doctorName: string;
   authError: string | null;
   setDoctorName: (name: string) => void;
@@ -17,7 +21,10 @@ interface DoctorAuthState {
 }
 
 export function useDoctorAuth(roomName: string): DoctorAuthState {
-  const { user, isAuthenticated } = useAuthSession();
+  // requiredRole re-checks clinician access with the server before the room
+  // restores a cached credential or renders pre-join; administrators are sent
+  // to /admin by the session hook.
+  const { user, isAuthenticated, isAuthorized, isLoading: isAuthLoading } = useAuthSession({ requiredRole: 'doctor' });
   const [doctorName, setDoctorName] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -86,6 +93,8 @@ export function useDoctorAuth(roomName: string): DoctorAuthState {
   return {
     user,
     isAuthenticated,
+    isAuthLoading,
+    isAuthorized,
     doctorName,
     authError,
     setDoctorName,

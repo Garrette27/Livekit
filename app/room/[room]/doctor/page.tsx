@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase';
 import DoctorSessionPanel from './components/DoctorSessionPanel';
 import LiveKitShell from './components/LiveKitShell';
 import AuthCard from './components/shared/AuthCard';
-import LoadingSpinner from './components/shared/LoadingSpinner';
+import PageSkeleton from '@/components/ui/feedback/PageSkeleton';
 import ErrorToast from './components/shared/ErrorToast';
 import { useDoctorAuth } from './hooks/useDoctorAuth';
 import { useDoctorToken } from './hooks/useDoctorToken';
@@ -20,6 +20,8 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
   const {
     user,
     isAuthenticated,
+    isAuthLoading,
+    isAuthorized,
     doctorName,
     setDoctorName,
     signIn,
@@ -35,7 +37,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
     generateDoctorToken,
     clearToken,
     clearTokenError,
-  } = useDoctorToken({ roomName, doctorName, user });
+  } = useDoctorToken({ roomName, doctorName, user: isAuthorized ? user : null });
 
   const { speechStatus, captureError, startCapture, stopCapture } = useSpeechCapture({
     roomName,
@@ -55,10 +57,10 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
   );
 
   useEffect(() => {
-    if (isAuthenticated && user && doctorName.trim() && !token && !isJoining) {
+    if (isAuthenticated && isAuthorized && user && doctorName.trim() && !token && !isJoining) {
       generateDoctorToken();
     }
-  }, [isAuthenticated, user, doctorName, token, isJoining, generateDoctorToken]);
+  }, [isAuthenticated, isAuthorized, user, doctorName, token, isJoining, generateDoctorToken]);
 
   const handleLeave = () => {
     stopCapture();
@@ -97,6 +99,10 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
     window.location.href = '/doctor/invitations';
   };
 
+  if (isAuthLoading) {
+    return <PageSkeleton layout="call" message="Restoring your sign-in…" detail="Checking your doctor session before opening the room." />;
+  }
+
   if (!isAuthenticated) {
     return (
       <AuthCard
@@ -123,6 +129,20 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
         >
           Sign in with Google
         </button>
+      </AuthCard>
+    );
+  }
+
+  if (isAuthenticated && !isAuthorized) {
+    return (
+      <AuthCard
+        icon="Doctor"
+        title="Clinician access required"
+        description="This account is not provisioned as a doctor. Administrators manage access only; use a separately provisioned doctor account to join consultations."
+        error={pageError}
+        footerLink={{ href: '/doctor/login', text: 'Sign in with a doctor account' }}
+      >
+        <span />
       </AuthCard>
     );
   }
@@ -226,7 +246,7 @@ function DoctorRoomClient({ roomName }: { roomName: string }) {
     );
   }
 
-  return <LoadingSpinner />;
+  return <PageSkeleton layout="call" message="Preparing your secure room…" detail="The server is issuing a short-lived room credential. This usually takes a few seconds." />;
 }
 
 export default function DoctorRoomPage({ params }: { params: Promise<{ room: string }> }) {
@@ -247,7 +267,7 @@ function DoctorRoomClientWrapper({ params }: { params: Promise<{ room: string }>
   }, [params]);
 
   if (!roomName) {
-    return <LoadingSpinner />;
+    return <PageSkeleton layout="call" message="Opening consultation…" />;
   }
 
   return <DoctorRoomClient roomName={roomName} />;

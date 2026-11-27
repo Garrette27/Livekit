@@ -181,7 +181,35 @@ export default function LiveKitStyles({
         align-items: center !important;
         gap: 0.5rem !important;
         max-width: calc(100% - 16px) !important;
-        overflow-x: auto !important;
+        /* No overflow clipping: the camera/microphone device menus are
+           popovers anchored inside this bar, and an overflow container clips
+           them (device names were cut off behind scroll arrows). Wrap the
+           buttons onto a second row instead of scrolling. */
+        overflow: visible !important;
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+      }
+
+      /* Device chooser popover: wide enough to read the full device name
+         (e.g. a webcam model or an OBS virtual camera), wrapping long names
+         rather than truncating them, and above the room chrome. */
+      .lk-device-menu {
+        z-index: 10100 !important;
+        min-width: 16rem !important;
+        max-width: min(92vw, 28rem) !important;
+        width: max-content !important;
+        max-height: 50vh !important;
+        overflow-y: auto !important;
+      }
+
+      .lk-device-menu .lk-media-device-select li > .lk-button,
+      .lk-device-menu .lk-media-device-select li > button {
+        white-space: normal !important;
+        text-align: left !important;
+        line-height: 1.3 !important;
+        height: auto !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
       }
 
       .lk-chat,
@@ -261,7 +289,7 @@ export default function LiveKitStyles({
 
         .lk-control-bar {
           width: min(calc(100% - 16px), 720px) !important;
-          overflow-x: auto !important;
+          overflow: visible !important;
           gap: 0.375rem !important;
           padding: 0.5rem !important;
           bottom: 10px !important;

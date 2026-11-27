@@ -9,6 +9,7 @@ import { db } from "@/lib/firebase";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { checkRoleConflictByEmail, RoleConflictUnavailableError } from "@/lib/auth/role-conflict";
 import { fetchWorkspaceAccess } from '@/lib/auth/workspace-client';
+import PageSkeleton from '@/components/ui/feedback/PageSkeleton';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,10 @@ export default function DoctorLoginPage() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  // Set once the identity provider has answered, while we check workspace
+  // access and the doctor profile. Without it the sign-in form stayed on
+  // screen for several seconds after Google had already signed the user in.
+  const [accessCheck, setAccessCheck] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -41,8 +46,10 @@ export default function DoctorLoginPage() {
 
     try {
       setError(null);
+      setAccessCheck(null);
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      setAccessCheck('Signed in with Google. Checking your doctor access…');
 
       if ((await fetchWorkspaceAccess(user, true)).administratorLevel) {
         router.replace('/admin');
@@ -134,6 +141,7 @@ export default function DoctorLoginPage() {
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setAccessCheck(null);
     setLoading(true);
     const normalizedEmail = email.toLowerCase().trim();
 
@@ -145,6 +153,7 @@ export default function DoctorLoginPage() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      setAccessCheck('Signed in. Checking your doctor access…');
 
       const user = auth.currentUser;
       if (user) {
@@ -281,6 +290,11 @@ export default function DoctorLoginPage() {
       setResetLoading(false);
     }
   };
+
+  // A shown error always wins: it means the access check finished and refused.
+  if (accessCheck && !error) {
+    return <PageSkeleton message={accessCheck} detail="You will be taken to your workspace automatically." />;
+  }
 
   if (firebaseStatus !== 'ready') {
     return (

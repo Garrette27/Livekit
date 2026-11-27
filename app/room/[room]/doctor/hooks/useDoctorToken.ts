@@ -38,6 +38,9 @@ export function useDoctorToken({ roomName, doctorName, user }: DoctorTokenArgs):
   // Load persisted token
   useEffect(() => {
     const key = `doctorToken_${roomName}`;
+    // No confirmed doctor yet (session restoring, or access refused): neither
+    // restore nor discard the cache; decide once the account is known.
+    if (!user?.uid) return;
     const savedToken = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
     // A saved token is reused only if it is unexpired (with a 5-minute margin)
     // and was issued to the account signed in now; otherwise it is dropped and

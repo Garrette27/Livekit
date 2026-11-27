@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useCallback, useEffect, useRef, useState } from 'react';
+import PageSkeleton from '@/components/ui/feedback/PageSkeleton';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DisconnectReason } from 'livekit-client';
@@ -120,12 +121,19 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
     }
   }, [roomName]);
 
+  // Until the saved admission has been read, show a skeleton instead of the
+  // "invitation required" screen, which otherwise flashed for every admitted
+  // patient before their credential was restored.
+  const [admissionRestored, setAdmissionRestored] = useState(false);
+
   useEffect(() => {
     const wasInCall = localStorage.getItem(`patientInCall_${roomName}`);
     const savedToken = localStorage.getItem(`patientToken_${roomName}`);
-    if (wasInCall === 'true' && patientName && savedToken) {
+    const savedName = patientName || localStorage.getItem(`patientName_${roomName}`);
+    if (wasInCall === 'true' && savedName && savedToken) {
       setToken(savedToken);
     }
+    setAdmissionRestored(true);
   }, [patientName, roomName]);
 
   useEffect(() => {
@@ -258,6 +266,10 @@ function PatientRoomClient({ roomName }: { roomName: string }) {
     }
     void leaveConsultation();
   }, [getPostCallRedirectPath, leaveConsultation, router, showToast]);
+
+  if (!token && !admissionRestored) {
+    return <PageSkeleton layout="call" message="Joining your consultation…" detail="Restoring the admission your doctor granted." />;
+  }
 
   if (!token) {
     return (

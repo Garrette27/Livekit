@@ -720,7 +720,9 @@ function InvitePageContent() {
               margin: '0 auto 2rem',
               animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
             }}>
-              <span style={{ fontSize: '2.5rem' }}>WAIT</span>
+              <svg aria-hidden="true" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 2h12M6 22h12M7 2v4a5 5 0 0 0 10 0V2M7 22v-4a5 5 0 0 1 10 0v4" />
+              </svg>
             </div>
 
             <h1 style={{
