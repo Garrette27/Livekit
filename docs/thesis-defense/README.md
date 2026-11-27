@@ -1,5 +1,7 @@
 # TeleConsole defense pack
 
+**Start here (27 Nov 2026, latest):** [PANEL-QA-LATEST.md](PANEL-QA-LATEST.md) · [ranked 89 answers](panel-questions-and-answers.md) ([PDF](TeleConsole-Panel-Questions-and-Answers.pdf)) · [team test plan for the top 40](TEAM-TEST-TOP-40.md) ([PDF](TeleConsole-Team-Test-Top-40.pdf)) · [demo script](one-day-defense-guide.md).
+
 Prepared 25 November 2026 (Asia/Singapore). Scope: minimally revise the supplied thesis and give three writers a coherent, reproducible explanation of capacity, costs, quality, security and remaining limitations. No examination outcome is guaranteed.
 
 ## Latest (27 November 2026) — start here

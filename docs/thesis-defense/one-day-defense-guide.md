@@ -76,23 +76,25 @@ The results answer the objectives **as written**: build (1, 2, 3) and evaluate p
 
 ---
 
-## 4. Demo script (≈7 minutes) — each step answers a panel question
+## 4. Demo script (≈8 minutes) — each step answers a top-20 panel question
+
+Question numbers refer to the [ranked bank](panel-questions-and-answers.md). Test every step first with [TEAM-TEST-TOP-40.md](TEAM-TEST-TOP-40.md).
 
 | # | Panel question it answers | Do | Say |
 |---|---|---|---|
-| 1 | "Who are you signed in as?" | Show header (logo, name + email) | "The header always shows the signed-in account." |
-| 2 | "Can anyone become a doctor?" / "Business for clinics?" | Open `/admin/login` with approved synthetic admin, then show a confirmed Doctor grant. Switch to the separate doctor identity. | "Administrators manage access only. Clinic admins are limited to their own clinic. Creating an identity grants no role." |
-| 3 | "How does the doctor assign a patient?" | Invitations: room `demo-nov27`, limit **2**, add Patient A's email chip → Create → Copy | "Patient A is assigned to enter directly; everyone else waits. The preview says so." |
-| 4 | "What if the link is forwarded?" | Guest 1 (incognito) opens link, types Patient A's email | "A typed email isn't proof — the guest waits." |
-| 5 | "What's the waiting limit?" | Guest 2 joins (2/2); Guest 3 joins → "Waiting room is full" | "The limit is enforced atomically." Then **Save limit = 3** and Guest 3 retries → waits. "Raising it applies to the next arrival; lowering never removes anyone." |
-| 6 | "How many joined, anonymous or not?" | View queue → **Visits:** line | "3 visits · 0 verified accounts · 3 guests — and each row shows how identity was established." |
-| 7 | "Who skips the queue?" | Patient A (Google) opens link | "Verified and on the list — direct entry." |
-| 8 | "Removed patient returns?" | Remove Guest 1; Guest 1 reopens | "Back in line; the doctor decides again." |
-| 9 | "Does the AI diagnose? Consent?" | Synthetic call with explicit optional consent; resize to phone/tablet and use the on-demand panel. Show Not finalized before leaving. | "Each person opts in. Rejoining begins unchecked; the call works without transcription. Viewport tests are not real iPad media tests." |
-| 10 | "Show the summary." | Dashboard → card "AI draft · review required" → Edit (Risk "Unknown") | "Draft only; the dentist reviews. Unknown is never turned into Low." |
-| 11 | "Multiple rows for one link? Retention? Scheduling?" | Compare distinct encounter records; explain retention without deleting data. In an explicitly enabled synthetic test environment only, book, reject an overlap, reschedule and cancel. | "A reusable invitation can host separate encounters. Firebase deletion is opt-in, not the Vercel retry cron. Appointments are implemented but deployment-gated, separate from admission and attendance." |
+| 1 | Q1 Title, Q3 contribution | Show the landing page, header with signed-in account, and the five-box diagram | "Every word of the title is on this screen or in the next seven minutes." |
+| 2 | Q28/Q31/Q40 Who makes doctors? | `/admin` with the synthetic admin: grant a doctor in a clinic. Switch to the separate doctor account. | "Administrators manage access only; a clinic admin can grant doctors only in their clinic." |
+| 3 | Q10 How many wait? | Create invitation `demo-nov27`, waiting limit **2**, add Patient A's email → Copy link | "The access preview says exactly who enters and who waits." |
+| 4 | Q14/Q29 Forwarded link? | Guest 1 opens the link and types Patient A's email | "A typed email is not proof — the guest waits. Notice the waiting page never turns on the camera (Q15)." |
+| 5 | Q11/Q12 Eleventh patient, limit change | Guest 2 joins; Guest 3 is refused "Waiting room is full". Save limit = 3; Guest 3 retries and waits | "Checked in one transaction; measured 25 into 10 → exactly 10. Raising applies to the next arrival; lowering removes nobody." |
+| 6 | Q14 Verified patient | Patient A opens the link with Google | "Verified and on the list — enters directly, even with a full queue." |
+| 7 | Q8/Q9 Quality and capacity | Admit a guest; in the call open **Call quality** | "These are measured numbers: round trip __ ms, loss __ %, 720p. Provider ceiling is 50 pairs; our trial ran 1, 3 and 5." |
+| 8 | Q5/Q7 Consent | Show both consent boxes; leave and rejoin as doctor | "Consent belongs to the encounter — the box is unticked again. The call works without it." |
+| 9 | Q6 Several history rows | Consultation History: show two encounters from the same invitation, one *Not finalized* while active | "An invitation is a door key; each encounter is a walk through the door, with its own summary." |
+| 10 | Q4 AI | Open the draft *AI draft · review required*, edit, Risk *Unknown* | "AI drafts, the dentist decides; no evidence is never turned into Low." |
+| 11 | Q20 Revocation (optional) | Admin revokes a test doctor; the doctor's next click is refused | "Cut on the next request, not after an hour." |
 
-**If something fails:** name the box that failed (§2) and continue. Never bypass admission. Backup: screenshots.
+**If something fails:** name the box that failed (§2), say what the system did correctly (e.g. it refused), and continue. Never bypass admission. Backup: the team's screenshots from the test plan.
 
 ## 5. Core research presentation and current demo supplement
 

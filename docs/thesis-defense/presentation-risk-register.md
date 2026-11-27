@@ -1,12 +1,14 @@
 # Current defense demonstration risks
 
+Latest: ranked answers in [panel-questions-and-answers.md](panel-questions-and-answers.md); pre-defense checks in [TEAM-TEST-TOP-40.md](TEAM-TEST-TOP-40.md).
+
 27 November 2026, source `69f9c85`. Read the [quick answers](PANEL-QA-LATEST.md) and [appointment review and verification limits](../testing/evidence/2026-11-27-appointments/implementation-review.md). Earlier PR9-only deployment advice is superseded; the relevant main-branch changes are already merged. Check the exact deployed frontend commit before rehearsal.
 
 | Risk | Containment and honest boundary |
 | --- | --- |
 | Administrator opens doctor tools | Both platform and clinic administrators are non-clinical. Use separate approved synthetic doctor and administrator identities. APIs deny combined old admin/doctor claims. |
 | Frontend succeeds but Firebase differs | Vercel does not deploy Firestore Rules or Firebase Functions. Local rules passed emulator cases; production deployment must be separately verified. Environment-only bootstrap owners need approved historical-claim migration. |
-| Old token retains access | Refresh grants explicitly. Existing Firebase/LiveKit credentials have separate expiry/revocation behavior; do not promise immediate universal revocation. |
+| Revoked staff token | Protected APIs now check revocation on every request and admin↔doctor switches revoke refresh tokens, so removed access fails on the next request. A call already in progress continues until that participant leaves or is removed. |
 | Queue demo identities collapse | Use distinct synthetic browser profiles. Shared Firebase uid is still one principal. Test a fresh invitation with waiting limit2, then raise to3. |
 | Tablet panels cover video | Compact layouts use on-demand panels through1200px; desktop panels reserve space. Six Chromium viewport checks passed, not actual iPad/Safari media acceptance. |
 | AI unavailable or insufficient evidence | Keep the call working. Show the real unavailable/insufficient state. Never manufacture a successful live generation. |
