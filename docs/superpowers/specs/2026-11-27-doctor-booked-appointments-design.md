@@ -1,6 +1,6 @@
 # Doctor-booked appointments: proposed first release
 
-Status: design approved by the user on 27 November 2026. Scheduling remains disabled until implementation and verification are complete.
+Status: design approved by the user on 27 November 2026; implemented at `69f9c85` with local verification. Scheduling remains default-off pending production rules/indexes, existing-data/contact-retention review and signed-in staging acceptance. The original proposed scope below is retained; see the implementation review for measured behavior and the deferred list-order minor.
 
 ## Intent and alternatives
 

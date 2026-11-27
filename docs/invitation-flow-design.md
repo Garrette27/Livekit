@@ -147,7 +147,7 @@ notes that webhook delivery is retried but not guaranteed.
 - Availability still depends on Firebase, LiveKit, OpenAI, and Vercel. The call
   degrades without AI; it does not become clinically validated offline.
 
-## Future capabilities: prepared, not shipped
+## Optional capabilities and release gates
 
 ### Attachments
 
@@ -164,11 +164,23 @@ author, and content, but using similar names is not a claim of FHIR compliance:
 
 ### Scheduling
 
-Scheduling has a reserved server capability name and is disabled by default
-with `ENABLE_CONSULTATION_SCHEDULING`. No route or UI exists. A future module
-should own timezone-safe start/end instants, participant references, lifecycle
-states, idempotent reminders, reschedule/cancel commands, and invitation
-issuance. It should not add date fields directly to invitation documents.
+Doctor-booked scheduling now has a server-owned API and responsive UI behind
+the default-off `ENABLE_CONSULTATION_SCHEDULING` capability. Production indexes,
+rules, existing-data/contact-retention review and signed-in staging acceptance
+are still required. Reminders, self-booking and calendar sync remain excluded.
 
-FHIR `Appointment` provides a proven lifecycle vocabulary worth mapping before
-implementation: [HL7 FHIR Appointment](https://hl7.org/fhir/R4/appointment.html).
+### Appointment planning is separate from admission
+
+The later doctor-booked appointment module is deployment-gated. It plans a visit
+using a private opaque appointment id, UTC time and named display zone. It does
+not make an invitation valid, prove patient identity, start recording or create
+an encounter. The three objects answer different questions: appointment = when
+care is planned; invitation = who may request access under which policy;
+encounter = what actually occurred during one session.
+
+The design uses a bounded booking workbench, modeless conflicts/cancellation and
+server-owned optimistic versions. A per-doctor transactional calendar lock keeps
+competing overlap checks consistent, at the cost of serializing that doctor's
+mutations; throughput is not measured. No additional pub/sub layer was added.
+The [HL7 Appointment/Encounter distinction](https://hl7.org/fhir/appointment.html)
+is design precedent, not a claim of FHIR interoperability or clinical validation.

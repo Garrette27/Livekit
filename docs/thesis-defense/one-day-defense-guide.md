@@ -1,6 +1,6 @@
 # TeleConsole — one-day defense guide
 
-Current follow-up: `ec6803a`, 27 November 2026. Use the [97 ranked answers](panel-questions-and-answers.md), [quick rehearsal route](PANEL-QA-LATEST.md), current 14-slide panel/demo deck and [verified checkpoint record](../testing/evidence/2026-11-27-clinical-separation/verification.json). All administrators are non-clinical; switch to a separate provisioned doctor identity for the call. Scheduling remains disabled while the selected doctor-booked design awaits implementation and testing. Older question references below use the [stable-id map](panel-question-number-map.md).
+Current follow-up: `69f9c85`, 27 November 2026. Use the [97 ranked answers](panel-questions-and-answers.md), [quick rehearsal route](PANEL-QA-LATEST.md), current 14-slide panel/demo deck and [appointment verification/review](../testing/evidence/2026-11-27-appointments/implementation-review.md). All administrators are non-clinical; switch to a separate provisioned doctor identity for the call. Doctor-booked appointments are implemented but default-off pending production rules/indexes, data/retention review and signed-in staging acceptance. They were not surveyed. Older question references below use the [stable-id map](panel-question-number-map.md).
 
 27 November 2026 · code at branch `fix/atomic-queue-capacity-visit-binding` (PR #9) · manuscript: same 259 pages, see [page-changes-2026-11-27.md](page-changes-2026-11-27.md).
 
@@ -60,7 +60,7 @@ Four rules carry every security answer:
 4. **Only an administrator makes someone a doctor.** Signing up with Google makes you a patient, never a doctor.
 
 ### How "the doctor assigns the patient"
-The invitation *is* the assignment. When the doctor creates an invitation, it is owned by that doctor and bound to one room. Putting a patient's email in **"Patients who can join directly"** assigns that verified account to skip the queue; anyone else with the link waits for this doctor. Admission, the encounter and its summary are then owned by that doctor, and the patient sees only their own history. There is deliberately no separate "assign patient" screen and no scheduling module (scheduling is a disabled, future capability).
+The invitation is the admission assignment. It is owned by the doctor and bound to one room. **"Patients who can join directly"** lets the corresponding verified account skip the queue; everyone else with the link waits. The encounter and summary remain doctor-owned, and the patient sees only their own history. The later, deployment-gated appointment module plans a time without granting admission or proving attendance; it does not replace invitation policy.
 
 ---
 
@@ -90,7 +90,7 @@ The results answer the objectives **as written**: build (1, 2, 3) and evaluate p
 | 8 | "Removed patient returns?" | Remove Guest 1; Guest 1 reopens | "Back in line; the doctor decides again." |
 | 9 | "Does the AI diagnose? Consent?" | Synthetic call with explicit optional consent; resize to phone/tablet and use the on-demand panel. Show Not finalized before leaving. | "Each person opts in. Rejoining begins unchecked; the call works without transcription. Viewport tests are not real iPad media tests." |
 | 10 | "Show the summary." | Dashboard → card "AI draft · review required" → Edit (Risk "Unknown") | "Draft only; the dentist reviews. Unknown is never turned into Low." |
-| 11 | "Multiple rows for one link? Retention? Scheduling?" | Compare invitation lifecycle with distinct encounter records; show the policy explanation without deleting data. | "A reusable invitation can host separate encounters. Firebase deletion is opt-in, not the Vercel retry cron. Scheduling is a separate future appointment workflow." |
+| 11 | "Multiple rows for one link? Retention? Scheduling?" | Compare distinct encounter records; explain retention without deleting data. In an explicitly enabled synthetic test environment only, book, reject an overlap, reschedule and cancel. | "A reusable invitation can host separate encounters. Firebase deletion is opt-in, not the Vercel retry cron. Appointments are implemented but deployment-gated, separate from admission and attendance." |
 
 **If something fails:** name the box that failed (§2) and continue. Never bypass admission. Backup: screenshots.
 

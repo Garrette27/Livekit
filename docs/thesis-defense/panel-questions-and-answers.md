@@ -4,7 +4,7 @@
 
 Start with question 1. This priority order is an engineering judgment based on scope, unsupported claims, privacy, access control and demonstration risk. It is not an empirical prediction of what a panel will ask and does not guarantee a grade. All 81 prior topics are retained, plus administrator, bilingual, retention, lifecycle and responsive-design questions. Read the first 20 before the detailed follow-ups.
 
-Reviewed source: `ec6803a` (role separation, encounter state and responsive layout). Existing queue evidence is dated and local; neither these answers nor a Ready deployment establish production load, clinical accuracy, security certification or multi-clinic clinical validation. No survey number or objective is changed. The [number map](panel-question-number-map.md) links older Q references to this order. Historical guides may retain those legacy references.
+Reviewed source: `69f9c85` (role separation, encounter state, responsive layout and deployment-gated appointments). Existing queue evidence is dated and local; neither these answers nor a Ready deployment establish production load, clinical accuracy, security certification or multi-clinic clinical validation. No survey number or objective is changed. The [number map](panel-question-number-map.md) links older Q references to this order. Historical guides may retain those legacy references.
 
 Use a 20-40 second answer: current rule, reason, specific evidence, limitation. Distinguish recorded results from proposed next tests. Provision only synthetic demonstration accounts; never show real patient records.
 
@@ -152,11 +152,11 @@ Before the fix, yes: queue entries were keyed by email even when the visitor onl
 
 An invitation is a reusable access policy; an encounter is a specific room opening with its own session id. Leaving and rejoining can create separate completed encounters, including doctor-only openings. Revocation closes future invitation access; it is not the sole encounter-completion event. Active encounters should say Not finalized rather than Awaiting summary, and summary generation must require finalization. Keep distinct records instead of merging by reused room name. A no-patient record is nonclinical, not an AI diagnosis or proof a scheduled patient failed to attend.
 
-### 25. Why is scheduling disabled, and how would you add it safely?
+### 25. Is appointment scheduling implemented, and why is it still deployment-gated?
 
 <!-- legacy-question: 97 -->
 
-The current prototype provides invitation-based consultations, not an implemented appointment service. The selected next step is doctor-booked appointments: separate opaque appointment records, timezone-aware start/end times, ownership checks, transactional overlap prevention and booked/cancelled states. Booking must never bypass invitation admission, begin transcription or create clinical evidence. Patient self-booking, reminders and calendar sync are outside that first release. HL7 FHIR's separate Appointment and Encounter resources provide a design precedent, not evidence that we implement FHIR interoperability. Until the new feature is built and tested, defend it as future work and do not attribute it to the original study respondents.
+Doctor-booked appointments are implemented behind the existing default-off scheduling capability. Separate opaque records store UTC times and a named display timezone; a per-doctor transaction lock prevents overlapping bookings. Rescheduling uses the same id with a version check, cancellation retains the record, and an immutable create receipt makes retries safe. Local unit, browser and emulator cases passed, but production indexes/rules, existing-data and contact-retention review, and signed-in staging acceptance remain release gates. Booking never grants invitation admission, starts transcription or creates an encounter or AI evidence. Self-booking, reminders and calendar sync are excluded. HL7 FHIR's separate Appointment and Encounter resources are a design precedent, not a claim of FHIR interoperability. This is a later implementation, not a feature evaluated by the original survey respondents.
 
 ### 26. Can another doctor admit my patient?
 
@@ -518,7 +518,7 @@ Open identity registration is a deliberate least-privilege entry path, not a cla
 
 <!-- legacy-question: 53 -->
 
-The invitation is the assignment. It belongs to the doctor and one room; emails in "Patients who can join directly" let those verified accounts skip the queue. Everyone else with the link waits for that doctor. The encounter, summary and history are owned by that doctor; the patient sees only their own records. There is no scheduling module by design.
+The invitation is the admission assignment. It belongs to the doctor and one room; emails in "Patients who can join directly" let those verified accounts skip the queue. Everyone else with the link waits for that doctor. The encounter, summary and history are owned by that doctor; the patient sees only their own records. The later, deployment-gated appointment module plans a time; it does not replace that policy or prove attendance. It was not evaluated in the original survey.
 
 ### 86. Why did View queue show patients for an expired invitation?
 
@@ -560,13 +560,13 @@ Yes. Per-invitation counts do not establish a combined room/clinic cap. If the p
 
 <!-- legacy-question: 30 -->
 
-We fixed the two queue defects because each fix was small and additive: one transaction, one extra signed claim, one new field on the queue row, and the removal of a hidden component. We did not change the call flow, the token format LiveKit relies on, or the stored data shape destructively; old rows still work until their next visit. Typecheck, lint, the regression suites and a production build passed. What we deliberately did not do the night before: rename the thesis, rewrite consent, add attachments or scheduling, or change the AI model.
+The initial queue repair was small and additive: a transaction, a signed claim, a queue-row field and removal of a hidden component. Later maintenance added role separation, lifecycle safeguards and a tested but deployment-gated appointment module. These checkpoints do not rewrite the original study results. We preserved the call's security boundary, optional consent, official title and AI model; attachments remain disabled. A passing build is not a reason to bypass release gates or enable unverified production features.
 
 ### 93. Which manuscript pages changed for this topic?
 
 <!-- legacy-question: 31 -->
 
-Printed 54, 73, 74, 89, 90 and 94; physical PDF 66, 85, 86, 101, 102 and 106. The official title, page count, numbering, financial amounts and reported survey data remain unchanged. The page register and manifest give exact replacements. Public privacy masks remain separate from research corrections.
+The latest follow-up concerns PDF 66, 71, 75, 106 and 111 / printed 54, 59, 63, 94 and 99: role separation, retention/future attachment cleanup, encounter finalization, responsive context/consent and deployment-gated scheduling. Earlier queue corrections also cover PDF 85, 86, 101 and 102. The complete register lists 45 bounded edits on 37 physical pages. The official title, 259-page count, numbering, expenses and reported survey data remain unchanged. Public privacy masks are separate from research corrections.
 
 ### 94. Which manuscript pages changed?
 

@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[2]
 PACK = ROOT / "docs/thesis-defense"
-EVIDENCE = PACK / "evidence/admin-defense-2026-11-27"
+EVIDENCE = PACK / "evidence/appointments-defense-2026-11-27"
 EVIDENCE.mkdir(parents=True, exist_ok=True)
 QA = ROOT / "tmp/queue-title-pack-qa"
 QA.mkdir(parents=True, exist_ok=True)
@@ -50,7 +50,7 @@ assert hashlib.sha256(thesis_path.read_bytes()).hexdigest() == pdf_report["outpu
 thesis = fitz.open(thesis_path)
 assert len(thesis) == 259
 assert normalize(slides["official_title"]) in normalize(thesis[0].get_text())
-for number in [66, 85, 86, 101, 102, 106]:
+for number in [66, 71, 75, 85, 86, 101, 102, 106, 111]:
     thesis[number - 1].get_pixmap(matrix=fitz.Matrix(1.2, 1.2), alpha=False).save(QA / f"public-manuscript-{number}.png")
 for amount in ["7,856.69", "356.69", "3,000.00", "2,000.00", "1,500.00", "1,000.00"]:
     assert amount in thesis[93].get_text(), amount
@@ -84,7 +84,7 @@ for filename in pdfs:
         sheet.save(QA / f"{filename[:-4]}-contact-{start + 1:02}.png")
 assert counts[pdfs[-1]] == 14
 report = {
-    "date": "2026-11-27", "source_baseline": "ec6803a", "slide_count": 14, "speaker_notes_verified": 14,
+    "date": "2026-11-27", "source_baseline": "69f9c85", "slide_count": 14, "speaker_notes_verified": 14,
     "editable_admission_connectors": 6, "native_evidence_table_slide": 7, "panel_question_count": 97,
     "pdf_pages": counts, "manuscript_pages": 259, "substantive_edits": 45, "substantive_pages": 37,
     "official_title_unchanged": True, "budget_amounts_unchanged": True, "pdf_text_within_margins": True,

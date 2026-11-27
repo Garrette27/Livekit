@@ -10,7 +10,7 @@ Prepared 25 November 2026 (Asia/Singapore). Scope: minimally revise the supplied
 4. [Page changes 27 Nov](page-changes-2026-11-27.md) — manuscript pages changed (same 259 pages).
 5. [Full ranked Q&A Q1–Q97](panel-questions-and-answers.md), [number map](panel-question-number-map.md), [current findings/Claude prompt](admin-entry-findings-and-claude-handoff.md) and [attachment plan](attachment-plan.md).
 
-The manuscript, ranked Q&A PDFs and 14-slide panel/demo deck are rebuilt for this follow-up. The capacity/cost research brief is dated 25 November; do not read historical race findings as the current tested implementation. The newest role boundary is platform administration only: the configured owner uses a separate provisioned identity for doctor work.
+The manuscript, ranked Q&A PDFs and 14-slide panel/demo deck are rebuilt for source `69f9c85`. The capacity/cost research brief is dated 25 November; do not read historical race findings as the current implementation. All administrators are non-clinical and use a separate provisioned identity for doctor work. Doctor-booked appointments are implemented but deployment-gated, not a surveyed result; see priority Q25 and the release gates.
 
 ## Send these first
 

@@ -1,5 +1,11 @@
 # Security and performance verification ledger
 
+## 27 November 2026: approved appointment implementation
+
+Source `69f9c85`:128 security regressions, seven appointment Chromium cases, expanded real local Firestore transaction cases, typecheck, lint and production build passed. Complete security execution used the tracked-instruction snapshot because the user's unrelated AGENTS.md changes trigger the root scope guard; those changes remain untouched. GitHub CI45921466995 and `livekit-frontend` deployment status succeeded. A separate `livekit` project failed; direct Vercel team metadata is unavailable. This is not signed-in production acceptance.
+
+The doctor-booked module is implemented but default-off. Production indexes/rules, existing-data inspection, approved contact retention and signed-in staging acceptance remain gates. No production flag, role, retention setting or clinical data was changed. See [review decisions and deferred list-order minor](evidence/2026-11-27-appointments/implementation-review.md), [backend evidence](evidence/2026-11-27-appointments/backend-verification.json) and [browser evidence](evidence/2026-11-27-appointments/ui-verification.json). Later implementation is not attributed to the original survey; real-device media, load and clinical accuracy remain unmeasured.
+
 ## 27 November 2026: administrator entry follow-up
 
 Reviewed `eb3b187` plus the administrator-entry fix. [Evidence](evidence/2026-11-27-admin-entry/verification.json): 91 regressions, both source contracts in a tracked-instructions snapshot, typecheck, lint, production build and 3 signed-out browser cases pass locally. The user's modified root AGENTS.md makes the root scope guard fail; it is preserved and excluded rather than silently rewritten. Browser fixtures exercise the actual form/header JSX and CSS with synthetic values, including 320px and long clinic names. A fresh review's navigation, clipping and Auth-outage findings were addressed.

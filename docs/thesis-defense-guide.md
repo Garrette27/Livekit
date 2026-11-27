@@ -334,10 +334,14 @@ consultations. See [access-control.md](./access-control.md).
 
 ### “What about file attachments and schedules?”
 
-They are prepared as disabled capabilities, not unfinished visible features.
-Attachments need secure storage, scanning, retention, and download policy;
-scheduling needs a separate timezone-safe appointment lifecycle. Neither is
-mixed into invitation documents or exposed in UI yet.
+Attachments remain disabled pending secure storage, scanning, retention and
+download policy. Doctor-booked appointments are now implemented as a separate,
+deployment-gated module: UTC times plus named timezone, transactional overlap
+checks, immutable create receipts, versioned reschedule/cancel and doctor-only
+ownership. Booking never grants admission or creates encounter evidence. The UI
+stays hidden until scheduling is explicitly enabled after indexes, rules,
+data/retention review and signed-in staging acceptance. This later addition was
+not evaluated by the original survey respondents.
 
 ## Release checklist before the defense
 

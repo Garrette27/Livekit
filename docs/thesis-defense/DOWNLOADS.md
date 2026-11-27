@@ -1,6 +1,6 @@
 # TeleConsole defense downloads
 
-Updated 27 November 2026 (Asia/Singapore). Current manuscript, 97-question ranked bank, quick answers and panel/demo slides are aligned with the documented follow-up. Dated capacity/cost research remains historical planning evidence, not a new load result.
+Updated 27 November 2026 (Asia/Singapore), source `69f9c85`. Current manuscript, 97-question ranked bank, quick answers and panel/demo slides cover non-clinical administrators, responsive calls, encounter/retention boundaries and implemented but deployment-gated doctor-booked appointments. Scheduling remains default-off pending release gates; it was not surveyed. Dated capacity/cost research remains historical planning evidence, not a new load result.
 
 ## Download the public-safe pack
 

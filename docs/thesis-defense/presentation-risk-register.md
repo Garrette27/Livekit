@@ -1,6 +1,6 @@
 # Current defense demonstration risks
 
-27 November 2026, source `ec6803a`. Read the [quick answers](PANEL-QA-LATEST.md) and [dated verification](../testing/evidence/2026-11-27-clinical-separation/verification.json). Earlier PR9-only deployment advice is superseded; the relevant main-branch changes are already merged. Check the exact deployed frontend commit before rehearsal.
+27 November 2026, source `69f9c85`. Read the [quick answers](PANEL-QA-LATEST.md) and [appointment review and verification limits](../testing/evidence/2026-11-27-appointments/implementation-review.md). Earlier PR9-only deployment advice is superseded; the relevant main-branch changes are already merged. Check the exact deployed frontend commit before rehearsal.
 
 | Risk | Containment and honest boundary |
 | --- | --- |
@@ -14,7 +14,7 @@
 | Consent appears again | New entry starts unchecked. Do not carry transcription consent across a reused room name. Device preflight is intentional. |
 | Older summary missing | Say unavailable unless deletion is independently confirmed. Firebase retention is opt-in; Vercel's cron retries summary work. Do not run destructive cleanup for a demo. |
 | Microphone, camera or venue network fails | Run device preflight at the venue, keep audio-only and a backup network available. Use clearly labeled offline evidence if needed. |
-| Panel asks about scheduling/uploads | Both remain disabled. Explain the separate doctor-booked appointment design and attachment safety gates as future work, not evaluated features. |
+| Panel asks about scheduling/uploads | Appointments are implemented but deployment-gated; uploads remain disabled future work. Demonstrate bookings only in an explicitly enabled synthetic environment. Neither feature was evaluated by the original survey. Production rules/indexes, data/retention review and signed-in staging acceptance remain appointment gates. |
 
 ## Release and rehearsal discipline
 

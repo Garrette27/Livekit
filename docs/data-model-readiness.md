@@ -136,26 +136,32 @@ short-lived upload or download operation. File signature and size checks,
 quarantine, malware scanning, deletion, retention, and cross-session denial
 tests are release gates.
 
-## Prepared scheduling model (disabled)
+## Implemented doctor-booked scheduling (deployment-gated)
 
 Scheduling is a separate aggregate; it is not a set of fields on an invitation:
 
 `appointments/{appointmentId}`
 
-Suggested fields:
+Current fields:
 
-- `doctorUserId`, `patientUserId` when known
+- `doctorUserId`, patient display name and optional unverified contact email
 - `startsAt` and `endsAt` as UTC timestamps
 - `displayTimeZone` as an IANA timezone such as `Asia/Manila`
-- `status`: `scheduled | rescheduled | cancelled | completed | no-show`
+- `status`: `booked | cancelled`; rescheduling retains the id and increments version
 - `createdAt`, `updatedAt`, optimistic `version`
-- optional `currentInvitationId` as a reference issued for this appointment
+- immutable server-only `creationIntentHash` for retry reconciliation, separate from mutable booking fields
 
-Use `appointments/{appointmentId}/events/{eventId}` for an append-only status
-timeline and `reminders/{channel-offset}` for idempotent delivery state. Doctor
-availability and recurrence rules belong to their own server-owned model.
-Conflict checks, reschedule/cancel commands, participant authorization, and
-timezone/DST tests must exist before the capability flag is enabled.
+`appointmentCalendars/{doctorUserId}` stores serialization version/timestamp only.
+Every booking mutation reads that lock and commits its version in the same
+transaction as the appointment. Overlap checks use half-open intervals; adjacent
+appointments may coexist. Create retries compare the immutable original-intent
+receipt, not fields that may have changed later. Cancellation never creates a
+clinical no-show or deletes an encounter. Booking issues no invitation credential.
+
+An event timeline, reminders, availability publication and recurrence remain
+future extensions, not hidden implementations. Client writes stay denied. The
+flag remains off until production index/data/retention checks and signed-in
+staging acceptance are complete; local tests are not a production data audit.
 
 ## Rule for future implementation
 

@@ -312,7 +312,7 @@
     "page": 111,
     "start": "The researchers configured the TeleConsole",
     "end": "restrictions based on user roles.",
-    "replacement": "Firebase Authentication and Google sign-in support accounts, and Firestore stores application and encounter records. LiveKit Cloud handles audio, video, and screen sharing. OpenAI supports optional evidence-grounded summaries when service access is available. File uploads and scheduling are prepared but disabled; ip-api.com is not an active admission dependency. JWT verification, webhook validation, and server-side ownership checks provide layered controls, not certification. A real clinic release additionally requires verified active rules, retention and restore procedures, provider agreements, a recurring budget, and measured paired-call quality and concurrency.",
+    "replacement": "Firebase Authentication and Google sign-in support accounts; Firestore stores application and encounter records. LiveKit Cloud handles audio, video and screen sharing. OpenAI supports optional evidence-grounded drafts. File uploads remain disabled. Doctor-booked appointments are implemented but deployment-gated: UTC times, named timezones, overlap prevention and version-checked changes. Booking grants no admission or clinical evidence and was not surveyed. ip-api.com is not an admission dependency. JWT, webhook and ownership checks are layered controls, not certification. Clinic release still requires verified rules/indexes, retention, restore, provider agreements, recurring budget and measured call quality/concurrency.",
     "reason": "Make the deployment plan consistent with currently enabled features and remaining readiness work."
   },
   {
@@ -337,7 +337,7 @@
     "page": 66,
     "start": "Concurrently, the Doctor actor initiates authentication",
     "end": "backend generation of an AI-assisted clinical summary.",
-    "replacement": "Staff identities use Firebase Authentication; signup alone grants no administrative role. Platform and clinic administrators manage staff access, without clinician API permissions even with old combined claims. Clinic administrators provision doctors within their clinic; legacy clinician profiles remain transitional. A separate doctor account manages invitations, admits visitors, conducts calls and reviews drafts. Verified allowlisted patients may enter directly. Admission is permission, not attendance; the host is not a patient visit. Attachments and scheduling remain disabled. Summary processing requires finalization, consent and usable evidence. Administrative metadata is separate from clinical record ownership.",
+    "replacement": "Staff use Firebase Authentication; signup grants no administrative role. Platform and clinic administrators manage staff access without clinician API permissions, even with old combined claims. Clinic administrators provision doctors in their clinic; legacy profiles remain transitional. A separate doctor account manages invitations, admission, calls and draft review. Verified allowlisted patients may enter directly. Admission is permission, not attendance; the host is not a patient visit. Attachments remain disabled. Doctor-booked appointments are implemented but deployment-gated, separate from admission and encounters. Summary processing requires finalization, consent and usable evidence. Administration does not confer clinical record ownership.",
     "reason": "Align the actor description with verified direct entry, clinician admission, disabled attachments and conditional AI finalization."
   },
   {

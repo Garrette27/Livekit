@@ -1,12 +1,12 @@
 {
   "official_title": "TeleConsole: Design and Development of a Secure Telehealth Video Communication System Using LiveKit with AI Summarization and Flexible User Access Design",
   "date": "27 November 2026",
-  "baseline": "ec6803a",
+  "baseline": "69f9c85",
   "slides": [
     {
       "kind": "cover",
       "subtitle": "Panel questions and an evidence-grounded demo",
-      "notes": "Introduce the original official title without renaming it. This supplement helps three writers explain scope and demonstrate the workflow; it does not replace the full methodology/results defense. The manuscript remains 259 pages with unchanged objectives, survey figures and project expense amounts. The source checkpoint is ec6803a. State the actual deployed commit used in the demonstration, separately from local source. Sources: docs/thesis-defense/panel-questions-and-answers.md; revision-manifest.json."
+      "notes": "Introduce the original official title without renaming it. This supplement helps three writers explain scope and demonstrate the workflow; it does not replace the full methodology/results defense. The manuscript remains 259 pages with unchanged objectives, survey figures and project expense amounts. The source checkpoint is 69f9c85. State the actual deployed commit used in the demonstration, separately from local source. Sources: docs/thesis-defense/panel-questions-and-answers.md; revision-manifest.json."
     },
     {
       "title": "Contribution and evidence boundaries",
@@ -205,7 +205,7 @@
         ]
       ],
       "bottom": "One invitation may host several distinct encounter records",
-      "notes": "The last doctor leaving ends an encounter; invitation revocation is not the only completion event. Never merge records by reused room name. The call works without transcription and a fresh entry starts unchecked. Chat is history, not current clinical summary evidence. Missing evidence may yield a deterministic nonclinical record without an AI call. The Firebase retention worker now processes at most 200 summaries plus 200 schedule entries per run; Vercel's cron retries summaries, not deletion. Other text copies/backups are not fully purged and age is not a deletion receipt. Future attachment cleanup needs its own approved policy and storage reconciliation. Scheduling remains disabled: the selected next design separates appointment planning from encounter evidence. Sources: functions/index.js; history-presentation.ts; docs/superpowers/specs/2026-11-27-doctor-booked-appointments-design.md."
+      "notes": "The last doctor leaving ends an encounter; invitation revocation is not the only completion event. Never merge records by reused room name. Fresh-entry transcription starts unchecked. Chat is history, not current clinical summary evidence. Missing evidence can yield a deterministic nonclinical record without AI. Firebase retention processes at most 200 summaries plus 200 schedule entries per run; Vercel retries summaries, not deletion. Other copies/backups are not fully purged; age is not a deletion receipt. Future attachments need a separate cleanup policy and storage reconciliation. Doctor-booked appointments are implemented but deployment-gated: planning creates no admission, encounter or evidence. The original survey did not evaluate them. Sources: functions/index.js; history-presentation.ts; docs/superpowers/specs/2026-11-27-doctor-booked-appointments-design.md."
     },
     {
       "title": "The answer to the CCTV capacity question",
@@ -236,11 +236,11 @@
         ],
         [
           "Regressions",
-          "118 local cases with synthetic IO adapters"
+          "128 local cases with synthetic IO adapters"
         ],
         [
           "Browser sizing",
-          "Six phone, tablet and desktop viewports"
+          "Six call sizes; seven appointment browser cases"
         ],
         [
           "Still required",
@@ -248,7 +248,7 @@
         ]
       ],
       "bottom": "Local checks do not establish production capacity or clinical accuracy",
-      "notes": "Source checkpoint ec6803a passed 118 local regressions, typecheck, lint and a production build. A separate Chromium test covered 320,390,768,820,1024 and1280px widths with synthetic media. Local Firestore rule cases denied combined/admin identities and retained doctor ownership access. This is not real iPad/Safari audio-video acceptance, production load or language accuracy. The root scope guard rejects unrelated user AGENTS.md content; the full security command passed in an isolated snapshot with tracked instructions. Do not attribute later maintenance to the survey respondents. Source: docs/testing/evidence/2026-11-27-clinical-separation/verification.json."
+      "notes": "Source checkpoint 69f9c85 passed 128 local regressions, seven appointment browser cases, real local Firestore transaction cases, typecheck, lint and a production build. Separate call-layout checks covered 320,390,768,820,1024 and1280px with synthetic media. Local rules cases denied combined/admin identities and retained doctor ownership access. This is not real iPad/Safari media acceptance, production load or language accuracy. The root scope guard rejects unrelated user AGENTS.md content; the full security command passed in an isolated snapshot with tracked instructions. Do not attribute later maintenance to survey respondents. Sources: docs/testing/evidence/2026-11-27-appointments/; docs/testing/evidence/2026-11-27-clinical-separation/verification.json."
     },
     {
       "title": "Three-writer panel rehearsal",
@@ -271,19 +271,19 @@
         ]
       ],
       "bottom": "Current rule, reason, specific evidence, limitation",
-      "notes": "Use the 97-question prioritized bank. All prior 81 topics remain, with a stable-id number map and 16 additions. Ranking is preparation judgment, not measured panel frequency. Retention is priority20, encounter lifecycle24 and scheduling25. Scheduling is not live: describe the selected doctor-booked design and its acceptance gates. Keep a five-minute version on slides2,3,4,7,10 and11. Sources: PANEL-QA-LATEST.md; panel-question-number-map.md."
+      "notes": "Use the 97-question prioritized bank. All prior 81 topics remain, with a stable-id map and 16 additions. Ranking is preparation judgment, not measured panel frequency. Retention is priority20, encounter lifecycle24 and scheduling25. Scheduling is implemented but default-off pending production rules/indexes, existing-data and contact-retention review and signed-in staging acceptance. No reminders or self-booking. Explain Appointment versus Encounter without claiming FHIR interoperability or original survey evaluation. Keep a five-minute version on slides2,3,4,7,10 and11. Sources: PANEL-QA-LATEST.md; panel-question-number-map.md."
     },
     {
       "title": "A bounded demonstration sequence",
       "steps": [
         "1. Administrator entry and correctly scoped staff grant",
-        "2. New invitation with a waiting limit of two",
-        "3. Third visitor refused; raise the limit and retry",
+        "2. Gated test only: book, reject overlap, reschedule, cancel",
+        "3. Waiting limit two; third refused; raise limit and retry",
         "4. Manual admission or verified allowlist direct entry",
         "5. One synthetic patient call with optional consented notes",
         "6. Encounter evidence, AI draft and clinician review"
       ],
-      "notes": "Prepare separate approved synthetic browser profiles; a shared Firebase uid is still one principal. The queue example demonstrates waiting admission, not a group clinical workflow. If network or AI fails, show the actual retry/unavailable state and use labeled offline evidence without pretending the live step succeeded. Freeze the demonstrated commit and confirm it before the defense. Preserve the original title, 259-page pagination and financial amounts; the private copy retains appendices and must not be placed in the public repository. Sources: one-day-defense-guide.md; admin-entry-findings-and-claude-handoff.md."
+      "notes": "Use separate synthetic browser profiles; a shared Firebase uid is one principal. Demonstrate appointments only in an explicitly enabled synthetic test environment after prerequisites; otherwise show labeled local evidence. A booking issues no invitation and grants no admission. The queue example is not a group clinical workflow. If network or AI fails, show the real unavailable state without pretending success. Freeze and confirm the demonstrated commit. Preserve the official title, 259 pages and expenses; private appendices must not enter the public repository. Sources: one-day-defense-guide.md; admin-entry-findings-and-claude-handoff.md."
     }
   ]
 }

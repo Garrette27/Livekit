@@ -33,7 +33,7 @@ intro = """# Panel questions and answers: priority study order
 
 Start with question 1. This priority order is an engineering judgment based on scope, unsupported claims, privacy, access control and demonstration risk. It is not an empirical prediction of what a panel will ask and does not guarantee a grade. All 81 prior topics are retained, plus administrator, bilingual, retention, lifecycle and responsive-design questions. Read the first 20 before the detailed follow-ups.
 
-Reviewed source: `ec6803a` (role separation, encounter state and responsive layout). Existing queue evidence is dated and local; neither these answers nor a Ready deployment establish production load, clinical accuracy, security certification or multi-clinic clinical validation. No survey number or objective is changed. The [number map](panel-question-number-map.md) links older Q references to this order. Historical guides may retain those legacy references.
+Reviewed source: `69f9c85` (role separation, encounter state, responsive layout and deployment-gated appointments). Existing queue evidence is dated and local; neither these answers nor a Ready deployment establish production load, clinical accuracy, security certification or multi-clinic clinical validation. No survey number or objective is changed. The [number map](panel-question-number-map.md) links older Q references to this order. Historical guides may retain those legacy references.
 
 Use a 20-40 second answer: current rule, reason, specific evidence, limitation. Distinguish recorded results from proposed next tests. Provision only synthetic demonstration accounts; never show real patient records.
 

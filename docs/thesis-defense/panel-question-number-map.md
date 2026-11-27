@@ -100,4 +100,4 @@
 | 94 | 36 | Does responsive layout mean the app is proven on every phone and iPad? |
 | 95 | 48 | What belongs in the consultation room rather than repeating invitation management? |
 | 96 | 46 | Does the doctor count as a verified patient visit? |
-| 97 | 25 | Why is scheduling disabled, and how would you add it safely? |
+| 97 | 25 | Is appointment scheduling implemented, and why is it still deployment-gated? |

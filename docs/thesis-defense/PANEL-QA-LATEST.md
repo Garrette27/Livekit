@@ -1,6 +1,6 @@
 # Panel Q&A: start here
 
-27 November 2026. Source: `ec6803a`. This is the short rehearsal route; the [complete priority bank](panel-questions-and-answers.md) contains **97 questions**, retaining all 81 earlier topics and 16 additions. [Old-to-new number map](panel-question-number-map.md). Ranking reflects preparation risk and engineering judgment, not measured panel-question frequency or a guarantee of passing.
+27 November 2026. Source: `69f9c85`. This is the short rehearsal route; the [complete priority bank](panel-questions-and-answers.md) contains **97 questions**, retaining all 81 earlier topics and 16 additions. [Old-to-new number map](panel-question-number-map.md). Ranking reflects preparation risk and engineering judgment, not measured panel-question frequency or a guarantee of passing.
 
 ## First five answers everyone must know
 
@@ -22,7 +22,7 @@ No. It drafts from usable consented transcript evidence; the clinician must veri
 
 ### 5. What can your evidence actually prove?
 
-The survey describes perceived quality of the evaluated build. The latest follow-up passed 118 local regressions, a synthetic Chromium test across six phone/tablet/desktop sizes and local Firestore rule cases. The previous administrator-entry checkpoint had three signed-out browser checks. None measures a safe production call maximum or bilingual clinical accuracy. State the actual deployed commit and the build respondents evaluated if recorded.
+The survey describes perceived quality of the evaluated build. The latest follow-up passed 128 local regressions, seven appointment browser cases and real local Firestore transaction cases. Separate call-layout checks covered six phone/tablet/desktop sizes; administrator separation also has local rules evidence. The earlier administrator-entry checkpoint had three signed-out browser checks. None measures a safe production call maximum, real iPad/Safari media quality or bilingual clinical accuracy. State the actual deployed commit and the build respondents evaluated if recorded.
 
 ## Access and administration demo
 
@@ -82,7 +82,7 @@ The Firebase daily deletion worker is **opt-in**, defaulting to a 30-day cutoff.
 
 The compact call layout uses on-demand panels, with reserved panel space on wider screens. Expand participant details for captured arrival/admission/departure times and identity provenance; a self-declared email is not verified identity. Hashed invitation addresses cannot be recovered for display. Report viewport checks separately from real iPad/Safari media acceptance. The host is excluded from new direct-entry audience counts and cannot reserve a patient visit on the host account.
 
-Scheduling remains disabled. The user selected doctor-booked appointments as the next bounded feature, with separate appointment records, timezone-aware times, overlap prevention and cancellation/rescheduling. An appointment must not grant consultation access or create clinical evidence. The design is not an implemented or surveyed result. See the [proposed design](../superpowers/specs/2026-11-27-doctor-booked-appointments-design.md).
+Doctor-booked appointments are implemented but deployment-gated. They use separate records, UTC times and named timezones, transactional overlap prevention, immutable retry receipts and version-checked cancellation/rescheduling. Booking grants no consultation access, starts no transcription and creates no encounter or AI evidence. Before enabling the existing default-off flag, verify production rules/indexes, existing data, contact retention and signed-in staging acceptance. Reminders and patient self-booking are excluded. This later implementation was not surveyed. See the [approved design](../superpowers/specs/2026-11-27-doctor-booked-appointments-design.md) and [review rulings and limits](../testing/evidence/2026-11-27-appointments/implementation-review.md).
 
 ## Demo sequence tied to questions
 
@@ -93,11 +93,12 @@ Scheduling remains disabled. The user selected doctor-booked appointments as the
 5. Admit one reviewed visitor, or show verified allowlist entry. Explain waiting/admitted/connected separately.
 6. Conduct one synthetic patient encounter. Demonstrate optional consented speech notes and the language setting without claiming measured accuracy.
 7. Show **Not finalized**, then end the encounter and show available evidence and draft/review state. If AI is unavailable, explain the actual state rather than pretending a live generation succeeded. Resize to phone/tablet and open/close the panels. Explain retention from the policy; do not run destructive cleanup during the demo.
+8. Only in an explicitly enabled synthetic test environment, book an appointment, reject an overlap, reschedule and cancel. Explain that a booking is not admission or attendance. If the feature is disabled, show labeled local evidence rather than claiming a live production demo.
 
 For a five-minute team briefing use slides 2, 3, 4, 7, 9 and 11. Writer 1 covers scope/evidence, writer 2 access/queue, writer 3 numbers/AI/recovery; rotate once. The supplement does not replace institutional methodology and results slides.
 
 ## Manuscript and deployment boundaries
 
-The manuscript remains **259 pages** with unchanged official title, numbering, objectives, survey data and project expenses. This follow-up updates printed **54, 59, 63 and 94** / PDF **66, 71, 75 and 106** for role separation, retention/future attachments, encounters and responsive call context. The historical consent qualifier remains printed **93** / PDF **105**. See the [exact page register](page-change-register.md). Public privacy masks and private submission boundaries remain separate.
+The manuscript remains **259 pages** with unchanged official title, numbering, objectives, survey data and project expenses. This follow-up updates printed **54, 59, 63, 94 and 99** / PDF **66, 71, 75, 106 and 111** for role separation, retention/future attachments, encounters, responsive context and deployment-gated appointments. The historical consent qualifier remains printed **93** / PDF **105**. See the [exact page register](page-change-register.md). Public privacy masks and private submission boundaries remain separate.
 
 A Ready deployment means a build/release event. Verify the actual frontend commit and signed-in behavior separately. The new administrator pages have not yet had signed-in production acceptance in this checkpoint. Do not claim the entire system is commercially ready or that other theses failed for a single universal reason. Remaining work and a bounded Claude prompt are in [the handoff](admin-entry-findings-and-claude-handoff.md).

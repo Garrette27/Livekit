@@ -60,6 +60,24 @@ remains idempotent.
 
 ## Deployment requirements
 
+### Appointment release gate
+
+The doctor-booked appointment module is implemented but not enabled by default.
+Before setting `ENABLE_CONSULTATION_SCHEDULING=true`, deploy and verify the two
+`appointments` composite indexes, inspect any existing appointment data for the
+new schema, approve scheduling-contact retention and run signed-in staging tests
+with separate doctor, patient and administrator identities. Direct client writes
+to appointments/calendar locks remain denied. Test concurrent overlap, immutable
+create retries after reschedule/cancel/start, stale versions, account switching
+with delayed responses, timezone gaps/ambiguities and cancellation before release.
+The local evidence is in `docs/testing/evidence/2026-11-27-appointments/`.
+
+Booking does not issue invitations/media tokens or start a consultation or
+transcription. There are no reminders, recurrence, self-booking or calendar sync.
+Vercel deployment does not deploy Firebase indexes, rules or retention functions.
+
+### Existing deployment requirements
+
 - Configure `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` (or the documented
   legacy webhook HMAC secret). Webhooks fail closed if verification is absent.
 - Configure long random `RATE_LIMIT_HASH_SECRET` and

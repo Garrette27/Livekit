@@ -110,3 +110,5 @@ Direct Firestore client rules also deny clinical access for admin claims/profile
 
 Pattern and tradeoff: separation of duties keeps administrative identity distinct from clinical ownership. It costs an additional provisioned sign-in for a person performing both jobs, but prevents a staff-management grant from implicitly authorizing consultations. Historical clinical records remain attributable and are not deleted or reassigned.
 
+Appointments use `appointment:manage-own`, granted only to Doctor. The API derives ownership from the verified request, never the command body. Patient/admin/reviewer identities cannot list or mutate calendars. Direct Firestore client reads/writes to appointments and calendar locks remain denied. The workbench is UID-keyed, clears authorization during identity changes, pins requests to the expected identity and ignores obsolete responses; a shared-browser switch must not carry contacts or drafts into another doctor's workspace.
+

@@ -32,8 +32,8 @@ Files: create `lib/appointments/appointment-policy.ts`; test `tests/appointment-
 
 Interfaces: `parseAppointmentCommand(body, now)` returns a validated create/reschedule/cancel command or bounded validation error; `localAppointmentTimeToUtc(local, timezone)` rejects impossible/ambiguous values; `appointmentsOverlap(start,end,otherStart,otherEnd)` uses half-open intervals. Document interfaces before implementation.
 
-- [ ] Write and run failing tests for input bounds, invalid dates, timezone conversion/DST ambiguity, adjacent versus overlapping intervals and stale expected versions.
-- [ ] Implement the pure policy and rerun the focused tests until green.
+- [x] Write and run failing tests for input bounds, invalid dates, timezone conversion/DST ambiguity, adjacent versus overlapping intervals and stale expected versions.
+- [x] Implement the pure policy and rerun the focused tests until green.
 
 ### Task 2: Server ownership and transactional booking
 
@@ -41,10 +41,10 @@ Files: create `lib/services/appointments/appointment-service.ts`, `app/api/docto
 
 Interfaces: `AppointmentService.list(doctorUid, cursor?)` returns a bounded page with next cursor; `AppointmentService.execute(doctorUid, command)` returns the committed appointment or a typed conflict. The route authenticates with `appointment:manage-own`, checks the existing capability flag and maps ServiceResult errors.
 
-- [ ] Add failing runtime tests for missing auth, admin/patient denial, wrong owner, malformed/null JSON and disabled flag.
-- [ ] Add transactional tests using a per-doctor `appointmentCalendars/{uid}` version lock, reading the appointment and overlap query before writes. A client-generated UUID serves as the opaque create/idempotency key, never as authority. Same-id same-command retries return the existing result; conflicting reuse fails409.
-- [ ] Implement create/reschedule/cancel with expected-version checks and bounded list pagination. Store UTC timestamps plus IANA display zone, patient label/contact and ownership. Log no contact values or tokens.
-- [ ] Verify concurrent overlap, adjacent booking, cross-doctor independence, replay, cancellation and reschedule conflict in the local Firestore emulator. Record required production indexes separately; do not claim Vercel deployed them.
+- [x] Add failing runtime tests for missing auth, admin/patient denial, wrong owner, malformed/null JSON and disabled flag.
+- [x] Add transactional tests using a per-doctor `appointmentCalendars/{uid}` version lock, reading the appointment and overlap query before writes. A client-generated UUID serves as the opaque create/idempotency key, never as authority. Same-id same-command retries return the existing result; conflicting reuse fails409.
+- [x] Implement create/reschedule/cancel with expected-version checks and bounded list pagination. Store UTC timestamps plus IANA display zone, patient label/contact and ownership. Log no contact values or tokens.
+- [x] Verify concurrent overlap, adjacent booking, cross-doctor independence, replay, cancellation and reschedule conflict in the local Firestore emulator. Record required production indexes separately; do not claim Vercel deployed them.
 
 ### Task 3: Responsive doctor workbench
 
@@ -52,18 +52,18 @@ Files: create `app/doctor/appointments/page.tsx`; modify `components/doctor/Doct
 
 Interfaces: authenticated GET/POST to the new endpoint; the page uses explicit timezone, upcoming list, inline pending/error/conflict states, reschedule/cancel and Show more. Do not fetch or display another clinician's patient history.
 
-- [ ] Write failing synthetic browser tests for create, cancel, stale reschedule, disabled state, keyboard navigation and320/820/1280px layouts.
-- [ ] Implement the workbench and feature-aware navigation using existing styles/feedback.
-- [ ] Verify no invitation token, media or transcription request occurs when booking.
+- [x] Write failing synthetic browser tests for create, cancel, stale reschedule, disabled state, keyboard navigation and320/820/1280px layouts.
+- [x] Implement the workbench and feature-aware navigation using existing styles/feedback.
+- [x] Verify no invitation token, media or transcription request occurs when booking.
 
 ### Task 4: Integration, publication and defense alignment
 
 Files: update tests/package chain, capability/readiness/access notes, ranked Q&A, slide notes and bounded manuscript wording only after verified implementation.
 
-- [ ] Run typecheck, lint, complete security regressions with tracked instructions, focused browser tests, emulator cases and production build. Review the diff against the approved scope.
-- [ ] Publish a verified code checkpoint to main without private files or production account/secret changes; inspect remote CI and frontend deployment separately.
-- [ ] Keep scheduling unavailable in production until its indexes and signed-in acceptance are verified. Explain implemented-but-disabled versus live behavior explicitly.
-- [ ] Update the scheduling answer and manuscript only to the measured state, preserving259 pages, objectives, survey findings and budget. Rebuild/verify public downloads and push the artifact checkpoint.
+- [x] Run typecheck, lint, complete security regressions with tracked instructions, focused browser tests, emulator cases and production build. Review the diff against the approved scope.
+- [x] Publish a verified code checkpoint to main without private files or production account/secret changes; inspect remote CI and frontend deployment separately.
+- [x] Keep scheduling unavailable in production until its indexes and signed-in acceptance are verified. Explain implemented-but-disabled versus live behavior explicitly.
+- [x] Update the scheduling answer and manuscript only to the measured state, preserving259 pages, objectives, survey findings and budget. Rebuild/verify public downloads and push the artifact checkpoint.
 
 ## Self-review
 

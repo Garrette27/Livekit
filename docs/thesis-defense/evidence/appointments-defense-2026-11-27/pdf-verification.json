@@ -1,0 +1,985 @@
+{
+  "source_sha256": "82cbc8b27d932cb88364decb66a155f4d19089932154526ef1e936a5cb4c7eb1",
+  "output_sha256": "daddec3c4ed107df848af529df0d109eb150bd516c794a2abf23ff9795851570",
+  "baseline": "69f9c85",
+  "date": "2026-11-27",
+  "assertions": {
+    "page_count_259": true,
+    "page_sizes_unchanged": true,
+    "page_labels_unchanged": true,
+    "bookmarks_unchanged": true,
+    "untouched_pages_pixel_identical": true,
+    "changed_pages_outside_rectangles_pixel_identical": true,
+    "original_unchanged": true
+  },
+  "edits": [
+    {
+      "id": "capacity-scope",
+      "pdf_page": 22,
+      "printed_page": 10,
+      "rect": [
+        90.024,
+        163.98797912597655,
+        543.2,
+        292.00201416015625
+      ],
+      "old_text": "The study is delimited to the development and evaluation of a functional software prototype intended for a single-clinic teleconsultation environment. Enterprise-level cloud scaling, multi-hospital deployment, and integration with external Electronic Health Records (EHR) and Hospital Information Systems (HIS) are excluded from the scope of the study.",
+      "replacement": "The prototype targets one doctor and one patient per encounter at a single dental clinic. Its maximum safe number of simultaneous encounters was not measured. Provider quotas are not validated application capacity. Multi-clinic operation, enterprise scaling, and external EHR/HIS integration remain outside the study.",
+      "reason": "State an intended encounter size without inventing a concurrent-call result.",
+      "spare_height_pt": 29.4183319091797,
+      "font_size": 12
+    },
+    {
+      "id": "capacity-deployment",
+      "pdf_page": 64,
+      "printed_page": 52,
+      "rect": [
+        90.024,
+        558.3,
+        543.2,
+        704.0
+      ],
+      "old_text": "The modular architecture and cloud-based services provide a foundation for possible future improvements, including additional users, expanded clinical workflows, and integration with other healthcare information systems. However, large-scale scalability, performance under high concurrent demand, and multi-clinic deployment were not independently evaluated",
+      "replacement": "The cloud services provide a foundation for future expansion, not a measured capacity guarantee. At the 25 November 2026 documentation check, LiveKit Build listed 100 concurrent connections, 5,000 participant-minutes and 50 GB downstream transfer per month (livekit.com/pricing). These are service allowances, not proof of 50 safe consultations. High-load performance and multi-clinic deployment were not independently evaluated",
+      "reason": "Distinguish documented allowance from measured system capacity; preserve the continuation on the next page.",
+      "spare_height_pt": 35.104296875000045,
+      "font_size": 12
+    },
+    {
+      "id": "context-inactive-services",
+      "pdf_page": 68,
+      "printed_page": 56,
+      "rect": [
+        90.024,
+        447.83800048828124,
+        543.2,
+        631.052001953125
+      ],
+      "old_text": "The platform also interacts with several external services to support its operations. Firebase Authentication handles user authentication, while Google Identity Provider supports Google-based sign-in through Firebase Authentication. LiveKit Cloud facilitates real-time consultation communication and participant media exchange. The OpenAI API processes consultation context to generate AI-assisted consultation summaries, while the ip-api.com Geolocation API provides coarse geolocation information during invitation validation.",
+      "replacement": "Firebase Authentication and Google Identity Provider support account sign-in. LiveKit Cloud transports real-time media, while the OpenAI API supports optional, evidence-grounded summary generation. The figures are logical component maps: legacy geolocation and attachment paths do not represent enabled production features. Current admission does not use ip-api.com, device fingerprints, or location as proof of identity.",
+      "reason": "Remove claims that removed geolocation is an active access control.",
+      "spare_height_pt": 60.61829833984376,
+      "font_size": 12
+    },
+    {
+      "id": "dfd-access",
+      "pdf_page": 70,
+      "printed_page": 58,
+      "rect": [
+        90.024,
+        309.81801147460936,
+        543.2,
+        493.0220031738281
+      ],
+      "old_text": "The first process, Manage Access and Admission, handles user authentication, account access, invitation validation, and waiting-room admission. It facilitates interactions with patients and dentists while utilizing Firebase Authentication and Google Identity Provider for authentication and the Geolocation API for location-related information during invitation validation. User profiles and role information, as well as invitation and waiting-room records, are maintained through the corresponding logical data stores.",
+      "replacement": "The first process, Manage Access and Admission, verifies Firebase identities and persisted invitation policy on the server. Only a provider-verified, allowlisted account may bypass waiting; other visitors require clinician admission. Invitation possession, typed email, location, and device information are not identity proof. User profiles, invitations, and waiting records occupy separate logical stores.",
+      "reason": "Align the diagram explanation with actual verified-account admission policy.",
+      "spare_height_pt": 60.60828857421876,
+      "font_size": 12
+    },
+    {
+      "id": "records-disabled-attachments",
+      "pdf_page": 71,
+      "printed_page": 59,
+      "rect": [
+        90.024,
+        144.1879913330078,
+        543.2,
+        299.802001953125
+      ],
+      "old_text": "The third process, Manage Consultation Records and Summaries, handles clinical documentation, consultation history, uploaded clinical files, and AI-assisted summary generation. It processes clinical notes and consultation transcripts, retrieves relevant consultation information, and interacts with the OpenAI API to generate consultation summaries when the service is available and enabled. The resulting documentation and summaries are stored for subsequent retrieval by authorized patients and dentists.",
+      "replacement": "The third process manages session-bound records and optional AI summaries. Authorized patients receive their visit history; clinicians receive authorized clinical summaries. Generation requires usable consented transcript evidence and service availability; drafts require clinician review. File attachments are prepared but disabled, and chat text is not currently a clinical summary input.",
+      "reason": "Separate patient history, clinician-only summary content, disabled files, and actual prompt evidence.",
+      "spare_height_pt": 33.0183074951172,
+      "font_size": 12
+    },
+    {
+      "id": "retention-opt-in",
+      "pdf_page": 71,
+      "printed_page": 59,
+      "rect": [
+        90.024,
+        337.418017578125,
+        543.2,
+        465.4219970703125
+      ],
+      "old_text": "The fourth process, Perform Audit and Retention Operations, supports backend operational activities, particularly automated audit logging and consultation summary retention. It receives relevant record changes from the application's data repositories, generates audit and activity records, and performs scheduled deletion of consultation summaries according to the implemented retention policy.",
+      "replacement": "The fourth process supports audits and opt-in summary retention. Firebase's daily deletion worker defaults to a 30-day cutoff; Vercel's separate cron retries summary processing. Neither age nor a missing summary proves deletion. Sessions, transcripts, messages, other copies and backups are not fully purged. Future attachments need a separate approved expiry policy, bounded storage/metadata cleanup, and retry reconciliation; uploads remain disabled.",
+      "reason": "Do not promise enabled or complete 30-day deletion.",
+      "spare_height_pt": 5.408276367187511,
+      "font_size": 12
+    },
+    {
+      "id": "stores-logical-not-enabled",
+      "pdf_page": 71,
+      "printed_page": 59,
+      "rect": [
+        90.024,
+        503.0380432128906,
+        543.2,
+        631.052001953125
+      ],
+      "old_text": "The diagram incorporates seven logical data stores representing user profiles and roles, invitation and waiting-room records, room and session records, chat messages, clinical documentation and summaries, uploaded clinical files, and audit and activity records. These logical stores are implemented using Firebase Firestore and Firebase Storage, which serve as the platform's underlying persistence technologies.",
+      "replacement": "The seven logical stores describe profiles, access, sessions, chat, clinical records, prepared attachments, and audits. Firestore implements structured persistence. Firebase Storage is a prepared binary-storage dependency, not an enabled clinical upload service. Logical relationships require application controls; the diagrams do not establish database-enforced foreign keys or cascades.",
+      "reason": "Avoid treating prepared storage paths as operational uploads or SQL constraints.",
+      "spare_height_pt": 5.418255615234386,
+      "font_size": 12
+    },
+    {
+      "id": "architecture-boundary",
+      "pdf_page": 74,
+      "printed_page": 62,
+      "rect": [
+        90.024,
+        254.61798400878905,
+        543.2,
+        493.0220031738281
+      ],
+      "old_text": "In addition to internal tier-to-tier communications, the architecture integrates specialized external cloud services through dedicated bidirectional interfaces: Firebase Authentication interfaces with the Google Identity Provider for secure Google Sign-in; the Presentation and Application layers connect directly with LiveKit Cloud for WebRTC real- time media transport and communication; the Application layer communicates with the OpenAI API for automated AI summary processing; and backend services dispatch calls to ip-api.com for client geolocation and IP lookup requests. This modular stratification ensures high security, scalability, and maintainability across all operational levels of the platform.",
+      "replacement": "Firebase Authentication integrates Google sign-in. Browser clients exchange media with LiveKit Cloud; application routes issue scoped credentials and process verified webhooks. Optional OpenAI processing receives authorized session evidence, not the full database. Geolocation lookup is not an active admission dependency. This layered design separates control, media, and persistence responsibilities; it does not independently prove clinical fitness, regulatory compliance, capacity, or guaranteed latency.",
+      "reason": "Replace obsolete geolocation and unconditional security/scalability assurance.",
+      "spare_height_pt": 91.80831604003907,
+      "font_size": 12
+    },
+    {
+      "id": "summary-not-every-call",
+      "pdf_page": 75,
+      "printed_page": 63,
+      "rect": [
+        90.024,
+        144.1879913330078,
+        543.2,
+        299.802001953125
+      ],
+      "old_text": "During the consultation, the platform facilitates video and audio communication, real-time messaging, screen sharing, and the management of consultation-related information. Upon completion of the session, the system processes clinical documentation and generates AI-assisted consultation summaries, which are stored for authorized access and future reference. Additionally, background operations support activity logging and the retention management of consultation records.",
+      "replacement": "During consultation, audio, video, chat and screen sharing are available. An invitation is reusable access policy; each room opening may create a distinct encounter. Active encounters are not finalized and cannot generate a summary. Leaving or lifecycle events may finalize an encounter without revoking its invitation. Finalized processing still requires consent, usable evidence, availability and revision guards; reviewed output is preserved. Doctor-only openings are nonclinical records, not diagnoses.",
+      "reason": "Clarify triggers versus eligibility and provider invocation.",
+      "spare_height_pt": 9.018307495117199,
+      "font_size": 12
+    },
+    {
+      "id": "flow-disabled-attachments",
+      "pdf_page": 77,
+      "printed_page": 65,
+      "rect": [
+        90.024,
+        558.2379638671875,
+        543.2,
+        686.2520141601562
+      ],
+      "old_text": "Once the dentist admits the patient, both actors establish a secure media handshake to Patient and Dentist join LiveKit room, transitioning into active consultation workflows featuring multi-modal video, audio, screen sharing, and real-time text chat. Following the session, the clinician records clinical notes and file attachments before triggering the automated termination sequence. At this stage, the backend executes sequential processes to finalize the",
+      "replacement": "After server-authorized admission, the doctor and patient can join the LiveKit room and exchange audio, video, screen sharing, and chat. A verified allowlisted account may join directly. File uploads are disabled. Optional transcript capture requires consent. Patient departure or another authorized lifecycle event can request finalization; it is not limited to a clinician pressing Revoke. The backend then attempts to finalize the",
+      "reason": "Correct disabled files, direct admission, and lifecycle trigger description.",
+      "spare_height_pt": 5.4183471679687045,
+      "font_size": 12
+    },
+    {
+      "id": "erd-no-cascade",
+      "pdf_page": 81,
+      "printed_page": 69,
+      "rect": [
+        90.024,
+        144.1879913330078,
+        543.2,
+        272.2019958496094
+      ],
+      "old_text": "maintains information about files uploaded and shared within those sessions. The CALL_SUMMARY entity stores consultation summaries and their associated information, including key points, recommendations, follow-up actions, and other relevant details. The relationships among these entities are represented through primary keys (PK) and foreign keys (FK), which identify records and establish logical associations between related data.",
+      "replacement": "describes prepared attachment metadata; uploads remain disabled. CALL_SUMMARY stores clinician-facing summary content linked to an encounter. The PK and FK notation represents logical identifiers in Firestore, not SQL-enforced constraints. Deleting a summary does not cascade to its session, messages, transcript segments, retry jobs, or other collections. Whole-encounter deletion needs a separately reviewed purge procedure.",
+      "reason": "Explain document relationships and lack of automatic relational cascade.",
+      "spare_height_pt": 5.418301391601574,
+      "font_size": 12
+    },
+    {
+      "id": "network-sdk-boundaries",
+      "pdf_page": 82,
+      "printed_page": 70,
+      "rect": [
+        90.024,
+        309.65001220703124,
+        543.2,
+        520.6220092773438
+      ],
+      "old_text": "1. Client Devices / User Network Tier: Comprising the Patient and Doctor Web Browsers, this tier represents the entry point where end-users interact with the client- side Next.js user interfaces. Client devices communicate securely with the web application tier over encrypted HTTPS / TLS 1.3 channels for standard web navigation and API requests. Furthermore, clients interact directly with managed backend services using client-side SDKs, including Firebase Auth SDK for user authentication, Firebase client SDK for real-time Firestore queries and consultation records, and Firebase Storage SDK for direct binary file uploads.",
+      "replacement": "1. Client Devices / User Network Tier: Patient and doctor browsers use HTTPS for the Next.js interface and API requests, Firebase Authentication for sign-in, and authorized Firestore client subscriptions for selected updates. Sensitive consultation operations use server-owned authorization. Browser media travels through LiveKit WebRTC, not through Firestore or the Vercel page server. Direct Firebase Storage uploads are disabled. HTTPS transport does not establish independently verified end-to-end media encryption.",
+      "reason": "Correct media topology and disabled direct uploads without claiming a fixed TLS version or E2EE.",
+      "spare_height_pt": 64.37629394531251,
+      "font_size": 12
+    },
+    {
+      "id": "network-storage",
+      "pdf_page": 83,
+      "printed_page": 71,
+      "rect": [
+        90.024,
+        144.01999206542968,
+        543.2,
+        355.00201416015625
+      ],
+      "old_text": "3. Cloud Services / Firebase Backend Tier: Comprising managed backend-as-a-service (BaaS) infrastructure, this tier handles persistent storage and security enforcement. Firebase Authentication integrates with the Google Identity Provider to facilitate secure OAuth sign-in workflows. Cloud Firestore maintains structured NoSQL records for rooms, invitations, and session metadata, while Firebase Storage secures binary chat attachments and clinical documents. Additionally, Firebase Cloud Functions execute asynchronous backend logic driven by Firestore triggers, automatically managing audit logging and scheduled data retention policies.",
+      "replacement": "3. Cloud Services / Firebase Backend Tier: Firebase Authentication handles accounts; Firestore stores structured access and encounter records. Cloud Functions support audit triggers and opt-in summary retention. Firebase Storage is prepared for binary files, but clinical uploads are disabled. The database holds text and metadata, not routine full-call video recordings. Retention must be approved and verified before routine clinical deployment.",
+      "reason": "Distinguish stored records from transported video and inactive storage.",
+      "spare_height_pt": 88.38631896972657,
+      "font_size": 12
+    },
+    {
+      "id": "network-geolocation",
+      "pdf_page": 83,
+      "printed_page": 71,
+      "rect": [
+        90.024,
+        614.7399780273438,
+        543.2,
+        661.1719970703125
+      ],
+      "old_text": "\u2022 ip-api.com: Provides coarse client geolocation data via HTTP GET requests during session onboarding.",
+      "replacement": "Legacy geolocation path: inactive. Location is not proof of identity.",
+      "reason": "Preserve figure context while clearly disabling the legacy branch.",
+      "spare_height_pt": 27.036315917968707,
+      "font_size": 12
+    },
+    {
+      "id": "room-features",
+      "pdf_page": 87,
+      "printed_page": 75,
+      "rect": [
+        90.024,
+        255.4580108642578,
+        543.2,
+        328.24200439453125
+      ],
+      "old_text": "The advanced clinical consultation room equipped with LiveKit media controls, waiting-room admission decisions, real-time chat, screen sharing, file attachments, and OpenAI summary generation triggers.",
+      "replacement": "The room provides media controls, admission, chat, screen sharing, and optional summaries. Attachments are disabled. Multi-patient clinical documentation is not a validated workflow.",
+      "reason": "Do not advertise disabled uploads or validated group consultations.",
+      "spare_height_pt": 26.988290405273446,
+      "font_size": 12
+    },
+    {
+      "id": "version-next-materials",
+      "pdf_page": 88,
+      "printed_page": 76,
+      "rect": [
+        257.8,
+        410.8,
+        398.2,
+        452.7
+      ],
+      "old_text": "Next.js 15.4.8 (App Router Server-side rendering, architecture)",
+      "replacement": "Next.js 15.5.x\n(App Router)",
+      "reason": "Match the current package manifest major/minor without claiming the deployed runtime.",
+      "spare_height_pt": 3.3042968749999773,
+      "font_size": 12
+    },
+    {
+      "id": "version-react-materials",
+      "pdf_page": 88,
+      "printed_page": 76,
+      "rect": [
+        257.8,
+        466.5,
+        398.2,
+        494.2
+      ],
+      "old_text": "React 19.1 & React DOM",
+      "replacement": "React 19.3.x / DOM",
+      "reason": "Match the current source dependency range.",
+      "spare_height_pt": 10.70429687499999,
+      "font_size": 12
+    },
+    {
+      "id": "storage-table",
+      "pdf_page": 89,
+      "printed_page": 77,
+      "rect": [
+        400.3,
+        228.9,
+        543.0,
+        281.0
+      ],
+      "old_text": "Securing and serving doctor note attachments and uploaded documents",
+      "replacement": "Prepared only; clinical uploads disabled",
+      "reason": "Correct the capability-status table.",
+      "spare_height_pt": 8.704296874999997,
+      "font_size": 12
+    },
+    {
+      "id": "geolocation-table",
+      "pdf_page": 89,
+      "printed_page": 77,
+      "rect": [
+        400.3,
+        550.3,
+        543.0,
+        626.0
+      ],
+      "old_text": "Client IP lookup and coarse API geolocation validation during onboarding",
+      "replacement": "Legacy dependency; not used for admission or identity verification",
+      "reason": "Remove geolocation as an active security mechanism.",
+      "spare_height_pt": 11.90429687500005,
+      "font_size": 12
+    },
+    {
+      "id": "persistence-stack",
+      "pdf_page": 90,
+      "printed_page": 78,
+      "rect": [
+        90.024,
+        420.23802490234374,
+        543.2,
+        686.2520141601562
+      ],
+      "old_text": "At the infrastructure and persistence layer, the application is deployed to Vercel's edge network, while serverless Firebase Cloud Functions handle background event processing, automated activity logging, and scheduled data retention policies. Persistent storage and security are managed via Firebase Authentication with Google Identity Provider for role-based sign-in, Cloud Firestore for NoSQL application records, and Firebase Storage for secure document and clinical note attachment handling. Dynamic application routing and session access are secured through custom cryptographic utilities using JSON Web Tokens (JWTs) and HMAC-SHA256 signature verifications. Finally, real-time audio/video streaming, multi-party screen sharing, and interactive room chat are offloaded to LiveKit Cloud (WebRTC SFU), while automated clinical summary generation",
+      "replacement": "The application runs on Vercel; Firebase Authentication and Firestore handle accounts and structured records. Cloud Functions support auditing and explicitly enabled retention. Binary attachments remain disabled. Server routes validate authorization and issue signed JWTs; LiveKit Cloud carries realtime media. Separation of these responsibilities helps maintenance, but does not establish measured scale or compliance. Optional clinical summary generation",
+      "reason": "Remove unsupported compliance implications and inactive uploads; preserve next-page continuation.",
+      "spare_height_pt": 143.4182861328125,
+      "font_size": 12
+    },
+    {
+      "id": "stack-no-compliance-guarantee",
+      "pdf_page": 91,
+      "printed_page": 79,
+      "rect": [
+        90.024,
+        144.1879913330078,
+        543.2,
+        244.5719757080078
+      ],
+      "old_text": "and client geolocation lookups are handled via server-side RESTful integrations with the OpenAI API (gpt-4o-mini) and ip-api.com, respectively. This consolidated technological stack ensures technical reliability, security compliance, and high performance across all operational domains of the platform.",
+      "replacement": "uses the OpenAI API with evidence and review safeguards. Geolocation lookup is not an active dependency. The architecture supports the prototype workflow; reliability, capacity, privacy compliance, and clinical suitability require separate deployment-specific verification.",
+      "reason": "Remove an explicit unsupported compliance/high-performance guarantee.",
+      "spare_height_pt": 25.78828125000001,
+      "font_size": 12
+    },
+    {
+      "id": "version-next-budget",
+      "pdf_page": 92,
+      "printed_page": 80,
+      "rect": [
+        112.8,
+        551.1,
+        256.7,
+        579.3
+      ],
+      "old_text": "Next.js 15.4.8 (App Router Web Framework 0 architecture)",
+      "replacement": "Next.js 15.5.x\n(App Router)",
+      "reason": "Align the budget inventory with the current manifest.",
+      "spare_height_pt": 0.40429687499992895,
+      "font_size": 12
+    },
+    {
+      "id": "version-react-budget",
+      "pdf_page": 92,
+      "printed_page": 80,
+      "rect": [
+        112.8,
+        579.2,
+        256.7,
+        606.0
+      ],
+      "old_text": "React 19.1 & React DOM",
+      "replacement": "React 19.3.x / DOM",
+      "reason": "Align the budget inventory with the current manifest.",
+      "spare_height_pt": 11.004296874999953,
+      "font_size": 12
+    },
+    {
+      "id": "budget-legacy-geolocation",
+      "pdf_page": 93,
+      "printed_page": 81,
+      "rect": [
+        112.8,
+        314.2,
+        421.5,
+        341.0
+      ],
+      "old_text": "ip-api.com Geolocation API Geolocation Service",
+      "replacement": "Legacy geolocation (disabled)   Not used for access",
+      "reason": "Keep the zero-cost development row while identifying an inactive dependency.",
+      "spare_height_pt": 11.00429687500001,
+      "font_size": 12
+    },
+    {
+      "id": "free-not-unlimited",
+      "pdf_page": 94,
+      "printed_page": 82,
+      "rect": [
+        90.024,
+        144.1879913330078,
+        543.2,
+        189.3720245361328
+      ],
+      "old_text": "Cloud)\u2014incurs zero marginal cost by leveraging open-source licenses, developer-tier allowances, and generous cloud free-tier allocations.",
+      "replacement": "Cloud) - uses bounded prototype allowances, not unlimited commercial hosting.",
+      "reason": "Distinguish development estimates from a commercial clinic operating plan.",
+      "spare_height_pt": 23.38833007812501,
+      "font_size": 12
+    },
+    {
+      "id": "operating-budget-boundary",
+      "pdf_page": 94,
+      "printed_page": 82,
+      "rect": [
+        90.024,
+        199.38800354003905,
+        543.2,
+        465.4219970703125
+      ],
+      "old_text": "Consequently, the overall anticipated additional implementation outlay is kept highly cost-efficient at \u20b17,856.69, which accounts strictly for necessary out-of-pocket operational and material expenditures. This aggregate budget comprises \u20b1356.69 for OpenAI API usage during development, integration, and demonstration of the consultation summarization module, \u20b13,000.00 for dedicated project-related internet connectivity, \u20b12,000.00 for formal documentation, printing, manuscript binding, and survey questionnaire reproduction, \u20b11,500.00 for field transportation supporting clinic coordination and stakeholder meetings, and a \u20b11,000.00 contingency fund allocated for unaccounted implementation incidentals. This lean financial model highlights the economic feasibility and scalable deployment potential of the teleconsultation system for clinical adoption.",
+      "replacement": "The overall anticipated additional development and demonstration outlay remains PHP 7,856.69. It includes PHP 356.69 for OpenAI integration and demonstration, PHP 3,000.00 for project internet, PHP 2,000.00 for documentation, printing, binding and questionnaires, PHP 1,500.00 for clinic coordination and travel, and PHP 1,000.00 contingency. Existing hardware and prototype allowances reduce additional development expenditure. These are project budget estimates, not a guaranteed monthly clinic bill or measured productivity savings. Routine clinical operation needs a separate usage-based hosting, media, database, AI, support and tax budget. No expense amount or total in the tables is changed by this clarification.",
+      "reason": "Preserve every reported expense and the total; clarify development versus recurring operating costs without inserting new provider prices into the thesis.",
+      "spare_height_pt": 58.23829040527346,
+      "font_size": 12
+    },
+    {
+      "id": "ai-expense-not-measured-benefit",
+      "pdf_page": 95,
+      "printed_page": 83,
+      "rect": [
+        431.9,
+        366.9,
+        543.0,
+        420.0
+      ],
+      "old_text": "Productivity Benefit",
+      "replacement": "Cost; time benefit unmeasured",
+      "reason": "An API expense is not evidence of productivity savings.",
+      "spare_height_pt": 9.704296875000026,
+      "font_size": 12
+    },
+    {
+      "id": "signed-not-encrypted",
+      "pdf_page": 104,
+      "printed_page": 92,
+      "rect": [
+        90.024,
+        254.61798400878905,
+        543.2,
+        272.2019958496094
+      ],
+      "old_text": "generation of the encrypted invitation URL.",
+      "replacement": "generation of the signed invitation URL (not an encrypted patient identity).",
+      "reason": "JWT signatures protect integrity, not payload confidentiality or patient identity.",
+      "spare_height_pt": 2.988308715820324,
+      "font_size": 12
+    },
+    {
+      "id": "consent-retention-claim",
+      "pdf_page": 105,
+      "printed_page": 93,
+      "rect": [
+        90.024,
+        144.1879913330078,
+        543.2,
+        355.00201416015625
+      ],
+      "old_text": "privacy guidelines, the interface outlines five core policy points: agreement to video consultations, notification regarding clinician visibility of the patient's registered email address, disclosure of optional real-time speech transcription for AI summarization, data retention policies specifying automatic deletion of consultation summaries after 30 days, and a formal disclosure stating that the platform functions as a university thesis prototype. A mandatory agreement checkbox (\"I have read this and agree.\") paired with a primary blue action button (\"Agree and continue\") ensures that user consent is explicitly captured before progressing to the consultation environment.",
+      "replacement": "privacy guidelines, the screen explains consultation consent, account visibility, optional transcription, and thesis-prototype limitations. The screenshot's 30-day summary-deletion text is not proof of enabled retention: the worker is opt-in and does not purge every related record. Routine clinical use requires an approved, verified retention policy and matching consent wording. Consent to consultation also does not automatically authorize every participant's audio transcription.",
+      "reason": "Describe the historical screenshot without presenting its retention promise as verified fact.",
+      "spare_height_pt": 64.21831970214845,
+      "font_size": 12
+    },
+    {
+      "id": "integration-current-enabled-scope",
+      "pdf_page": 111,
+      "printed_page": 99,
+      "rect": [
+        90.024,
+        337.418017578125,
+        543.2,
+        658.6519775390625
+      ],
+      "old_text": "The researchers configured the TeleConsole application and its integrated cloud services to support the platform's primary functions. Firebase Authentication and Google Identity Provider were configured to support user authentication, while Cloud Firestore was used to manage application records, consultation information, and other relevant data. Firebase Storage was used for supported document and attachment storage. LiveKit Cloud was configured to facilitate real-time audio and video communication, screen sharing, and consultation room interactions. The OpenAI API was integrated to support AI-assisted consultation summary generation, while the ip-api.com Geolocation API provided location- related information during invitation validation. The researchers also configured the platform's security mechanisms, including JSON Web Token (JWT) authentication, HMAC-based webhook verification, TLS-encrypted communication, input sanitization, and access restrictions based on user roles.",
+      "replacement": "Firebase Authentication and Google sign-in support accounts; Firestore stores application and encounter records. LiveKit Cloud handles audio, video and screen sharing. OpenAI supports optional evidence-grounded drafts. File uploads remain disabled. Doctor-booked appointments are implemented but deployment-gated: UTC times, named timezones, overlap prevention and version-checked changes. Booking grants no admission or clinical evidence and was not surveyed. ip-api.com is not an admission dependency. JWT, webhook and ownership checks are layered controls, not certification. Clinic release still requires verified rules/indexes, retention, restore, provider agreements, recurring budget and measured call quality/concurrency.",
+      "reason": "Make the deployment plan consistent with currently enabled features and remaining readiness work.",
+      "spare_height_pt": 102.63825683593751,
+      "font_size": 12
+    },
+    {
+      "id": "test-recommendation-specific",
+      "pdf_page": 173,
+      "printed_page": 161,
+      "rect": [
+        90.024,
+        475.43800659179686,
+        543.2,
+        658.6519775390625
+      ],
+      "old_text": "It is recommended that future studies conduct quantitative performance assessments to establish measurable evidence of TeleConsole's responsiveness and real-time communication capabilities. These assessments may include system response time measurements, audio and video latency monitoring, connection stability testing, and performance evaluation under varying numbers of concurrent users. Testing across different internet speeds, devices, and network environments would help identify potential performance limitations and determine appropriate optimization strategies. Such assessments would complement the favorable",
+      "replacement": "Future work should measure paired consultations, not only website response times. A controlled pilot can test 1, 3, and 5 concurrent doctor-patient pairs on separate devices, with repeated ten-minute trials. Record join delay, transport RTT, jitter, interval packet loss, delivered resolution/FPS, disconnects, and database usage under stated networks. Report only the highest completed passing level and its conditions; no such capacity result is claimed here. This would complement the favorable",
+      "reason": "Give a reproducible next test without inserting fabricated Chapter IV results.",
+      "spare_height_pt": 36.618267822265636,
+      "font_size": 12
+    },
+    {
+      "id": "appendix-historical-status",
+      "pdf_page": 193,
+      "printed_page": 181,
+      "rect": [
+        90.024,
+        247.53802795410155,
+        543.2,
+        320.322021484375
+      ],
+      "old_text": "This appendix presents selected original source code from the TeleConsole system, organized according to its principal implemented modules. The excerpts document the real-time consultation interface, authentication and access controls, invitation-based patient access, AI- assisted summarization, Firestore record handling, and role-specific user pathways. Excerpts are identified as such; they are not intended to reproduce entire source files.",
+      "replacement": "This appendix preserves historical development excerpts, not the current deployed security boundary. Fingerprint, geolocation, raw-signal audit, registration and upload paths below are superseded or disabled. Current behavior is reviewed against repository aa041fe (25 November 2026). Consult current source for implementation or security review.",
+      "reason": "Explicitly disclose stale security-sensitive appendix code without rewriting or repaginating the appendix.",
+      "spare_height_pt": 17.388290405273445,
+      "font_size": 12
+    },
+    {
+      "id": "queue-actor-and-summary-scope",
+      "pdf_page": 66,
+      "printed_page": 54,
+      "rect": [
+        90.024,
+        282.21800537109374,
+        543.2,
+        520.6220092773438
+      ],
+      "old_text": "Concurrently, the Doctor actor initiates authentication via sign-in, creates and manages consultation rooms and invitations, manages the waiting queue by admitting or rejecting patients, conducts live audio and video consultations, utilizes real-time chat and screen sharing, controls hardware peripherals, adds consultation notes and attachments, views clinical history, reviews and edits summaries, and terminates or leaves the session. Furthermore, system-level execution patterns are governed by mandatory inclusion dependencies, where joining an admitted consultation requires validating access credentials, participating in live video sessions triggers media connection protocols, and ending a consultation automatically invokes the backend generation of an AI-assisted clinical summary.",
+      "replacement": "Staff use Firebase Authentication; signup grants no administrative role. Platform and clinic administrators manage staff access without clinician API permissions, even with old combined claims. Clinic administrators provision doctors in their clinic; legacy profiles remain transitional. A separate doctor account manages invitations, admission, calls and draft review. Verified allowlisted patients may enter directly. Admission is permission, not attendance; the host is not a patient visit. Attachments remain disabled. Doctor-booked appointments are implemented but deployment-gated, separate from admission and encounters. Summary processing requires finalization, consent and usable evidence. Administration does not confer clinical record ownership.",
+      "reason": "Align the actor description with verified direct entry, clinician admission, disabled attachments and conditional AI finalization.",
+      "spare_height_pt": 19.80830078125001,
+      "font_size": 12
+    },
+    {
+      "id": "queue-invite-direct-exception",
+      "pdf_page": 85,
+      "printed_page": 73,
+      "rect": [
+        90.024,
+        644.4279663085938,
+        543.2,
+        689.6119995117188
+      ],
+      "old_text": "A dynamic route that processes tokenized invitation URLs sent to patients, validating expiration times and routing them into the waiting queue.",
+      "replacement": "This route validates the stored invitation. Qualifying verified allowlisted accounts may enter directly; other accepted visitors wait for doctor admission.",
+      "reason": "Do not imply every valid invitation holder must wait.",
+      "spare_height_pt": 2.98833007812496,
+      "font_size": 12
+    },
+    {
+      "id": "queue-clinician-navigation",
+      "pdf_page": 86,
+      "printed_page": 74,
+      "rect": [
+        90.024,
+        505.55800170898436,
+        543.2,
+        550.7420043945312
+      ],
+      "old_text": "The primary clinician control panel for monitoring active room presence, managing patient queues, and overseeing daily teleconsultation operations.",
+      "replacement": "The clinician history surface supports encounter and draft-summary review. Invitation management and the in-room queue provide patient admission controls.",
+      "reason": "Describe the actual dashboard and locate queue actions in the invitation and room surfaces.",
+      "spare_height_pt": 2.988299560546892,
+      "font_size": 12
+    },
+    {
+      "id": "queue-patient-waiting-description",
+      "pdf_page": 101,
+      "printed_page": 89,
+      "rect": [
+        90.024,
+        482.1580078125,
+        543.2,
+        692.9719848632812
+      ],
+      "old_text": "The Patient Waiting Room interface represents the transitional pre-consultation holding state encountered by patients after validating their secure invitation link. Styled with a centralized, minimalist card layout against a soft background, the screen displays a prominent heading stating \"You're in the Waiting Room\" alongside clear instructional text informing the user that the page will automatically update once admitted by the clinician. An informational tip callout instructs patients to keep the browser tab active for seamless auto-routing. Additionally, an account status box displays the currently signed-in user's email address with an option to sign in with an alternative account if required. A real-time loading spinner and",
+      "replacement": "The Patient Waiting Room shows accepted visitors who require clinician admission; qualifying verified allowlisted accounts may enter directly. The screen explains that the patient should keep the page open while the doctor reviews the worklist. Account details identify the signed-in account, while guest identity remains unverified. The doctor sees oldest arrivals first but chooses whom to admit; the software does not enforce FIFO scheduling or clinical triage. Admission grants permission to enter and is distinct from a connected or completed consultation. A loading indicator and",
+      "reason": "Clarify the direct-entry exception, manual worklist ordering and admitted-versus-connected semantics without replacing historical screenshots.",
+      "spare_height_pt": 40.21827392578126,
+      "font_size": 12
+    },
+    {
+      "id": "queue-refresh-implementation",
+      "pdf_page": 102,
+      "printed_page": 90,
+      "rect": [
+        90.024,
+        144.1879913330078,
+        543.2,
+        216.9720001220703
+      ],
+      "old_text": "status message at the base (\"Waiting for doctor to admit you...\") confirm continuous synchronization with the backend database waiting queue via Firestore listeners, ensuring a frictionless onboarding experience prior to joining the live WebRTC consultation room.",
+      "replacement": "a status message indicate pending admission. The patient polls about every three seconds. Doctor change events invalidate an authenticated API view, with periodic refresh; these signals do not prove media presence.",
+      "reason": "Correct the claim that the patient waiting spinner demonstrates continuous Firestore-listener synchronization.",
+      "spare_height_pt": 1.78830566406252,
+      "font_size": 12
+    },
+    {
+      "id": "queue-panel-capacity-boundary",
+      "pdf_page": 106,
+      "printed_page": 94,
+      "rect": [
+        90.024,
+        254.61798400878905,
+        543.2,
+        465.4219970703125
+      ],
+      "old_text": "The interface is flanked by two functional side panels designed for workflow efficiency: the left-hand Waiting Queue (WQ) sidebar monitors incoming patient traffic, displaying queue counts and real-time admission controls, while the right-hand Doctor Session Panel (DR) houses advanced clinical tools. The session panel displays active room metadata, integrated optional speech notes controls for browser-based speech recognition and transcription (supporting localized languages such as Filipino / Tagalog (Taglish)), patient invitation link copying utilities, and a prominent red Leave Call button for securely terminating or exiting the session.",
+      "replacement": "The Waiting Queue lists visits with admission controls; expanded details show captured identity provenance and arrival/admission/departure times. Admission is permission, not confirmed media or triage. The default ten-visitor waiting target is enforced atomically per invitation, not measured call capacity. Compact phone/tablet layouts expose on-demand panels; wider layouts reserve panel space. Room details show minimal audience/count context, not a duplicate invitation manager. Optional transcription starts unchecked on each new entry; reusing a room does not carry consent into another encounter. Real-device media acceptance remains separate from viewport checks.",
+      "reason": "Explain the queue's actual purpose, operational states, per-invitation target and verified non-atomic capacity limitation. Updated 27 Nov 2026: the per-invitation target is now enforced atomically (emulator evidence), so the earlier race disclaimer was removed.",
+      "spare_height_pt": 16.20830993652345,
+      "font_size": 12
+    },
+    {
+      "id": "intro-current-admission",
+      "pdf_page": 15,
+      "printed_page": 3,
+      "rect": [
+        108.0,
+        144.2,
+        543.2,
+        224.5
+      ],
+      "old_text": "The platform introduces a simplified consultation flow: patients join via invitation links and complete a one-time registration with consent-based device, browser, and location validation, while doctors access sessions directly through a dedicated portal. After",
+      "replacement": "\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0The platform introduces a simplified consultation flow: patients join through signed invitation links; verified allowlisted accounts enter directly, while other visitors wait for doctor admission. Doctors use a dedicated portal. After",
+      "reason": "The implemented admission never used device, browser or location validation; describe the actual verified-account or doctor-admission policy. Objectives unchanged.",
+      "spare_height_pt": 5.704296875000011,
+      "font_size": 12
+    },
+    {
+      "id": "rrl-bandarra-storage",
+      "pdf_page": 27,
+      "printed_page": 15,
+      "rect": [
+        90.0,
+        144.2,
+        543.2,
+        197.0
+      ],
+      "old_text": "rather than a local model\u2014the underlying privacy objective is shared: consultation summaries are generated ephemerally, stored only in a patient-restricted Firestore collection, and",
+      "replacement": "rather than a local model\u2014the underlying privacy objective is shared: summaries are generated on the server, stored as session-bound drafts that require clinician review, and",
+      "reason": "Summaries are not ephemeral or patient-restricted; they are stored clinician-reviewed drafts bound to one encounter.",
+      "spare_height_pt": 2.2042968750000114,
+      "font_size": 12
+    },
+    {
+      "id": "rrl-bandarra-transcription",
+      "pdf_page": 27,
+      "printed_page": 15,
+      "rect": [
+        90.0,
+        282.2,
+        543.2,
+        362.5
+      ],
+      "old_text": "Klepper\u2019s emphasis on minimizing data exposure informed TeleConsole\u2019s decision to transmit audio transcripts to the OpenAI API only at session end, reducing the duration and surface area of any external data handling [2].",
+      "replacement": "Klepper's emphasis on minimizing data exposure informed TeleConsole's design: audio is sent for transcription only after each participant opts in, the audio is discarded after transcription, and only session-bound text evidence is sent for summaries [2].",
+      "reason": "Transcription runs in short chunks during the call with per-participant consent, not once at session end.",
+      "spare_height_pt": 5.704296875000011,
+      "font_size": 12
+    },
+    {
+      "id": "rrl-cordero-transport-encryption",
+      "pdf_page": 35,
+      "printed_page": 23,
+      "rect": [
+        90.0,
+        199.4,
+        543.2,
+        280.0
+      ],
+      "old_text": "insights directly inform TeleConsole\u2019s architectural requirements, reinforcing the necessity of end-to-end encryption, strict role-based access controls, and transparent data handling to safeguard patient privacy and clinical integrity within the Philippine healthcare landscape [17].",
+      "replacement": "insights directly inform TeleConsole's requirements for encrypted transport (TLS and WebRTC DTLS-SRTP), strict role-based access controls, and transparent data handling in the Philippine healthcare landscape [17]; end-to-end media encryption was not enabled.",
+      "reason": "Application-level end-to-end encryption was never enabled; state the actual transport encryption.",
+      "spare_height_pt": 6.004296874999994,
+      "font_size": 12
+    },
+    {
+      "id": "iso-instrument-labels",
+      "pdf_page": 54,
+      "printed_page": 42,
+      "rect": [
+        90.0,
+        613.5,
+        543.2,
+        716.0
+      ],
+      "old_text": "Rather than evaluating every characteristic of the ISO/IEC 25010 model, the study adopts six selected software quality characteristics relevant to the scope of the teleconsultation platform. These characteristics are evaluated through role-specific questionnaires.",
+      "replacement": "\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0Rather than evaluating every characteristic of the ISO/IEC 25010 model, the study adopts six characteristics relevant to the platform's scope. In the instruments, Interaction Capability and Flexibility appear under their earlier labels, Usability and Compatibility; those items assess ease of use and adaptability to supported devices and browsers.",
+      "reason": "The 2023 model renamed Usability to Interaction Capability and Portability to Flexibility, while Compatibility remains separate; explain the instrument labels without changing the instrument or data.",
+      "spare_height_pt": 3.904296875,
+      "font_size": 12
+    },
+    {
+      "id": "main-entry-no-scheduling",
+      "pdf_page": 98,
+      "printed_page": 86,
+      "rect": [
+        90.0,
+        634.9,
+        543.2,
+        692.0
+      ],
+      "old_text": "Furthermore, an informational callout box at the base of the interface informs patients that they can join scheduled video consultations directly through secure, tokenized invitation links",
+      "replacement": "Furthermore, an informational callout box at the base of the interface informs patients that they can open consultations through signed invitation links and wait for doctor admission",
+      "reason": "Scheduling is disabled, and guests wait for admission rather than joining directly.",
+      "spare_height_pt": 6.504296875000023,
+      "font_size": 12
+    },
+    {
+      "id": "create-room-allowlist-meaning",
+      "pdf_page": 103,
+      "printed_page": 91,
+      "rect": [
+        90.0,
+        655.8,
+        543.2,
+        713.0
+      ],
+      "old_text": "advanced Invitation Settings. These settings include an optional restricted email field for patients who can join directly without manual admission, a customizable token expiration",
+      "replacement": "advanced Invitation Settings: an optional email allowlist (verified signed-in accounts on it join directly; others wait for admission), a customizable token expiration",
+      "reason": "A typed email never bypasses waiting; only a provider-verified signed-in account on the allowlist does.",
+      "spare_height_pt": 6.6042968750000455,
+      "font_size": 12
+    }
+  ],
+  "changed_pages": [
+    22,
+    64,
+    68,
+    70,
+    71,
+    74,
+    75,
+    77,
+    81,
+    82,
+    83,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    104,
+    105,
+    111,
+    173,
+    193,
+    66,
+    85,
+    86,
+    101,
+    102,
+    106,
+    15,
+    27,
+    35,
+    54,
+    98,
+    103,
+    99,
+    249,
+    250,
+    251,
+    252,
+    253,
+    254,
+    255,
+    256,
+    257,
+    258,
+    259
+  ],
+  "public_copy": true,
+  "privacy_redactions": [
+    {
+      "pdf_page": 99,
+      "printed_page": 87,
+      "rect": [
+        103.65000221252441,
+        236.1250146484375,
+        270.15001068115237,
+        251.8225146484375
+      ],
+      "reason": "Demo identity / invitation information"
+    },
+    {
+      "pdf_page": 99,
+      "printed_page": 87,
+      "rect": [
+        103.65000221252441,
+        339.2800146484375,
+        337.6500141143799,
+        402.0700146484375
+      ],
+      "reason": "Demo identity / invitation information"
+    },
+    {
+      "pdf_page": 101,
+      "printed_page": 89,
+      "rect": [
+        247.150009765625,
+        341.0419950866699,
+        409.15001800537107,
+        369.35599548339843
+      ],
+      "reason": "Demo identity / invitation information"
+    },
+    {
+      "pdf_page": 104,
+      "printed_page": 92,
+      "rect": [
+        244.54999771118162,
+        335.4205242919922,
+        411.04999206542965,
+        354.95502319335935
+      ],
+      "reason": "Demo identity / invitation information"
+    },
+    {
+      "pdf_page": 105,
+      "printed_page": 93,
+      "rect": [
+        463.5,
+        487.4114813232422,
+        540.0,
+        564.2539770507813
+      ],
+      "reason": "Demo identity / invitation information"
+    },
+    {
+      "pdf_page": 249,
+      "printed_page": 237,
+      "rect": [
+        129.6999969482422,
+        231.04299926757812,
+        524.8300170898438,
+        734.3930053710938
+      ],
+      "reason": "Personal CV"
+    },
+    {
+      "pdf_page": 250,
+      "printed_page": 238,
+      "rect": [
+        114.6500015258789,
+        167.39898681640625,
+        521.4000244140625,
+        721.7990112304688
+      ],
+      "reason": "Personal CV"
+    },
+    {
+      "pdf_page": 251,
+      "printed_page": 239,
+      "rect": [
+        90.0,
+        171.5999755859375,
+        540.0,
+        660.0499877929688
+      ],
+      "reason": "Personal CV"
+    },
+    {
+      "pdf_page": 252,
+      "printed_page": 240,
+      "rect": [
+        90.4000015258789,
+        143.99896240234375,
+        494.25,
+        698.3989868164062
+      ],
+      "reason": "Personal CV"
+    },
+    {
+      "pdf_page": 253,
+      "printed_page": 241,
+      "rect": [
+        90.4000015258789,
+        144.0,
+        496.94000244140625,
+        690.7999877929688
+      ],
+      "reason": "Personal CV"
+    },
+    {
+      "pdf_page": 254,
+      "printed_page": 242,
+      "rect": [
+        149.35000610351562,
+        165.75,
+        518.25,
+        647.9500122070312
+      ],
+      "reason": "Personal CV"
+    },
+    {
+      "pdf_page": 254,
+      "printed_page": 242,
+      "rect": [
+        174.9499969482422,
+        627.9089965820312,
+        449.510009765625,
+        731.6589965820312
+      ],
+      "reason": "Personal CV"
+    },
+    {
+      "pdf_page": 255,
+      "printed_page": 243,
+      "rect": [
+        128.89999389648438,
+        200.0,
+        511.5,
+        747.7960205078125
+      ],
+      "reason": "Personal CV"
+    },
+    {
+      "pdf_page": 256,
+      "printed_page": 244,
+      "rect": [
+        120.4000015258789,
+        129.1500244140625,
+        517.2000122070312,
+        714.530029296875
+      ],
+      "reason": "Personal CV"
+    },
+    {
+      "pdf_page": 257,
+      "printed_page": 245,
+      "rect": [
+        103.44999694824219,
+        128.0,
+        524.989990234375,
+        672.5499877929688
+      ],
+      "reason": "Personal CV"
+    },
+    {
+      "pdf_page": 258,
+      "printed_page": 246,
+      "rect": [
+        101.25,
+        127.35003662109375,
+        528.2000122070312,
+        657.6500244140625
+      ],
+      "reason": "Personal CV"
+    },
+    {
+      "pdf_page": 259,
+      "printed_page": 247,
+      "rect": [
+        87.0999984741211,
+        159.0999755859375,
+        537.0999755859375,
+        663.0499877929688
+      ],
+      "reason": "Personal CV"
+    }
+  ],
+  "outside_differences": [],
+  "not_performed": [
+    "No provider load trial",
+    "No application tests run by this PDF script",
+    "No production data write",
+    "No survey recalculation"
+  ]
+}

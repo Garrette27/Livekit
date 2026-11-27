@@ -15,7 +15,7 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[2]
 PACK = ROOT / "docs/thesis-defense"
-latest_report = PACK / "evidence/admin-defense-2026-11-27/pdf-verification.json"
+latest_report = PACK / "evidence/appointments-defense-2026-11-27/pdf-verification.json"
 report_path = latest_report if latest_report.exists() else PACK / "evidence/pdf-verification.json"
 report = json.loads(report_path.read_text(encoding="utf-8"))
 thesis = PACK / "TeleConsole-Revised-259-Pages.pdf"
