@@ -26,7 +26,7 @@
 4. Cross-doctor ids or stale versions: deny other owners and return409 on stale mutation without changing data.
 5. Cancellation and disabled-feature state: release only that booking's slot; do not affect invitations, calls or existing records.
 
-### Task1: Policy and timezone contracts
+### Task 1: Policy and timezone contracts
 
 Files: create `lib/appointments/appointment-policy.ts`; test `tests/appointment-regressions.test.mjs`.
 
@@ -35,7 +35,7 @@ Interfaces: `parseAppointmentCommand(body, now)` returns a validated create/resc
 - [ ] Write and run failing tests for input bounds, invalid dates, timezone conversion/DST ambiguity, adjacent versus overlapping intervals and stale expected versions.
 - [ ] Implement the pure policy and rerun the focused tests until green.
 
-### Task2: Server ownership and transactional booking
+### Task 2: Server ownership and transactional booking
 
 Files: create `lib/services/appointments/appointment-service.ts`, `app/api/doctor/appointments/route.ts`; modify `lib/auth/access-policy.ts`, `firestore.indexes.json`, `firestore.rules` only where the new server-owned namespace needs explicit denial.
 
@@ -46,7 +46,7 @@ Interfaces: `AppointmentService.list(doctorUid, cursor?)` returns a bounded page
 - [ ] Implement create/reschedule/cancel with expected-version checks and bounded list pagination. Store UTC timestamps plus IANA display zone, patient label/contact and ownership. Log no contact values or tokens.
 - [ ] Verify concurrent overlap, adjacent booking, cross-doctor independence, replay, cancellation and reschedule conflict in the local Firestore emulator. Record required production indexes separately; do not claim Vercel deployed them.
 
-### Task3: Responsive doctor workbench
+### Task 3: Responsive doctor workbench
 
 Files: create `app/doctor/appointments/page.tsx`; modify `components/doctor/DoctorAppHeader.tsx` and the private account capability projection as needed, keeping admin navigation non-clinical.
 
@@ -56,7 +56,7 @@ Interfaces: authenticated GET/POST to the new endpoint; the page uses explicit t
 - [ ] Implement the workbench and feature-aware navigation using existing styles/feedback.
 - [ ] Verify no invitation token, media or transcription request occurs when booking.
 
-### Task4: Integration, publication and defense alignment
+### Task 4: Integration, publication and defense alignment
 
 Files: update tests/package chain, capability/readiness/access notes, ranked Q&A, slide notes and bounded manuscript wording only after verified implementation.
 
