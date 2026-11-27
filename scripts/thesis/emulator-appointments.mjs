@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import ts from 'typescript';
 
 assert.equal(process.env.FIRESTORE_EMULATOR_HOST, '127.0.0.1:8189');
@@ -20,6 +20,7 @@ const policy = compiled('lib/appointments/appointment-policy.ts');
 const results = compiled('lib/services/shared/service-result.ts');
 const { AppointmentService } = compiled('lib/services/appointments/appointment-service.ts', {
   'firebase-admin/firestore': firestore,
+  'node:crypto': { createHash },
   '@/lib/appointments/appointment-policy': policy,
   '../shared/service-result': results,
 });
@@ -54,6 +55,15 @@ assert.equal((await service.execute(uid, { ...reschedule, startsAt: '2026-11-28T
 const moved = await service.execute(uid, { ...reschedule, startsAt: '2026-11-28T02:00:00.000Z', endsAt: '2026-11-28T02:30:00.000Z' });
 assert.equal(moved.ok, true);
 assert.equal(moved.data.appointment.version, 2);
+const movedRetry = await service.execute(uid, winner);
+assert.equal(movedRetry.ok, true, 'Original create intent remains replayable after rescheduling');
+assert.equal(movedRetry.data.appointment.startsAt, '2026-11-28T02:00:00.000Z');
+assert.equal((await service.execute(uid, { ...winner, startsAt: moved.data.appointment.startsAt, endsAt: moved.data.appointment.endsAt })).error.status, 409, 'Edited fields cannot impersonate original create intent');
+assert.equal((await service.execute(uid, { action: 'cancel', id: winner.id, expectedVersion: 2 })).ok, true);
+assert.equal((await service.execute(uid, winner)).data.appointment.status, 'cancelled', 'Replay does not recreate a cancelled booking');
+const afterStart = new AppointmentService(db, () => new Date('2026-12-01T00:00:00Z'));
+assert.equal((await afterStart.execute(uid, winner)).ok, true, 'Receipt lookup works after the original start time');
+assert.equal((await afterStart.execute(uid, booking())).error.status, 400, 'A new past booking is still refused');
 assert.equal((await service.execute(uid, { action: 'cancel', id: adjacent.id, expectedVersion: 1 })).data.appointment.status, 'cancelled');
 assert.equal((await service.execute(uid, booking('2026-11-28T09:30'))).ok, true, 'Cancellation releases only its interval');
 assert.equal((await service.execute(uid, { ...adjacent, action: 'reschedule', expectedVersion: 2 })).error.status, 409);

@@ -29,7 +29,7 @@ test('appointment commands normalize a future clinic-local booking without accep
 test('malformed, oversized, past and excessive appointment commands fail before any transaction', () => {
   const { parseAppointmentCommand } = policy();
   assert.equal(typeof parseAppointmentCommand, 'function');
-  for (const value of [null, [], {}, { ...create, id: '../other' }, { ...create, patientName: '' }, { ...create, patientName: 'x'.repeat(101) }, { ...create, patientEmail: 'not-an-email' }, { ...create, durationMinutes: 14 }, { ...create, durationMinutes: 121 }, { ...create, durationMinutes: NaN }, { ...create, localStart: '2026-02-30T10:00' }, { ...create, localStart: '2026-11-26T10:00' }, { ...create, localStart: '2028-01-01T10:00' }, { ...create, displayTimeZone: 'imaginary/zone' }]) {
+  for (const value of [null, [], {}, { ...create, id: '../other' }, { ...create, patientName: '' }, { ...create, patientName: 'x'.repeat(101) }, { ...create, patientEmail: 'not-an-email' }, { ...create, durationMinutes: 14 }, { ...create, durationMinutes: 121 }, { ...create, durationMinutes: NaN }, { ...create, localStart: '2026-02-30T10:00' }, { ...create, action: 'reschedule', expectedVersion: 1, localStart: '2026-11-26T10:00' }, { ...create, localStart: '2028-01-01T10:00' }, { ...create, displayTimeZone: 'imaginary/zone' }]) {
     assert.equal(parseAppointmentCommand(value, now).ok, false);
   }
   assert.equal(parseAppointmentCommand({ ...create, patientEmail: '', durationMinutes: 15 }, now).ok, true);
@@ -43,6 +43,25 @@ test('timezone conversion rejects DST gaps and ambiguous local wall times', () =
   assert.equal(localAppointmentTimeToUtc('2026-07-01T10:00', 'America/New_York').toISOString(), '2026-07-01T14:00:00.000Z');
   assert.throws(() => localAppointmentTimeToUtc('2026-03-08T02:30', 'America/New_York'), /exist|ambiguous/i);
   assert.throws(() => localAppointmentTimeToUtc('2026-11-01T01:30', 'America/New_York'), /exist|ambiguous/i);
+  assert.throws(() => localAppointmentTimeToUtc('2026-11-28T10:00', '+05:30'), /named|zone|IANA/i);
+});
+
+test('a past create intent can reach its immutable receipt; only new bookings are rejected as past by persistence', () => {
+  assert.equal(policy().parseAppointmentCommand({ ...create, localStart: '2026-11-26T10:00' }, now).ok, true);
+});
+
+test('a scoped authenticated request cannot borrow a newly signed-in account or send an old token after switching', async () => {
+  let sends = 0;
+  let release;
+  const auth = { currentUser: { uid: 'doctor-a', getIdToken: async () => 'synthetic-token' } };
+  const { authenticatedFetch } = loadAppointmentModule('lib/auth/authenticated-fetch.ts', { '@/lib/firebase': { auth } }, { Headers, fetch: async () => { sends++; return { status: 200 }; } });
+  await assert.rejects(authenticatedFetch('/api/doctor/appointments', {}, 'doctor-b'), /account|identity|changed/i);
+  auth.currentUser.getIdToken = () => new Promise((resolve) => { release = resolve; });
+  const pending = authenticatedFetch('/api/doctor/appointments', {}, 'doctor-a');
+  auth.currentUser = { uid: 'doctor-b', getIdToken: async () => 'synthetic-token-b' };
+  release('synthetic-token-a');
+  await assert.rejects(pending, /account|identity|changed/i);
+  assert.equal(sends, 0);
 });
 
 test('booking intervals overlap only when they share actual time, not at adjacent boundaries', () => {
@@ -104,4 +123,20 @@ test('scheduling remains disabled by default and invalid/null commands cause no 
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
   assert.equal((await enabled.route.POST({ json: async () => { throw new SyntaxError('Malformed JSON'); } })).status, 400);
+});
+
+test('private workspace capability never exposes scheduling to an administrator', async () => {
+  for (const administrator of [false, true]) {
+    const record = loadAppointmentModule('app/api/account/access/route.ts', {
+      'next/server': { NextResponse: { json: (body) => ({ body }) } },
+      '@/lib/services/shared/request-auth': { authenticateBearerToken: async () => ({ ok: true, data: { userId: 'staff', claimedRole: 'doctor', isAdminClaim: administrator, emailVerified: true } }) },
+      '@/lib/services/shared/http': {},
+      '@/lib/firebase-admin': {},
+      '@/lib/auth/role-administration': loadAppointmentModule('lib/auth/role-administration.ts', {}, { Set }),
+      '@/lib/consultations/consultation-capabilities': { isConsultationCapabilityEnabled: () => true },
+      '@/lib/services/shared/request-logging': { withRequestLogging: (fn) => fn },
+    }, { process: { env: {} } });
+    const response = await record.GET({});
+    assert.equal(response.body.schedulingEnabled, !administrator);
+  }
 });

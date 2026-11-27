@@ -1,4 +1,5 @@
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
+import { createHash } from 'node:crypto';
 import type { AppointmentCommand, AppointmentFields } from '@/lib/appointments/appointment-policy';
 import { serviceError, serviceOk, type ServiceResult } from '../shared/service-result';
 
@@ -9,6 +10,11 @@ export interface AppointmentRecord extends AppointmentFields {
   version: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Immutable request receipt, distinct from later mutable booking state. Never logged or returned. */
+function creationIntentHash(fields: AppointmentFields): string {
+  return createHash('sha256').update(JSON.stringify([fields.patientName, fields.patientEmail, fields.startsAt, fields.endsAt, fields.displayTimeZone])).digest('hex');
 }
 
 /** Normalize SDK dates at the server boundary; malformed stored records fail closed. */
@@ -61,7 +67,7 @@ export class AppointmentService {
   }
 
   /** Commit a validated command, returning conflicts without mutating either booking or calendar. */
-  async execute(doctorUserId: string, command: AppointmentCommand): Promise<ServiceResult<{ appointment: AppointmentRecord }>> {
+  async execute(doctorUserId: string, command: AppointmentCommand): Promise<ServiceResult<{ appointment: AppointmentRecord; replayed?: boolean }>> {
     const ref = this.db.collection('appointments').doc(command.id);
     const calendar = this.db.collection('appointmentCalendars').doc(doctorUserId);
     const at = this.now();
@@ -71,8 +77,8 @@ export class AppointmentService {
       if (existing.exists && existing.data()?.doctorUserId !== doctorUserId) return serviceError(403, 'appointment_forbidden', 'You can only change your own appointments.');
       const current = existing.exists ? appointmentRecord(existing.id, existing.data()!) : null;
       if (command.action === 'create' && current) {
-        const same = current.status === 'booked' && ['patientName', 'patientEmail', 'startsAt', 'endsAt', 'displayTimeZone'].every((key) => current[key as keyof AppointmentFields] === command[key as keyof AppointmentFields]);
-        return same ? serviceOk({ appointment: current }) : serviceError(409, 'request_id_conflict', 'This booking request was already used. Refresh before retrying.');
+        const same = existing.data()?.creationIntentHash === creationIntentHash(command);
+        return same ? serviceOk({ appointment: current, replayed: true }) : serviceError(409, 'request_id_conflict', 'This booking request was already used. Refresh before retrying.');
       }
       if (command.action !== 'create') {
         if (!current) return serviceError(404, 'appointment_not_found', 'Appointment not found.');
@@ -80,6 +86,7 @@ export class AppointmentService {
         if (current.status === 'cancelled') return command.action === 'cancel' ? serviceOk({ appointment: current }) : serviceError(409, 'appointment_cancelled', 'A cancelled appointment cannot be rescheduled. Create a new booking.');
       }
       if (command.action !== 'cancel') {
+        if (Date.parse(command.startsAt) <= at.getTime() || Date.parse(command.startsAt) > at.getTime() + 180 * 86_400_000) return serviceError(400, 'appointment_time_invalid', 'Choose a future time within 180 days.');
         const overlaps = await transaction.get(this.db.collection('appointments')
           .where('doctorUserId', '==', doctorUserId).where('status', '==', 'booked')
           .where('startsAt', '<', new Date(command.endsAt)).where('endsAt', '>', new Date(command.startsAt))
@@ -96,7 +103,7 @@ export class AppointmentService {
       };
       const { id: documentId, ...stored } = appointment;
       void documentId;
-      transaction.set(ref, { ...stored, startsAt: new Date(stored.startsAt), endsAt: new Date(stored.endsAt), createdAt: new Date(stored.createdAt), updatedAt: at });
+      transaction.set(ref, { ...stored, creationIntentHash: command.action === 'create' ? creationIntentHash(command) : existing.data()?.creationIntentHash || null, startsAt: new Date(stored.startsAt), endsAt: new Date(stored.endsAt), createdAt: new Date(stored.createdAt), updatedAt: at });
       transaction.set(calendar, { version: Number(calendarDoc.data()?.version || 0) + 1, updatedAt: at });
       return serviceOk({ appointment });
     });

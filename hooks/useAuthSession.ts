@@ -76,6 +76,9 @@ export function useAuthSession({
         return;
       }
 
+      // Stop exposing the previous account's workspace while resolving a new
+      // identity. Data-bearing children must not remain authorized in this gap.
+      setState({ user, role: null, isAuthenticated: true, isAuthorized: false, isLoading: true });
       let role: UserRole = null;
       let doctorAccess = true;
       try {

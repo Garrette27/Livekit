@@ -8,6 +8,7 @@ export interface WorkspaceAccess {
   doctorAccess: boolean;
   clinicId: string | null;
   homePath: string | null;
+  schedulingEnabled?: boolean;
 }
 
 /** Refresh claims explicitly at entry, then use the server's private navigation projection. */

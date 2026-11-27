@@ -9,19 +9,24 @@ import { auth } from '@/lib/firebase';
  */
 export async function authenticatedFetch(
   input: RequestInfo | URL,
-  init: RequestInit = {}
+  init: RequestInit = {},
+  expectedUserId?: string
 ): Promise<Response> {
   const user = auth?.currentUser;
   if (!user) {
     throw new Error('You must be signed in to perform this action.');
   }
+  if (expectedUserId && user.uid !== expectedUserId) throw new Error('Your signed-in account changed. Reload this workspace.');
 
   const idToken = await user.getIdToken();
+  if (auth?.currentUser?.uid !== user.uid) throw new Error('Your signed-in account changed. Reload this workspace.');
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${idToken}`);
 
-  return fetch(input, {
+  const response = await fetch(input, {
     ...init,
     headers,
   });
+  if (auth?.currentUser?.uid !== user.uid) throw new Error('Your signed-in account changed. Reload this workspace.');
+  return response;
 }

@@ -67,6 +67,8 @@ export default function DoctorAppHeader({ title, subtitle, user, navLink, doctor
               transition between the two doctor pages could stall on the
               destination's auth initialisation (seen in production). */}
           {(doctorAccess ?? access?.doctorAccess) === true && <a href={navLink.href} className="doctor-nav-link">{navLink.label}</a>}
+          {access?.doctorAccess && access.schedulingEnabled && pathname !== '/doctor/appointments' && <a href="/doctor/appointments" className="doctor-nav-link">Appointments</a>}
+          {access?.doctorAccess && pathname === '/doctor/appointments' && <a href="/doctor/dashboard" className="doctor-nav-link">Consultation History</a>}
           {access?.administratorLevel && pathname !== '/admin' && <a href="/admin" className="doctor-nav-link">Administration</a>}
           <span className="doctor-account" title={account.secondary || account.primary}>
             <span className="doctor-avatar" aria-hidden="true">{account.initial}</span>

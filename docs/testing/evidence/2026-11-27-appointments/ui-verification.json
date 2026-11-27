@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-27",
+  "parent_source": "350a09f92bd9863b5ed342b998a866e3fb0c999f",
+  "environment": "Local WSL Node22, isolated HTTPS Chromium fixture with real React page/workbench and synthetic auth/HTTP adapters",
+  "security_regressions": {"passed": 128, "failed": 0},
+  "browser_cases": {"passed": 7, "failed": 0, "viewports": [320, 820, 1280]},
+  "typecheck": "passed",
+  "lint": "passed",
+  "production_build": "passed",
+  "independent_review": "one Critical and four Important findings fixed with observed red/green regressions; stale reads re-graded Important and fixed",
+  "emulator_receipts": "overlap, ownership, immutable retry after reschedule/cancel/start, new past denial, stale version, cancellation and pagination passed",
+  "scheduled_feature_default": "disabled until explicitly configured",
+  "production_data_or_settings_mutated": false,
+  "signed_in_production_acceptance": false,
+  "production_firebase_rules_and_indexes_deployed": false
+}

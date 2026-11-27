@@ -26,6 +26,7 @@ export function appointmentsOverlap(start: number, end: number, otherStart: numb
  * times rather than guessing at a daylight-saving offset. No device zone is used.
  */
 export function localAppointmentTimeToUtc(local: string, timezone: string): Date {
+  if (/^[+-]/.test(timezone)) throw new Error('Use a named IANA timezone or UTC, not a numeric offset.');
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local);
   if (!match) throw new Error('Enter a valid local date and time.');
   const [year, month, day, hour, minute] = match.slice(1).map(Number);
@@ -76,7 +77,9 @@ export function parseAppointmentCommand(body: unknown, now: Date = new Date()): 
   let startsAt;
   try { startsAt = localAppointmentTimeToUtc(input.localStart, input.displayTimeZone); }
   catch { return invalid('The date or timezone is invalid, or that local time is ambiguous.'); }
-  if (startsAt.getTime() <= now.getTime() || startsAt.getTime() > now.getTime() + 180 * 86_400_000) return invalid('Choose a future time within 180 days.');
+  // A create retry may refer to a booking whose start has passed. Persistence
+  // checks its immutable receipt first, and enforces future time on new creates.
+  if ((action !== 'create' && startsAt.getTime() <= now.getTime()) || startsAt.getTime() > now.getTime() + 180 * 86_400_000) return invalid('Choose a future time within 180 days.');
   const fields: AppointmentFields = { patientName, patientEmail: patientEmail || null, startsAt: startsAt.toISOString(), endsAt: new Date(startsAt.getTime() + Number(input.durationMinutes) * 60_000).toISOString(), displayTimeZone: input.displayTimeZone };
   return { ok: true, data: action === 'create' ? { action, id, ...fields } : { action: 'reschedule', id, expectedVersion: Number(expectedVersion), ...fields } };
 }
