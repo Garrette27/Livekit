@@ -1327,13 +1327,15 @@ test('two guests on the same network and browser get separate entries via the pe
   assert.equal(tab('tab-a'), tab('tab-a'), 'A reload in the same tab keeps its entry');
 });
 
-test('only a super admin can change an administrator account; grants never sign anyone out', () => {
+test('only a super admin can change an administrator account; only privilege-removing changes sign anyone out', () => {
   const { decideRoleChange } = loadModule('lib/auth/role-administration.ts');
   const clinicAdmin = { userId: 'u-admin', email: 'a@x.test', emailVerified: true, isAdminClaim: true, clinicId: 'north-dental' };
   const result = decideRoleChange({ caller: clinicAdmin, superAdminEmails: new Set(), targetUserId: 'u-other-admin', role: 'doctor', action: 'revoke', targetClinicId: 'north-dental', targetIsAdmin: true });
   assert.equal(result.allowed, false);
   const route = readFileSync('app/api/admin/roles/route.ts', 'utf8');
-  assert.match(route, /if \(action === 'revoke'\) \{[\s\S]*revokeRefreshTokens/);
+  assert.match(route, /if \(action === 'revoke' \|\| grantRemovesPrivilege\) \{[\s\S]*revokeRefreshTokens/);
+  assert.match(route, /wasAdministrator && role !== 'admin'/, 'Admin -> doctor ends the admin token');
+  assert.match(route, /role === 'admin' && previousRole === 'doctor'/, 'Doctor -> admin ends the clinical token');
   assert.match(route, /claims\.role = role;/, 'Administrator grants must not silently grant Doctor');
 });
 

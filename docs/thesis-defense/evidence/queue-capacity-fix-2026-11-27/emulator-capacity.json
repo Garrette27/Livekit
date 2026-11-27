@@ -1,5 +1,6 @@
 {
-  "run_at_utc": "2026-11-26T22:38:04.234Z",
+  "run_at_utc": "2026-11-27T03:04:26.415Z",
+  "note": "contentionErrors = arrivals whose transaction gave up after Firestore retries under extreme same-invitation contention; they hold no place and consume no use.",
   "environment": "Firestore emulator (firebase-tools), Node v20.20.2, synthetic ids, single machine",
   "results": {
     "pair_at_9_of_10": {
@@ -8,8 +9,10 @@
       "concurrentArrivals": 2,
       "reserved": 1,
       "refusedFull": 1,
+      "contentionErrors": 0,
       "finalWaiting": 10,
-      "invitationUses": 1
+      "invitationUses": 1,
+      "wallClockMs": 3579
     },
     "burst_25_into_10": {
       "initialWaiting": 0,
@@ -17,8 +20,43 @@
       "concurrentArrivals": 25,
       "reserved": 10,
       "refusedFull": 15,
+      "contentionErrors": 0,
       "finalWaiting": 10,
-      "invitationUses": 10
+      "invitationUses": 10,
+      "wallClockMs": 15273
+    },
+    "burst_150_into_100_maximum": {
+      "initialWaiting": 0,
+      "maxPatients": 100,
+      "concurrentArrivals": 150,
+      "reserved": 10,
+      "refusedFull": 0,
+      "contentionErrors": 140,
+      "finalWaiting": 10,
+      "invitationUses": 10,
+      "wallClockMs": 28167
+    },
+    "waves_12x10_into_100_maximum": {
+      "initialWaiting": 0,
+      "maxPatients": 100,
+      "concurrentArrivals": 10,
+      "waves": 12,
+      "reserved": 100,
+      "refusedFull": 18,
+      "contentionErrors": 2,
+      "finalWaiting": 100,
+      "invitationUses": 100,
+      "wallClockMs": 135922
+    },
+    "limit_change": {
+      "limit2_three_arrivals": [
+        "reserved",
+        "reserved",
+        "full"
+      ],
+      "raised_to_3_next_arrival": "reserved",
+      "lowered_to_2_next_arrival": "full",
+      "waiting_after_lowering": 3
     }
   },
   "claim_status": "Per-invitation waiting target held under concurrent transactions in the emulator. Not a production or cloud load measurement."

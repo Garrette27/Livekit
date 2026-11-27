@@ -21,7 +21,7 @@ export function consultationBrowserFixture() {
     'firebase/firestore': 'exports.doc = () => null; exports.setDoc = async () => {};',
     '@/lib/firebase': 'exports.db = null;',
     '@/lib/consultations/doctor-presence-client': 'exports.trackDoctorPresenceEvent = async () => {};',
-    [`${room}/doctor/hooks/useDoctorAuth`]: `exports.useDoctorAuth = () => ({ user: { uid: 'synthetic-doctor', displayName: 'Demo doctor' }, isAuthenticated: true, doctorName: 'Demo doctor', clearAuthError() {} });`,
+    [`${room}/doctor/hooks/useDoctorAuth`]: `exports.useDoctorAuth = () => ({ user: { uid: 'synthetic-doctor', displayName: 'Demo doctor' }, isAuthenticated: true, isAuthorized: true, isAuthLoading: false, doctorName: 'Demo doctor', clearAuthError() {} });`,
     [`${room}/doctor/hooks/useDoctorToken`]: `exports.useDoctorToken = () => ({ token: 'synthetic-token', clearTokenError() {} });`,
     [`${room}/doctor/hooks/useRoomLifecycle`]: `exports.useRoomLifecycle = () => ({ consultationSessionId: 'synthetic-session' });`,
     [`${room}/doctor/hooks/useSpeechCapture`]: `exports.useSpeechCapture = () => ({ speechStatus: 'unsupported', startCapture() {}, stopCapture() {} });`,
@@ -44,6 +44,8 @@ export function consultationBrowserFixture() {
       exports.useLocalParticipant = () => ({localParticipant: {identity: 'synthetic-doctor'}});
       exports.useParticipants = () => [];
       exports.useConnectionState = () => 'connected';
+      const syntheticRoom = { localParticipant: { trackPublications: new Map() }, remoteParticipants: new Map() };
+      exports.useRoomContext = () => syntheticRoom;
     `,
   };
   const modules = {};

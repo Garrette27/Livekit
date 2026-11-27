@@ -52,7 +52,7 @@ function requestAuthorization(decoded, configuredOwners = 'owner@example.test') 
   const policy = { exports: {} };
   runInNewContext(ts.transpileModule(readFileSync('lib/auth/access-policy.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { module: policy, exports: policy.exports, Set });
   const deps = {
-    '@/lib/firebase-admin': { getFirebaseAdmin: () => ({}), getFirebaseAdminAuth: () => ({ verifyIdToken: async () => decoded }) },
+    '@/lib/firebase-admin': { getFirebaseAdmin: () => ({}), getFirebaseAdminAuth: () => ({ verifyIdToken: async (_token, checkRevoked) => (typeof decoded === 'function' ? decoded(checkRevoked) : decoded) }) },
     '@/lib/auth/access-policy': policy.exports,
     '@/lib/auth/role-administration': loadPolicy(),
     '@/lib/repositories/user-repository': { UserRepository: class { async getById() { observed.profileReads++; return { exists: true, data: () => ({ role: 'doctor' }) }; } } },
@@ -153,4 +153,15 @@ test('an Auth lookup outage is retryable, not an assertion that the account is m
   const h = roleRoute(owner, null, { code: 'auth/internal-error' });
   assert.equal((await h.get()).status, 503);
   assert.equal((await h.post({ email: 'target@example.test', role: 'doctor', action: 'grant' })).status, 503);
+});
+
+test('a revoked doctor is refused on the next API request, not after token expiry', async () => {
+  const revoked = requestAuthorization((checkRevoked) => {
+    assert.equal(checkRevoked, true, 'Protected APIs must ask Firebase to check revocation');
+    throw Object.assign(new Error('revoked'), { code: 'auth/id-token-revoked' });
+  });
+  const result = await revoked.authorize('invitation:manage');
+  assert.equal(result.ok, false);
+  assert.equal(result.error.status, 401);
+  assert.equal(result.error.code, 'session_revoked');
 });

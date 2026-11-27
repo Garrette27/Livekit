@@ -86,11 +86,28 @@ export function useAuthSession({
         // Re-query authority before opening clinician subscriptions or screens.
         if (requiredRole === 'doctor') {
           doctorAccess = false;
-          const access = await fetchWorkspaceAccess(user);
+          // A failed access check is "unknown", not "denied": retry with a
+          // short backoff while the page keeps its loading state. Treating it
+          // as denied sent real doctors round a / <-> /doctor/invitations
+          // redirect loop whenever the access endpoint hiccupped.
+          let access: Awaited<ReturnType<typeof fetchWorkspaceAccess>> | null = null;
+          for (let attempt = 0; access === null; attempt++) {
+            try {
+              access = await fetchWorkspaceAccess(user);
+            } catch (accessError) {
+              if (requestId !== requestIdRef.current) return;
+              console.error('Workspace access check failed; retrying:', accessError);
+              await new Promise((resolve) => setTimeout(resolve, Math.min(1000 * 2 ** attempt, 8000)));
+              if (requestId !== requestIdRef.current) return;
+            }
+          }
           doctorAccess = access.doctorAccess;
           role = doctorAccess ? 'doctor' : null;
           if (requestId === requestIdRef.current && access.administratorLevel) {
+            // Stay in the loading state: the page must not run its own
+            // "unauthorized" redirect and race this one.
             window.location.replace('/admin');
+            return;
           }
         } else if (resolveRole) {
           role = await resolveUserRole(user);

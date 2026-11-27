@@ -125,6 +125,7 @@ async function handlePOST(req: NextRequest) {
   const claims = { ...(target.customClaims || {}) } as Record<string, unknown>;
   const now = new Date();
   const wasAdministrator = claims.admin === true || claims.role === 'admin' || profileRole === 'admin';
+  const previousRole = typeof claims.role === 'string' ? claims.role : null;
   if (action === 'grant') {
     claims.role = role;
     claims.clinicId = decision.clinicId;
@@ -149,10 +150,14 @@ async function handlePOST(req: NextRequest) {
     // profile-role fallback from honouring it.
     await profileRef.set({ role: 'revoked', revokedRole: profileRole, revokedAt: now }, { merge: true });
   }
-  if (action === 'revoke') {
-    // Ends other sessions so removed access cannot be refreshed. Not done on
-    // grant: a grant only adds access, and revoking would sign the person out
-    // (possibly mid-consultation).
+  // A grant that switches between administrator and doctor also removes a
+  // privilege (admins are never clinical), so it must end the old token too.
+  const grantRemovesPrivilege = action === 'grant'
+    && ((wasAdministrator && role !== 'admin') || (role === 'admin' && previousRole === 'doctor'));
+  if (action === 'revoke' || grantRemovesPrivilege) {
+    // Ends existing sessions; protected APIs check revocation on every request,
+    // so the old ID token stops working immediately. A grant that only adds
+    // access (e.g. a new doctor) does not sign anyone out.
     await auth.revokeRefreshTokens(target.uid);
   }
   await db.collection('adminAuditEvents').add({
