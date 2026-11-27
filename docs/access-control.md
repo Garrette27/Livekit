@@ -100,8 +100,8 @@ verified Firebase tokens plus the server-side user profile.
 - Test one account per role and a cross-account denial case before a thesis
   demonstration.
 - Treat compliance certification, retention policy approval, incident response,
-  backups, and LiveKit E2EE as separate deployment decisions; the repository
-  alone does not certify them.
+  backups, and enabling LiveKit E2EE (`LIVEKIT_E2EE_SECRET`) as separate
+  deployment decisions; the repository alone does not certify them.
 # Administrator/clinician separation — 27 November 2026 follow-up
 
 This section supersedes earlier combined administrator/doctor examples. Platform owners and clinic administrators manage staff access only; clinical work requires a separate provisioned doctor identity. The server checks administrator authority before clinician claims or legacy profile fallback. Workspace navigation follows the same projection. New Administrator grants write `role: admin`, not `role: doctor`; removal must not reactivate a legacy clinician profile. No production account is silently migrated by these changes.

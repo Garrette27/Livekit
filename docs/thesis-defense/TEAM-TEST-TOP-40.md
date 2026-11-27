@@ -39,6 +39,7 @@ Use only synthetic accounts: **Doctor** (provisioned), **Patient A** (Google, ve
 | 8, 9 | In a call, open **Call quality** (top-left) and click *Copy measurement* | Shows RTT ms, jitter ms, loss %, received/sent resolution and fps |
 | 8 | **Paired-call trial:** run 1, then 3, then 5 doctor–patient pairs on separate devices for 5 minutes each; at minute 4 copy the measurement from one patient device per pair | Fill the sheet below; report the highest level that stayed acceptable |
 | 22 | Doctor-booked appointments are off in production | No Appointments link in production; explain the feature flag |
+| 17 | In a call, open **Call quality** | Summary reads *End-to-end encrypted*; Protection reads *End-to-end (AES-GCM) + DTLS-SRTP*; Copy measurement shows `"mediaEncryption":"end-to-end"` |
 | 23 | Open the doctor room and invitations page on a real phone | No sideways scrolling; queue/session panels open on demand; the camera menu shows full device names |
 | 24 | Speech notes with Filipino/Tagalog selected, speak Taglish | Transcript captured; summary in English |
 | 39 | Open Consultation History | Summaries appear first; chat transcripts fill in after |

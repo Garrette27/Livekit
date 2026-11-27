@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   LiveKitRoom,
   PreJoin,
@@ -13,6 +13,8 @@ import {
   type LocalUserChoices,
 } from '@livekit/components-react';
 import { VideoPresets, type RoomOptions } from 'livekit-client';
+import PageSkeleton from '@/components/ui/feedback/PageSkeleton';
+import { prepareConsultationRoom, type ConsultationRoomPreparation } from '@/lib/livekit/media-encryption-client';
 import CallQualityMeter from './CallQualityMeter';
 import LiveKitStyles from './LiveKitStyles';
 import SessionTranscriptionBridge from './SessionTranscriptionBridge';
@@ -421,6 +423,27 @@ export default function RoomShell({
   const handleParticipantCountChange = useCallback((count: number) => {
     setParticipantCount((previous) => (previous === count ? previous : count));
   }, []);
+  // The encrypted Room is prepared while the user checks devices, so joining
+  // is not delayed. A new credential (e.g. after admission) prepares afresh.
+  const [preparation, setPreparation] = useState<ConsultationRoomPreparation | null>(null);
+  const [preparationAttempt, setPreparationAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    let prepared: ConsultationRoomPreparation | null = null;
+    setPreparation(null);
+    void prepareConsultationRoom(token, ROOM_MEDIA_OPTIONS, controller.signal).then((next) => {
+      prepared = next;
+      if (controller.signal.aborted) {
+        if (next.kind === 'ready') void next.room.disconnect();
+        return;
+      }
+      setPreparation(next);
+    });
+    return () => {
+      controller.abort();
+      if (prepared?.kind === 'ready') void prepared.room.disconnect();
+    };
+  }, [token, preparationAttempt]);
 
   if (!userChoices) {
     return (
@@ -495,13 +518,43 @@ export default function RoomShell({
     );
   }
 
+  if (!preparation) {
+    return <PageSkeleton layout="call" message="Securing your call…" detail="Setting up end-to-end encryption for this consultation." />;
+  }
+
+  if (preparation.kind !== 'ready') {
+    return (
+      <main role="alert" style={{ minHeight: '100dvh', flex: 1, order: 2, display: 'grid', placeItems: 'center', padding: '1rem', background: '#0f172a', color: '#e2e8f0' }}>
+        <div style={{ maxWidth: '32rem', textAlign: 'center' }}>
+          <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.15rem' }}>
+            {preparation.kind === 'unsupported' ? 'This browser cannot join an encrypted consultation' : 'We could not secure this call yet'}
+          </h2>
+          <p style={{ margin: '0 0 1rem', color: '#cbd5e1', lineHeight: 1.5 }}>
+            {preparation.kind === 'unsupported'
+              ? 'Consultations are end-to-end encrypted. Please open this link in a current version of Chrome, Edge, Safari or Firefox.'
+              : preparation.message}
+          </p>
+          {preparation.kind === 'failed' ? (
+            <button
+              type="button"
+              onClick={() => setPreparationAttempt((attempt) => attempt + 1)}
+              style={{ padding: '0.5rem 1rem', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+            >
+              Retry
+            </button>
+          ) : null}
+        </div>
+      </main>
+    );
+  }
+
   return (
     <div ref={roomScopeRef} style={{ width: '100%', minWidth: 0, height: '100dvh', position: 'relative', flex: 1, order: 2 }}>
       <LiveKitRoom
+        room={preparation.room}
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}
         connect={true}
-        options={ROOM_MEDIA_OPTIONS}
         audio={userChoices.audioEnabled ? { deviceId: userChoices.audioDeviceId, ...SPEECH_PROCESSING } : false}
         video={userChoices.videoEnabled ? { deviceId: userChoices.videoDeviceId } : false}
         style={{ width: '100%', height: '100%', backgroundColor: '#000' }}
@@ -511,7 +564,7 @@ export default function RoomShell({
         <ParticipantCountBridge onCountChange={handleParticipantCountChange} />
         <ConnectionStatusBanner />
         <ConnectionStateToast />
-        <CallQualityMeter />
+        <CallQualityMeter encryption={preparation.encryption} />
         <ChatBehaviorBridge
           enabled={chatEnabled}
           defaultOpen={chatDefaultOpen}

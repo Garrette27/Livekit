@@ -1,0 +1,40 @@
+{
+  "testedAtUtc": "2026-11-27T03:55:14.965Z",
+  "environment": "local livekit-server --dev (docker) + headless Chromium fake camera/mic; same issuer and client modules as production",
+  "doctorPatientPairBeforeEavesdroppers": {
+    "doctorDecryptErrors": 0,
+    "patientDecryptErrors": 0
+  },
+  "patientWithAppKey": {
+    "mode": "app",
+    "encryptionErrors": 12,
+    "preparation": "ready:end-to-end",
+    "localEncrypting": true,
+    "doctorTrackSubscribed": true,
+    "framesDecoded": 506,
+    "videoSize": "640x360",
+    "lumaStdDev": 14.2,
+    "doctorMarkedEncrypted": true
+  },
+  "eavesdropperWithWrongKey": {
+    "mode": "wrong-key",
+    "encryptionErrors": 24,
+    "localEncrypting": true,
+    "doctorTrackSubscribed": true,
+    "framesDecoded": 0,
+    "videoSize": null,
+    "lumaStdDev": null,
+    "doctorMarkedEncrypted": true
+  },
+  "eavesdropperWithoutE2EE": {
+    "mode": "plain",
+    "encryptionErrors": 6,
+    "localEncrypting": false,
+    "doctorTrackSubscribed": true,
+    "framesDecoded": 0,
+    "videoSize": null,
+    "lumaStdDev": null,
+    "doctorMarkedEncrypted": true
+  },
+  "verdict": "PASS"
+}

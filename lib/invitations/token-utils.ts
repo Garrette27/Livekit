@@ -35,6 +35,8 @@ export interface VerifiedLiveKitRoomToken {
   participantName?: string;
   roomName: string;
   issuedAt?: number;
+  /** True only for consultation credentials; waiting credentials cannot publish or subscribe. */
+  canExchangeMedia: boolean;
 }
 
 /**
@@ -50,7 +52,7 @@ export function verifyLiveKitRoomToken(token: string): VerifiedLiveKitRoomToken 
     name?: string;
     appPatientUserId?: string;
     appVisitId?: string;
-    video?: { roomJoin?: boolean; room?: string };
+    video?: { roomJoin?: boolean; room?: string; canPublish?: boolean; canSubscribe?: boolean };
   };
 
   if (
@@ -70,6 +72,7 @@ export function verifyLiveKitRoomToken(token: string): VerifiedLiveKitRoomToken 
     participantName: typeof payload.name === 'string' ? payload.name : undefined,
     roomName: payload.video.room,
     issuedAt: payload.iat,
+    canExchangeMedia: payload.video.canSubscribe === true && payload.video.canPublish === true,
   };
 }
 

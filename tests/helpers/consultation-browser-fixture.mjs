@@ -30,7 +30,8 @@ export function consultationBrowserFixture() {
     '@/components/ui/feedback/ToastProvider': 'exports.useToast = () => ({ showToast() {} });',
     '@/lib/invitations/invitation-link-client': `exports.fetchInvitationLink = async () => ({ success: true, inviteUrl: 'https://example.test/invite/synthetic', invitationContext: { directAdmissionEmailCount: 2, waitingCapacity: 4, createdAt: '2026-11-27T00:00:00Z', expiresAt: '2099-01-02T00:00:00Z' } }); exports.copyTextToClipboard = async () => {};`,
     'next/link': `const React = require('react'); module.exports = ({children, ...props}) => React.createElement('a', props, children);`,
-    'livekit-client': `exports.VideoPresets = { h720: { resolution: { width: 1280, height: 720 } } };`,
+    'livekit-client': `exports.VideoPresets = { h720: { resolution: { width: 1280, height: 720 } } }; exports.RoomEvent = { ParticipantEncryptionStatusChanged: 'e2ee-status', EncryptionError: 'e2ee-error' };`,
+    '@/lib/livekit/media-encryption-client': `exports.prepareConsultationRoom = async () => ({ kind: 'ready', room: { disconnect: async () => {} }, encryption: 'end-to-end' });`,
     [`${room}/components/shared/SessionTranscriptionBridge`]: `const React = require('react'); module.exports = ({consentConfirmed}) => React.createElement('span', { 'data-testid': 'transcription-state', 'data-active': String(consentConfirmed) });`,
     '@livekit/components-react': `
       const React = require('react');
@@ -44,7 +45,7 @@ export function consultationBrowserFixture() {
       exports.useLocalParticipant = () => ({localParticipant: {identity: 'synthetic-doctor'}});
       exports.useParticipants = () => [];
       exports.useConnectionState = () => 'connected';
-      const syntheticRoom = { localParticipant: { trackPublications: new Map() }, remoteParticipants: new Map() };
+      const syntheticRoom = { localParticipant: { trackPublications: new Map() }, remoteParticipants: new Map(), isE2EEEnabled: true, on() {}, off() {} };
       exports.useRoomContext = () => syntheticRoom;
     `,
   };
