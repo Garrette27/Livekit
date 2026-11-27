@@ -212,6 +212,11 @@ service cloud.firestore {
         allow read, write: if false;
       }
     }
+
+    // Calendar serialization state is owned by the authenticated server service.
+    match /appointmentCalendars/{doctorUserId} {
+      allow read, write: if false;
+    }
     
     // Sessions - users can only access their own sessions
     match /sessions/{sessionId} {

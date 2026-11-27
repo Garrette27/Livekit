@@ -13,6 +13,7 @@ export const APP_ROLES = [
 export type AppRole = (typeof APP_ROLES)[number];
 
 export type AppPermission =
+  | 'appointment:manage-own'
   | 'consultation:link-own'
   | 'consultation:read-own'
   | 'consultation:review-assigned'
@@ -25,6 +26,7 @@ export type AppPermission =
 
 const ROLE_PERMISSIONS: Record<AppRole, ReadonlySet<AppPermission>> = {
   doctor: new Set([
+    'appointment:manage-own',
     'consultation:read-own',
     'invitation:manage',
     'room:join-doctor',

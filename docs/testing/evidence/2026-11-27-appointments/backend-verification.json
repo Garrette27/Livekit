@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-27",
+  "parent_source": "f816083f06b21cdaf24b8588c4edcf93375e3d8e",
+  "environment": "WSL Node22 and dedicated local Firestore emulator; synthetic records only",
+  "unit_and_route_tests": { "passed": 125, "failed": 0 },
+  "transaction_cases": ["one of two overlapping bookings accepted", "same-id retry has no duplicate", "another doctor cannot mutate the booking", "independent doctors may book the same time", "adjacent bookings accepted", "stale version denied", "reschedule overlap denied", "cancellation releases its interval", "stable pagination returns50 then5 records", "no invitation, encounter or summary-job writes"],
+  "typecheck": "passed",
+  "lint": "passed",
+  "production_build": "passed",
+  "scheduling_flag": "remains opt-in and disabled unless configured true",
+  "production_indexes_deployed": false,
+  "signed_in_production_acceptance": false,
+  "production_patient_data_read_or_written": false
+}
