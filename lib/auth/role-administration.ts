@@ -54,6 +54,47 @@ export function administratorLevel(
   return caller.isAdminClaim ? 'admin' : null;
 }
 
+/** Resolve navigation from verified server identity; this projection grants no permissions. */
+export function resolveWorkspaceAccess(
+  caller: RoleAdministrator & { claimedRole?: string },
+  superAdminEmails: Set<string>,
+  legacyProfileRole?: string
+) {
+  const level = administratorLevel(caller, superAdminEmails);
+  const role = caller.claimedRole || legacyProfileRole;
+  const doctorAccess = caller.isAdminClaim || role === 'doctor' || role === 'admin';
+  return {
+    administratorLevel: level,
+    clinicId: normalizeClinicId(caller.clinicId),
+    doctorAccess,
+    homePath: level ? '/admin' : doctorAccess ? '/doctor/invitations' : role === 'patient' ? '/patient/dashboard' : null,
+  };
+}
+
+/** Display authority separately from profile history; only Auth can establish bootstrap identity. */
+export function presentManagedAccount(
+  user: { uid: string; email?: string; emailVerified?: boolean; displayName?: string; disabled?: boolean; customClaims?: Record<string, unknown> } | null,
+  profile: { email?: string; role?: string; doctorName?: string; clinicId?: string },
+  superAdminEmails: Set<string>
+) {
+  const claims = user?.customClaims || {};
+  const bootstrap = Boolean(user && administratorLevel({ userId: user.uid, email: user.email,
+    emailVerified: user.emailVerified === true, isAdminClaim: false }, superAdminEmails) === 'super_admin');
+  const administrator = claims.admin === true;
+  const provisioned = bootstrap || administrator || (typeof claims.role === 'string' && claims.role === profile.role);
+  const authority = !user ? 'account_missing' : user.disabled ? 'disabled' : bootstrap ? 'server_bootstrap' : provisioned ? 'custom_claims' : 'legacy_profile';
+  return {
+    email: user?.email || profile.email || null,
+    name: profile.doctorName || user?.displayName || null,
+    role: bootstrap ? 'super_admin' : administrator ? 'admin' : profile.role || claims.role || 'unassigned',
+    clinicId: normalizeClinicId(claims.clinicId) || normalizeClinicId(profile.clinicId),
+    provisioned,
+    disabled: user?.disabled === true,
+    authority,
+    canManage: Boolean(user && !bootstrap),
+  };
+}
+
 export function decideRoleChange(input: {
   caller: RoleAdministrator;
   superAdminEmails: Set<string>;
@@ -66,12 +107,17 @@ export function decideRoleChange(input: {
   targetClinicId?: string | null;
   /** Target currently holds the administrator claim. */
   targetIsAdmin?: boolean;
+  /** Server-derived bootstrap status, never supplied by the browser. */
+  targetIsSuperAdmin?: boolean;
 }):
   | { allowed: true; clinicId: string | null }
   | { allowed: false; status: number; code: string; message: string } {
   const level = administratorLevel(input.caller, input.superAdminEmails);
   if (!level) {
     return { allowed: false, status: 403, code: 'not_administrator', message: 'Only an administrator can change roles.' };
+  }
+  if (input.targetIsSuperAdmin) {
+    return { allowed: false, status: 409, code: 'bootstrap_managed', message: 'This platform administrator is managed by server configuration, not clinician role commands.' };
   }
   if (input.role !== 'doctor' && input.role !== 'admin') {
     return { allowed: false, status: 400, code: 'invalid_role', message: 'Only doctor or admin roles are managed here.' };

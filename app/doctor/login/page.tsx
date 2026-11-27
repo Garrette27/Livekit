@@ -8,6 +8,7 @@ import Link from "next/link";
 import { db } from "@/lib/firebase";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { checkRoleConflictByEmail, RoleConflictUnavailableError } from "@/lib/auth/role-conflict";
+import { fetchWorkspaceAccess } from '@/lib/auth/workspace-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +43,11 @@ export default function DoctorLoginPage() {
       setError(null);
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+
+      if ((await fetchWorkspaceAccess(user, true)).administratorLevel) {
+        router.replace('/admin');
+        return;
+      }
 
       // Auto-register doctor if first login
       if (user && db) {
@@ -142,6 +148,10 @@ export default function DoctorLoginPage() {
 
       const user = auth.currentUser;
       if (user) {
+        if ((await fetchWorkspaceAccess(user, true)).administratorLevel) {
+          router.replace('/admin');
+          return;
+        }
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data();

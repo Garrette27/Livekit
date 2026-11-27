@@ -34,15 +34,24 @@ Use the **/admin** console (server route `app/api/admin/roles`, policy
 first administrator is bootstrapped by the server-only `SUPER_ADMIN_EMAILS`
 setting (provider-verified emails). Super admins grant doctor and admin;
 admins grant doctor; nobody changes their own role; patient accounts are not
-converted. Each change writes `adminAuditEvents` (uids only) and revokes
-refresh tokens. Manual steps, equivalently:
+converted. Each change writes `adminAuditEvents` (uids only). Grants appear on
+ID-token refresh; only revocations revoke refresh tokens. Manual steps, equivalently:
 
 1. Create the Firebase Authentication account.
 2. Set the Firebase custom claim `role` to `doctor`, `faculty_reviewer`, or
    `admin`. Admin accounts should also set `admin: true`.
 3. Create the matching `users/{uid}` profile, or allow its first authenticated
    login to create it under `firestore.rules`.
-4. Revoke refresh tokens when changing or removing a privileged role.
+4. Refresh the recipient's ID token after a grant. Revoke refresh tokens when
+   removing access; existing ID tokens and transport grants have separate expiry.
+
+Administrator entry uses `/admin/login` and identity-only `/admin/signup`.
+Signup never writes privileged claims or clinician profiles. `/api/account/access`
+returns a private, server-derived navigation projection: administrators land in
+`/admin`, doctors in Invitations. It grants no permission. The environment-owned,
+provider-verified bootstrap identity is labeled separately from legacy clinical
+profiles and cannot be changed through clinician role commands. A Doctor grant
+does not grant Administration. Newly approved users explicitly refresh access.
 
 Roles cannot be changed by editing a browser request. Firestore rules keep a
 profile's email and role immutable, and API routes resolve permissions from

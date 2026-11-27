@@ -8,6 +8,7 @@ import {
   administratorLevel,
   decideRoleChange,
   parseSuperAdminEmails,
+  presentManagedAccount,
   type ManagedRole,
   type RoleAction,
 } from '@/lib/auth/role-administration';
@@ -22,9 +23,8 @@ function superAdmins() {
  * GET: the caller's administrator level and the clinician/admin accounts,
  * each with whether its role comes from a claim (provisioned) or only from a
  * legacy profile. POST { email, role, action }: grant or revoke a role.
- * Every change sets/removes the custom claim, aligns the profile, revokes
- * refresh tokens (the new role applies at next sign-in) and writes an audit
- * event that names uids, never emails.
+ * Changes align claims/profile metadata and write a uid-only audit event.
+ * Only revocations revoke refresh tokens; grants appear on token refresh.
  */
 async function handleGET(req: NextRequest) {
   const caller = await authenticateBearerToken(req);
@@ -43,21 +43,22 @@ async function handleGET(req: NextRequest) {
   const scopedDocs = level === 'super_admin'
     ? snapshot.docs
     : snapshot.docs.filter((doc) => caller.data.clinicId && doc.data().clinicId === caller.data.clinicId);
-  const accounts = await Promise.all(scopedDocs.map(async (doc) => {
+  let accounts;
+  try {
+  accounts = await Promise.all(scopedDocs.map(async (doc) => {
     const profile = doc.data() as { email?: string; role?: string; doctorName?: string; clinicId?: string };
-    const user = await auth.getUser(doc.id).catch(() => null);
-    const claimRole = user?.customClaims?.role as string | undefined;
-    const isAdmin = user?.customClaims?.admin === true;
+    const user = await auth.getUser(doc.id).catch((error) => {
+      if (error?.code === 'auth/user-not-found') return null;
+      throw error;
+    });
     return {
       uid: doc.id,
-      email: profile.email || user?.email || null,
-      name: profile.doctorName || user?.displayName || null,
-      role: isAdmin ? 'admin' : profile.role,
-      clinicId: profile.clinicId || (user?.customClaims?.clinicId as string | undefined) || null,
-      provisioned: claimRole === profile.role || (isAdmin && claimRole === 'doctor'),
-      disabled: user?.disabled === true,
+      ...presentManagedAccount(user, profile, superAdmins()),
     };
   }));
+  } catch {
+    return NextResponse.json({ success: false, error: 'Could not verify account status. Please retry.' }, { status: 503 });
+  }
   return NextResponse.json({ success: true, level, callerUid: caller.data.userId, clinicId: caller.data.clinicId || null, accounts });
 }
 
@@ -67,7 +68,11 @@ async function handlePOST(req: NextRequest) {
   const caller = await authenticateBearerToken(req);
   if (!caller.ok) return serviceResultToResponse(caller);
 
-  const body = await req.json().catch(() => ({}));
+  if (!administratorLevel(caller.data, superAdmins())) {
+    return NextResponse.json({ success: false, code: 'not_administrator', error: 'Only an administrator can change roles.' }, { status: 403 });
+  }
+
+  const body = (await req.json().catch(() => ({}))) ?? {};
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const role = body.role as ManagedRole;
   const action = body.action as RoleAction;
@@ -81,7 +86,14 @@ async function handlePOST(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'Service unavailable' }, { status: 503 });
   }
 
-  const target = await auth.getUserByEmail(email).catch(() => null);
+  let target;
+  try {
+    target = await auth.getUserByEmail(email);
+  } catch (error) {
+    if ((error as { code?: string })?.code !== 'auth/user-not-found') {
+      return NextResponse.json({ success: false, error: 'Could not verify the target account. Please retry.' }, { status: 503 });
+    }
+  }
   if (!target) {
     return NextResponse.json({ success: false, code: 'account_not_found', error: 'No account uses that email. Ask the clinician to sign in once first.' }, { status: 404 });
   }
@@ -98,6 +110,7 @@ async function handlePOST(req: NextRequest) {
     clinicId: body.clinicId,
     targetClinicId,
     targetIsAdmin: target.customClaims?.admin === true,
+    targetIsSuperAdmin: administratorLevel({ userId: target.uid, email: target.email, emailVerified: target.emailVerified, isAdminClaim: false }, superAdmins()) === 'super_admin',
   });
   if (!decision.allowed) {
     return NextResponse.json({ success: false, code: decision.code, error: decision.message }, { status: decision.status });

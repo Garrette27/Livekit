@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-27",
+  "timezone": "Asia/Singapore",
+  "baseline": "eb3b187",
+  "environment": "Local WSL Node 22.23.0, synthetic IO fixtures and local production server",
+  "security_regressions": {"tests": 91, "pass": 91, "fail": 0},
+  "source_contracts": "PASS in separate snapshot using working app sources and tracked AGENTS.md",
+  "root_worktree_security_command": "FAIL: unrelated user-modified AGENTS.md includes product scopes rejected by the existing scope guard; preserved, not committed",
+  "typecheck": "PASS",
+  "lint": "PASS",
+  "production_build": "PASS",
+  "signed_out_local_browser_cases": {"pass": 3, "fail": 0},
+  "form_reflow_css_pixels": [320, 700, 1000],
+  "long_clinic_header_css_pixels": [320, 700],
+  "prior_form_overlap_reproduced_at_css_pixels": 700,
+  "review_findings_corrected": ["client-transition home link", "long clinic title clipping", "Auth outage mislabeled account missing"],
+  "red_green_evidence": ["initial workspace/projection regressions 0/4 then 4/4", "null command throws then returns 400", "Auth outage returned 200 then 503", "baseline form overlap then current non-overlap"],
+  "signed_in_production_acceptance": "NOT TESTED",
+  "production_account_role_or_data_mutations": "NONE",
+  "media_capacity_latency_and_bilingual_accuracy": "NOT MEASURED",
+  "document_rebuild": "Separate following checkpoint; historical bundles are not updated by this app checkpoint"
+}

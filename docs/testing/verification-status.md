@@ -1,5 +1,11 @@
 # Security and performance verification ledger
 
+## 27 November 2026: administrator entry follow-up
+
+Reviewed `eb3b187` plus the administrator-entry fix. [Evidence](evidence/2026-11-27-admin-entry/verification.json): 91 regressions, both source contracts in a tracked-instructions snapshot, typecheck, lint, production build and 3 signed-out browser cases pass locally. The user's modified root AGENTS.md makes the root scope guard fail; it is preserved and excluded rather than silently rewritten. Browser fixtures exercise the actual form/header JSX and CSS with synthetic values, including 320px and long clinic names. A fresh review's navigation, clipping and Auth-outage findings were addressed.
+
+Dedicated administrator entry is identity-only, server authority determines navigation and the bootstrap label, and ordinary callers are denied before role-target lookup. No real roles, accounts or clinical records were changed. Signed-in production acceptance, paired-media load, bilingual clinical accuracy and real-clinic readiness remain unmeasured. Artifact alignment is a separate following checkpoint, not retroactive evidence that a prior survey evaluated these changes.
+
 ## Required checkpoint workflow
 
 This is the current status index; dated reports are immutable historical evidence.

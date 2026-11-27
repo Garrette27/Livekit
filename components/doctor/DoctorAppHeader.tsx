@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { MouseEvent } from 'react';
+import { useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { fetchWorkspaceAccess, type WorkspaceAccess } from '@/lib/auth/workspace-client';
 
 /**
  * Account label for the signed-in clinician, strongest first: the account
@@ -25,7 +25,7 @@ export function accountLabel(user: Pick<User, 'email' | 'displayName' | 'uid'> |
 }
 
 interface DoctorAppHeaderProps {
-  /** Page name, shown in the clickable title box that returns to this page's top. */
+  /** Current page name. Brand navigation always has a real workspace destination. */
   title: string;
   subtitle?: string;
   user: User | null | undefined;
@@ -40,31 +40,32 @@ interface DoctorAppHeaderProps {
 export default function DoctorAppHeader({ title, subtitle, user, navLink }: DoctorAppHeaderProps) {
   const pathname = usePathname();
   const account = accountLabel(user);
-
-  const goToTop = (event: MouseEvent<HTMLAnchorElement>) => {
-    // Already on this page: scroll to the top instead of reloading it.
-    if (pathname === event.currentTarget.getAttribute('href')) {
-      event.preventDefault();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
+  const [access, setAccess] = useState<WorkspaceAccess | null>(null);
+  useEffect(() => {
+    let current = true;
+    setAccess(null);
+    if (user) void fetchWorkspaceAccess(user).then((next) => { if (current) setAccess(next); }).catch(() => {});
+    return () => { current = false; };
+  }, [user]);
+  const homePath = pathname?.startsWith('/admin') ? '/admin' : access?.homePath || '/doctor/invitations';
 
   return (
     <header className="doctor-app-header">
       <div className="app-header-bar" style={{ maxWidth: '80rem', margin: '0 auto' }}>
-        <Link href={pathname || '/'} onClick={goToTop} className="doctor-title-box" aria-label={`${title} — go to top`}>
+        <a href={homePath} className="doctor-title-box" aria-label="TeleConsole workspace home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/teleconsole-logo.svg" alt="" width={36} height={36} />
           <span>
             <span className="doctor-title">{title}</span>
             {subtitle && <span className="doctor-subtitle">{subtitle}</span>}
           </span>
-        </Link>
-        <nav className="doctor-header-actions" aria-label="Doctor navigation">
+        </a>
+        <nav className="doctor-header-actions" aria-label="Workspace navigation">
           {/* A full document navigation, not a client transition: the client
               transition between the two doctor pages could stall on the
               destination's auth initialisation (seen in production). */}
           <a href={navLink.href} className="doctor-nav-link">{navLink.label}</a>
+          {access?.administratorLevel && pathname !== '/admin' && <a href="/admin" className="doctor-nav-link">Administration</a>}
           <span className="doctor-account" title={account.secondary || account.primary}>
             <span className="doctor-avatar" aria-hidden="true">{account.initial}</span>
             <span className="doctor-account-text">
@@ -86,6 +87,8 @@ export default function DoctorAppHeader({ title, subtitle, user, navLink }: Doct
         }
         :global(.doctor-title-box) {
           display: inline-flex;
+          min-width: 0;
+          max-width: 100%;
           align-items: center;
           gap: 0.75rem;
           padding: 0.5rem 0.875rem 0.5rem 0.5rem;
@@ -95,6 +98,8 @@ export default function DoctorAppHeader({ title, subtitle, user, navLink }: Doct
           text-decoration: none;
           transition: background-color 120ms, border-color 120ms, box-shadow 120ms;
         }
+        :global(.doctor-title-box > span) { min-width: 0; overflow-wrap: anywhere; }
+        :global(.doctor-title-box > img) { flex: none; }
         :global(.doctor-title-box:hover) {
           background: #f0fdfa;
           border-color: #99f6e4;
@@ -118,6 +123,7 @@ export default function DoctorAppHeader({ title, subtitle, user, navLink }: Doct
         }
         .doctor-header-actions {
           display: flex;
+          max-width: 100%;
           align-items: center;
           gap: 1rem;
           flex-wrap: wrap;
