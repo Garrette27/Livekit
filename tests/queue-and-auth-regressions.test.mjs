@@ -838,6 +838,8 @@ test('realtime invalidates without exposing snapshot rows, shares a listener, an
     ['doctorUserId', '==', 'synthetic-doctor'], ['status', 'in', ['waiting', 'admitted']],
   ]));
   queue.emit();
+  assert.equal(invalidations, 0, 'the initial snapshot is the already-fetched result set, not a change');
+  queue.emit();
   assert.equal(invalidations, 2);
   first();
   assert.equal(queue.counts().unsubscribed, 0);
@@ -872,7 +874,9 @@ test('periodic refresh survives stream failure and shared requests stay deduplic
   assert.equal(queue.timers.size, 0);
   const hook = readFileSync('hooks/useWaitingQueue.ts', 'utf8');
   assert.doesNotMatch(hook, /onPatients:|isStreaming|setIsStreaming/);
-  assert.match(hook, /onInvalidate:[\s\S]*?void refresh\(false\)/);
+  assert.match(hook, /onInvalidate:[\s\S]*?void refreshRef\.current\(false\)/);
+  assert.match(hook, /visibilityState !== 'visible'/, 'hidden tabs skip invalidation refreshes');
+  assert.match(hook, /LIVE_RECONCILE_INTERVAL_MS = 60_000/);
   assert.match(hook, /!roomName \|\| waitingPatient.roomName === roomName/);
 });
 
@@ -960,13 +964,13 @@ test('database availability classification never converts permission errors into
   }
 });
 
-/** Equality-query fake keeps filtering behavior in the actual domain service. */
+/** Equality/`in` query fake keeps filtering behavior in the actual domain service. */
 function syntheticDatabase(collections) {
   function query(rows) {
     return {
       where(field, operator, value) {
-        assert.equal(operator, '==');
-        return query(rows.filter(row => row[field] === value));
+        assert.ok(operator === '==' || operator === 'in', operator);
+        return query(rows.filter(row => (operator === 'in' ? value.includes(row[field]) : row[field] === value)));
       },
       limit(count) { return query(rows.slice(0, count)); },
       async get() { return { docs: rows.map(row => ({ id: row.id, data: () => row })) }; },

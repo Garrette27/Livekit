@@ -68,6 +68,9 @@ function countWaitingPatientsByInvitation(waitingPatients: WaitingPatient[]): Wa
   }, {});
 }
 
+/** Reconciliation cadence while the live Firestore listener is delivering changes. */
+const LIVE_RECONCILE_INTERVAL_MS = 60_000;
+
 export function useWaitingQueue({
   roomName,
   doctorUserId,
@@ -84,17 +87,16 @@ export function useWaitingQueue({
   const [scopeInitialized, setScopeInitialized] = useState(false);
   const dispatch = useAppDispatch();
 
-  const invitationIdsSet = useMemo(() => {
-    if (typeof invitationIds === 'undefined') {
-      return null;
-    }
-
-    return new Set(invitationIds);
-  }, [invitationIds]);
-
   const invitationScope = useMemo(
     () => (invitationIds ? [...invitationIds].sort().join('|') : 'all'),
     [invitationIds]
+  );
+  // Keyed by content, not array identity: every invitations snapshot hands us
+  // a new array, and an identity-keyed Set re-created `refresh`, which re-ran
+  // the initial fetch and rebuilt the Firestore listener (re-reading it).
+  const invitationIdsSet = useMemo(
+    () => (invitationScope === 'all' ? null : new Set(invitationScope ? invitationScope.split('|') : [])),
+    [invitationScope]
   );
   const statusScope = (
     Array.isArray(statuses) && statuses.length > 0
@@ -291,10 +293,18 @@ export function useWaitingQueue({
     void refresh(true);
   }, [refresh]);
 
-  // Firestore announces changes, while the API owns the projection. Never
-  // overwrite the filtered result with historical rows from a raw snapshot.
+  // Long-lived subscriptions call the latest refresh through a ref, so a
+  // re-render never tears down and re-reads the Firestore listener.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  const [liveUpdatesHealthy, setLiveUpdatesHealthy] = useState(Boolean(doctorUserId));
+
+  // Event-driven invalidation (Firestore announces changes; the API owns the
+  // projection — never overwrite it with raw snapshot rows). Hidden tabs skip
+  // invalidations: the poll group refreshes once the tab is visible again.
   useEffect(() => {
     if (!autoRefresh || !doctorUserId) {
+      setLiveUpdatesHealthy(false);
       return;
     }
 
@@ -302,36 +312,40 @@ export function useWaitingQueue({
     const unsubscribe = subscribeToDoctorQueueChanges({
       doctorUserId,
       onInvalidate: () => {
-        if (cancelled) {
+        if (cancelled || document.visibilityState !== 'visible') {
           return;
         }
-        void refresh(false);
+        void refreshRef.current(false);
       },
       onUnavailable: () => {
         if (cancelled) {
           return;
         }
+        setLiveUpdatesHealthy(false);
         console.warn('Waiting queue live updates unavailable; periodic refresh remains active.');
       },
     });
+    setLiveUpdatesHealthy(Boolean(unsubscribe));
 
     return () => {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [autoRefresh, doctorUserId, refresh]);
+  }, [autoRefresh, doctorUserId]);
 
   useEffect(() => {
     if (!autoRefresh) {
       return;
     }
 
-    // Expiry and age advance even without Firestore writes. Keep one timer
-    // per scope, also bounding staleness if an event overlaps an in-flight read.
-    return subscribeToWaitingQueuePoll(requestKey, pollIntervalMs, () => {
-      void refresh(false);
+    // Reconciliation poll: expiry and age advance without Firestore writes.
+    // While the live listener is healthy it already delivers every queue
+    // change, so a slow poll suffices; without it, poll at the caller's rate.
+    const intervalMs = liveUpdatesHealthy ? Math.max(pollIntervalMs, LIVE_RECONCILE_INTERVAL_MS) : pollIntervalMs;
+    return subscribeToWaitingQueuePoll(requestKey, intervalMs, () => {
+      void refreshRef.current(false);
     });
-  }, [autoRefresh, pollIntervalMs, refresh, requestKey]);
+  }, [autoRefresh, liveUpdatesHealthy, pollIntervalMs, requestKey]);
 
   return useMemo(
     () => ({

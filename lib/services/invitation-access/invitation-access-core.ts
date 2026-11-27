@@ -435,14 +435,27 @@ export class FirestoreInvitationAccessCore implements InvitationAccessService {
 
   async listWaitingEntries(input: ListWaitingEntriesInput): Promise<WaitingPatient[]> {
     const statuses = (input.statuses || ['waiting']).filter((status) => ALLOWED_WAITING_STATUSES.includes(status));
+    if (statuses.length === 0) return [];
     const singleStatus = statuses.length === 1 ? statuses[0] : null;
     const activeOnly = input.activeOnly === true;
 
     if (input.doctorUserId) {
+      // Bounded reads: the live queue must not scan the doctor's whole visit
+      // history (it grows forever and this runs on every queue refresh).
+      // - Room-scoped: limited by the room; pure equality filters are served
+      //   by single-field indexes, no composite index needed.
+      // - Active multi-status: `status in` on the (doctorUserId, status)
+      //   index. Legacy rows without `status` predate the 24h active window,
+      //   so the active filter would drop them anyway; history reads
+      //   (activeOnly false) keep the full scan and still see them.
       const baseQuery = this.db.collection('waitingPatients').where('doctorUserId', '==', input.doctorUserId);
-      const snapshot = singleStatus
-        ? await baseQuery.where('status', '==', singleStatus).get()
-        : await baseQuery.get();
+      const snapshot = input.roomName
+        ? await baseQuery.where('roomName', '==', input.roomName).get()
+        : singleStatus
+          ? await baseQuery.where('status', '==', singleStatus).get()
+          : activeOnly
+            ? await baseQuery.where('status', 'in', statuses).get()
+            : await baseQuery.get();
 
       const waitingPatients = snapshot.docs.map((doc) =>
         mapWaitingDocToModel({ id: doc.id, data: doc.data() as Record<string, unknown> })

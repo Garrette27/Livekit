@@ -115,6 +115,7 @@ function mergeHistoryRecords(existing: HistoryRecord, incoming: HistoryRecord): 
     lastEditedAt: incoming.lastEditedAt || existing.lastEditedAt || null,
     waitingRoomHistory: mergedWaitingRoomHistory,
     chatHistory: mergedChatHistory,
+    chatAvailable: existing.chatAvailable === true || incoming.chatAvailable === true,
   };
 }
 
@@ -516,6 +517,21 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
     };
   }
 
+  /**
+   * One encounter's chat transcript for its owning doctor, loaded on demand
+   * (1 session read + one bounded messages query) instead of for every row
+   * of the history list. Returns undefined for a session the doctor does not
+   * own, exactly as if it had no chat, so ownership is not disclosed.
+   */
+  async loadDoctorSessionChat(input: { doctorUserId: string; consultationSessionId: string }): Promise<HistoryChatRecord | undefined> {
+    const doctorUserId = input.doctorUserId.trim();
+    const sessionId = input.consultationSessionId.trim();
+    if (!doctorUserId || !sessionId) return undefined;
+    const session = await this.db.collection('consultationSessions').doc(sessionId).get();
+    if (!session.exists || session.data()?.doctorUserId !== doctorUserId) return undefined;
+    return loadSessionChatHistory(this.db, sessionId);
+  }
+
   /** Show each encounter's own lifecycle without merging separate openings of a reused room. */
   async buildDoctorHistory(input: {
     doctorUserId: string;
@@ -584,6 +600,9 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
         lastEditedAt: toIsoString(summaryMetadata.lastEditedAt),
         waitingRoomHistory,
         chatHistory,
+        // Lets the list offer "Chat transcript" without reading the messages;
+        // they are fetched only when the clinician opens it.
+        chatAvailable: Boolean(chatHistory),
       };
 
       const existing = historyById.get(record.id);
@@ -630,6 +649,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
         patientUserId: patientUserId || undefined,
         waitingRoomHistory,
         chatHistory,
+        chatAvailable: Boolean(sessionData.lastMessageAt) || Boolean(chatHistory),
       };
 
       const existing = historyById.get(record.id);

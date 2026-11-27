@@ -62,6 +62,8 @@ export interface HistoryRecord {
   lastEditedAt?: string | null;
   waitingRoomHistory?: WaitingRoomHistoryRecord;
   chatHistory?: HistoryChatRecord;
+  /** True when the encounter has chat that can be loaded on demand. */
+  chatAvailable?: boolean;
 }
 
 export interface SummaryProjectionService {

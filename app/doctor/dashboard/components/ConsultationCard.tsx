@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 import {
   formatDateTime,
   formatDuration,
@@ -45,6 +47,7 @@ export interface ConsultationCardRecord {
       waitingDurationMinutes: number | null;
     }>;
   };
+  chatAvailable?: boolean;
   chatHistory?: {
     totalMessages: number;
     firstMessageAt: string | null;
@@ -269,45 +272,79 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
         </details>
       )}
 
-      {record.chatHistory && record.chatHistory.totalMessages > 0 && (
-        <details style={{ marginTop: '0.25rem' }}>
-          <summary style={disclosureStyle}>
-            Chat transcript ({record.chatHistory.totalMessages} message
-            {record.chatHistory.totalMessages === 1 ? '' : 's'})
-          </summary>
-          <div
-            style={{
-              marginTop: '0.5rem',
-              maxHeight: '16rem',
-              overflowY: 'auto',
-              border: '1px solid #e5e7eb',
-              borderRadius: '0.375rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: '#f9fafb',
-            }}
-          >
-            {record.chatHistory.messages.map((message) => (
-              <div key={message.id} style={{ padding: '0.375rem 0', borderBottom: '1px solid #e5e7eb' }}>
-                <p style={{ margin: 0, fontSize: '0.6875rem', color: '#6b7280', fontWeight: 600 }}>
-                  {message.senderName} · {formatDateTime(parseIso(message.createdAt))}
-                </p>
-                <p
-                  style={{
-                    margin: '0.125rem 0 0',
-                    fontSize: '0.8125rem',
-                    color: '#374151',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  {message.text || <em style={{ color: '#6b7280' }}>(empty message)</em>}
-                </p>
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
+      <ChatTranscript consultationId={record.id} preloaded={record.chatHistory} available={record.chatAvailable === true} />
     </article>
+  );
+}
+
+type ChatHistory = NonNullable<ConsultationCardRecord['chatHistory']>;
+
+/**
+ * "Chat transcript" disclosure. Messages already in the record render
+ * directly; otherwise they are fetched once, the first time the clinician
+ * opens it, so listing history never reads every consultation's messages.
+ */
+function ChatTranscript({ consultationId, preloaded, available }: { consultationId: string; preloaded?: ChatHistory; available: boolean }) {
+  const [loaded, setLoaded] = useState<ChatHistory | null | undefined>(preloaded);
+  const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
+  if (!preloaded && !available) return null;
+  if (loaded === null) return null;
+  if (loaded && loaded.totalMessages === 0) return null;
+
+  const load = async () => {
+    if (loaded || state === 'loading') return;
+    setState('loading');
+    try {
+      const response = await authenticatedFetch(`/api/doctor/history?chatSessionId=${encodeURIComponent(consultationId)}`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.error || 'Could not load chat.');
+      setLoaded(data.chatHistory || null);
+      setState('idle');
+    } catch {
+      setState('error');
+    }
+  };
+
+  const count = loaded?.totalMessages;
+  return (
+    <details style={{ marginTop: '0.25rem' }} onToggle={(event) => { if (event.currentTarget.open) void load(); }}>
+      <summary style={disclosureStyle}>
+        Chat transcript{typeof count === 'number' ? ` (${count} message${count === 1 ? '' : 's'})` : ''}
+      </summary>
+      <div
+        role="status"
+        aria-live="polite"
+        style={{
+          marginTop: '0.5rem',
+          maxHeight: '16rem',
+          overflowY: 'auto',
+          border: '1px solid #e5e7eb',
+          borderRadius: '0.375rem',
+          padding: '0.5rem 0.75rem',
+          backgroundColor: '#f9fafb',
+        }}
+      >
+        {state === 'loading' ? <p style={{ margin: 0, fontSize: '0.8125rem', color: '#6b7280' }}>Loading chat…</p> : null}
+        {state === 'error' ? (
+          <p style={{ margin: 0, fontSize: '0.8125rem', color: '#b91c1c' }}>
+            Chat could not be loaded.{' '}
+            <button type="button" onClick={() => { setState('idle'); void load(); }} style={{ border: 'none', background: 'none', color: '#1d4ed8', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>
+              Retry
+            </button>
+          </p>
+        ) : null}
+        {loaded?.messages.map((message) => (
+          <div key={message.id} style={{ padding: '0.375rem 0', borderBottom: '1px solid #e5e7eb' }}>
+            <p style={{ margin: 0, fontSize: '0.6875rem', color: '#6b7280', fontWeight: 600 }}>
+              {message.senderName} · {formatDateTime(parseIso(message.createdAt))}
+            </p>
+            <p style={{ margin: '0.125rem 0 0', fontSize: '0.8125rem', color: '#374151', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {message.text || <em style={{ color: '#6b7280' }}>(empty message)</em>}
+            </p>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 

@@ -45,6 +45,7 @@ interface CallSummary {
       waitingDurationMinutes: number | null;
     }>;
   };
+  chatAvailable?: boolean;
   chatHistory?: {
     totalMessages: number;
     firstMessageAt: string | null;
@@ -118,6 +119,7 @@ interface DoctorHistoryResponseItem {
       waitingDurationMinutes: number | null;
     }>;
   };
+  chatAvailable?: boolean;
   chatHistory?: {
     totalMessages: number;
     firstMessageAt: string | null;
@@ -171,6 +173,7 @@ function mapHistoryRecordToSummary(record: DoctorHistoryResponseItem): CallSumma
     duration: Math.max(0, Math.round(Number(record.duration || 0))),
     waitingRoomHistory: record.waitingRoomHistory,
     chatHistory: record.chatHistory,
+    chatAvailable: record.chatAvailable,
     patientEmail: record.patientEmail || null,
     metadata: {
       totalParticipants: 1,
@@ -208,6 +211,7 @@ function toCardRecord(summary: CallSummary): ConsultationCardRecord {
     requiresClinicianReview: summary.metadata?.requiresClinicianReview,
     waitingRoomHistory: summary.waitingRoomHistory,
     chatHistory: summary.chatHistory,
+    chatAvailable: summary.chatAvailable,
   };
 }
 
@@ -252,12 +256,12 @@ export default function DoctorDashboard() {
     }
 
     setLoading(true);
-    // Two phases: the summaries render first; chat transcripts (one extra
-    // Firestore query per consultation) are merged in when they arrive, so
-    // the slowest part no longer blocks the whole list.
-    const fetchHistory = async (includeChatHistory: boolean): Promise<DoctorHistoryResponseItem[]> => {
+    // One bounded history read per visit. Chat transcripts are fetched per
+    // consultation only when the clinician opens one (ConsultationCard), not
+    // for every row: that N+1 load was a large share of Firestore reads.
+    try {
       const idToken = await user.getIdToken();
-      const response = await fetch(`/api/doctor/history${includeChatHistory ? '?includeChatHistory=true' : ''}`, {
+      const response = await fetch('/api/doctor/history', {
         headers: { Authorization: `Bearer ${idToken}` },
         cache: 'no-store',
       });
@@ -265,25 +269,13 @@ export default function DoctorDashboard() {
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to fetch doctor consultation history');
       }
-      return Array.isArray(data.summaries) ? (data.summaries as DoctorHistoryResponseItem[]) : [];
-    };
-    try {
-      setSummaries((await fetchHistory(false)).map(mapHistoryRecordToSummary));
+      const records = Array.isArray(data.summaries) ? (data.summaries as DoctorHistoryResponseItem[]) : [];
+      setSummaries(records.map(mapHistoryRecordToSummary));
     } catch (error) {
       console.error('Error fetching summaries:', error);
       setSummaries([]);
+    } finally {
       setLoading(false);
-      return;
-    }
-    setLoading(false);
-    try {
-      const withChat = new Map((await fetchHistory(true)).map((record) => [record.id, record.chatHistory]));
-      setSummaries((current) => current.map((summary) => (
-        withChat.get(summary.id) ? { ...summary, chatHistory: withChat.get(summary.id) } : summary
-      )));
-    } catch (error) {
-      // Chat transcripts are supplementary; the summaries are already shown.
-      console.warn('Chat transcripts could not be loaded:', error);
     }
   }, [isAuthorized, user]);
 
