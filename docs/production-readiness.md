@@ -121,8 +121,14 @@ below follows a standard pattern and is pinned by `tests/firestore-budget.test.m
 | LiveKit webhook spent 1 read + 1 write on a Firestore rate limiter before verifying the signature | Per-instance in-memory throttle; the signature check is the control | Webhook events cost no quota for throttling |
 | Quota exhaustion turned into retry storms | 503 + Retry-After; shared access check; hidden tabs pause | Clients back off instead of hammering |
 
-The Cloud Functions change ships only through the manual
-`firebase-functions-deploy` workflow. Remaining known costs are deliberate:
+Deployment state (verified 27 Nov 2026): the project is on the Spark plan.
+Function logs show "Billing disabled. Shutting down instance" on 20 Nov and
+no executions since, so the Firestore audit triggers and the scheduled
+retention job are **not running** and add no Firestore writes today. That
+also means no `audit-logs` rows are recorded on Spark; access attempts are
+still written by the application's bounded subcollection events. A Functions
+deploy (`firebase deploy --only functions`) needs Blaze; the merged
+single-write audit code takes effect the next time Functions are deployed. Remaining known costs are deliberate:
 transaction-safe invitation reservation, per-chunk transcript revision guards,
 and Firestore-backed rate limits on chat, transcription and invitations, which
 protect OpenAI spend and abuse limits. The Spark tier still suits a demo-scale
