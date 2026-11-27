@@ -78,11 +78,27 @@ function emitRequestLog(fields: {
   console.log(JSON.stringify(line));
 }
 
+/** Seconds a client should wait after the database reports its quota is used up. */
+export const QUOTA_RETRY_AFTER_SECONDS = 60;
+
+/**
+ * True for Firestore/gRPC RESOURCE_EXHAUSTED (code 8), raised when the
+ * project's daily quota or a rate limit is spent. It is a capacity condition,
+ * not a bug: callers should back off, not retry immediately.
+ */
+export function isQuotaExhaustedError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const { code, message } = error as { code?: unknown; message?: unknown };
+  return code === 8 || code === 'resource-exhausted' || (typeof message === 'string' && message.includes('RESOURCE_EXHAUSTED'));
+}
+
 /**
  * Wraps a route handler with per-request structured logging. The handler's
  * behavior is unchanged: its request object, arguments, and response pass
  * through untouched. Uncaught errors become a `{ success: false }` 500
  * response after being logged, so no route can leak a raw stack to clients.
+ * A database quota error becomes 503 + Retry-After (logged once, without a
+ * stack) so clients back off instead of hammering an exhausted quota.
  */
 export function withRequestLogging<Req extends Request, Args extends unknown[]>(
   handler: (req: Req, ...args: Args) => Promise<Response> | Response
@@ -104,6 +120,20 @@ export function withRequestLogging<Req extends Request, Args extends unknown[]>(
         });
         return response;
       } catch (error) {
+        if (isQuotaExhaustedError(error)) {
+          emitRequestLog({
+            method: req.method,
+            url,
+            status: 503,
+            durationMs: Date.now() - startedAt,
+            userId: context.userId,
+            error: 'database_quota_exhausted',
+          });
+          return NextResponse.json(
+            { success: false, code: 'service_busy', error: 'The service is busy right now. Please try again in a minute.' },
+            { status: 503, headers: { 'Retry-After': String(QUOTA_RETRY_AFTER_SECONDS) } }
+          );
+        }
         emitRequestLog({
           method: req.method,
           url,

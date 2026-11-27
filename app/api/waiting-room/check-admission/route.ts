@@ -56,11 +56,9 @@ async function handlePOST(req: NextRequest) {
       );
     }
 
-    console.error('Error checking admission status:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
+    // Unmapped failures (including database quota) go to the shared wrapper,
+    // which logs once and returns 500, or 503 + Retry-After for quota.
+    throw error;
   }
 }
 

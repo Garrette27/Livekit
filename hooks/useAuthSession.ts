@@ -5,7 +5,7 @@ import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getUserRole } from '@/lib/auth-utils';
 import type { AppRole } from '@/lib/auth/access-policy';
-import { fetchWorkspaceAccess } from '@/lib/auth/workspace-client';
+import { fetchWorkspaceAccess, WorkspaceAccessError } from '@/lib/auth/workspace-client';
 
 type UserRole = AppRole | null;
 
@@ -87,7 +87,7 @@ export function useAuthSession({
         if (requiredRole === 'doctor') {
           doctorAccess = false;
           // A failed access check is "unknown", not "denied": retry with a
-          // short backoff while the page keeps its loading state. Treating it
+          // backoff while the page keeps its loading state. Treating it
           // as denied sent real doctors round a / <-> /doctor/invitations
           // redirect loop whenever the access endpoint hiccupped.
           let access: Awaited<ReturnType<typeof fetchWorkspaceAccess>> | null = null;
@@ -97,7 +97,10 @@ export function useAuthSession({
             } catch (accessError) {
               if (requestId !== requestIdRef.current) return;
               console.error('Workspace access check failed; retrying:', accessError);
-              await new Promise((resolve) => setTimeout(resolve, Math.min(1000 * 2 ** attempt, 8000)));
+              // Honour the server's Retry-After (database quota) and otherwise
+              // back off 1s, 2s, 4s ... up to 30s so a long outage costs few calls.
+              const serverDelay = accessError instanceof WorkspaceAccessError ? accessError.retryAfterMs : null;
+              await new Promise((resolve) => setTimeout(resolve, serverDelay ?? Math.min(1000 * 2 ** attempt, 30_000)));
               if (requestId !== requestIdRef.current) return;
             }
           }

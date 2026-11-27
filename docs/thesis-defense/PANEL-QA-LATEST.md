@@ -17,9 +17,11 @@ Every answer follows **rule → reason → evidence → boundary**, in 20–40 s
 9. **Revoked doctor?** Cut on the next request: refresh tokens revoked and every protected API checks revocation. An already-open call ends when they leave or are removed. *(Q20)*
 10. **Data after 30 days / OpenAI?** Daily opt-in deletion, default 30 days, 200 per run; OpenAI API data is not used for training and is kept up to 30 days for abuse monitoring. Chat is never sent to the AI. *(Q18, Q19, Q21)*
 
+**Encrypted?** Yes. Media and chat are end-to-end encrypted (AES-GCM) in the browser, so LiveKit forwards only ciphertext. The key is released only to consultation credentials, never to waiting visitors. Trial result: an eavesdropper with the wrong key decoded 0 frames. Our own server could derive the key but never receives media. *(Q17)*
+
 ## Demo order (each step answers a question)
 
-Header and roles → `/admin` grant (Q28, Q40) → create invitation, limit 2 (Q10) → guest types patient email and waits (Q14, Q29) → third guest refused, raise to 3 (Q11, Q12) → visit breakdown → verified patient enters directly (Q14) → call with Call quality panel open (Q8, Q9) and consent shown (Q5, Q7) → leave and rejoin to show a second encounter (Q6) → summary draft with Unknown risk (Q4).
+Header and roles → `/admin` grant (Q28, Q40) → create invitation, limit 2 (Q10) → guest types patient email and waits (Q14, Q29) → third guest refused, raise to 3 (Q11, Q12) → visit breakdown → verified patient enters directly (Q14) → call with Call quality panel open, reading *End-to-end encrypted* (Q8, Q9, Q17) and consent shown (Q5, Q7) → leave and rejoin to show a second encounter (Q6) → summary draft with Unknown risk (Q4).
 
 ## Manuscript
 

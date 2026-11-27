@@ -575,13 +575,15 @@ test('waiting admission polling never overlaps or commits after the visit change
     validationResult: { invitationId: 'invite-a', waitingPatientId: 'visit-a', waitingRoomEnabled: true, waitingRoomToken: true },
     waitingPatientIdRef: { current: 'visit-a' },
     fetch: () => { requests++; return new Promise(resolve => { resolveRequest = resolve; }); },
-    setInterval: callback => { tick = callback; return 1; }, clearInterval() {},
+    // A visible-again event while a check is in flight must not start a second one.
+    document: { visibilityState: 'visible', addEventListener: (_event, callback) => { tick = callback; }, removeEventListener() {} },
+    window: { setTimeout: () => 1, clearTimeout() {} },
     setError() {}, setValidationResult() { writes++; },
   });
   tick(); tick();
   assert.equal(requests, 1);
   stop();
-  resolveRequest({ json: async () => ({ success: true, admitted: true, liveKitToken: 'synthetic' }) });
+  resolveRequest({ ok: true, headers: { get: () => null }, json: async () => ({ success: true, admitted: true, liveKitToken: 'synthetic' }) });
   await flush();
   assert.equal(writes, 0);
 });
@@ -1315,7 +1317,8 @@ test('room media uses adaptive stream, dynacast, simulcast and browser speech pr
   for (const option of ['adaptiveStream: true', 'dynacast: true', 'simulcast: true', 'echoCancellation: true', 'noiseSuppression: true']) {
     assert.ok(source.includes(option), option);
   }
-  assert.match(source, /options=\{ROOM_MEDIA_OPTIONS\}/);
+  // The options reach LiveKit through the (end-to-end encrypted) Room constructor.
+  assert.match(source, /prepareConsultationRoom\(token, ROOM_MEDIA_OPTIONS/);
 });
 
 test('two guests on the same network and browser get separate entries via the per-tab id', () => {

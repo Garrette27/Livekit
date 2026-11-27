@@ -129,7 +129,13 @@ Not while waiting: waiting credentials carry no media permissions, and the waiti
 
 ### 17. Is the video end-to-end encrypted?
 
-Media is encrypted in transit with DTLS-SRTP between each browser and LiveKit, and all signalling and API traffic uses TLS. That is the same transport protection standard video platforms use. We did not enable LiveKit's optional end-to-end encryption, which would also hide media from LiveKit's servers; Chapter II cites it as literature. It is a configuration-level upgrade we list for a production clinic.
+**Yes.** Every audio frame, video frame and chat message is encrypted in the browser with AES-GCM before it leaves the device, using LiveKit's end-to-end encryption. LiveKit's servers forward only ciphertext they cannot read. This sits on top of DTLS-SRTP and TLS in transit.
+
+- **Who gets the key:** our server derives one key per room from a secret that LiveKit never sees. It releases the key only to someone holding a valid consultation credential for that room. Waiting-room visitors never get it, so they cannot see or hear the consultation even in principle.
+- **Evidence:** in our trial, a real LiveKit server ran with four browsers. The doctor and patient decoded each other's video (506 frames) with zero decrypt errors. An eavesdropper with a wrong key decoded **0** frames, and so did one without encryption. Rerun with `scripts/thesis/e2ee-media-trial.mjs`; the result is in `evidence/e2ee-trial-2026-11-27/`. In a call, the **Call quality** panel reads *End-to-end encrypted*.
+- **No silent fallback:** a browser that cannot encrypt is told to use current Chrome, Edge, Safari or Firefox. It is never joined in plaintext.
+- **Boundary:** this hides media from the video provider, not from our own application server, which could derive the key but never receives media. The manuscript describes transport encryption; end-to-end encryption was added afterwards as hardening. AI transcription still works because each browser transcribes its own microphone before encryption, and only with consent.
+- **Check before answering:** the Call quality panel must read *End-to-end encrypted*. If it reads *In transit (DTLS-SRTP / TLS)*, then `LIVEKIT_E2EE_SECRET` is not set in production. In that case the honest answer is transport encryption only, with E2EE built and tested but switched off.
 
 ### 18. Does OpenAI keep the transcripts?
 

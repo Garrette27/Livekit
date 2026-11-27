@@ -142,8 +142,15 @@ notes that webhook delivery is retried but not guaranteed.
 - Key rotation and incident-response procedures need an operational runbook.
 - Retention is partly implemented but must be approved and verified across
   Firestore, logs, backups, transcripts, and provider systems.
-- LiveKit transport encryption is not the same as verified end-to-end
-  encryption. Do not claim E2EE unless LiveKit E2EE is configured and tested.
+- Media end-to-end encryption (LiveKit E2EE, AES-GCM frame encryption) is on
+  when `LIVEKIT_E2EE_SECRET` (32+ chars) is set; keys are HMAC-derived per room
+  from that secret (never `LIVEKIT_API_SECRET`, which the provider holds) and
+  released by `/api/livekit/media-key` only for consultation credentials, never
+  waiting credentials. Browsers without E2EE support are refused, never joined
+  in plaintext. Evidence: `scripts/thesis/e2ee-media-trial.mjs`. Boundary: our
+  server can derive keys; E2EE hides media from the video provider only. Rooms
+  reused by one invitation share a key. Unset the secret to fall back to
+  transport encryption for every participant.
 - Availability still depends on Firebase, LiveKit, OpenAI, and Vercel. The call
   degrades without AI; it does not become clinically validated offline.
 

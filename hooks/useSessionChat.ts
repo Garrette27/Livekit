@@ -155,8 +155,9 @@ export function useSessionChat({
       return;
     }
 
+    // Hidden tabs skip polls; LiveKit chat still arrives live in the room.
     const interval = window.setInterval(() => {
-      void refresh();
+      if (document.visibilityState === 'visible') void refresh();
     }, pollIntervalMs);
 
     return () => {

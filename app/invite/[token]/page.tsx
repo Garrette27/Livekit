@@ -56,6 +56,20 @@ function WaitingRoomView({
     const controller = new AbortController();
     let cancelled = false;
     let inFlight = false;
+    // Poll every 3s while the tab is visible; pause while hidden (a forgotten
+    // background tab used to spend database reads all day) and back off up to
+    // 30s, or the server's Retry-After, while checks keep failing.
+    const BASE_DELAY_MS = 3000;
+    let failures = 0;
+    let serverDelayMs: number | null = null;
+    let timer: number | undefined;
+    const schedule = () => {
+      window.clearTimeout(timer);
+      if (cancelled || document.visibilityState !== 'visible') return;
+      const delay = serverDelayMs ?? Math.min(BASE_DELAY_MS * 2 ** failures, 30_000);
+      serverDelayMs = null;
+      timer = window.setTimeout(() => void checkAdmission(), delay);
+    };
     const checkAdmission = async () => {
       if (cancelled || inFlight) return;
       inFlight = true;
@@ -73,8 +87,15 @@ function WaitingRoomView({
           signal: controller.signal,
         });
 
-        const result = await response.json();
+        const result = await response.json().catch(() => ({}));
         if (cancelled) return;
+        if (response.ok) {
+          failures = 0;
+        } else {
+          failures += 1;
+          const retryAfterSeconds = Number(response.headers.get('Retry-After'));
+          if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) serverDelayMs = retryAfterSeconds * 1000;
+        }
 
         if (result.success && result.admitted && result.liveKitToken) {
           waitingPatientIdRef.current = result.waitingPatientId || waitingPatientIdRef.current;
@@ -114,28 +135,34 @@ function WaitingRoomView({
         } else if (!result.success && result.error) {
           console.error('Error checking admission:', result.error);
           // Don't set error for waiting status - that's expected
-          if (result.error !== 'Waiting patient not found' && !result.error.includes('waiting')) {
+          if (result.code !== 'service_busy' && result.error !== 'Waiting patient not found' && !result.error.includes('waiting')) {
             setError(result.error);
           }
         }
       } catch (err: any) {
         if (cancelled) return;
+        failures += 1;
         console.error('Error checking admission:', err);
         // Don't set error for network issues during polling - just log it
         // setError('Network error while checking admission status.');
       } finally {
         inFlight = false;
+        schedule();
       }
     };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void checkAdmission();
+      else window.clearTimeout(timer);
+    };
 
-    // Check immediately, then poll every 3 seconds
-    checkAdmission();
-    const interval = setInterval(checkAdmission, 3000);
+    void checkAdmission();
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       cancelled = true;
       controller.abort();
-      clearInterval(interval);
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [
     setError,
