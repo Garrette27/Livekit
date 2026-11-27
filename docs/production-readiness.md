@@ -104,3 +104,27 @@ Vercel deployment does not deploy Firebase indexes, rules or retention functions
   application release.
 - Keep retention enforcement disabled until the thesis team approves the
   period and backup/deletion implications.
+
+## Firestore free-tier budget (27 Nov 2026)
+
+Production hit Spark's daily quota (50k reads / 20k writes). A read-only code
+audit (no production data was read) ranked the recurring costs; each fix
+below follows a standard pattern and is pinned by `tests/firestore-budget.test.mjs`.
+
+| Cost driver | Pattern applied | Effect |
+|---|---|---|
+| Doctor queue refresh scanned every `waitingPatients` row the doctor ever had (every 15 s) | Bounded queries: room equality, or `status in` on the existing `(doctorUserId, status)` index for active reads | Reads scale with the current queue, not with history |
+| 15 s queue poll while a live listener already reports every change | Event-driven invalidation + 60 s reconciliation poll (15 s only if the listener fails); skip the initial snapshot; no refresh in hidden tabs; stable listener (no rebuild on re-render) | About 4× fewer polls, and no duplicate first load |
+| Audit trigger wrote 2 rows per write, including no-op and heartbeat merges | One `audit-logs` row per real change; bookkeeping-only updates (`updatedAt`, `lastMessageAt`, `transcription.*`, `audit.lastAccessed`) write nothing | At least half of the trigger writes removed; chat and transcript chunks add no audit writes |
+| History loaded twice per visit, plus one messages query per consultation | Single history read; chat fetched per consultation when the clinician opens it (`?chatSessionId=`, ownership-checked) | N+1 removed from every dashboard visit |
+| Guest admission check every 3 s (2 reads) | 4 s for the first 3 minutes, then 10 s; paused while hidden; back-off on 503 | Long waits cost about 3× less |
+| LiveKit webhook spent 1 read + 1 write on a Firestore rate limiter before verifying the signature | Per-instance in-memory throttle; the signature check is the control | Webhook events cost no quota for throttling |
+| Quota exhaustion turned into retry storms | 503 + Retry-After; shared access check; hidden tabs pause | Clients back off instead of hammering |
+
+The Cloud Functions change ships only through the manual
+`firebase-functions-deploy` workflow. Remaining known costs are deliberate:
+transaction-safe invitation reservation, per-chunk transcript revision guards,
+and Firestore-backed rate limits on chat, transcription and invitations, which
+protect OpenAI spend and abuse limits. The Spark tier still suits a demo-scale
+clinic. A clinic running all day should use the Blaze plan with a budget
+alert, and that is an owner decision.

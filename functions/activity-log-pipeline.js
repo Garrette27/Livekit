@@ -4,10 +4,27 @@ const admin = require('firebase-admin');
 const { logInfo, logError } = require('./structured-logger');
 
 const AUDIT_LOG_COLLECTION = 'audit-logs';
-const ADMIN_ACTIVITY_FEED_COLLECTION = 'admin-activity-feed';
 const MAX_SNAPSHOT_DEPTH = 4;
 const MAX_CHANGED_FIELDS = 40;
-const MAX_FEED_CHANGED_FIELDS = 12;
+/**
+ * Bookkeeping fields that change on routine reconnects, polls and presence
+ * refreshes. An update that touches only these (or nothing) is not an
+ * auditable state change, so it produces no audit row. Without this filter
+ * every heartbeat cost an extra billed write.
+ */
+const NOISE_FIELDS = new Set([
+  'updatedAt',
+  'lastSeenAt',
+  'lastSeen',
+  'lastActivityAt',
+  'lastHeartbeatAt',
+  'lastCheckedAt',
+  'lastPolledAt',
+  'heartbeatAt',
+  'lastMessageAt',
+  'lastSegmentAt',
+  'lastAccessed',
+]);
 const OMITTED_VALUE_MARKER = '[omitted]';
 
 const SENSITIVE_KEYS = new Set([
@@ -275,8 +292,23 @@ function buildSummary({
 }
 
 /**
- * Persist one immutable, metadata-only audit row and one admin feed row.
- * Clinical content and document snapshots never enter the audit collections.
+ * True when an update carries no auditable change: no field changed, or only
+ * bookkeeping timestamps did. Creates and deletes are always audited.
+ */
+function isNoiseOnlyUpdate(operation, changedFields) {
+  if (operation !== 'update') return false;
+  // Match the leaf name so nested bookkeeping (metadata.updatedAt,
+  // transcription.updatedAt, audit.lastAccessed) is treated the same way.
+  // `transcription.*` is per-chunk progress (revision guard, segment count);
+  // the segments themselves carry provenance, so progress is not audited.
+  return changedFields.every((field) => field.startsWith('transcription.') || NOISE_FIELDS.has(field.split('.').pop()));
+}
+
+/**
+ * Persist one immutable, metadata-only audit row. Clinical content and
+ * document snapshots never enter the audit collection. (A second
+ * "admin-activity-feed" copy was dropped: nothing read it and it doubled the
+ * write cost of every audited change; an admin view reads audit-logs.)
  */
 async function writeActivityDocuments({
   eventId,
@@ -298,7 +330,6 @@ async function writeActivityDocuments({
     const db = admin.firestore();
 
     const auditRef = db.collection(AUDIT_LOG_COLLECTION).doc(eventId);
-    const adminFeedRef = db.collection(ADMIN_ACTIVITY_FEED_COLLECTION).doc(eventId);
 
     const auditPayload = {
       schemaVersion: 1,
@@ -321,36 +352,10 @@ async function writeActivityDocuments({
       source: 'cloud-function:onWrite',
     };
 
-    const adminFeedPayload = {
-      schemaVersion: 1,
-      eventId,
-      operation,
-      sourceCollection,
-      sourcePath,
-      sourceDocumentId: documentId,
-      roomName: roomName || null,
-      consultationSessionId: consultationSessionId || null,
-      doctorUserId: doctorUserId || null,
-      patientUserId: patientUserId || null,
-      actorUserId: actorUserId || null,
-      eventType: eventType || null,
-      summary,
-      changedFields: changedFields.slice(0, MAX_FEED_CHANGED_FIELDS),
-      occurredAt,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      tags: [
-        sourceCollection,
-        operation,
-        roomName || null,
-        consultationSessionId || null,
-        eventType || null,
-      ].filter(Boolean),
-    };
-
-    await Promise.all([auditRef.set(auditPayload), adminFeedRef.set(adminFeedPayload)]);
+    await auditRef.set(auditPayload);
 
     logInfo({
-      message: 'Audit and admin activity documents written.',
+      message: 'Audit document written.',
       correlation: {
         eventDomain: 'audit.activity',
         eventType: eventType || `firestore_${operation}`,
@@ -367,7 +372,7 @@ async function writeActivityDocuments({
     });
   } catch (error) {
     logError({
-      message: 'Failed to persist audit/admin activity documents.',
+      message: 'Failed to persist audit document.',
       correlation: {
         eventDomain: 'audit.activity',
         eventType: eventType || `firestore_${operation}_failed`,
@@ -403,6 +408,8 @@ function createTopLevelCollectionTrigger(collectionName) {
         operation === 'update'
           ? collectChangedFields(beforeSnapshot, afterSnapshot).slice(0, MAX_CHANGED_FIELDS)
           : [];
+
+      if (isNoiseOnlyUpdate(operation, changedFields)) return;
 
       const actor = resolveActor(beforeData, afterData);
       const entityContext = resolveEntityContext(collectionName, context.params || {}, beforeData, afterData);
@@ -476,6 +483,8 @@ function createConsultationEventTrigger() {
             ? collectChangedFields(beforeSnapshot, afterSnapshot).slice(0, MAX_CHANGED_FIELDS)
             : [];
 
+        if (isNoiseOnlyUpdate(operation, changedFields)) return;
+
         const actor = resolveActor(beforeData, afterData);
         const entityContext = resolveEntityContext(
           'consultationSessionEvents',
@@ -539,3 +548,4 @@ for (const config of COLLECTION_TRIGGER_CONFIGS) {
 exportedTriggers.auditConsultationSessionEvents = createConsultationEventTrigger();
 
 module.exports = exportedTriggers;
+module.exports.isNoiseOnlyUpdate = isNoiseOnlyUpdate;

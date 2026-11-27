@@ -2,7 +2,7 @@ import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { WebhookReceiver } from 'livekit-server-sdk';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
-import { enforceRateLimit, RateLimitConfigs } from '../../../lib/rate-limit';
+import { checkRateLimit, RateLimitConfigs } from '../../../lib/rate-limit';
 import { isRoomEndEvent } from '../../../lib/webhooks/room-end-processor';
 import { verifyWebhookSignature } from '../../../lib/webhooks/signature-utils';
 import { processWebhookFinalizationFallback } from '../../../lib/webhooks/webhook-finalization-fallback';
@@ -50,9 +50,16 @@ async function verifyWebhookRequest(body: string, req: NextRequest): Promise<{ o
 
 async function handlePOST(req: NextRequest) {
   try {
-    const rateLimitResponse = await enforceRateLimit(req, RateLimitConfigs.WEBHOOK);
-    if (rateLimitResponse) {
-      return rateLimitResponse;
+    // Per-instance throttle with no database cost. The distributed
+    // (Firestore-backed) limiter spent a read and a write on every LiveKit
+    // event and could be driven by unsigned traffic; the signature check
+    // below is the real control and costs nothing.
+    const throttle = checkRateLimit(req, RateLimitConfigs.WEBHOOK);
+    if (!throttle.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(throttle.retryAfter ?? 60) } }
+      );
     }
 
     const body = await req.text();

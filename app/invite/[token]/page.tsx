@@ -56,17 +56,19 @@ function WaitingRoomView({
     const controller = new AbortController();
     let cancelled = false;
     let inFlight = false;
-    // Poll every 3s while the tab is visible; pause while hidden (a forgotten
-    // background tab used to spend database reads all day) and back off up to
-    // 30s, or the server's Retry-After, while checks keep failing.
-    const BASE_DELAY_MS = 3000;
+    // Poll every 4s for the first 3 minutes (admission feels immediate), then
+    // every 10s for a long wait; pause while hidden (a forgotten background
+    // tab used to spend database reads all day) and back off up to 30s, or the
+    // server's Retry-After, while checks keep failing. Each check costs 2 reads.
+    const waitStartedAt = Date.now();
+    const baseDelay = () => (Date.now() - waitStartedAt < 3 * 60_000 ? 4000 : 10_000);
     let failures = 0;
     let serverDelayMs: number | null = null;
     let timer: number | undefined;
     const schedule = () => {
       window.clearTimeout(timer);
       if (cancelled || document.visibilityState !== 'visible') return;
-      const delay = serverDelayMs ?? Math.min(BASE_DELAY_MS * 2 ** failures, 30_000);
+      const delay = serverDelayMs ?? Math.min(baseDelay() * 2 ** failures, 30_000);
       serverDelayMs = null;
       timer = window.setTimeout(() => void checkAdmission(), delay);
     };

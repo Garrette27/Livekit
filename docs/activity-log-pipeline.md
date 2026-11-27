@@ -7,7 +7,7 @@ This repository now has two complementary observability layers:
 1. Firestore `onWrite` audit pipeline (Cloud Functions) for operational debugging and compliance review.
 2. Explicit patient presence timeline (`joined`, `left`, `rejoined`) attached to each generated consultation summary.
 
-## Cloud Functions: Audit + Admin Feed
+## Cloud Functions: Audit log
 
 File: `functions/activity-log-pipeline.js`
 
@@ -23,10 +23,16 @@ File: `functions/activity-log-pipeline.js`
 
 ### Output collections
 
-- `audit-logs/{eventId}`
-- `admin-activity-feed/{eventId}`
+- `audit-logs/{eventId}`: one metadata-only row per auditable change, keyed by
+  a deterministic id derived from the Cloud Functions event id (retries are
+  idempotent).
 
-Both docs are written for each Firestore write event, keyed by a deterministic event id derived from the Cloud Functions event id.
+Write budget (27 Nov 2026): an update whose changed fields are empty or only
+bookkeeping timestamps (`updatedAt`, `lastSeenAt`, `lastActivityAt`, ...) is
+not an auditable state change and writes nothing. Creates, deletes and real
+field changes are always audited. The former `admin-activity-feed` copy is no
+longer written: nothing read it and it doubled every audited write. Existing
+feed rows stay readable by admins; an admin view should read `audit-logs`.
 
 ### Admin feed schema
 

@@ -69,9 +69,17 @@ export function subscribeToDoctorQueueChanges(input: {
         subscribers,
         unsubscribe: () => undefined,
       };
+      // The first snapshot is the initial result set, which every subscriber
+      // has already fetched through the API; invalidating on it only doubled
+      // the first load. Later snapshots are real changes.
+      let receivedInitialSnapshot = false;
       createdGroup.unsubscribe = onSnapshot(
         waitingQuery,
         () => {
+          if (!receivedInitialSnapshot) {
+            receivedInitialSnapshot = true;
+            return;
+          }
           createdGroup.subscribers.forEach((currentSubscriber) => {
             currentSubscriber.onInvalidate();
           });

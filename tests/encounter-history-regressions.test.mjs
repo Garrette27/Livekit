@@ -143,6 +143,8 @@ test('legacy completed sessions keep end-marker compatibility without inventing 
 
 const ConsultationCard = loadModule('app/doctor/dashboard/components/ConsultationCard.tsx', {
   'react/jsx-runtime': jsxRuntime,
+  react,
+  '@/lib/auth/authenticated-fetch': { authenticatedFetch: async () => { throw new Error('history cards must not fetch while rendering'); } },
   '@/lib/consultations/history-presentation': presentation,
   '@/lib/consultations/retention-policy': retention,
 }).default;
@@ -357,4 +359,17 @@ test('retention uses the configured summary creation-age window instead of assum
   assert.equal(result.deletedCount, 0);
   assert.equal(fixture.stats().cutoff.toISOString(), '2026-10-13T00:00:00.000Z');
   assert.equal(fixture.stats().committed, 0);
+});
+
+test('chat transcripts load on demand: the list never fetches messages for every encounter', () => {
+  const lazy = renderCard({ chatAvailable: true });
+  assert.match(lazy, /Chat transcript/);
+  assert.doesNotMatch(lazy, /message\)/);
+  assert.equal(renderCard({}).includes('Chat transcript'), false, 'no chat, no disclosure');
+  const page = readFileSync('app/doctor/dashboard/page.tsx', 'utf8');
+  assert.doesNotMatch(page, /includeChatHistory=true/);
+  const route = readFileSync('app/api/doctor/history/route.ts', 'utf8');
+  assert.match(route, /chatSessionId/);
+  const service = readFileSync('lib/services/history-summary/summary-projection-service.ts', 'utf8');
+  assert.match(service, /doctorUserId !== doctorUserId\) return undefined/);
 });

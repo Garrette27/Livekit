@@ -26,6 +26,11 @@ async function handleGET(req: NextRequest) {
     }
 
     const historyProjection = new FirestoreSummaryProjectionService(db);
+    const chatSessionId = searchParams.get('chatSessionId')?.trim();
+    if (chatSessionId) {
+      const chatHistory = await historyProjection.loadDoctorSessionChat({ doctorUserId, consultationSessionId: chatSessionId });
+      return NextResponse.json({ success: true, chatHistory: chatHistory || null }, { headers: { 'Cache-Control': 'private, no-store' } });
+    }
     const includeChatHistory = searchParams.get('includeChatHistory') === 'true';
     const summaries = await historyProjection.buildDoctorHistory({
       doctorUserId,
