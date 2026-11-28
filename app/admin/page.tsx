@@ -6,6 +6,7 @@ import { auth } from '@/lib/firebase';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 import DoctorAppHeader from '@/components/doctor/DoctorAppHeader';
 import OversightPanel from '@/components/admin/OversightPanel';
+import InvitationActivityPanel from '@/components/admin/InvitationActivityPanel';
 import RefreshIconButton from '@/components/ui/RefreshIconButton';
 import ChangePasswordCard from '@/components/admin/ChangePasswordCard';
 import { resendSecondsLeft } from '@/lib/auth/resend-cooldown';
@@ -294,6 +295,7 @@ export default function AdminPage() {
             <ChangePasswordCard user={user} />
 
             <OversightPanel staffLabels={Object.fromEntries(accounts.map((account) => [account.uid, account.name || account.email || account.uid.slice(0, 8)]))} />
+            <InvitationActivityPanel />
           </>
         )}
       </main>

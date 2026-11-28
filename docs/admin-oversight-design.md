@@ -35,6 +35,7 @@ authorization guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authoriza
 | Role changes | Server authority, no self-change, clinic guard, patient-account protection, claims/profile updates and successful `adminAuditEvents` | Idempotent recovery across Auth/profile/audit partial failures |
 | Audit review | Successful role mutations store `actorUid`, `targetUid`, `clinicId`, `action`, `role`, `at`; `/admin` Oversight panel lists the newest 50, clinic-scoped in the query for clinic administrators (`/api/admin/oversight`) | Explicit outcomes, sign-in/denial/lifecycle events, filters and cursor pages |
 | Operations/business | Platform-owner Oversight cards from Firestore `count()` aggregations: staff, patients, active invitations, 30-day encounters/summaries, drafts awaiting review, failed summary jobs, upcoming appointments, last retention run | Per-clinic consumption (encounters are not clinic-scoped yet), time series, small-group suppression, provider cost/quota import |
+| Invitations and visits | `/admin` **Invitations and visits** (`/api/admin/invitation-activity`): newest 25 invitations in scope, the creating doctor (name/email), lifecycle, expiry, and each visit's arrival type, admission (joined directly / admitted by doctor / not admitted), status and times. Patients appear as a 6-character pseudonymous reference, not a name | Doctor room-join events, filters and cursor pages |
 | Clinical access | Administrators are denied clinician APIs; a separate provisioned Doctor identity is required | No blanket clinical-data grant is proposed |
 
 These login routes distinguish task and audience. Visiting a URL, choosing a
@@ -136,3 +137,45 @@ production counts from this note. Acceptance must include separate synthetic
 platform-owner, clinic-admin, doctor, patient and unapproved identities, API
 cross-clinic/clinical denials, bounded query checks, partial-failure recovery
 and the complete doctor/patient call with optional AI off.
+
+## Invitations and visits view — 28 November 2026
+
+Request: administrators should know who created a recent invitation and who
+joined through it.
+
+Pattern: an **audit-trail read model**. Each row answers time · actor · action
+· target · outcome, the columns of established audit logs such as Microsoft
+Entra's. The rows are projected from records the invitation flow already
+writes transactionally:
+- the invitation document: creating doctor, expiry, status;
+- its `waitingPatients` rows: arrival, admission mode, admitted time, status.
+
+Nothing new is written, so invitations created before this change appear
+immediately. An event-sourced log written at each step was the alternative;
+it would only cover new activity and would add a write to the join
+transaction.
+
+Minimum necessary:
+- The doctor is named, because staff accountability is the purpose.
+- Patients are shown only by how they joined (verified invited account,
+  signed-in account, guest with a typed name) and a short keyed-hash
+  reference that stays stable across their repeat visits on that invitation.
+- Names, emails, room names, allowlists, network and browser hashes, chat and
+  clinical text are never copied. The projection allowlists its output fields,
+  and a regression test checks the serialized result for leaks.
+- The owning doctor still sees names in their own queue.
+
+Showing patient names to administrators would be a policy decision. It needs
+an approved purpose, access auditing and retention review first.
+
+Scope:
+- The platform owner sees the newest 25 invitations platform-wide.
+- A clinic administrator sees invitations created by doctors in their verified
+  clinic only. The lookup is bounded to 200 doctors and uses the existing
+  `createdBy + createdAt` index.
+- An administrator with no clinic sees nothing.
+
+Visits per invitation are capped at 10 shown and 300 read. The route is
+separate from the oversight counts, so a failure here never hides them.
+
+Tests: `tests/invitation-activity.test.mjs`.
