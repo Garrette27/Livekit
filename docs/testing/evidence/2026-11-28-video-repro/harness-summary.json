@@ -1,0 +1,186 @@
+{
+ "environment": "Local LiveKit server v1.9.12 (docker, --dev), livekit-client as installed, Chromium 1223 headless, synthetic camera/mic (20 fps), E2EE with random throwaway key, VP8, simulcast, adaptiveStream {pauseVideoInBackground:false}, dynacast",
+ "date": "2026-11-28",
+ "scenarios": {
+  "background": {
+   "variableChangedAtSecond": 15,
+   "results": {
+    "doctor": {
+     "secondsSampled": 30,
+     "codec": [
+      "video/VP8"
+     ],
+     "decoder": [
+      "libvpx"
+     ],
+     "framesDecoded": 590,
+     "framesDropped": 0,
+     "freezes": 0,
+     "keyframesDecoded": 4,
+     "keyframeRequests": 0,
+     "packetsLost": 0,
+     "remoteElementDetached": 0,
+     "trackUnsubscribed": 0,
+     "visibilityStates": [
+      "visible"
+     ]
+    },
+    "patient": {
+     "secondsSampled": 30,
+     "codec": [
+      "video/VP8"
+     ],
+     "decoder": [
+      "libvpx"
+     ],
+     "framesDecoded": 583,
+     "framesDropped": 0,
+     "freezes": 0,
+     "keyframesDecoded": 5,
+     "keyframeRequests": 5,
+     "packetsLost": 0,
+     "remoteElementDetached": 0,
+     "trackUnsubscribed": 0,
+     "visibilityStates": [
+      "visible"
+     ]
+    }
+   }
+  },
+  "baseline": {
+   "variableChangedAtSecond": 15,
+   "results": {
+    "doctor": {
+     "secondsSampled": 30,
+     "codec": [
+      "video/VP8"
+     ],
+     "decoder": [
+      "libvpx"
+     ],
+     "framesDecoded": 568,
+     "framesDropped": 0,
+     "freezes": 0,
+     "keyframesDecoded": 5,
+     "keyframeRequests": 2,
+     "packetsLost": 0,
+     "remoteElementDetached": 0,
+     "trackUnsubscribed": 0,
+     "visibilityStates": [
+      "visible"
+     ]
+    },
+    "patient": {
+     "secondsSampled": 30,
+     "codec": [
+      "video/VP8"
+     ],
+     "decoder": [
+      "libvpx"
+     ],
+     "framesDecoded": 594,
+     "framesDropped": 0,
+     "freezes": 0,
+     "keyframesDecoded": 8,
+     "keyframeRequests": 0,
+     "packetsLost": 0,
+     "remoteElementDetached": 0,
+     "trackUnsubscribed": 0,
+     "visibilityStates": [
+      "visible"
+     ]
+    }
+   }
+  },
+  "camera-restart": {
+   "variableChangedAtSecond": 18,
+   "results": {
+    "doctor": {
+     "secondsSampled": 45,
+     "codec": [
+      "video/VP8"
+     ],
+     "decoder": [
+      "libvpx"
+     ],
+     "framesDecoded": 890,
+     "framesDropped": 0,
+     "freezes": 0,
+     "keyframesDecoded": 7,
+     "keyframeRequests": 0,
+     "packetsLost": 0,
+     "remoteElementDetached": 0,
+     "trackUnsubscribed": 0,
+     "visibilityStates": [
+      "visible"
+     ]
+    },
+    "patient": {
+     "secondsSampled": 45,
+     "codec": [
+      "video/VP8"
+     ],
+     "decoder": [
+      "libvpx"
+     ],
+     "framesDecoded": 884,
+     "framesDropped": 0,
+     "freezes": 0,
+     "keyframesDecoded": 5,
+     "keyframeRequests": 5,
+     "packetsLost": 0,
+     "remoteElementDetached": 0,
+     "trackUnsubscribed": 0,
+     "visibilityStates": [
+      "visible"
+     ]
+    }
+   }
+  },
+  "tile-resize": {
+   "variableChangedAtSecond": 15,
+   "results": {
+    "doctor": {
+     "secondsSampled": 30,
+     "codec": [
+      "video/VP8"
+     ],
+     "decoder": [
+      "libvpx"
+     ],
+     "framesDecoded": 591,
+     "framesDropped": 0,
+     "freezes": 0,
+     "keyframesDecoded": 9,
+     "keyframeRequests": 0,
+     "packetsLost": 0,
+     "remoteElementDetached": 0,
+     "trackUnsubscribed": 0,
+     "visibilityStates": [
+      "visible"
+     ]
+    },
+    "patient": {
+     "secondsSampled": 30,
+     "codec": [
+      "video/VP8"
+     ],
+     "decoder": [
+      "libvpx"
+     ],
+     "framesDecoded": 579,
+     "framesDropped": 0,
+     "freezes": 0,
+     "keyframesDecoded": 6,
+     "keyframeRequests": 6,
+     "packetsLost": 0,
+     "remoteElementDetached": 0,
+     "trackUnsubscribed": 0,
+     "visibilityStates": [
+      "visible"
+     ]
+    }
+   }
+  }
+ }
+}

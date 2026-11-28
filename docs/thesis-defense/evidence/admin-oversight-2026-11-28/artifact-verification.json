@@ -8,7 +8,7 @@
     },
     "TeleConsole-Panel-Questions-and-Answers.pdf": {
       "pages": 18,
-      "sha256": "d4fa8b21aa71d3fb451287892b42ec2efdf17ad29c7a7faf2cdd7d90807769c0",
+      "sha256": "e5a49e18da4249fb5369783ba18b14fbdac381c8e7ab8fb5909884aa114ca5d4",
       "questions": 100,
       "https_links": 7,
       "question_heading_pages": {
@@ -116,17 +116,18 @@
     },
     "TeleConsole-Panel-Quick-Answers.pdf": {
       "pages": 2,
-      "sha256": "cf093bef04d174079cd4f6de1e525ccad4eac0b1759bc38573ca7b365788d40e"
+      "sha256": "82012ac813dede26fcc8314188cb5c4811d329e6aeccdc43b3ce984f8da6e8b8"
     },
     "TeleConsole-Team-Test-Top-40.pdf": {
       "pages": 3,
-      "sha256": "f288331730e0af9bb5634523c64b28cd770499e0bbb792ee3f4b073b9ab74d18"
+      "sha256": "a3f431181b49c3d51aaae8f764c35b277d2853e133260d4f4710819dff335303"
     }
   },
   "notes": [
     "Panel PDFs regenerated after priority-order-v3 re-ranking and scheduling/device-menu answer updates (28 November 2026).",
     "Regenerated after retention (Vercel cron) and oversight-panel answer updates, 28 November 2026.",
     "Regenerated after theme-root, no-show and appointment-cancellation answer updates, 28 November 2026.",
-    "Regenerated after video-stability answer update, 28 November 2026."
+    "Regenerated after video-stability answer update, 28 November 2026.",
+    "Regenerated after correcting the video-flicker answer to an open investigation, 28 November 2026."
   ]
 }

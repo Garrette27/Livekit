@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:security": "node scripts/regression-security-contracts.mjs && node scripts/regression-thesis-flow-contracts.mjs && node --test tests/security-policies.test.mjs tests/queue-and-auth-regressions.test.mjs tests/defense-load-regressions.test.mjs tests/admin-workspace-regressions.test.mjs tests/encounter-history-regressions.test.mjs tests/consultation-workspace.test.mjs tests/appointment-regressions.test.mjs tests/summary-retention.test.mjs tests/admin-oversight.test.mjs tests/call-quality.test.mjs",
+    "test:security": "node scripts/regression-security-contracts.mjs && node scripts/regression-thesis-flow-contracts.mjs && node --test tests/security-policies.test.mjs tests/queue-and-auth-regressions.test.mjs tests/defense-load-regressions.test.mjs tests/admin-workspace-regressions.test.mjs tests/encounter-history-regressions.test.mjs tests/consultation-workspace.test.mjs tests/appointment-regressions.test.mjs tests/summary-retention.test.mjs tests/admin-oversight.test.mjs tests/call-quality.test.mjs tests/media-diagnostics.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:mobile": "playwright test --project=mobile-chromium",
     "test:e2e:ui": "playwright test --ui",

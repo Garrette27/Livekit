@@ -16,6 +16,7 @@ import { VideoPresets, type RoomOptions } from 'livekit-client';
 import PageSkeleton from '@/components/ui/feedback/PageSkeleton';
 import { prepareConsultationRoom, type ConsultationRoomPreparation } from '@/lib/livekit/media-encryption-client';
 import DevicePermissionNotice from './DevicePermissionNotice';
+import MediaDiagnosticsPanel, { mediaDiagnosticsRequested } from './MediaDiagnosticsPanel';
 import CallQualityMeter from './CallQualityMeter';
 import LiveKitStyles from './LiveKitStyles';
 import SessionTranscriptionBridge from './SessionTranscriptionBridge';
@@ -421,6 +422,8 @@ export default function RoomShell({
 }: RoomShellProps) {
   const roomScopeRef = useRef<HTMLDivElement | null>(null);
   const [participantCount, setParticipantCount] = useState(1);
+  // Read once per page load; the temporary flicker diagnostics never mount otherwise.
+  const [showMediaDiagnostics] = useState(mediaDiagnosticsRequested);
   const [userChoices, setUserChoices] = useState<LocalUserChoices | null>(null);
   const [transcriptionConsent, setTranscriptionConsent] = useState(false);
   const chatEnabled = chatPolicy.enabled;
@@ -577,6 +580,7 @@ export default function RoomShell({
         <ConnectionStateToast />
         <CallQualityMeter encryption={preparation.encryption} />
         <DevicePermissionNotice />
+        {showMediaDiagnostics ? <MediaDiagnosticsPanel /> : null}
         <ChatBehaviorBridge
           enabled={chatEnabled}
           defaultOpen={chatDefaultOpen}

@@ -2,51 +2,55 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRoomContext } from '@livekit/components-react';
-import { RoomEvent } from 'livekit-client';
-
-type BlockedDevice = 'camera' | 'microphone';
+import { MediaDeviceFailure, RoomEvent, Track, type LocalTrackPublication } from 'livekit-client';
+import { describeDeviceProblems, deviceForKind, type DeviceProblem, type DeviceProblems } from '@/lib/livekit/device-problems';
 
 /**
- * In-call notice shown when this browser has blocked camera or microphone
- * access for the site.
+ * In-call notice for a camera or microphone this browser could not use.
  *
- * LiveKit's device menus (the arrows beside Microphone and Camera) list
- * devices only after the browser grants media permission; when the site is
- * blocked the menu opens empty with no explanation. This notice names the
- * blocked device and tells the user how to re-allow it. It reads the browser
- * Permissions API where available and also listens for LiveKit's
- * MediaDevicesError, so browsers without the API still get the message after
- * a failed camera/microphone start. It never requests permission itself and
- * never blocks the call: the participant can still hear, see and chat.
+ * Sources of truth, in order: the Permissions API (`denied` means the site is
+ * blocked), and LiveKit's `MediaDevicesError(error, kind)` classified with
+ * `MediaDeviceFailure` (permission denied, device in use, not found). Only the
+ * device named by `kind` is reported. A problem clears as soon as that device
+ * publishes a track again, so a working camera never sits under a stale
+ * "blocked" warning. It never requests permission and never blocks the call.
  */
 export default function DevicePermissionNotice() {
   const room = useRoomContext();
-  const [blocked, setBlocked] = useState<Set<BlockedDevice>>(new Set());
+  const [problems, setProblems] = useState<DeviceProblems>({});
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     const statuses: PermissionStatus[] = [];
-    const update = (device: BlockedDevice, state: PermissionState) => {
+    const set = (device: 'camera' | 'microphone', problem: DeviceProblem | null) => {
       if (cancelled) return;
-      setBlocked((current) => {
-        const next = new Set(current);
-        if (state === 'denied') next.add(device);
-        else next.delete(device);
+      setProblems((current) => {
+        if ((current[device] ?? null) === problem) return current;
+        const next = { ...current };
+        if (problem) next[device] = problem; else delete next[device];
         return next;
       });
-      if (state === 'denied') setDismissed(false);
+      if (problem) setDismissed(false);
     };
 
-    const watch = async (device: BlockedDevice) => {
+    const watch = async (device: 'camera' | 'microphone') => {
       try {
         const status = await navigator.permissions.query({ name: device as PermissionName });
         statuses.push(status);
-        update(device, status.state);
-        status.onchange = () => update(device, status.state);
+        const apply = () => {
+          if (status.state === 'denied') set(device, 'blocked');
+          else setProblems((current) => {
+            if (current[device] !== 'blocked') return current;
+            const next = { ...current };
+            delete next[device];
+            return next;
+          });
+        };
+        apply();
+        status.onchange = apply;
       } catch {
-        // Permissions API or this permission name is unsupported; the
-        // MediaDevicesError listener below still covers a failed start.
+        // Unsupported permission name; MediaDevicesError still reports failures.
       }
     };
     if (typeof navigator !== 'undefined' && 'permissions' in navigator) {
@@ -54,22 +58,31 @@ export default function DevicePermissionNotice() {
       void watch('microphone');
     }
 
-    const onMediaError = (error: Error) => {
-      if (error?.name !== 'NotAllowedError') return;
-      setBlocked((current) => (current.size > 0 ? current : new Set<BlockedDevice>(['camera', 'microphone'])));
-      setDismissed(false);
+    const onMediaError = (error: Error, kind?: MediaDeviceKind) => {
+      const device = deviceForKind(kind);
+      const failure = MediaDeviceFailure.getFailure(error);
+      if (!device || !failure) return;
+      set(device, failure === MediaDeviceFailure.PermissionDenied ? 'blocked'
+        : failure === MediaDeviceFailure.DeviceInUse ? 'in-use'
+          : failure === MediaDeviceFailure.NotFound ? 'not-found' : 'failed');
+    };
+    const onPublished = (publication: LocalTrackPublication) => {
+      if (publication.source === Track.Source.Camera) set('camera', null);
+      if (publication.source === Track.Source.Microphone) set('microphone', null);
     };
     room.on(RoomEvent.MediaDevicesError, onMediaError);
+    room.on(RoomEvent.LocalTrackPublished, onPublished);
 
     return () => {
       cancelled = true;
       statuses.forEach((status) => { status.onchange = null; });
       room.off(RoomEvent.MediaDevicesError, onMediaError);
+      room.off(RoomEvent.LocalTrackPublished, onPublished);
     };
   }, [room]);
 
-  if (blocked.size === 0 || dismissed) return null;
-  const devices = Array.from(blocked).sort().join(' and ');
+  const message = describeDeviceProblems(problems);
+  if (!message || dismissed) return null;
 
   return (
     <div
@@ -91,14 +104,11 @@ export default function DevicePermissionNotice() {
         boxShadow: '0 6px 16px rgba(0,0,0,0.25)',
       }}
     >
-      <strong>This browser has blocked the {devices} for this site.</strong>{' '}
-      The device lists stay empty until access is allowed. Click the site icon left of the
-      address bar, set Camera and Microphone to <em>Allow</em>, then reload this page. You can
-      still hear, see and chat with the other participant meanwhile.
+      {message}
       <button
         type="button"
         onClick={() => setDismissed(true)}
-        aria-label="Dismiss device permission notice"
+        aria-label="Dismiss device notice"
         style={{ marginLeft: '0.5rem', border: 'none', background: 'transparent', color: '#78350f', fontWeight: 700, cursor: 'pointer' }}
       >
         ×

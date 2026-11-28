@@ -1,57 +1,80 @@
-# Video "blinking": diagnosis and design — 28 November 2026
+# Video flicker investigation — status 28 November 2026 (open)
 
-## Symptom
+This note supersedes the earlier version of the same date, which stated
+background pausing and CPU limitation as causes. Those were hypotheses; the
+evidence below does not support them, and the root cause is **not yet
+confirmed**.
 
-During a same-PC test (doctor window plus an incognito patient window), tiles
-showed half-updated pictures (top half live, bottom half an older scene) and
-brief stalls. The tint visible in some screenshots was the DevTools element
-highlight, not the app.
+## Symptom (user recording, production `63372c8`, same PC, two windows)
 
-## What was ruled out (source-checked)
+- Doctor view, 2 tiles. Tiles alternately match and diverge; a region of one
+  tile stays stale or dark; at ~45 s one tile is bright while the other is
+  almost black. The connection stays Connected.
+- Doctor Call quality (cumulative since join, read at ~9 min): received
+  1280×720 at 14–16 fps while the sender reports 29–30 fps; 12–13 freezes
+  (4.1–4.4 s); 99–101 frames dropped; **0 keyframe requests**; send limited by
+  **none**.
+- A "camera and microphone blocked" notice appeared at ~14 s although the
+  camera visibly worked.
+- The doctor's local tile and the remote patient tile show the same scene from
+  the same angle, consistent with both windows capturing one physical camera
+  (not yet confirmed).
 
-| Suspect | Finding |
+`Send limited by: none` and zero keyframe requests contradict the earlier
+CPU-limitation and decode-gap explanations for this run.
+
+## Verified
+
+| Check | Result |
 | --- | --- |
-| Layout re-flow | Fixed earlier: the missing `data-lk-theme` root made the grid height invalid. After that fix, the 2-tile grid is stable in full-screen captures. |
-| App restarting media | `LiveKitRoom` applies `audio`/`video` only on `SignalConnected`, so new prop objects do not republish tracks. |
-| Token churn / reconnect | The patient admission poll stops once admitted; doctor token is fetched once. |
-| E2EE passing ciphertext to the decoder | LiveKit's E2EE worker drops undecryptable frames instead of forwarding them. |
-| H.264 E2EE keyframe bugs ([client-sdk-js#2180](https://github.com/livekit/client-sdk-js/issues/2180), [livekit#5041](https://github.com/livekit/livekit/issues/5041)) | Do not apply: we publish VP8, LiveKit's default. |
+| Deployed build | `livekit-frontend-tau.vercel.app` serves deployment `dpl_F2MLcerJyAvE63DdAmYVAeMcnYMf` from `63372c8`; the shipped bundle contains `adaptiveStream:{pauseVideoInBackground:!1}` and the `data-lk-theme` room root. |
+| Controlled reproduction | `scripts/diagnostics/livekit-media-repro.mjs`: two Chromium contexts, local LiveKit 1.9.12, installed `livekit-client`, E2EE worker, VP8 simulcast and the app's room options, synthetic devices. Baseline, tile resize (layer switch) and camera restart (`restartTrack`): **0 freezes, 0 dropped frames, no element detach, no unsubscribe**, steady 20 fps (the synthetic camera rate). Summary: [harness-summary.json](testing/evidence/2026-11-28-video-repro/harness-summary.json). |
+| Background tab | **Inconclusive**: headless Chromium kept `visibilityState=visible`. |
+| Device notice | Confirmed defect: it ignored `MediaDevicesError`'s `kind`, reported both devices for any `NotAllowedError`, and never cleared after the device published. Fixed (see below). |
 
-## Remaining causes (documented LiveKit/WebRTC behavior)
+Conclusion so far: the SDK, E2EE, codec and app room options reproduce no
+flicker under controlled conditions. The remaining differences from the
+user's run are the real camera(s), both windows on one PC (possibly sharing
+one camera), the OBS virtual camera, real background tabs and the real
+network. Each must be tested on its own.
 
-1. **Background pause/resume.** `adaptiveStream` pauses video in a hidden tab by
-   default. On return the receiver must wait for a keyframe, so the picture is
-   partly stale for a moment. Alternating windows during a test triggers this
-   constantly.
-2. **Gaps until the next keyframe.** A dropped or late frame leaves the VP8
-   decoder with stale regions until the receiver's keyframe request (PLI) is
-   served. That is the "half new, half old" picture.
-3. **CPU limitation.** One PC encoding two 720p simulcast streams, running two
-   E2EE workers, speech recognition and DevTools makes Chrome lower or drop
-   frames (`qualityLimitationReason: cpu`).
+## Changes in this round
 
-## Pattern chosen: measure with standard stats, remove the app-controlled trigger
+- **`DevicePermissionNotice`** now names only the device in the event's
+  `kind`, classifies with LiveKit's `MediaDeviceFailure` (blocked / in use /
+  not found), and clears when that device publishes again
+  (`lib/livekit/device-problems.ts`, `tests/media-diagnostics.test.mjs`).
+- **Temporary diagnostics** (`?mediaDiagnostics=1` on the room URL): per video
+  track, a redacted participant/track id, source, subscription, mute and
+  stream state, attached-element count, local capture settings (resolution,
+  frame rate, redacted device id, readyState) and **per-second deltas**
+  (decoded, encoded, dropped, freezes, keyframes, keyframe requests, packet
+  loss, quality limitation). It also logs timestamped room/track events,
+  `MediaDevicesError` with kind and failure, page visibility and `<video>`
+  lifecycle (DOM add/remove, emptied, stalled, waiting, resize). "Copy
+  diagnostics" exports JSON with no tokens, names, emails or room names.
+  Remove the panel when this investigation closes.
 
-- **Observability (W3C webrtc-stats):** the Call quality panel now shows
-  received-video `freezeCount`/`totalFreezesDuration`, `framesDropped`,
-  keyframe requests (`pliCount + firCount`) and the sender's
-  `qualityLimitationReason`. This is how Meet/Zoom-style health indicators
-  attribute a stall to network, CPU or decoding instead of guessing.
-- **`adaptiveStream: { pauseVideoInBackground: false }`:** a 1:1 consultation
-  has one remote video, so continuous receipt costs little and removes the
-  pause/resume freeze. Size-based layer selection, dynacast and simulcast stay
-  on.
+No media setting was changed in this round.
 
-Rejected alternatives: disabling simulcast or E2EE (loses the documented
-quality-adaptation and confidentiality properties without evidence that they
-cause this); custom layouts replacing `VideoConference` (layout was not the
-remaining cause).
+## Next runs (one variable at a time, synthetic accounts)
 
-## How to verify
+Open both room URLs with `?mediaDiagnostics=1`. Run 3 minutes each and copy the
+diagnostics from both windows.
 
-Test with **two devices** (doctor and patient on separate machines). Open
-Call quality for 5 minutes and record: freezes, dropped frames, keyframe
-requests, Send limited by. `cpu` on a same-PC test identifies the test rig,
-not the product. Rising freezes with packet loss point to the network; rising
-keyframe requests with low loss point to decode gaps. Physical-device
-acceptance is performed by a person; these numbers are its evidence.
+1. **Two devices**: doctor on the PC, patient on a phone. If clean, the
+   product path is cleared for that network.
+2. **Same PC, patient camera off** (patient receives only). Tests whether the
+   artifact needs two capture sessions.
+3. **Same PC, two different physical cameras**, OBS Virtual Camera unused.
+4. **Same PC, same camera**: the original setup. Compare the sender's
+   `capture` line (redacted device id, fps) in both windows.
+5. **Background**: from a clean run, switch the doctor tab away for 30 s and
+   back; look for `page-visibility`, then `streamState` and decode deltas.
+
+How to read it: a remote row with `dec` near the sender's `enc` and `drop` 0
+while the image looks wrong points at **capture or source** (compare with
+the sender's own local preview). `video-element-removed`/`added` or
+`TrackUnsubscribed` around the moment points at **remount/subscription**.
+Rising `drop` with `loss` points at **network**. `EncryptionError` points at
+**E2EE**. `MediaDevicesError … DeviceInUse` points at **camera sharing**.
