@@ -13,6 +13,28 @@ export class AudioTranscriptionProviderError extends Error {
 export interface AudioTranscriptionResult {
   text: string;
   model: string;
+  /**
+   * Mean log-probability of the returned tokens (0 = certain), or null when
+   * the model does not report token log-probabilities. Speech the model heard
+   * clearly scores near 0; song lyrics, TV and crosstalk score lower. The
+   * summary gate in lib/ai/consultation-evidence.ts owns the threshold.
+   */
+  meanTokenLogprob: number | null;
+}
+
+/** gpt-4o-transcribe and gpt-4o-mini-transcribe report token log-probabilities; whisper-1 does not. */
+function reportsLogprobs(model: string): boolean {
+  return /^gpt-4o.*transcribe/i.test(model);
+}
+
+/** Average of the reported token log-probabilities; null when absent or malformed. */
+export function meanLogprob(logprobs: unknown): number | null {
+  if (!Array.isArray(logprobs)) return null;
+  const values = logprobs
+    .map((entry) => Number((entry as { logprob?: unknown })?.logprob))
+    .filter((value) => Number.isFinite(value) && value <= 0);
+  if (!values.length) return null;
+  return values.reduce((total, value) => total + value, 0) / values.length;
 }
 
 function isTransientStatus(status: number): boolean {
@@ -48,8 +70,9 @@ export class OpenAiAudioTranscriber {
       body.set('response_format', 'json');
       body.set(
         'prompt',
-        'Telehealth conversation in Filipino/Tagalog, English, or Taglish. Transcribe exactly as spoken, preserve medical terms and names, and do not translate or add content.'
+        'Telehealth conversation in Filipino/Tagalog, English, or Taglish. Transcribe exactly as spoken, preserve medical terms and names, and do not translate or add content. Transcribe only a person speaking to the other participant; leave out background music, song lyrics, TV, radio and other background audio, and return nothing if no one is speaking.'
       );
+      if (reportsLogprobs(this.model)) body.append('include[]', 'logprobs');
       body.set('file', input.audio, input.filename);
 
       return fetch(OPENAI_TRANSCRIPTION_ENDPOINT, {
@@ -84,10 +107,11 @@ export class OpenAiAudioTranscriber {
       throw new AudioTranscriptionProviderError(response.status);
     }
 
-    const payload = (await response.json()) as { text?: unknown };
+    const payload = (await response.json()) as { text?: unknown; logprobs?: unknown };
     return {
       text: typeof payload.text === 'string' ? payload.text.trim() : '',
       model: this.model,
+      meanTokenLogprob: meanLogprob(payload.logprobs),
     };
   }
 }

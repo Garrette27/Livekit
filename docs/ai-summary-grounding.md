@@ -58,3 +58,52 @@ new verification.
 Tests: `tests/claim-verification.test.mjs` (the malaria-from-*malala* case,
 whole-word matching, speaker contradiction, doctor-only recommendations,
 verbatim medication names, null result, defensive parsing of stored evidence).
+
+## Abstain when the audio is not clear — 28 November 2026
+
+Observed: with music playing in the room, song lyrics were transcribed and
+then quoted in a draft ("Patient and doctor did not say any of these"). The
+quotes passed verification because the words *were* in the recognized
+transcript. Verification cannot catch speech that should never have become
+evidence. Both microphones in one room also transcribed the same sentence
+twice, once under the wrong speaker.
+
+Pattern: **selective prediction (abstention)**. The system declines to answer
+when its input confidence is low, rather than producing a fluent but
+unsupported draft. It is applied before the model is called:
+
+1. **Recognition confidence.** Transcription requests token log-probabilities
+   (`include[]=logprobs`, supported by `gpt-4o-transcribe`/`-mini`). Each
+   segment stores `meanTokenLogprob`. Segments below -1.0 are kept in the
+   transcript but excluded from summary evidence. -1.0 is the
+   `logprob_threshold` OpenAI Whisper's own decoder uses to reject a segment.
+   Legacy segments and models without log-probabilities count as clear.
+2. **Prompted rejection of background audio.** The transcription prompt asks
+   the model to leave out music, lyrics, TV and radio, and to return nothing
+   when no one is speaking.
+3. **Crosstalk removal.** A line is dropped when one of the 3 preceding lines
+   is from the other speaker and shares ≥60% of its words. The first capture
+   is kept.
+4. **Abstention rules** (`prepareTranscriptEvidence`). The deterministic "No
+   reliable clinical summary could be generated because…" record is stored,
+   with no model call, when:
+   - at least half the recognized segments were unclear (`unclear_audio`), or
+   - speaker-labelled evidence has fewer than 8 words from the doctor or from
+     the patient (`one_sided_capture`).
+
+   A consultation summary needs both sides of the conversation.
+5. A session that captured participant audio never falls back to the older
+   room buffer, even when every segment was unclear.
+
+Tradeoffs:
+- A doctor-only dictation, or a call where the patient declined
+  transcription, no longer gets an AI draft. The clinician writes the note.
+- Confident singing can still pass the confidence floor. The two-party rule,
+  claim verification and clinician review remain the backstops.
+- Advise participants to turn off music and TV during a consultation.
+
+Metadata records `transcriptUnclearSegments`, `transcriptCrosstalkLines` and
+`transcriptEvidenceReason`. Summaries already stored are unchanged;
+regenerating a non-reviewed summary applies the gate.
+
+Tests: `tests/transcript-evidence.test.mjs`.

@@ -70,7 +70,7 @@ interface TrackRow extends Partial<VideoStatDelta>, Partial<RenderInterval> {
   attachedElements: number;
   capture: string | null;
 }
-interface Sample { t: number; visibility: string; rows: TrackRow[] }
+interface Sample { t: number; visibility: string; speakerChanges: number; rows: TrackRow[] }
 interface LogEntry { t: number; event: string; detail?: string }
 
 const MAX_SAMPLES = 180;
@@ -141,6 +141,11 @@ export default function MediaDiagnosticsPanel() {
     const onMediaError = (error: Error, kind?: MediaDeviceKind) =>
       log(RoomEvent.MediaDevicesError, `${kind ?? 'unknown-kind'} · ${MediaDeviceFailure.getFailure(error) ?? 'unknown'} · ${error?.name ?? ''}`);
     room.on(RoomEvent.MediaDevicesError, onMediaError);
+    // Active-speaker flips per second: background music toggles this many
+    // times a second, which is what used to blink LiveKit's speaking ring.
+    let speakerChanges = 0;
+    const onSpeakers = () => { speakerChanges += 1; };
+    room.on(RoomEvent.ActiveSpeakersChanged, onSpeakers);
 
     const onVisibility = () => log('page-visibility', document.visibilityState);
     document.addEventListener('visibilitychange', onVisibility);
@@ -228,7 +233,8 @@ export default function MediaDiagnosticsPanel() {
         for (const delta of deltas) rows.push({ ...base, ...delta });
       }
       previous = next;
-      const sample = { t: at(), visibility: document.visibilityState, rows };
+      const sample = { t: at(), visibility: document.visibilityState, speakerChanges, rows };
+      speakerChanges = 0;
       samples.current.push(sample);
       if (samples.current.length > MAX_SAMPLES) samples.current.shift();
       setLatest(sample);
@@ -240,6 +246,7 @@ export default function MediaDiagnosticsPanel() {
       meters.forEach((entry) => entry.stop());
       handlers.forEach(([name, handler]) => room.off(name, handler));
       room.off(RoomEvent.MediaDevicesError, onMediaError);
+      room.off(RoomEvent.ActiveSpeakersChanged, onSpeakers);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pagehide', onPageHide);
       mediaEvents.forEach((name) => document.removeEventListener(name, onMediaElement, true));
@@ -269,7 +276,7 @@ export default function MediaDiagnosticsPanel() {
         background: 'rgba(2,6,23,0.92)', color: '#e2e8f0', font: '11px/1.4 ui-monospace, monospace', border: '1px solid #f59e0b', borderRadius: 8, padding: 8 }}
     >
       <strong style={{ color: '#fbbf24' }}>Media diagnostics (temporary)</strong>{' '}
-      <span>t={latest ? `${(latest.t / 1000).toFixed(0)}s` : '…'} · {latest?.visibility} · events {eventCount}</span>{' '}
+      <span>t={latest ? `${(latest.t / 1000).toFixed(0)}s` : '…'} · {latest?.visibility} · speaker flips {latest?.speakerChanges ?? 0}/s · events {eventCount}</span>{' '}
       <button type="button" onClick={copy} style={{ font: 'inherit', marginLeft: 6 }}>{copied ? 'Copied' : 'Copy diagnostics'}</button>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 6 }}>
         <thead><tr>{['who', 'track', 'dir/rid', 'res@fps', 'dec', 'enc', 'drop', 'frz', 'key', 'kreq', 'rfps', 'gap', 'blk', 'state', 'el', 'limit'].map((h) => <th key={h} style={{ textAlign: 'left', paddingRight: 6 }}>{h}</th>)}</tr></thead>

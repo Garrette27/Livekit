@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import { isClearSpeech } from '@/lib/ai/consultation-evidence';
 
 const SESSION_COLLECTION = 'consultationSessions';
 const SEGMENT_COLLECTION = 'transcriptSegments';
@@ -18,6 +19,8 @@ export interface ConsultationTranscriptSegmentInput {
   durationMs: number;
   text: string;
   model: string;
+  /** Provider recognition confidence (mean token log-probability); null when not reported. */
+  meanTokenLogprob: number | null;
   consentConfirmed: boolean;
 }
 
@@ -28,9 +31,12 @@ export interface ConsultationTranscriptAppendResult {
 }
 
 export interface ConsultationTranscriptEvidence {
+  /** Clearly recognized, speaker-labelled lines in spoken order. */
   lines: string[];
   revision: number;
   segmentCount: number;
+  /** Segments left out of `lines` because recognition confidence was low (music, TV, crosstalk). */
+  unclearSegmentCount: number;
 }
 
 function toMillis(value: unknown): number {
@@ -107,6 +113,7 @@ export class ConsultationTranscriptRepository {
         source: 'participant_audio_track',
         transcriptionProvider: 'openai',
         transcriptionModel: input.model,
+        meanTokenLogprob: input.meanTokenLogprob,
         consentConfirmed: input.consentConfirmed,
         createdAt: new Date(),
       });
@@ -132,7 +139,11 @@ export class ConsultationTranscriptRepository {
     });
   }
 
-  /** Returns ordered speaker-attributed lines and the revision they represent. */
+  /**
+   * Returns ordered speaker-attributed lines and the revision they represent.
+   * Segments the recognizer was unsure of are counted, not returned: they are
+   * kept in the stored transcript but never become summary evidence.
+   */
   async getSummaryEvidence(consultationSessionId: string): Promise<ConsultationTranscriptEvidence> {
     const sessionRef = this.db.collection(SESSION_COLLECTION).doc(consultationSessionId);
     const [sessionDoc, segmentSnapshot] = await Promise.all([
@@ -154,6 +165,8 @@ export class ConsultationTranscriptRepository {
           capturedAtMs: toMillis(data.capturedAt || data.createdAt),
           sequence: toNonNegativeInteger(data.sequence),
           id: document.id,
+          // Legacy segments have no confidence and are treated as clear.
+          clear: isClearSpeech(typeof data.meanTokenLogprob === 'number' ? data.meanTokenLogprob : null),
         };
       })
       .filter((segment) => segment.text.length > 0)
@@ -163,12 +176,14 @@ export class ConsultationTranscriptRepository {
         || left.id.localeCompare(right.id)
       );
 
+    const clearSegments = segments.filter((segment) => segment.clear);
     return {
-      lines: segments.map(
+      lines: clearSegments.map(
         (segment) => `[${segment.speakerType === 'doctor' ? 'Doctor' : 'Patient'}] ${segment.text}`
       ),
       revision: toNonNegativeInteger(transcription.revision),
       segmentCount: segments.length,
+      unclearSegmentCount: segments.length - clearSegments.length,
     };
   }
 }

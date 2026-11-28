@@ -417,6 +417,8 @@ function defaultMetadata(
     transcriptUniqueLines: transcriptEvidence.uniqueLineCount,
     transcriptWordCount: transcriptEvidence.wordCount,
     transcriptDuplicateRate: transcriptEvidence.duplicateRate,
+    transcriptCrosstalkLines: transcriptEvidence.crosstalkLineCount,
+    transcriptUnclearSegments: transcriptEvidence.unclearSegmentCount,
     transcriptEvidenceQuality: transcriptEvidence.quality,
     transcriptEvidenceReason: transcriptEvidence.reason,
     transcriptEvidenceTruncated: transcriptEvidence.wasTruncated,
@@ -487,6 +489,10 @@ function buildInsufficientEvidenceContent(
 ): ParsedSummary {
   const captureProblem = override === 'no_verifiable_claims'
     ? 'no statement in the draft could be matched to the recognized transcript'
+    : transcriptEvidence.reason === 'unclear_audio'
+    ? 'most of the recorded audio was not clear speech (for example background music, TV, or overlapping voices)'
+    : transcriptEvidence.reason === 'one_sided_capture'
+    ? 'clear speech from both the doctor and the patient was not captured'
     : transcriptEvidence.reason === 'highly_repetitive_capture'
     ? 'the captured transcript repeated prior recognition results and is not reliable'
     : transcriptEvidence.reason === 'too_little_speech'
@@ -649,17 +655,20 @@ export async function generateAndStoreConsultationSummary({
   // older sessions and browsers without MediaRecorder support.
   const sessionTranscript = consultationSessionId
     ? await new ConsultationTranscriptRepository(db).getSummaryEvidence(consultationSessionId)
-    : { lines: [], revision: 0, segmentCount: 0 };
+    : { lines: [], revision: 0, segmentCount: 0, unclearSegmentCount: 0 };
+  // A session that captured participant audio uses it even when every segment
+  // was unclear; falling back to an older buffer would bypass that judgment.
+  const hasSessionTranscript = sessionTranscript.segmentCount > 0;
   const callerTranscription = transcriptionData && transcriptionData.length > 0
     ? transcriptionData
     : null;
-  const browserFallback = sessionTranscript.lines.length === 0 && !callerTranscription
+  const browserFallback = !hasSessionTranscript && !callerTranscription
     ? await new CallRepository(db).getTranscriptLines(roomName, consultationSessionId)
     : null;
-  const resolvedTranscription = sessionTranscript.lines.length > 0
+  const resolvedTranscription = hasSessionTranscript
     ? sessionTranscript.lines
     : callerTranscription || browserFallback;
-  const transcriptSource: TranscriptSource = sessionTranscript.lines.length > 0
+  const transcriptSource: TranscriptSource = hasSessionTranscript
     ? 'participant_audio_tracks'
     : callerTranscription
       ? 'caller'
@@ -679,7 +688,9 @@ export async function generateAndStoreConsultationSummary({
 
   await updateSummaryJob('processing');
 
-  const transcriptEvidence = prepareTranscriptEvidence(resolvedTranscription);
+  const transcriptEvidence = prepareTranscriptEvidence(resolvedTranscription, {
+    unclearSegmentCount: hasSessionTranscript ? sessionTranscript.unclearSegmentCount : 0,
+  });
 
   let presenceTimeline: PresenceTimeline | null = null;
   let presenceTimelineMetadata = buildPresenceTimelineMetadata(null);

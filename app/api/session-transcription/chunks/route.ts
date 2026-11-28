@@ -133,6 +133,7 @@ async function handlePOST(req: NextRequest) {
       durationMs,
       text: transcription.text,
       model: transcription.model,
+      meanTokenLogprob: transcription.meanTokenLogprob,
       consentConfirmed,
     });
 

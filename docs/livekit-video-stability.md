@@ -166,3 +166,35 @@ How to read it while the flicker is visible:
 - All four steady while you still see flicker means the problem is in the
   camera image itself (two windows sharing one webcam). Repeat with the
   patient on a phone.
+
+## Run of 28 November 2026, ~16:30–16:40 (deployed `7f142a3`, same PC, music playing)
+
+Measured with the render meter:
+- The remote decoder held 29–30 fps.
+- Painted frames (`rfps`) were 24–28 fps, with the longest gap around 67 ms.
+- One dark sample (`blk`) in about 100 s.
+
+So frames were neither dropping out nor going black. Turning off browser
+graphics acceleration changed nothing. Two degradations did show:
+- When the doctor's tab was hidden (t≈78–81 s), local capture, encode and the
+  remote decoder all fell to 3–10 fps for a few seconds.
+- The local `f` layer dropped to 11 fps at t≈12 s.
+
+Both fit one webcam and one CPU shared by two windows, not a network or
+decode fault.
+
+What changed with the music: LiveKit's stylesheet draws a 2.5px accent ring
+(`.lk-participant-tile::after`) whenever the participant "is speaking", and
+fades it out 0.5 s after they stop. Background music keeps flipping the
+active-speaker state, so the ring blinks around the picture.
+
+Change: the ring is no longer drawn (`LiveKitStyles.tsx`). A 1:1 consultation
+does not need an active-speaker cue. The diagnostics panel now shows
+**speaker flips/s** (`speakerChanges` in each exported sample), so the next
+run can confirm or rule out this cause.
+
+Still open:
+- Confirm with music on and the panel open. Flicker gone means the ring was
+  the cause. Flicker remaining with steady `rfps` means look at capture.
+- Run the two-device test (patient on a phone). Sharing one webcam between two
+  windows is not representative of a real consultation.

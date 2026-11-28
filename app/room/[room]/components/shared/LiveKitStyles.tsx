@@ -158,6 +158,17 @@ export default function LiveKitStyles({
         object-fit: cover !important;
       }
 
+      /* No active-speaker ring. LiveKit draws a 2.5px accent border over the
+         video whenever a participant "is speaking" and fades it out 0.5s
+         later. Background music or a TV keeps toggling that state, so the
+         ring blinks around the picture and reads as video flicker even while
+         every frame paints (the diagnostics panel showed steady frames with no
+         black flashes). A 1:1 consultation does not need to show who speaks. */
+      .lk-participant-tile::after {
+        content: none !important;
+        display: none !important;
+      }
+
       .lk-participant-tile .lk-participant-name,
       .lk-participant-tile .lk-participant-metadata,
       .lk-participant-tile .lk-participant-placeholder {
