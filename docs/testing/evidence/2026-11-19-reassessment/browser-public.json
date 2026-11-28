@@ -1,0 +1,151 @@
+{
+  "testedAt": "2026-11-19T06:39:38.736Z",
+  "method": "isolated Chromium public navigation smoke, no saved Chrome session, no login or media",
+  "browser": "148.0.7778.96",
+  "checks": [
+    {
+      "profile": "desktop",
+      "path": "/",
+      "httpStatus": 200,
+      "totalMs": 959,
+      "title": "",
+      "hasMain": false,
+      "heading": true,
+      "horizontalOverflow": false,
+      "secureInvitationRequired": false,
+      "nav": [
+        {
+          "ttfbMs": 30,
+          "domContentLoadedMs": 190,
+          "loadMs": 312
+        }
+      ]
+    },
+    {
+      "profile": "desktop",
+      "path": "/doctor/login",
+      "httpStatus": 200,
+      "totalMs": 642,
+      "title": "",
+      "hasMain": false,
+      "heading": true,
+      "horizontalOverflow": false,
+      "secureInvitationRequired": false,
+      "nav": [
+        {
+          "ttfbMs": 30,
+          "domContentLoadedMs": 66,
+          "loadMs": 66
+        }
+      ]
+    },
+    {
+      "profile": "desktop",
+      "path": "/access-denied?reason=invalid-token",
+      "httpStatus": 200,
+      "totalMs": 1444,
+      "title": "",
+      "hasMain": false,
+      "heading": true,
+      "horizontalOverflow": false,
+      "secureInvitationRequired": false,
+      "nav": [
+        {
+          "ttfbMs": 31,
+          "domContentLoadedMs": 87,
+          "loadMs": 420
+        }
+      ]
+    },
+    {
+      "profile": "desktop",
+      "path": "/room/thesis-synthetic/patient",
+      "httpStatus": 200,
+      "totalMs": 2058,
+      "title": "",
+      "hasMain": true,
+      "heading": true,
+      "horizontalOverflow": false,
+      "secureInvitationRequired": true,
+      "nav": [
+        {
+          "ttfbMs": 30,
+          "domContentLoadedMs": 1203,
+          "loadMs": 1510
+        }
+      ]
+    },
+    {
+      "profile": "mobile",
+      "path": "/",
+      "httpStatus": 200,
+      "totalMs": 1573,
+      "title": "",
+      "hasMain": false,
+      "heading": true,
+      "horizontalOverflow": false,
+      "secureInvitationRequired": false,
+      "nav": [
+        {
+          "ttfbMs": 33,
+          "domContentLoadedMs": 219,
+          "loadMs": 295
+        }
+      ]
+    },
+    {
+      "profile": "mobile",
+      "path": "/doctor/login",
+      "httpStatus": 200,
+      "totalMs": 1064,
+      "title": "",
+      "hasMain": false,
+      "heading": true,
+      "horizontalOverflow": false,
+      "secureInvitationRequired": false,
+      "nav": [
+        {
+          "ttfbMs": 29,
+          "domContentLoadedMs": 60,
+          "loadMs": 60
+        }
+      ]
+    },
+    {
+      "profile": "mobile",
+      "path": "/access-denied?reason=invalid-token",
+      "httpStatus": 200,
+      "totalMs": 1177,
+      "title": "",
+      "hasMain": false,
+      "heading": true,
+      "horizontalOverflow": false,
+      "secureInvitationRequired": false,
+      "nav": [
+        {
+          "ttfbMs": 30,
+          "domContentLoadedMs": 80,
+          "loadMs": 115
+        }
+      ]
+    },
+    {
+      "profile": "mobile",
+      "path": "/room/thesis-synthetic/patient",
+      "httpStatus": 200,
+      "totalMs": 1423,
+      "title": "",
+      "hasMain": true,
+      "heading": true,
+      "horizontalOverflow": false,
+      "secureInvitationRequired": true,
+      "nav": [
+        {
+          "ttfbMs": 30,
+          "domContentLoadedMs": 325,
+          "loadMs": 411
+        }
+      ]
+    }
+  ]
+}

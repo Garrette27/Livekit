@@ -7,8 +7,11 @@ import { createUserWithEmailAndPassword, sendEmailVerification, signInWithEmailA
 import { auth, provider } from '@/lib/firebase';
 import { fetchWorkspaceAccess } from '@/lib/auth/workspace-client';
 
-/** Identity-only entry: creating an account never creates a role or clinician profile. */
-export default function AdministratorEntry({ signup = false }: { signup?: boolean }) {
+/** Role-specific entry: the server projection selects the workspace; signup creates only an identity. */
+export default function AdministratorEntry({ signup = false, administratorLevel = 'admin' }: {
+  signup?: boolean;
+  administratorLevel?: 'admin' | 'super_admin';
+}) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,19 +19,32 @@ export default function AdministratorEntry({ signup = false }: { signup?: boolea
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const ready = Boolean(auth && provider);
+  const platformOwner = administratorLevel === 'super_admin';
 
+  /** A successful Firebase sign-in still needs the exact authority requested by this entry page. */
   const checkAccess = async () => {
     if (!auth?.currentUser) throw new Error('Sign in with your administrator account first.');
     const access = await fetchWorkspaceAccess(auth.currentUser, true);
-    if (access.administratorLevel) router.replace('/admin');
-    else setMessage('Your account exists, but administrator access has not been granted. Ask the platform owner to grant Administrator for your clinic, then choose Check access again.');
+    if (access.administratorLevel !== administratorLevel) {
+      setMessage('');
+      setError(platformOwner
+        ? 'This sign-in is for the configured super administrator. Use the sign-in page for your account role.'
+        : 'This sign-in requires clinic administrator access. Ask the platform owner to grant access, or use the sign-in page for your account role.');
+      await auth.signOut();
+      return;
+    }
+    router.replace('/admin');
   };
 
   useEffect(() => {
     // Entry remains usable while Firebase restores the session; no automatic
     // clinician navigation can race with the explicit administrator intent.
-    setMessage(signup ? 'Create your sign-in identity, then ask the platform owner to grant access. Signup does not grant administrator privileges.' : 'Use the account granted administrator access by the platform owner.');
-  }, [signup]);
+    setMessage(signup
+      ? 'Create your sign-in identity, then ask the platform owner to grant access. Signup does not grant administrator privileges.'
+      : platformOwner
+        ? 'Use the provider-verified account configured as the platform owner.'
+        : 'Use the account granted administrator access by the platform owner.');
+  }, [signup, platformOwner]);
 
   const perform = async (operation: () => Promise<void>) => {
     setBusy(true);
@@ -42,9 +58,9 @@ export default function AdministratorEntry({ signup = false }: { signup?: boolea
     <section className="entry-card" aria-labelledby="admin-entry-title">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/teleconsole-logo.svg" width="44" height="44" alt="TeleConsole" />
-      <p className="eyebrow">Clinic administration</p>
-      <h1 id="admin-entry-title">{signup ? 'Create an administrator sign-in account' : 'Administrator sign in'}</h1>
-      <p className="explanation">{signup ? 'Account creation and permission approval are separate steps.' : 'Return to your clinic administration workspace.'}</p>
+      <p className="eyebrow">{platformOwner ? 'Platform administration' : 'Clinic administration'}</p>
+      <h1 id="admin-entry-title">{signup ? 'Create a clinic administrator sign-in account' : platformOwner ? 'Super administrator sign in' : 'Clinic administrator sign in'}</h1>
+      <p className="explanation">{signup ? 'Account creation and permission approval are separate steps.' : platformOwner ? 'Manage clinic administrators and staff access.' : 'Return to your clinic administration workspace.'}</p>
       {!ready && <p role="alert">Sign-in is unavailable. Check the deployment configuration or contact the platform owner.</p>}
       {error && <p role="alert" className="error">{error}</p>}
       {message && <p role="status" className="notice">{message}</p>}
@@ -75,7 +91,7 @@ export default function AdministratorEntry({ signup = false }: { signup?: boolea
         <button type="submit" disabled={busy || !ready}>{busy ? 'Checking…' : signup ? 'Create sign-in account' : 'Sign in to administration'}</button>
       </form>
       <button className="secondary" type="button" disabled={busy || !ready} onClick={() => void perform(checkAccess)}>Check access again</button>
-      <p><Link href={signup ? '/admin/login' : '/admin/signup'}>{signup ? 'Already have an account? Sign in' : 'Need a sign-in account? Create one'}</Link></p>
+      {!platformOwner && <p><Link href={signup ? '/admin/login' : '/admin/signup'}>{signup ? 'Already have an account? Sign in' : 'Need a sign-in account? Create one'}</Link></p>}
       <p><Link href="/doctor/login">Doctor sign in</Link> · <Link href="/patient/login">Patient sign in</Link></p>
       <button className="secondary" type="button" disabled={busy} onClick={() => void perform(async () => { await auth?.signOut(); setMessage('Signed out. You can choose another account.'); })}>Sign out / use another account</button>
     </section>

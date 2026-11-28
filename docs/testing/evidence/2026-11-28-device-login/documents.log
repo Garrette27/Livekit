@@ -1,0 +1,17 @@
+{
+  "thesis_pages": 259,
+  "substantive_edits": 48,
+  "substantive_pages": 37,
+  "current_run_edits": 5,
+  "current_run_physical_pages": [
+    66,
+    86,
+    98,
+    106,
+    111
+  ],
+  "brief_pages": 14,
+  "local_markdown_links_valid": true,
+  "brief_text_within_margins": true,
+  "thesis_sha256_matches_report": true
+}

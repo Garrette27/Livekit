@@ -1,0 +1,98 @@
+
+> livekit-frontend@0.2.0 build
+> next build
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /home/ret/package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * /home/ret/Livekit/package-lock.json
+
+   ▲ Next.js 15.5.29
+   - Experiments (use with caution):
+     ✓ forceSwcTransforms
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 2.9s
+   Skipping linting
+   Checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/53) ...
+   Generating static pages (13/53) 
+   Generating static pages (26/53) 
+   Generating static pages (39/53) 
+ ✓ Generating static pages (53/53)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                   Size  First Load JS
+┌ ○ /                                      5.83 kB         288 kB
+├ ○ /_not-found                              996 B         104 kB
+├ ○ /access-denied                         1.71 kB         108 kB
+├ ○ /admin                                 3.54 kB         288 kB
+├ ○ /admin/login                             141 B         288 kB
+├ ○ /admin/signup                            141 B         288 kB
+├ ƒ /api/account/access                      219 B         103 kB
+├ ƒ /api/admin/roles                         219 B         103 kB
+├ ƒ /api/doctor-access                       219 B         103 kB
+├ ƒ /api/doctor/appointments                 219 B         103 kB
+├ ƒ /api/doctor/history                      219 B         103 kB
+├ ƒ /api/invite/create                       219 B         103 kB
+├ ƒ /api/invite/get-link                     219 B         103 kB
+├ ƒ /api/invite/limit                        219 B         103 kB
+├ ƒ /api/invite/revoke                       219 B         103 kB
+├ ƒ /api/invite/validate                     219 B         103 kB
+├ ƒ /api/link-patient-consultations          219 B         103 kB
+├ ƒ /api/livekit/media-key                   219 B         103 kB
+├ ƒ /api/password-reset                      219 B         103 kB
+├ ƒ /api/patient/consent                     219 B         103 kB
+├ ƒ /api/patient/consultations               219 B         103 kB
+├ ƒ /api/patient/pending-waiting-room        219 B         103 kB
+├ ƒ /api/session-chat/attachments            219 B         103 kB
+├ ƒ /api/session-chat/attachments/extract    219 B         103 kB
+├ ƒ /api/session-chat/messages               219 B         103 kB
+├ ƒ /api/session-transcription/chunks        219 B         103 kB
+├ ƒ /api/summary/delete                      219 B         103 kB
+├ ƒ /api/summary/generate                    219 B         103 kB
+├ ƒ /api/summary/process-queue               219 B         103 kB
+├ ƒ /api/summary/update                      219 B         103 kB
+├ ƒ /api/token                               219 B         103 kB
+├ ƒ /api/track-consultation                  219 B         103 kB
+├ ƒ /api/track-doctor-presence               219 B         103 kB
+├ ƒ /api/user/role-conflict                  219 B         103 kB
+├ ƒ /api/waiting-room/admit                  219 B         103 kB
+├ ƒ /api/waiting-room/check-admission        219 B         103 kB
+├ ƒ /api/waiting-room/list                   219 B         103 kB
+├ ƒ /api/waiting-room/mark-left              219 B         103 kB
+├ ƒ /api/waiting-room/reject                 219 B         103 kB
+├ ƒ /api/webhook                             219 B         103 kB
+├ ƒ /create-room/[room]                    5.68 kB         290 kB
+├ ○ /dashboard                             5.07 kB         284 kB
+├ ○ /doctor/appointments                   5.03 kB         289 kB
+├ ○ /doctor/dashboard                      8.12 kB         292 kB
+├ ƒ /doctor/history                          219 B         103 kB
+├ ○ /doctor/invitations                    11.7 kB         309 kB
+├ ○ /doctor/login                          8.85 kB         291 kB
+├ ○ /icon.svg                                  0 B            0 B
+├ ○ /invitations                             523 B         103 kB
+├ ƒ /invite/[token]                         7.8 kB         488 kB
+├ ○ /login                                   601 B         103 kB
+├ ○ /patient/dashboard                     9.09 kB         291 kB
+├ ○ /patient/login                         5.73 kB         284 kB
+├ ƒ /room/[room]                             201 B         505 kB
+├ ƒ /room/[room]/doctor                      201 B         505 kB
+├ ƒ /room/[room]/patient                   4.93 kB         488 kB
+├ ƒ /room/[room]/redirect                    533 B         103 kB
+└ ○ /super-admin/login                       140 B         288 kB
++ First Load JS shared by all               103 kB
+  ├ chunks/1255-35a7bdaef956d9ad.js        46.6 kB
+  ├ chunks/4bd1b696-f785427dddbba9fb.js    54.2 kB
+  └ other shared chunks (total)            1.99 kB
+
+
+ƒ Middleware                               34.9 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

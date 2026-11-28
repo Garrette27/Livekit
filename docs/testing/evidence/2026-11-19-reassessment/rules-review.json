@@ -1,0 +1,34 @@
+{
+  "score": 2,
+  "rubric": "Firebase security-rules-auditor skill 1-5 rubric; engineering assessment only, not certification",
+  "summary": "Profile protections pass but consultation create/update permit forged participant identity and owner reassignment under retrieved production source.",
+  "findings": [
+    {
+      "check": "Authority source and business boundary",
+      "severity": "major",
+      "issue": "Authenticated patient can create consultation with another patientUserId; target can read injected record.",
+      "recommendation": "Centralize consultation writes behind server-authorized commands or specify equivalent bounded client rules."
+    },
+    {
+      "check": "Update bypass",
+      "severity": "major",
+      "issue": "Existing owner can change createdBy and patientUserId through direct update.",
+      "recommendation": "Keep creator, patient and encounter ownership immutable; add positive and negative regressions."
+    },
+    {
+      "check": "Storage abuse and type safety",
+      "severity": "minor",
+      "issue": "Consultation client create/update do not define an application field/type/size schema. No resource-exhaustion workload was run.",
+      "recommendation": "Define a bounded schema if client writes remain permitted."
+    }
+  ],
+  "checklist": {
+    "updateBypass": "FAIL: ADD02",
+    "authoritySource": "FAIL: ADD01",
+    "businessPurpose": "FAIL: server role boundary not mirrored by database",
+    "storageAbuse": "Source observation: consultation schema lacks application bounds; load not tested",
+    "typeSafety": "Source observation: consultation fields other than create owner not typed",
+    "fieldAndIdentityScope": "Old-owner check exists, new identity fields unrestricted"
+  },
+  "productionWrites": false
+}

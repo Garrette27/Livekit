@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-28",
+  "environment": "Local Linux/WSL, Node 22.22.2; synthetic browser and authentication adapters",
+  "typecheck": { "status": "passed", "log": "typecheck-final.log" },
+  "securityRegression": { "status": "passed", "log": "security-final.log" },
+  "focusedAdministration": { "passed": 25, "failed": 0, "log": "auth-final.log" },
+  "deviceAndWorkspace": { "passed": 8, "failed": 0, "log": "device-browser.log" },
+  "build": { "status": "passed", "log": "build-final.log" },
+  "fullLint": {
+    "status": "failed_on_preexisting_untracked_evidence",
+    "log": "lint.log",
+    "preservedFile": "docs/testing/evidence/2026-11-19-reassessment/supplemental-rules.cjs"
+  },
+  "scopedLint": { "status": "passed_with_one_existing_appointment_warning", "log": "lint-final.log" },
+  "review": { "status": "no_remaining_actionable_findings", "fixedFinding": "Completed doctor access checks retained a pending skeleton after sign-in method changes" },
+  "documents": {
+    "status": "passed",
+    "log": "documents.log",
+    "thesisPages": 259,
+    "changedPhysicalPages": [66, 86, 98, 106, 111],
+    "changedPrintedPages": [54, 74, 86, 94, 99],
+    "panelQuestions": 100,
+    "panelPdfPages": 18,
+    "quickAnswerPages": 2
+  },
+  "deploymentPerformed": false,
+  "productionWritesPerformed": false,
+  "schedulingEnabled": false,
+  "realHardwareAndAuthenticatedCallAcceptance": "not_performed"
+}

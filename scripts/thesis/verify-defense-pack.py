@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import re
 import sys
+import tempfile
 
 sys.path.insert(0, r"C:/Users/garre/AppData/Local/Temp/teleconsole-pdf-deps")
 import pymupdf as fitz
@@ -15,17 +16,42 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[2]
 PACK = ROOT / "docs/thesis-defense"
-latest_report = PACK / "evidence/appointments-defense-2026-11-27/pdf-verification.json"
-report_path = latest_report if latest_report.exists() else PACK / "evidence/pdf-verification.json"
+incremental_report = PACK / "evidence/admin-oversight-2026-11-28/pdf-verification.json"
+previous_report = PACK / "evidence/appointments-defense-2026-11-27/pdf-verification.json"
+report_path = next(path for path in (incremental_report, previous_report, PACK / "evidence/pdf-verification.json") if path.exists())
 report = json.loads(report_path.read_text(encoding="utf-8"))
 thesis = PACK / "TeleConsole-Revised-259-Pages.pdf"
 assert hashlib.sha256(thesis.read_bytes()).hexdigest() == report["output_sha256"]
 assert len(fitz.open(thesis)) == 259 and all(report["assertions"].values())
-assert report["public_copy"]
 manifest = json.loads((PACK / "revision-manifest.json").read_text(encoding="utf-8"))
-assert len(report["edits"]) == len(manifest)
-assert {edit["pdf_page"] for edit in report["edits"]} == {edit["page"] for edit in manifest}
-assert {edit["id"] for edit in report["edits"]} == {edit["id"] for edit in manifest}
+if report_path == incremental_report:
+    # The current run starts from the verified public copy and preserves every
+    # untouched pixel. Its five regions are not the cumulative 48-region history.
+    baseline = json.loads(previous_report.read_text(encoding="utf-8"))
+    assert baseline["public_copy"] and all(baseline["assertions"].values())
+    assert report["source_sha256"] == baseline["output_sha256"]
+    selected_manifest = json.loads((PACK / "revision-manifest-2026-11-28.json").read_text(encoding="utf-8"))
+    assert {edit["id"] for edit in manifest} == {edit["id"] for edit in baseline["edits"]} | {edit["id"] for edit in selected_manifest}
+else:
+    assert report["public_copy"]
+    selected_manifest = manifest
+assert len(report["edits"]) == len(selected_manifest)
+assert {edit["pdf_page"] for edit in report["edits"]} == {edit["page"] for edit in selected_manifest}
+assert {edit["id"] for edit in report["edits"]} == {edit["id"] for edit in selected_manifest}
+for edit in selected_manifest:
+    assert next(item for item in manifest if item["id"] == edit["id"])["replacement"] == edit["replacement"]
+
+artifact_report_path = PACK / "evidence/admin-oversight-2026-11-28/artifact-verification.json"
+if report_path == incremental_report:
+    artifacts = json.loads(artifact_report_path.read_text(encoding="utf-8"))["artifacts"]
+    for name, artifact in artifacts.items():
+        artifact_path = PACK / name
+        assert hashlib.sha256(artifact_path.read_bytes()).hexdigest() == artifact["sha256"], name
+        assert len(fitz.open(artifact_path)) == artifact["pages"], name
+    bank = (PACK / "panel-questions-and-answers.md").read_text(encoding="utf-8")
+    assert list(map(int, re.findall(r"^### (\d+)\.", bank, re.M))) == list(range(1, 101))
+    question_pages = artifacts["TeleConsole-Panel-Questions-and-Answers.pdf"]["question_heading_pages"]
+    assert set(map(int, question_pages)) == set(range(1, 101))
 
 missing_links = []
 for source in PACK.glob("*.md"):
@@ -37,7 +63,7 @@ assert not missing_links, missing_links
 
 brief_path = ROOT / "output/pdf/TeleConsole-Capacity-Cost-and-Defense-Team-Brief.pdf"
 brief = fitz.open(brief_path)
-qa = ROOT / "tmp/pdfs/defense-brief-qa"
+qa = Path(tempfile.gettempdir()) / "teleconsole-defense-brief-qa"
 qa.mkdir(parents=True, exist_ok=True)
 tiles = []
 for index, page in enumerate(brief):
@@ -61,5 +87,6 @@ for start in range(0, len(tiles), 12):
         sheet.paste(tile, ((offset % 4) * 265, (offset // 4) * 372))
     sheet.save(qa / f"contact-{start + 1:02}.png")
 print(json.dumps({"thesis_pages": 259, "substantive_edits": len(manifest), "substantive_pages": len({edit["page"] for edit in manifest}),
+    "current_run_edits": len(selected_manifest), "current_run_physical_pages": sorted({edit["page"] for edit in selected_manifest}),
     "brief_pages": len(brief), "local_markdown_links_valid": True,
     "brief_text_within_margins": True, "thesis_sha256_matches_report": True}, indent=2))

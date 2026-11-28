@@ -14,7 +14,8 @@ invitation link is a separate, capability-based mechanism — see
 | `doctor` | Own rooms, invitations, waiting queues, consultation history, and summaries |
 | `patient` | Own patient history, invited room entry, and patient-owned deletion actions |
 | `faculty_reviewer` | No clinical data by default; reserved for explicitly assigned, read-only thesis reviews |
-| `admin` | Server permission map includes all application actions; maintenance endpoints still require `ADMIN_SECRET_KEY` |
+| `admin` | Clinic-scoped doctor provisioning; no clinical permissions; maintenance endpoints separately require `ADMIN_SECRET_KEY` |
+| `super_admin` (server-derived authority, not an application role claim) | Platform staff and clinic-administrator provisioning; no clinical permissions |
 
 The `faculty_reviewer` role is intentionally deny-by-default. Adding a professor
 does not automatically expose every consultation. Before enabling a reviewer UI,
@@ -35,7 +36,8 @@ first administrator is bootstrapped by the server-only `SUPER_ADMIN_EMAILS`
 setting (provider-verified emails). Super admins grant doctor and admin;
 admins grant doctor; nobody changes their own role; patient accounts are not
 converted. Each change writes `adminAuditEvents` (uids only). Grants appear on
-ID-token refresh; only revocations revoke refresh tokens. Manual steps, equivalently:
+ID-token refresh. Revocations and grants that replace clinical authority with
+administrative authority (or the reverse) revoke refresh tokens. Manual steps, equivalently:
 
 1. Create the Firebase Authentication account.
 2. Set the Firebase custom claim `role` to `doctor`, `faculty_reviewer`, or
@@ -45,7 +47,8 @@ ID-token refresh; only revocations revoke refresh tokens. Manual steps, equivale
 4. Refresh the recipient's ID token after a grant. Revoke refresh tokens when
    removing access; existing ID tokens and transport grants have separate expiry.
 
-Administrator entry uses `/admin/login` and identity-only `/admin/signup`.
+Clinic-administrator entry uses `/admin/login` and identity-only `/admin/signup`.
+The platform owner signs in separately at `/super-admin/login`.
 Signup never writes privileged claims or clinician profiles. `/api/account/access`
 returns a private, server-derived navigation projection: administrators land in
 `/admin`, doctors in Invitations. It grants no permission. The environment-owned,
@@ -56,6 +59,39 @@ does not grant Administration. Newly approved users explicitly refresh access.
 Roles cannot be changed by editing a browser request. Firestore rules keep a
 profile's email and role immutable, and API routes resolve permissions from
 verified Firebase tokens plus the server-side user profile.
+
+### Separate sign-in intent, shared server authorization
+
+`/doctor/login` accepts only a server-projected doctor account. Google and
+password entry both reject and sign out clinic administrators, configured
+platform owners and other roles before any doctor-profile write. It does not
+redirect an administrative identity into `/admin`.
+
+`/admin/login` accepts exactly the `admin` authority; `/super-admin/login`
+accepts exactly `super_admin`. A mismatched authenticated identity is signed
+out with an inline explanation, including when an existing session chooses
+**Check access again**. Neither route automatically forwards a restored
+session. `/admin/signup` creates only a Firebase identity for clinic access;
+it cannot grant a role or configure a platform owner. The platform-owner entry
+has no signup option. Both accepted administrative authorities use `/admin`,
+where every staff command re-checks role and clinic scope on the server.
+Signing out there shows the explicitly named clinic and super-administrator
+sign-in choices.
+
+Pattern and tradeoff: role-specific entry makes the user's workspace intent
+explicit while sharing the identity-provider and access-check implementation.
+This costs a separate entry URL for each administrative audience, and selecting
+the wrong one requires signing in again. It adds no authorization by itself:
+the server's verified token, trusted role policy and ownership checks remain
+authoritative on every protected request. This follows
+[Firebase's server-managed custom-claims pattern](https://firebase.google.com/docs/auth/admin/custom-claims)
+and [OWASP's least-privilege, deny-by-default and per-request authorization guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html).
+
+Local verification uses synthetic identities and isolated identity-provider /
+database adapters in `tests/admin-workspace-regressions.test.mjs`. It exercises
+Google/password acceptance and rejection, sign-out, existing-session refresh,
+identity-only signup and access-service failure. These are repository tests,
+not evidence of deployed Firebase accounts or live provider sign-in.
 
 ## Ownership boundaries
 

@@ -1,0 +1,559 @@
+{
+  "testedAt": "2026-11-19T06:37:34.184Z",
+  "origin": "https://livekit-frontend-tau.vercel.app",
+  "environment": "production, anonymous read/rejection probes",
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/doctor/history",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 418,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/patient/consultations",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 265,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/patient/pending-waiting-room",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 267,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/summary/process-queue",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 1366,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/invite/get-link?roomName=thesis-synthetic",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 261,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "GET",
+      "path": "/api/waiting-room/list",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 294,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/doctor-access",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 265,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/invite/create",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 775,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/invite/revoke",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 313,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/link-patient-consultations",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 317,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/patient/consent",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 774,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/summary/generate",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 281,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/token",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 271,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/track-consultation",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 287,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/track-doctor-presence",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 288,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/user/role-conflict",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 277,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/waiting-room/admit",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 275,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/waiting-room/check-admission",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 255,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/waiting-room/mark-left",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 280,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/waiting-room/reject",
+      "statusCode": 401,
+      "successFalse": true,
+      "totalMs": 320,
+      "expected": 401,
+      "status": "PASS"
+    },
+    {
+      "method": "POST",
+      "path": "/api/webhook",
+      "statusCode": 401,
+      "successFalse": false,
+      "totalMs": 2127,
+      "expected": 401,
+      "status": "PASS"
+    }
+  ],
+  "pages": [
+    {
+      "path": "/",
+      "samples": [
+        {
+          "trial": 1,
+          "statusCode": 200,
+          "headersMs": 37,
+          "totalMs": 38,
+          "bytes": 6758,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 2,
+          "statusCode": 200,
+          "headersMs": 42,
+          "totalMs": 42,
+          "bytes": 6758,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 3,
+          "statusCode": 200,
+          "headersMs": 50,
+          "totalMs": 50,
+          "bytes": 6758,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 4,
+          "statusCode": 200,
+          "headersMs": 39,
+          "totalMs": 40,
+          "bytes": 6758,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 5,
+          "statusCode": 200,
+          "headersMs": 35,
+          "totalMs": 35,
+          "bytes": 6758,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 6,
+          "statusCode": 200,
+          "headersMs": 49,
+          "totalMs": 50,
+          "bytes": 6758,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 7,
+          "statusCode": 200,
+          "headersMs": 40,
+          "totalMs": 41,
+          "bytes": 6758,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 8,
+          "statusCode": 200,
+          "headersMs": 35,
+          "totalMs": 35,
+          "bytes": 6758,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 9,
+          "statusCode": 200,
+          "headersMs": 69,
+          "totalMs": 69,
+          "bytes": 6758,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 10,
+          "statusCode": 200,
+          "headersMs": 40,
+          "totalMs": 41,
+          "bytes": 6758,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        }
+      ],
+      "n": 10,
+      "medianMs": 41,
+      "p95Ms": 69,
+      "criterion": "10/10 HTTP 200 and nearest-rank p95 full response body <=3000 ms; sequential 250 ms spacing; single WSL machine, no network throttling",
+      "status": "PASS"
+    },
+    {
+      "path": "/access-denied?reason=invalid-token",
+      "samples": [
+        {
+          "trial": 1,
+          "statusCode": 200,
+          "headersMs": 1296,
+          "totalMs": 1297,
+          "bytes": 6692,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "PRERENDER",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 2,
+          "statusCode": 200,
+          "headersMs": 65,
+          "totalMs": 65,
+          "bytes": 6692,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 3,
+          "statusCode": 200,
+          "headersMs": 68,
+          "totalMs": 68,
+          "bytes": 6692,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 4,
+          "statusCode": 200,
+          "headersMs": 61,
+          "totalMs": 61,
+          "bytes": 6692,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 5,
+          "statusCode": 200,
+          "headersMs": 55,
+          "totalMs": 55,
+          "bytes": 6692,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 6,
+          "statusCode": 200,
+          "headersMs": 52,
+          "totalMs": 52,
+          "bytes": 6692,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 7,
+          "statusCode": 200,
+          "headersMs": 57,
+          "totalMs": 57,
+          "bytes": 6692,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 8,
+          "statusCode": 200,
+          "headersMs": 86,
+          "totalMs": 86,
+          "bytes": 6692,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 9,
+          "statusCode": 200,
+          "headersMs": 69,
+          "totalMs": 69,
+          "bytes": 6692,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        },
+        {
+          "trial": 10,
+          "statusCode": 200,
+          "headersMs": 68,
+          "totalMs": 68,
+          "bytes": 6692,
+          "headers": {
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.livekit.cloud wss://*.livekit.cloud https://*.firebaseapp.com https://*.web.app https://*.googleapis.com https://www.google.com https://apis.google.com https://securetoken.google.com https://identitytoolkit.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.web.app; media-src 'self' https://*.livekit.cloud; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cache-control": "public, max-age=0, must-revalidate",
+            "x-vercel-cache": "HIT",
+            "x-nextjs-cache": null
+          }
+        }
+      ],
+      "n": 10,
+      "medianMs": 66.5,
+      "p95Ms": 1297,
+      "criterion": "10/10 HTTP 200 and nearest-rank p95 full response body <=3000 ms; sequential 250 ms spacing; single WSL machine, no network throttling",
+      "status": "PASS"
+    }
+  ],
+  "finishedAt": "2026-11-19T06:37:58.247Z"
+}

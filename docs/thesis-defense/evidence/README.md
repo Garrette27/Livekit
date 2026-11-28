@@ -1,4 +1,8 @@
-# Evidence index: 25 November 2026
+# Evidence index: historical checkpoints and current documents
+
+Current local document checkpoint (28 November): [integrity evidence](admin-oversight-2026-11-28/README.md), [current artifact hashes](admin-oversight-2026-11-28/artifact-verification.json) and [259-page incremental verification](admin-oversight-2026-11-28/pdf-verification.json). The thesis, 100-question bank and quick answers were regenerated locally; no publication/deployment is implied. `checksums.txt` is explicitly historical and must not be applied to modified working-tree PDFs. Its refresh script fingerprints reviewed Git/index blobs; no privacy guard was bypassed to manufacture current publication hashes.
+
+## 25 November historical evidence
 
 Scope: source baseline `aa041fe0fa43017856cbff3f69ae83502aaad061` plus the app changes published with this pack. Node 22.23.0 on local Ubuntu/WSL. Synthetic data only; no paid AI requests, cloud media load, production clinical reads/writes, migration or rules release. Final commit identity is discoverable from this folder's Git history; source fingerprints are in `checksums.txt`.
 
@@ -6,7 +10,7 @@ App/artifact checkpoint `25cd516fff4cc81fd9b406745f6d7aad6f7c14f1` is on main. [
 
 `checksums.txt` fingerprints published **Git blobs**, excluding itself, rather than promising identical Windows working-copy line endings. Verify against the publication commit's blobs; CRLF conversion in a local checkout can legitimately change raw text-file bytes. The manuscript's separate SHA-256 check is on PDF file bytes.
 
-The later [waiting-queue/title checkpoint](queue-title-2026-11-25/README.md) adds six manuscript corrections and documents the non-atomic waiting-capacity gap. Its report matches the current 38-edit manuscript. The table below preserves the initial `25cd516` evidence and does not relabel the capacity finding as passed.
+The later [waiting-queue/title checkpoint](queue-title-2026-11-25/README.md) adds six manuscript corrections and documents the non-atomic waiting-capacity gap. Its report matched the 38-edit manuscript at that checkpoint; the current document report is linked above. The table below preserves the initial `25cd516` evidence and does not relabel the capacity finding as passed.
 
 ## Initial checkpoint results (`25cd516`)
 

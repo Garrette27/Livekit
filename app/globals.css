@@ -135,125 +135,35 @@ a {
   word-break: break-word;
 }
 
-/* LiveKit Dropdown Menu Fixes - Better Visibility */
-.lk-device-menu,
-.lk-dropdown,
-.lk-menu {
-  background-color: #ffffff !important;
-  border: 1px solid #d1d5db !important;
-  border-radius: 0.5rem !important;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
-  z-index: 10000 !important;
+/* LiveKit owns popup placement (computed top/left, viewport flip and shift).
+   Keep presentation shared by preflight and in-call controls; adding a bottom
+   inset here constrains the computed popup to a clipped strip. */
+[data-lk-theme] .lk-device-menu {
+  --lk-bg2: #ffffff;
+  --lk-bg3: #f1f5f9;
+  --lk-control-bg: #ffffff;
+  --lk-control-fg: #1f2937;
+  --lk-control-hover-bg: #f1f5f9;
+  --lk-accent-bg: #dbeafe;
+  --lk-accent-fg: #1e3a8a;
+  --lk-border-color: #cbd5e1;
+  color: #1f2937;
+  z-index: 10100;
+  min-width: min(16rem, calc(100vw - 1rem));
+  max-width: min(28rem, calc(100vw - 1rem));
+  max-height: min(50vh, 24rem);
+  overflow-y: auto;
 }
 
-.lk-device-menu-item,
-.lk-dropdown-item,
-.lk-menu-item {
-  background-color: #ffffff !important;
-  color: #374151 !important;
-  padding: 0.75rem 1rem !important;
-  border-bottom: 1px solid #f3f4f6 !important;
-  font-size: 0.875rem !important;
-  font-weight: 500 !important;
-  transition: background-color 0.2s ease !important;
+[data-lk-theme] .lk-device-menu .lk-media-device-select .lk-button {
+  min-height: 44px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+  line-height: 1.4;
 }
 
-.lk-device-menu-item:hover,
-.lk-dropdown-item:hover,
-.lk-menu-item:hover {
-  background-color: #f3f4f6 !important;
-  color: #111827 !important;
-}
-
-.lk-device-menu-item:last-child,
-.lk-dropdown-item:last-child,
-.lk-menu-item:last-child {
-  border-bottom: none !important;
-}
-
-/* Ensure dropdown text is always visible */
-.lk-device-menu-item span,
-.lk-dropdown-item span,
-.lk-menu-item span {
-  color: #374151 !important;
-  font-weight: 500 !important;
-}
-
-.lk-device-menu-item:hover span,
-.lk-dropdown-item:hover span,
-.lk-menu-item:hover span {
-  color: #111827 !important;
-}
-
-/* Fix for microphone and camera dropdown buttons */
-.lk-device-menu button,
-.lk-dropdown button {
-  background-color: #ffffff !important;
-  color: #374151 !important;
-  border: 1px solid #d1d5db !important;
-  border-radius: 0.375rem !important;
-  padding: 0.5rem 0.75rem !important;
-  font-size: 0.875rem !important;
-  font-weight: 500 !important;
-  transition: all 0.2s ease !important;
-}
-
-.lk-device-menu button:hover,
-.lk-dropdown button:hover {
-  background-color: #f3f4f6 !important;
-  color: #111827 !important;
-  border-color: #9ca3af !important;
-}
-
-/* Ensure dropdown arrows are visible */
-.lk-device-menu button svg,
-.lk-dropdown button svg {
-  color: #6b7280 !important;
-  fill: #6b7280 !important;
-}
-
-.lk-device-menu button:hover svg,
-.lk-dropdown button:hover svg {
-  color: #374151 !important;
-  fill: #374151 !important;
-}
-
-/* Additional fixes for LiveKit control bar dropdowns */
-.lk-control-bar .lk-device-menu,
-.lk-control-bar .lk-dropdown {
-  position: absolute !important;
-  bottom: 100% !important;
-  margin-bottom: 0.5rem !important;
-  min-width: 200px !important;
-}
-
-/* Force white background for all LiveKit dropdowns regardless of theme */
-[class*="lk-device-menu"],
-[class*="lk-dropdown"],
-[class*="lk-menu"] {
-  background-color: #ffffff !important;
-  color: #374151 !important;
-}
-
-/* Override any inline styles that might be setting dark backgrounds */
-.lk-device-menu[style*="background"],
-.lk-dropdown[style*="background"],
-.lk-menu[style*="background"] {
-  background-color: #ffffff !important;
-}
-
-.lk-device-menu-item[style*="color"],
-.lk-dropdown-item[style*="color"],
-.lk-menu-item[style*="color"] {
-  color: #374151 !important;
-}
-
-/* Ensure proper contrast for accessibility */
-.lk-device-menu-item:focus,
-.lk-dropdown-item:focus,
-.lk-menu-item:focus {
-  background-color: #dbeafe !important;
-  color: #1e40af !important;
-  outline: 2px solid #3b82f6 !important;
-  outline-offset: -2px !important;
+[data-lk-theme] .lk-device-menu .lk-button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
 }

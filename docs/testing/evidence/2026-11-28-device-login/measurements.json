@@ -1,0 +1,236 @@
+[
+  {
+    "width": 1280,
+    "height": 800,
+    "kind": "audioinput",
+    "button": {
+      "x": 412.3515625,
+      "y": 653.234375,
+      "width": 430,
+      "height": 60.78125,
+      "right": 842.3515625,
+      "bottom": 714.015625
+    },
+    "item": {
+      "x": 412.3515625,
+      "y": 653.234375,
+      "width": 430,
+      "height": 60.78125,
+      "right": 842.3515625,
+      "bottom": 714.015625
+    },
+    "list": {
+      "x": 412.3515625,
+      "y": 605.234375,
+      "width": 430,
+      "height": 108.78125,
+      "right": 842.3515625,
+      "bottom": 714.015625
+    },
+    "menu": {
+      "x": 403.3515625,
+      "y": 596.234375,
+      "width": 448,
+      "height": 126.78125,
+      "right": 851.3515625,
+      "bottom": 723.015625
+    },
+    "hit": true,
+    "background": "rgb(255, 255, 255)"
+  },
+  {
+    "width": 1280,
+    "height": 800,
+    "kind": "videoinput",
+    "button": {
+      "x": 581.5078125,
+      "y": 670,
+      "width": 405.515625,
+      "height": 44,
+      "right": 987.0234375,
+      "bottom": 714
+    },
+    "item": {
+      "x": 581.5078125,
+      "y": 670,
+      "width": 405.515625,
+      "height": 44,
+      "right": 987.0234375,
+      "bottom": 714
+    },
+    "list": {
+      "x": 581.5078125,
+      "y": 622,
+      "width": 405.515625,
+      "height": 92,
+      "right": 987.0234375,
+      "bottom": 714
+    },
+    "menu": {
+      "x": 572.5078125,
+      "y": 613,
+      "width": 423.515625,
+      "height": 110,
+      "right": 996.0234375,
+      "bottom": 723
+    },
+    "hit": true,
+    "background": "rgb(255, 255, 255)"
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "kind": "audioinput",
+    "button": {
+      "x": 14,
+      "y": 705.234375,
+      "width": 356,
+      "height": 60.78125,
+      "right": 370,
+      "bottom": 766.015625
+    },
+    "item": {
+      "x": 14,
+      "y": 705.234375,
+      "width": 356,
+      "height": 60.78125,
+      "right": 370,
+      "bottom": 766.015625
+    },
+    "list": {
+      "x": 14,
+      "y": 657.234375,
+      "width": 356,
+      "height": 108.78125,
+      "right": 370,
+      "bottom": 766.015625
+    },
+    "menu": {
+      "x": 5,
+      "y": 648.234375,
+      "width": 374,
+      "height": 126.78125,
+      "right": 379,
+      "bottom": 775.015625
+    },
+    "hit": true,
+    "background": "rgb(255, 255, 255)"
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "kind": "videoinput",
+    "button": {
+      "x": 20,
+      "y": 705.234375,
+      "width": 356,
+      "height": 60.78125,
+      "right": 376,
+      "bottom": 766.015625
+    },
+    "item": {
+      "x": 20,
+      "y": 705.234375,
+      "width": 356,
+      "height": 60.78125,
+      "right": 376,
+      "bottom": 766.015625
+    },
+    "list": {
+      "x": 20,
+      "y": 657.234375,
+      "width": 356,
+      "height": 108.78125,
+      "right": 376,
+      "bottom": 766.015625
+    },
+    "menu": {
+      "x": 11,
+      "y": 648.234375,
+      "width": 374,
+      "height": 126.78125,
+      "right": 385,
+      "bottom": 775.015625
+    },
+    "hit": true,
+    "background": "rgb(255, 255, 255)"
+  },
+  {
+    "width": 320,
+    "height": 568,
+    "kind": "audioinput",
+    "button": {
+      "x": 14,
+      "y": 429.234375,
+      "width": 286,
+      "height": 60.78125,
+      "right": 300,
+      "bottom": 490.015625
+    },
+    "item": {
+      "x": 14,
+      "y": 429.234375,
+      "width": 286,
+      "height": 60.78125,
+      "right": 300,
+      "bottom": 490.015625
+    },
+    "list": {
+      "x": 14,
+      "y": 381.234375,
+      "width": 286,
+      "height": 108.78125,
+      "right": 300,
+      "bottom": 490.015625
+    },
+    "menu": {
+      "x": 5,
+      "y": 372.234375,
+      "width": 304,
+      "height": 126.78125,
+      "right": 309,
+      "bottom": 499.015625
+    },
+    "hit": true,
+    "background": "rgb(255, 255, 255)"
+  },
+  {
+    "width": 320,
+    "height": 568,
+    "kind": "videoinput",
+    "button": {
+      "x": 20,
+      "y": 429.234375,
+      "width": 286,
+      "height": 60.78125,
+      "right": 306,
+      "bottom": 490.015625
+    },
+    "item": {
+      "x": 20,
+      "y": 429.234375,
+      "width": 286,
+      "height": 60.78125,
+      "right": 306,
+      "bottom": 490.015625
+    },
+    "list": {
+      "x": 20,
+      "y": 381.234375,
+      "width": 286,
+      "height": 108.78125,
+      "right": 306,
+      "bottom": 490.015625
+    },
+    "menu": {
+      "x": 11,
+      "y": 372.234375,
+      "width": 304,
+      "height": 126.78125,
+      "right": 315,
+      "bottom": 499.015625
+    },
+    "hit": true,
+    "background": "rgb(255, 255, 255)"
+  }
+]

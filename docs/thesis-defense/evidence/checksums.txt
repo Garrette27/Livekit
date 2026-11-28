@@ -1,3 +1,6 @@
+# Historical published Git-blob inventory retained from the previous checkpoint.
+# Current 28 November local PDF hashes are in admin-oversight-2026-11-28/artifact-verification.json.
+# This list is not a checksum assertion for the modified working-tree files.
 34960948af65c6a39c90b96275174c397560c7a9705a7a20adcc35579aaf7d24  app/api/session-chat/messages/route.ts
 ec2bd64145f2c773234f6d6b1f1ed640e85e3c2f893febc3b64c9884193ff23c  app/api/summary/generate/route.ts
 6931d2960e6c3dae92a5320fab7b520732fe2c4a3a349a87bb0b80d97de9a3a7  app/room/[room]/components/shared/RoomShell.tsx

@@ -1,0 +1,8 @@
+[
+  {
+    "name": "vercel",
+    "enabled": true,
+    "auth_status": "o_auth",
+    "url": "https://mcp.vercel.com"
+  }
+]

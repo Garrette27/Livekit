@@ -1,0 +1,14 @@
+
+> livekit-frontend@0.2.0 lint
+> eslint .
+
+
+/home/ret/Livekit/app/doctor/appointments/components/AppointmentWorkbench.tsx
+  58:56  warning  The ref value 'readRevision.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'readRevision.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+
+/home/ret/Livekit/docs/testing/evidence/2026-11-19-reassessment/supplemental-rules.cjs
+  2:23  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  6:36  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+✖ 3 problems (2 errors, 1 warning)
+

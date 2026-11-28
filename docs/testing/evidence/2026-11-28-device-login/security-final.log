@@ -1,0 +1,58 @@
+
+> livekit-frontend@0.2.0 test:security
+> node scripts/regression-security-contracts.mjs && node scripts/regression-thesis-flow-contracts.mjs && node --test tests/security-policies.test.mjs tests/queue-and-auth-regressions.test.mjs tests/defense-load-regressions.test.mjs tests/admin-workspace-regressions.test.mjs tests/encounter-history-regressions.test.mjs tests/consultation-workspace.test.mjs tests/appointment-regressions.test.mjs
+
+Security architecture regression contracts passed.
+Thesis invitation, consent, summary, and UI contracts verified.
+TAP version 13
+# Subtest: tests/admin-workspace-regressions.test.mjs
+ok 1 - tests/admin-workspace-regressions.test.mjs
+  ---
+  duration_ms: 1819.90863
+  type: 'test'
+  ...
+# Subtest: tests/appointment-regressions.test.mjs
+ok 2 - tests/appointment-regressions.test.mjs
+  ---
+  duration_ms: 960.343762
+  type: 'test'
+  ...
+# Subtest: tests/consultation-workspace.test.mjs
+ok 3 - tests/consultation-workspace.test.mjs
+  ---
+  duration_ms: 860.993417
+  type: 'test'
+  ...
+# Subtest: tests/defense-load-regressions.test.mjs
+ok 4 - tests/defense-load-regressions.test.mjs
+  ---
+  duration_ms: 1221.350478
+  type: 'test'
+  ...
+# Subtest: tests/encounter-history-regressions.test.mjs
+ok 5 - tests/encounter-history-regressions.test.mjs
+  ---
+  duration_ms: 1244.026982
+  type: 'test'
+  ...
+# Subtest: tests/queue-and-auth-regressions.test.mjs
+ok 6 - tests/queue-and-auth-regressions.test.mjs
+  ---
+  duration_ms: 2033.027179
+  type: 'test'
+  ...
+# Subtest: tests/security-policies.test.mjs
+ok 7 - tests/security-policies.test.mjs
+  ---
+  duration_ms: 870.105551
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2048.49887

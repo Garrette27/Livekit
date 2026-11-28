@@ -103,7 +103,8 @@ export default function AdminPage() {
         <section style={{ maxWidth: '30rem', padding: '2rem', background: 'white', border: '1px solid #ccdedb', borderRadius: '1rem' }}>
           <h1>Clinic administration</h1>
           <p style={{ margin: '1rem 0' }}>Sign in with your administrator account to manage clinician access.</p>
-          <a href="/admin/login" style={{ display: 'inline-block', padding: '.75rem 1rem', borderRadius: '.5rem', background: '#0f766e', color: 'white' }}>Administrator sign in</a>
+          <a href="/admin/login" style={{ display: 'inline-block', padding: '.75rem 1rem', borderRadius: '.5rem', background: '#0f766e', color: 'white' }}>Clinic administrator sign in</a>
+          <p style={{ marginTop: '1rem' }}><a href="/super-admin/login" style={{ color: '#0f766e', textDecoration: 'underline' }}>Super administrator sign in</a></p>
           <p style={{ marginTop: '1rem' }}><a href="/admin/signup" style={{ color: '#0f766e', textDecoration: 'underline' }}>Create a sign-in account</a> · Access requires owner approval.</p>
         </section>
       </main>

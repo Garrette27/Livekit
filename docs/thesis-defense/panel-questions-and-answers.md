@@ -1,6 +1,8 @@
 # Panel questions and answers: priority study order
 
-27 November 2026. <!-- priority-order-v2 -->
+28 November 2026. <!-- priority-order-v2 -->
+
+Current bank: **100 questions**. Q90–Q100 cover the researched administration pattern, separate staff entry routes and the scheduling release boundary. The original priority order Q1–Q89 is preserved; later source evidence does not rewrite the surveyed build.
 
 Questions 1–20 are the ones every writer must answer without notes; 21–40 are the next most likely follow-ups. The order reflects what a capstone panel probes first (title, security, contribution, AI and consent, numbers) and what the demo proves. Each answer is built as **rule → reason → evidence → boundary**. Numbers come from the dated evidence files and the in-room Call quality panel; anything marked *[fill in]* must be replaced with the team's own trial result or left out.
 
@@ -13,7 +15,7 @@ Yes. Every phrase names something we built and can show.
 | Title phrase | What it means in our system | Evidence we show |
 |---|---|---|
 | **Design and Development** | The objectives are build objectives: Chapter III designs (use case, DFD, ERD, architecture) were implemented as a working, deployed system. | Live demo on the deployed site; Chapter III figures match the routes and modules. |
-| **Secure** | Layered, server-enforced controls: signed invitation links, Firebase sign-in with revocation checks, role-based access, waiting-room admission by the doctor, visit-bound credentials, HMAC-verified LiveKit webhooks, TLS and DTLS-SRTP transport, and an atomic waiting limit. | 139 automated regression tests plus security and flow contract checks on every build; Firestore emulator transaction runs; all four respondent groups rated Security *Highly Acceptable* (3.64 dentists, 3.68 staff, 3.91 patients, 3.80 IT professionals). |
+| **Secure** | Layered, server-enforced controls: signed invitation links, Firebase sign-in with revocation checks, role-based access, waiting-room admission by the doctor, visit-bound credentials, HMAC-verified LiveKit webhooks, TLS and DTLS-SRTP transport, and an atomic waiting limit. | Dated automated regression/security-contract evidence and Firestore emulator transaction runs; all four respondent groups rated Security *Highly Acceptable* (3.64 dentists, 3.68 staff, 3.91 patients, 3.80 IT professionals). |
 | **Telehealth Video Communication System Using LiveKit** | Real-time audio, video, screen sharing and chat over LiveKit's WebRTC SFU, with adaptive streaming and an in-room call-quality readout. | Demo call; Call quality panel shows measured round-trip time, jitter, loss and resolution. |
 | **with AI Summarization** | Consented transcript → evidence gate → structured draft (OpenAI gpt-4o-mini) → clinician review and edit. | Demo of a draft marked *AI draft · review required*; an insufficient-evidence record. |
 | **and Flexible User Access Design** | Three ways in: a verified allowlisted account enters directly, a guest with the link waits for the doctor, a registered patient uses the portal; separate doctor, patient and administrator workspaces. | Demo steps 3–6. |
@@ -22,7 +24,7 @@ Yes. Every phrase names something we built and can show.
 
 ### 2. Why call it secure if you still have limitations?
 
-Secure is our design objective, and we implemented and tested the controls that deliver it: signed invitation links, server-checked roles, a waiting room where only the doctor admits, credentials bound to one visit, revocation checked on every protected request, HMAC-verified webhooks and encrypted transport. Every build runs 139 automated regression tests and security contract checks, and the waiting-limit invariant was verified against Firestore's real transaction engine. Our IT-professional respondents rated Security 3.80, *Highly Acceptable*.
+Secure is our design objective, and we implemented and tested the controls that deliver it: signed invitation links, server-checked roles, a waiting room where only the doctor admits, credentials bound to one visit, revocation checked on every protected request, HMAC-verified webhooks and encrypted transport. Dated local regression/security-contract checks and Firestore emulator runs cover specific implemented invariants; they do not establish a penetration test or universal safety. Our IT-professional respondents rated Security 3.80, *Highly Acceptable*.
 
 What "secure" does not mean is "certified" or "impossible to attack" — no honest system claims that. Chapter I's delimitation says exactly this: no penetration test or compliance certification was part of the study. The next step for a real clinic is an independent penetration test and a privacy impact assessment under RA 10173.
 
@@ -77,10 +79,10 @@ This is the established pattern: Zoom and Microsoft Teams announce recording at 
 We designed for one doctor with one patient per encounter, and the numbers we can state are:
 
 - **Provider ceiling:** our LiveKit Build plan allows **100 concurrent connections** — at most **50 doctor–patient pairs** at one instant, and **5,000 participant-minutes** a month, which is about **125 twenty-minute consultations** a month.
-- **Our own measurement:** every call has a **Call quality** readout (round-trip time, jitter, packet loss, received resolution and frame rate). Our rehearsal trial ran **1, 3 and 5 simultaneous pairs** on separate devices and recorded those numbers: *[fill in from today's trial sheet — e.g. "5 pairs: RTT ≤ __ ms, loss ≤ __ %, 720p at __ fps"; if the trial was not run, say only the two bullets above]*.
+- **Our own measurement:** every call has a **Call quality** readout (round-trip time, jitter, packet loss, received resolution and frame rate). A proposed rehearsal trial would run **1, 3 and 5 simultaneous pairs** on separate devices; claim results only if the team actually recorded them: *[fill in from today's trial sheet — e.g. "5 pairs: RTT ≤ __ ms, loss ≤ __ %, 720p at __ fps"; if the trial was not run, say only the two bullets above]*.
 - **Admission load:** the waiting limit holds at its maximum — 120 arrivals in waves of 10 into a limit of 100 ended with exactly 100 waiting and 18 refused (emulator run).
 
-So the provider ceiling is 50 pairs; what we have measured is the level in our trial sheet; we do not claim beyond what we measured. A clinic with one dentist rarely needs more than one or two at a time.
+So the provider ceiling is 50 pairs; what we have measured is the level in our trial sheet; we do not claim beyond what we measured. The clinic must measure its own workload before selecting an operating plan.
 
 ### 9. Did you do anything about video and audio quality?
 
@@ -157,7 +159,7 @@ Summary deletion is a switch the clinic turns on, by design. The Firebase functi
 
 ### 22. Is appointment scheduling implemented? Why is it switched off in production?
 
-Yes. Doctor-booked appointments are implemented and tested: separate appointment records with UTC times and the clinic's timezone, overlap prevention inside a per-doctor transaction, version-checked rescheduling, cancellation that keeps history, and safe retries — covered by unit, browser and emulator tests. It ships behind a server feature flag that is **off in production on purpose**: turning on a new data store in a clinic requires its database rules and indexes, data-retention review and a signed-in staging check first. That is a standard staged rollout (feature flag), not an unfinished feature. A booking never lets anyone into a call, starts transcription or creates an AI record; those stay with the invitation and encounter. It was built after the survey, so respondents did not evaluate it.
+The repository contains a later doctor-booked `/doctor/appointments` module behind the default-off, server-only `ENABLE_CONSULTATION_SCHEDULING` capability. Ordinary deployments hide its navigation, so its absence is expected. Local tests cover UTC/named-zone times, doctor ownership, overlap transactions, retry receipts and versioned reschedule/cancel; they do not prove production acceptance. Before enabling it, verify rules/indexes, existing-data shape and contact retention, timezone/concurrency/account-switch cases and signed-in staging. Reminders, recurrence, self-booking and calendar sync are excluded. Booking grants no admission, call token or transcript consent. The survey did not evaluate this later module. See [release gates](../production-readiness.md).
 
 ### 23. Is the app tested on phones and tablets?
 
@@ -181,7 +183,7 @@ Every credential is checked against current state when it is used. Invitation st
 
 ### 28. If you sold this to several small clinics, how would accounts be provisioned?
 
-Delegated, tenant-scoped administration: the platform super admin creates a clinic administrator per clinic; each clinic admin grants doctor accounts only within their clinic (claims carry `clinicId`; the server refuses cross-clinic grants and revocations); doctors invite their own patients; patients self-register only as patients. Doctors in different areas cannot see each other's patients because records are owned by the inviting doctor. Before a commercial launch we would add clinic-level record sharing, billing, DPA/RA 10173 compliance work, backups, monitoring and an independent security test.
+Use **delegated, tenant-scoped administration**: the platform operator grants clinic administrators; each clinic administrator manages doctors only in their verified clinic; doctors own their encounters. This follows the provider control-plane/tenant application distinction described by [AWS](https://docs.aws.amazon.com/whitepapers/latest/saas-architecture-fundamentals/control-plane-vs.-application-plane.html). The source already has `clinicId` role checks and separate administrative/clinical identities. A tenant catalog, complete staff pagination, billing and aggregate oversight remain future work. The thesis evaluated a single clinic; staff scope preparation does not prove commercial multi-clinic readiness or clinical sharing.
 
 ### 29. Why have a waiting queue when the patient has a valid link?
 
@@ -193,7 +195,7 @@ The server-only SUPER_ADMIN_EMAILS configuration recognizes the owner's provider
 
 ### 31. Why must administrators use a separate doctor account?
 
-Separation of duties: platform and clinic administrators manage staff access, not consultations. Clinical APIs deny administrator authority even with historical combined doctor/admin claims. New Administrator grants write an administrative role only, and removing it does not restore a legacy doctor profile. A separate clinician identity must be explicitly provisioned. Local Firestore rules also deny administrator clinical access, but require separate deployment. Server-only bootstrap configuration is not visible to those rules, so an environment-only owner's historical doctor claims still need an approved migration. Existing media credentials retain their separate lifecycle; no universal instant revocation is claimed.
+Separation of duties: administrative identity manages staff, while a separately provisioned doctor identity owns clinical work. `/doctor/login` rejects administrator identities, `/admin/login` admits clinic administrators and `/super-admin/login` admits the configured platform owner; Google/password authentication must pass the same server-derived role checks. Both administrator levels reuse `/admin` with server scope. The route is guidance; APIs and Firestore Rules remain the boundary. Legacy mixed claims/profile fallback and already-issued media credentials retain their documented migration/expiry limits. We accept another sign-in for people doing both jobs to avoid turning staff-management access into clinical ownership.
 
 ### 32. If the patient refreshes, do they use up another invitation use?
 
@@ -397,11 +399,11 @@ The initial queue repair was small and additive: a transaction, a signed claim, 
 
 ### 82. Which manuscript pages changed for this topic?
 
-The latest follow-up concerns PDF 66, 71, 75, 106 and 111 / printed 54, 59, 63, 94 and 99: role separation, retention/future attachment cleanup, encounter finalization, responsive context/consent and deployment-gated scheduling. Earlier queue corrections also cover PDF 85, 86, 101 and 102. The complete register lists 45 bounded edits on 37 physical pages. The official title, 259-page count, numbering, expenses and reported survey data remain unchanged. Public privacy masks are separate from research corrections.
+The 28 November follow-up changes physical PDF pages **66, 86, 98, 106 and 111**, whose printed chapter numbers are **54, 74, 86, 94 and 99**. It clarifies separate doctor/clinic/platform entry, server role checks, administrative oversight as future work and hidden scheduling release gates, plus the media-device popup correction. The cumulative manifest has 48 bounded edits across the same 37 physical pages; this update adds three regions and revises two existing regions. The official title, 259-page count, numbering, budget and survey data are preserved. See [exact register](page-change-register.md); public privacy masks are separate.
 
 ### 83. Which manuscript pages changed?
 
-37 physical pages, same 259 pages and numbering; the register lists each page, edit and reason. Objectives and Chapter IV numbers were not edited.
+The current manuscript has 37 cumulatively edited physical pages and remains 259 pages. This follow-up changes five of those pages: physical 66/86/98/106/111, printed 54/74/86/94/99. The [page register](page-change-register.md) records both numbering systems and every reason. Objectives, reported Chapter IV findings and expenses were not changed.
 
 ### 84. What stops a patient opening the patient room URL directly?
 
@@ -420,9 +422,9 @@ No. The official title begins "TeleConsole: Design and Development of a Secure T
 Four kinds, each labelled for what it proves:
 
 1. **Survey results (Chapter IV)** — perceived quality from 30 respondents; all four groups *Highly Acceptable* (3.51–3.94).
-2. **Automated tests** — 139 regression tests plus security and thesis-flow contract checks run on every build, including six-width responsive browser checks.
+2. **Automated checks** — dated local regression, security/thesis-flow and browser evidence for the named source and environment. The 28 November focused login checks and real-component synthetic device tests are separate from earlier six-width viewport evidence; no fixed count is a clinical-quality measure.
 3. **Measured invariants** — Firestore emulator runs (`evidence/queue-capacity-fix-2026-11-27/emulator-capacity.json`): never above the waiting limit in any trial, 100 of 100 at the maximum.
-4. **Live measurement** — the in-room Call quality panel and the team's 1/3/5-pair trial sheet.
+4. **Live measurement** — the in-room Call quality panel and the team's 1/3/5-pair trial sheet **only if those trials were actually run and recorded**.
 
 We present each for what it is: perceptions, automated checks, a local transaction measurement and a live call measurement — not a penetration test or a clinical accuracy study.
 
@@ -433,6 +435,50 @@ It is descriptive for those five purposively chosen people, not generalisable. W
 ### 89. You use ISO/IEC 25010:2023 but your questionnaire says "Usability" and "Compatibility". Which is it?
 
 In the 2023 edition Usability was renamed Interaction Capability, and Portability became Flexibility; Compatibility still exists as a separate characteristic. Our "F. Compatibility" items ask about devices, browsers and environment, which matches Flexibility (adaptability) in the 2023 model. The data is unchanged; the section heading in the instrument uses the older name. Admit the labelling mismatch; do not claim we evaluated Compatibility in the 2023 sense. The validation certificate also lists eight characteristics while the instrument covers six.
+
+### 90. Is the super-admin/clinic pattern based on a proven company architecture?
+
+Yes as an architectural precedent: AWS separates a provider control plane from the tenant application, and Azure distinguishes global and tenant administration. We adapt that to platform oversight, clinic-scoped staff administration and doctor-owned clinical work. It is a researched design choice, not proof of healthcare compliance or an endorsement. Current provisioning implements part of it; the full oversight dashboard is proposed. [AWS](https://docs.aws.amazon.com/whitepapers/latest/saas-architecture-fundamentals/control-plane-vs.-application-plane.html), [Azure](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/control-planes).
+
+### 91. What should a platform owner monitor without reading patient records?
+
+Approved aggregate operational and business metadata: active clinics/doctors, invitation outcomes, waiting/admission delays, connected/completed encounter counts, summary lifecycle/retry backlog, service errors, provider quotas and estimated consumption. Show period, freshness, denominator and coverage; suppress identifying small groups. Admission is not attendance and a ready draft is not a reviewed record. This is the proposed oversight view; the current `/admin` page manages staff rather than providing those analytics. Tenant consumption monitoring follows the [AWS SaaS Lens](https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/tenant-activity-and-consumption.html).
+
+### 92. Why not give the super admin access to every consultation and summary?
+
+Platform responsibility does not establish a treatment relationship or ownership. Routine provisioning, configuration and reliability work can use bounded metadata. Server clinician permissions continue to deny administrators. Any exceptional support access would need an explicit purpose, narrow/time-limited authorization, approval, auditing and privacy review; no blanket clinical grant or patient-data export is proposed. This applies [OWASP least privilege and per-object authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html).
+
+### 93. What belongs in an audit event, and do you already have an audit dashboard?
+
+Proposed event: opaque id, timestamp, clinic scope, actor id/type, action, target type/id, outcome, bounded reason code and correlation id. Distinguish an attempt, denial, failure and completed lifecycle change. Microsoft Entra demonstrates activity/status/actor/target review. Our existing successful role-change events contain uid/clinic/role/action/time; they do not provide every outcome or an audit browser. Invitation events are separate. A paginated authorized viewer and cross-service failure reconciliation remain future work. [Entra audit logs](https://learn.microsoft.com/en-us/entra/identity/monitoring-health/concept-audit-logs).
+
+### 94. How would that audit dashboard preserve privacy and database budget?
+
+Apply clinic scope in the server query before paging; allowlist filters and a time window, cap pages (proposed 50), order by timestamp/id and reauthorize each opaque cursor. Exclude clinical text, names/emails, tokens, raw IP/user-agent and clinical snapshots. Uids still require restricted access and approved retention. Current staff listing caps 200 global profiles before clinic filtering, so it can omit staff and is not a total. The proposed query follows [Firestore cursor pagination](https://firebase.google.com/docs/firestore/query-data/query-cursors); exclusions follow [OWASP logging](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html).
+
+### 95. Can an administration dashboard guarantee low costs or prove the business is profitable?
+
+No. A future dashboard should show bounded usage rollups, quota pressure and dated estimated costs, with alerts and retry backoff. Configuration needs allowlisted fields, safe ranges, versions and audit receipts; secrets stay server-only. Provider usage estimates are not invoices, revenue or profit, and an alert is not a hard spend cap. The PHP 7,856.69 thesis development budget stays separate. No billing/analytics product or commercial capacity measurement is claimed.
+
+### 96. Is a clinic id in the URL enough to isolate clinics?
+
+No. The server derives the caller's clinic from verified authority and checks action, target clinic and ownership on every request. A browser-supplied id or hidden navigation is not authorization. Clinic administrators cannot manage another clinic or grant administrator authority; clinical records remain doctor-owned. Current staff-scoping preparation is not evidence that all future tenant data is isolated. New endpoints need explicit cross-clinic denial tests. [OWASP resource and tenant checks](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Patterns_Cheat_Sheet.html).
+
+### 97. Why three staff login pages if Firebase signs in everyone?
+
+They express three different tasks and prevent an administrator from landing in a clinician workspace: `/doctor/login`, `/admin/login` for a clinic administrator and `/super-admin/login` for the platform owner. The two administrator entries reuse one implementation and the same server-scoped `/admin` workspace. Authentication establishes the account; trusted claims/configuration authorize its work. A wrong-audience account is rejected/signed out; signup grants no privileged role. The pages neither create three authentication systems nor replace API checks.
+
+### 98. Where is consultation scheduling in the demo?
+
+It stays hidden while the server capability is off. The repository contains the doctor-booked module, but it was not part of the survey and has not passed the documented deployment release gates. Say that directly instead of searching for a missing menu or enabling it during the defense. Appointment planning is separate from invitation admission and the encounter that actually happened; booking grants no room access. Verify rules/indexes, data/contact retention and signed-in staging first. Attachments also remain disabled. See [scheduling boundary](../production-readiness.md).
+
+### 99. What evidence makes these administration answers defensible today?
+
+Three distinct things: official AWS/Azure/OWASP/Firebase sources justify the pattern; repository source shows the current role/scope boundary; fresh local regressions/browser checks show only the cases and environment actually tested. Future audit/metrics screens are a design roadmap, not a demo claim. The regenerated manuscript is separately checked for 259 pages, exact changed regions and preserved unrelated pages. Production identity acceptance, provider deployment and multi-clinic/security/clinical validation require their own evidence. Use the [design note](../admin-oversight-design.md) and current test record; never carry an old passing count into a new build.
+
+### 100. What caused the microphone/camera menu bug, and how was the fix verified?
+
+Application CSS forced `bottom: 100%` while LiveKit computed the popup's `top`; broad toolbar rules also affected its nested choice buttons. The fix keeps the vendor's positioning and device-selection behavior, scopes toolbar styles to actual controls, and gives the popup/list their own wrapping and viewport bounds. That follows [LiveKit's recommendation to retain its lower-level controls](https://docs.livekit.io/reference/components/react/guide/); its [MediaDeviceMenu](https://docs.livekit.io/reference/components/react/component/mediadevicemenu/) already handles device selection. Browser checks mount the installed real components with synthetic device discovery at 1280, 390 and 320 px: geometry, hit testing, long names, Enter/Tab selection, pointer selection and the Room's active device. This is not a connected consultation, physical-device capture or production acceptance. See the [device-menu design and tradeoff](../livekit-device-menu-design.md).
 
 ## Three-writer rehearsal
 

@@ -1,0 +1,77 @@
+{
+  "commit": "0be08989759dbbe6aaef53c02444aa0121cb4baf",
+  "branch": "main",
+  "reportDate": "2026-11-19",
+  "timezone": "Asia/Shanghai (UTC+8)",
+  "productionWrites": false,
+  "securityVerdict": "FAIL",
+  "performanceVerdict": "Full consultation NOT TESTED; public HTTP pilot PASS",
+  "checks": [
+    {
+      "id": "application-security",
+      "status": "PASS",
+      "tests": 29,
+      "contractScripts": 2,
+      "exitCode": 0
+    },
+    {
+      "id": "typecheck",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "id": "lint",
+      "status": "PASS",
+      "exitCode": 0,
+      "warnings": 1
+    },
+    {
+      "id": "build",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "id": "existing-rules",
+      "status": "PASS",
+      "tests": 8,
+      "exitCode": 0
+    },
+    {
+      "id": "mobile-chromium",
+      "status": "PASS",
+      "tests": 29,
+      "exitCode": 0
+    },
+    {
+      "id": "supplemental-consultation-integrity",
+      "status": "FAIL",
+      "failedCases": 2,
+      "exitCode": 1
+    }
+  ],
+  "environment": {
+    "node": "22.22.2",
+    "npm": "10.9.7",
+    "playwright": "1.58.2",
+    "chromium": "148.0.7778.96",
+    "java": "Temurin 21.0.13.1",
+    "firebaseCli": "15.36.0",
+    "os": "WSL2 6.6.87.2",
+    "cpu": "Intel Core Ultra 5 225"
+  },
+  "sourceHashes": {
+    "package.json": "4fbd5d4a5dc2c43a6a9134cd1816170722637df738e38dcb1e37d1ba65982e5c",
+    "package-lock.json": "7fd9d5a742a7c5c23f273f6e4b272a33b33b63e61951a934655b9d5fc5806102",
+    "functions/package.json": "3f2ca27539e09297ea379888c614c88aaea65374519fe177abaac9262612b891",
+    "functions/package-lock.json": "a982c6b4630a7db2a732a1525fc91858f4856181486a4d80bb8bc2c2682d24e5",
+    "firestore.rules": "a96044637bfb56c7821c7bb791faa59b553486659027956a051581d741c8b53f",
+    "storage.rules": "c752c1112db7af29683049d73972acf58c7c4280bdfbedd45fb9efbdcfc0db22"
+  },
+  "limitations": [
+    "Existing application node_modules used; not a clean application npm ci",
+    "Storage active-rule retrieval returned no active rules",
+    "Browser desktop helper could not execute; isolated public Chromium used",
+    "No authenticated two-party call, load, media, AI quality or new usability study",
+    "Earlier failed GitHub audit job not rerun; current local audits pass"
+  ]
+}

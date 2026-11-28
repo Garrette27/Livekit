@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { signInWithPopup, signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { signInWithPopup, signInWithEmailAndPassword, sendPasswordResetEmail, type User } from "firebase/auth";
 import { auth, provider } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -38,6 +38,15 @@ export default function DoctorLoginPage() {
     }
   }, []);
 
+  /** Reject other workspaces before doctor-profile reads or writes, using the server's access decision. */
+  const checkDoctorAccess = async (user: User): Promise<boolean> => {
+    const access = await fetchWorkspaceAccess(user, true);
+    if (access.doctorAccess && !access.administratorLevel) return true;
+    setError('Doctor sign in requires a provisioned doctor account. Use the sign-in page for your account role.');
+    await auth?.signOut();
+    return false;
+  };
+
   const signInWithGoogle = async () => {
     if (!auth || !provider) {
       setError('Firebase not initialized. Please refresh the page.');
@@ -51,10 +60,7 @@ export default function DoctorLoginPage() {
       const user = result.user;
       setAccessCheck('Signed in with Google. Checking your doctor access…');
 
-      if ((await fetchWorkspaceAccess(user, true)).administratorLevel) {
-        router.replace('/admin');
-        return;
-      }
+      if (!(await checkDoctorAccess(user))) return;
 
       // Auto-register doctor if first login
       if (user && db) {
@@ -135,6 +141,8 @@ export default function DoctorLoginPage() {
         console.error('Login error:', err);
         setError('An unexpected error occurred.');
       }
+    } finally {
+      setAccessCheck(null);
     }
   };
 
@@ -157,10 +165,7 @@ export default function DoctorLoginPage() {
 
       const user = auth.currentUser;
       if (user) {
-        if ((await fetchWorkspaceAccess(user, true)).administratorLevel) {
-          router.replace('/admin');
-          return;
-        }
+        if (!(await checkDoctorAccess(user))) return;
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data();
@@ -229,6 +234,7 @@ export default function DoctorLoginPage() {
         setError(err.message || 'An error occurred. Please try again.');
       }
     } finally {
+      setAccessCheck(null);
       setLoading(false);
     }
   };
@@ -364,7 +370,7 @@ export default function DoctorLoginPage() {
         </p>
 
         {error && (
-          <div style={{
+          <div role="alert" style={{
             backgroundColor: '#fef2f2',
             border: '1px solid #fecaca',
             borderRadius: '0.5rem',

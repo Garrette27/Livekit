@@ -13,6 +13,7 @@ const inline = (s) => escape(s)
   .replace(/`([^`]+)`/g, '<code>$1</code>')
   .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
   .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+  .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2">$1</a>')
   .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1');
 
 function toHtml(md) {
@@ -63,12 +64,13 @@ function toHtml(md) {
   return out.join('\n');
 }
 
-const css = `body{font:10.5pt/1.45 Georgia,serif;color:#111;margin:0}h1{font-size:18pt;color:#1e3a8a}h2{font-size:13pt;color:#1e3a8a;margin-top:1.2em}
+const css = `body{font:10.5pt/1.45 Georgia,serif;color:#111;margin:0}p{orphans:3;widows:3}h3+p{break-inside:avoid}h1{font-size:18pt;color:#1e3a8a}h2{font-size:13pt;color:#1e3a8a;margin-top:1.2em}
 h3{font-size:11.5pt;color:#1e3a8a;margin:1.1em 0 .3em;break-after:avoid}table{border-collapse:collapse;width:100%;margin:.5em 0;font-size:9.5pt;break-inside:avoid}
 th,td{border:1px solid #cbd5e1;padding:3px 6px;text-align:left;vertical-align:top}th{background:#eff6ff}code{font-size:9pt;background:#f1f5f9;padding:0 2px}
 pre{font-size:8.5pt;background:#f1f5f9;padding:6px;white-space:pre-wrap}blockquote{border-left:3px solid #93c5fd;margin:.5em 0;padding-left:.75em;color:#334155}`;
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH });
+const revisionDate = '28 Nov 2026';
 for (const [source, target] of [
   ['panel-questions-and-answers.md', 'TeleConsole-Panel-Questions-and-Answers.pdf'],
   ['PANEL-QA-LATEST.md', 'TeleConsole-Panel-Quick-Answers.pdf'],
@@ -79,7 +81,7 @@ for (const [source, target] of [
   await page.pdf({
     path: `${DIR}/${target}`, format: 'A4', margin: { top: '18mm', bottom: '18mm', left: '16mm', right: '16mm' },
     displayHeaderFooter: true, headerTemplate: '<span></span>',
-    footerTemplate: '<div style="font-size:8px;width:100%;text-align:center;color:#64748b">TeleConsole · panel preparation · 27 Nov 2026 · <span class="pageNumber"></span>/<span class="totalPages"></span></div>',
+    footerTemplate: `<div style="font-size:8px;width:100%;text-align:center;color:#64748b">TeleConsole · panel preparation · ${revisionDate} · <span class="pageNumber"></span>/<span class="totalPages"></span></div>`,
   });
   await page.close();
   console.log(`Rendered ${target}`);

@@ -1,24 +1,24 @@
 # TeleConsole defense pack
 
-**Start here (27 Nov 2026, latest):** [PANEL-QA-LATEST.md](PANEL-QA-LATEST.md) · [ranked 89 answers](panel-questions-and-answers.md) ([PDF](TeleConsole-Panel-Questions-and-Answers.pdf)) · [team test plan for the top 40](TEAM-TEST-TOP-40.md) ([PDF](TeleConsole-Team-Test-Top-40.pdf)) · [demo script](one-day-defense-guide.md).
+**Start here (28 Nov 2026, latest):** [PANEL-QA-LATEST.md](PANEL-QA-LATEST.md) · [100 panel answers](panel-questions-and-answers.md) ([PDF](TeleConsole-Panel-Questions-and-Answers.pdf)) · [team test plan for the top 40](TEAM-TEST-TOP-40.md) ([PDF](TeleConsole-Team-Test-Top-40.pdf)) · [demo script](one-day-defense-guide.md).
 
 Prepared 25 November 2026 (Asia/Singapore). Scope: minimally revise the supplied thesis and give three writers a coherent, reproducible explanation of capacity, costs, quality, security and remaining limitations. No examination outcome is guaranteed.
 
-## Latest (27 November 2026) — start here
+## Latest (28 November 2026) — start here
 
 1. **[PANEL-QA-LATEST.md](PANEL-QA-LATEST.md)** — short rehearsal route, evidence boundaries and current demo. Priority is preparation judgment, not measured panel-question frequency.
 2. [One-day guide](one-day-defense-guide.md) — schedule, five-box explanation, objectives→evidence, demo script, slide plan, CCTV answer.
 3. [Presentation risk register](presentation-risk-register.md) — what could break the demo and the fallback.
-4. [Page changes 27 Nov](page-changes-2026-11-27.md) — manuscript pages changed (same 259 pages).
-5. [Full ranked Q&A Q1–Q97](panel-questions-and-answers.md), [number map](panel-question-number-map.md), [current findings/Claude prompt](admin-entry-findings-and-claude-handoff.md) and [attachment plan](attachment-plan.md).
+4. [Exact page changes 28 Nov](page-changes-2026-11-28.md) — manuscript pages changed (same 259 pages).
+5. [Q&A Q1–Q100](panel-questions-and-answers.md), [number map](panel-question-number-map.md), [current findings/Claude prompt](admin-entry-findings-and-claude-handoff.md) and [attachment plan](attachment-plan.md).
 
-The manuscript, ranked Q&A PDFs and 14-slide panel/demo deck are rebuilt for source `69f9c85`. The capacity/cost research brief is dated 25 November; do not read historical race findings as the current implementation. All administrators are non-clinical and use a separate provisioned identity for doctor work. Doctor-booked appointments are implemented but deployment-gated, not a surveyed result; see priority Q25 and the release gates.
+The 28 November source follow-up separates doctor, clinic-admin and platform-owner entry and adds researched administration answers. `/doctor/login`, `/admin/login` and `/super-admin/login` serve different staff audiences; both administrative levels reuse server-scoped `/admin`. The [administrative oversight design](../admin-oversight-design.md) distinguishes current provisioning from future tenant lifecycle, paginated audits and aggregate operating/business views. No new analytics dashboard, production deployment or blanket clinical-data permission is claimed. Doctor-booked scheduling remains default-off and hidden pending release gates; it was not surveyed. This manuscript follow-up changes physical pages 66/86/98/106/111 (printed 54/74/86/94/99). The panel/demo slides retain their earlier checkpoint and are not rebuilt by this update.
 
 ## Send these first
 
 For direct browser downloads, use the [download index](DOWNLOADS.md) or [public-safe ZIP](TeleConsole-Public-Defense-Pack.zip). The ZIP uses the redacted manuscript and deliberately excludes the private submission copy and personal appendices.
 
-Current panel/demo supplement: [editable PowerPoint with speaker notes](TeleConsole-Waiting-Queue-and-Title-Defense.pptx), [offline slide handout](TeleConsole-Waiting-Queue-and-Title-Slides.pdf), [teammate teaching PDF](TeleConsole-Waiting-Queue-and-Title-Team-Guide.pdf), [97 ranked panel answers](TeleConsole-Panel-Questions-and-Answers.pdf) and [quick answers](TeleConsole-Panel-Quick-Answers.pdf). Current slide content is [panel-demo-slides.json](panel-demo-slides.json); `queue-title-slides.json` remains a historical source. The official thesis title stays unchanged.
+Current panel/demo supplement: [editable PowerPoint with speaker notes](TeleConsole-Waiting-Queue-and-Title-Defense.pptx), [offline slide handout](TeleConsole-Waiting-Queue-and-Title-Slides.pdf), [teammate teaching PDF](TeleConsole-Waiting-Queue-and-Title-Team-Guide.pdf), [100 panel answers](TeleConsole-Panel-Questions-and-Answers.pdf) and [quick answers](TeleConsole-Panel-Quick-Answers.pdf). Current slide content is [panel-demo-slides.json](panel-demo-slides.json); `queue-title-slides.json` remains a historical source. The official thesis title stays unchanged.
 
 1. [Messenger messages and three-writer briefing](messenger-and-three-writer-brief.md): quickest shared explanation, five-minute emergency version, speaker assignments and reading route.
 2. [Exact page-change register](page-change-register.md): printed and physical page numbers, preserved expense total, and separate public-copy privacy redactions.
@@ -54,9 +54,11 @@ python scripts/thesis/defense-cost-model.py
 
 The scripts currently select Windows fonts and the original author's local optional PyMuPDF dependency directory. Install those packages in the interpreter or adjust that documented dependency path on another workstation. The source-inspection helper writes private extracts under `tmp/`; never publish those extracts. Running the revision script without `--public-copy` produces a private copy containing the original personal appendices; do not publish it by accident.
 
-PDF checks cover all 259 pages, extracted replacements, unchanged dimensions/labels/bookmarks, pixel-identical untouched pages, unchanged pixels outside approved regions and original-source integrity. The latest manuscript has 38 bounded substantive edits on 31 pages, including six queue-specific corrections. Its current report is [queue/title PDF verification](evidence/queue-title-2026-11-25/pdf-verification.json); the earlier 32-edit report is historical for the original published version. These checks do not turn proposed load tests into results. Application commands and the clean validation snapshot are documented in the evidence index.
+PDF checks cover all 259 pages, extracted replacements, unchanged dimensions/labels/bookmarks, pixel-identical untouched pages, unchanged pixels outside approved regions and original-source integrity. The cumulative manuscript has 48 bounded edits on 37 physical pages. The [current verification](evidence/admin-oversight-2026-11-28/pdf-verification.json) covers the five-page incremental follow-up from the already-redacted public baseline; the private original is unavailable on this workstation. The [incremental manifest](revision-manifest-2026-11-28.json) and report retain exact anchors, baseline hash and rectangles. Earlier reports describe their own historical artifacts. These checks do not turn proposed load tests into results. Application commands and the clean validation snapshot are documented in the evidence index.
 
-The queue follow-up locally reproduced a capacity pre-check race: nine initial waiting rows plus two concurrent arrivals can produce eleven for a configured target of ten. The hard atomic-capacity claim is NOT PASSED. This documentation change does not fix that app invariant or the earlier unique-visit replay gap. See [the source audit](evidence/queue-title-2026-11-25/source-audit.json).
+The historical 25 November queue audit found a capacity race; the 27 November transaction correction has separate emulator evidence. Do not reuse the earlier failed-capacity statement as the current source result, or treat queue fencing as proof of universal replay isolation. Production authenticated acceptance and provider capacity remain separate from document checks.
+
+To reproduce this incremental document pass, use the exact prior public baseline matching the report's source hash, the 28 November manifest and `revise-defense-thesis.py --date 2026-11-28 --baseline public-pdf-2026-11-27 --report <report.json> --render-dir <private-render-dir>`. Omit `--public-copy` for this already-redacted baseline: its existing privacy masks are preserved. Run `node scripts/thesis/render-panel-qa-pdf.mjs` for the current Q&A/quick/team PDFs. Do not infer that older ZIP, slide or study-book artifacts contain this update.
 
 ## Maintenance and publication checklist
 

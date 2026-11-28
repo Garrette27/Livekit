@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { test } from 'node:test';
 import ts from 'typescript';
+import { entryNodes, entryText, loginEntryHarness } from './helpers/login-entry-harness.mjs';
 
 function loadPolicy() {
   const record = { exports: {} };
@@ -13,6 +14,119 @@ function loadPolicy() {
 }
 const superEmails = new Set(['owner@example.test']);
 const caller = { userId: 'u-1', email: 'staff@example.test', emailVerified: true, isAdminClaim: false };
+
+const loginAccess = {
+  doctor: { administratorLevel: null, doctorAccess: true, homePath: '/doctor/invitations', clinicId: 'north-clinic' },
+  admin: { administratorLevel: 'admin', doctorAccess: false, homePath: '/admin', clinicId: 'north-clinic' },
+  super_admin: { administratorLevel: 'super_admin', doctorAccess: false, homePath: '/admin', clinicId: null },
+  patient: { administratorLevel: null, doctorAccess: false, homePath: '/patient/dashboard', clinicId: null },
+  faculty_reviewer: { administratorLevel: null, doctorAccess: false, homePath: null, clinicId: null },
+  unassigned: { administratorLevel: null, doctorAccess: false, homePath: null, clinicId: null },
+};
+
+for (const method of ['google', 'password']) {
+  test(`doctor ${method} entry rejects every non-doctor before profile writes or workspace navigation`, async () => {
+    for (const role of ['admin', 'super_admin', 'patient', 'faculty_reviewer', 'unassigned']) {
+      const h = loginEntryHarness('/doctor/login', loginAccess[role]);
+      await h.login(method);
+      assert.deepEqual(h.observed.redirects, [], role);
+      assert.equal(h.auth.currentUser, null, `${role} is signed out`);
+      assert.equal(h.observed.writes.length, 0, `${role} has no clinician profile side effects`);
+      assert.ok(entryNodes(h.render(), node => node.props?.role === 'alert').some(node => entryText(node).length > 0), 'The rejected sign-in has an announced explanation');
+    }
+    const doctor = loginEntryHarness('/doctor/login', loginAccess.doctor);
+    await doctor.login(method);
+    assert.deepEqual(doctor.observed.redirects, ['/doctor/invitations']);
+    assert.equal(doctor.observed.signouts, 0);
+  });
+
+  test(`doctor ${method} rejection leaves the other sign-in method usable`, async () => {
+    for (const role of ['admin', 'super_admin']) {
+      const access = { ...loginAccess[role] };
+      const h = loginEntryHarness('/doctor/login', access);
+      await h.login(method);
+      assert.equal(h.auth.currentUser, null);
+      assert.deepEqual(h.observed.redirects, []);
+
+      Object.assign(access, loginAccess.doctor);
+      const retryMethod = method === 'google' ? 'password' : 'google';
+      if (retryMethod === 'google') await h.click('Google');
+      await h.login(retryMethod);
+      assert.deepEqual(h.observed.redirects, ['/doctor/invitations'], `${role} rejection permits another account to sign in`);
+      assert.equal(h.observed.signouts, 1);
+    }
+  });
+
+  for (const [route, allowedRole, heading] of [
+    ['/admin/login', 'admin', 'Clinic administrator sign in'],
+    ['/super-admin/login', 'super_admin', 'Super administrator sign in'],
+  ]) {
+    test(`${route} ${method} entry accepts only ${allowedRole} and signs out other roles`, async () => {
+      for (const role of Object.keys(loginAccess)) {
+        const h = loginEntryHarness(route, loginAccess[role]);
+        await h.login(method);
+        assert.deepEqual(h.observed.redirects, role === allowedRole ? ['/admin'] : [], role);
+        assert.equal(h.auth.currentUser !== null, role === allowedRole, role);
+        assert.equal(h.observed.identityCreations, 0, 'Sign-in cannot register or provision an account');
+        assert.equal(h.observed.writes.length, 0, 'Administrative entry never writes clinical profiles');
+        assert.ok(entryText(h.render()).includes(heading), 'The page identifies its intended administrator');
+        if (role !== allowedRole) assert.ok(entryNodes(h.render(), node => node.props?.role === 'alert').some(node => entryText(node).length > 0));
+      }
+    });
+  }
+}
+
+test('administrator access refresh enforces the selected entry audience on an existing session', async () => {
+  for (const [route, accepted, rejected] of [
+    ['/admin/login', 'admin', 'super_admin'], ['/super-admin/login', 'super_admin', 'admin'],
+  ]) {
+    for (const role of [accepted, rejected]) {
+      const h = loginEntryHarness(route, loginAccess[role], { existingSession: true });
+      await h.click('Check access again');
+      assert.deepEqual(h.observed.redirects, role === accepted ? ['/admin'] : []);
+      assert.equal(h.auth.currentUser !== null, role === accepted);
+    }
+  }
+});
+
+test('doctor entry and platform-owner entry expose only their intended sign-in choices', () => {
+  const doctor = loginEntryHarness('/doctor/login', loginAccess.doctor);
+  const doctorLinks = entryNodes(doctor.render(), node => node.props?.href).map(node => node.props.href);
+  assert.equal(doctorLinks.some(path => path.startsWith('/admin') || path.startsWith('/super-admin')), false);
+  const owner = loginEntryHarness('/super-admin/login', loginAccess.super_admin);
+  assert.equal(entryNodes(owner.render(), node => node.props?.href?.endsWith('/signup')).length, 0, 'Platform-owner authority is provisioned through server configuration');
+});
+
+test('clinic signup creates only an identity and cannot enter administration without a role grant', async () => {
+  const h = loginEntryHarness('/admin/signup', loginAccess.unassigned);
+  await h.login('password');
+  assert.equal(h.observed.identityCreations, 1);
+  assert.equal(h.observed.writes.length, 0);
+  assert.deepEqual(h.observed.redirects, []);
+  await h.click('Check access again');
+  assert.deepEqual(h.observed.redirects, []);
+});
+
+test('clinic signup uses the same clinic-only Google access check and never converts a platform owner', async () => {
+  for (const role of ['admin', 'super_admin']) {
+    const h = loginEntryHarness('/admin/signup', loginAccess[role]);
+    await h.login('google');
+    assert.deepEqual(h.observed.redirects, role === 'admin' ? ['/admin'] : []);
+    assert.equal(h.auth.currentUser !== null, role === 'admin');
+    assert.equal(h.observed.writes.length, 0);
+    assert.equal(h.observed.identityCreations, 0);
+  }
+});
+
+test('an unavailable server access check cannot navigate or create a clinician profile', async () => {
+  for (const route of ['/doctor/login', '/admin/login', '/super-admin/login']) {
+    const h = loginEntryHarness(route, loginAccess.doctor, { accessError: true });
+    await h.login('google');
+    assert.deepEqual(h.observed.redirects, [], route);
+    assert.equal(h.observed.writes.length, 0);
+    assert.ok(entryNodes(h.render(), node => node.props?.role === 'alert').some(node => entryText(node).length > 0));
+  }
+});
 
 test('the server sends admins to Administration and doctors to Invitations, without self-promotion', () => {
   const { resolveWorkspaceAccess } = loadPolicy();

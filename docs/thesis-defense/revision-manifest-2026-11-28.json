@@ -1,0 +1,47 @@
+[
+  {
+    "id": "integration-current-enabled-scope",
+    "page": 111,
+    "start": "Firebase Authentication and Google",
+    "end": "quality/concurrency.",
+    "replacement": "Firebase authenticates accounts and stores records; LiveKit carries media. OpenAI drafts require consented evidence and clinician review. Doctor, clinic-admin and platform-owner entry remain separate; administrators have no blanket clinical access. Role-change audit metadata exists; tenant lifecycle, paginated audit review and aggregate cost/operating dashboards remain future work. Files stay disabled. Doctor-booked scheduling is default-off pending rules/indexes, data/contact-retention review and signed-in staging. Booking grants no admission or clinical evidence and was not surveyed. Clinic release also needs retention, restore, provider agreements, recurring budget and measured call quality/concurrency.",
+    "reason": "Make the deployment plan consistent with currently enabled features and remaining readiness work. Updated 28 November: distinct staff entry and proposed metadata-only administrative oversight, without implying commercial tenancy or scheduling release.",
+    "lineheight": 1.85
+  },
+  {
+    "id": "queue-actor-and-summary-scope",
+    "page": 66,
+    "start": "Staff use Firebase",
+    "end": "Administration does not confer clinical record ownership.",
+    "replacement": "Staff authenticate through role-specific entry: Doctor, clinic administrator or platform owner. Signup grants identity only. The server checks role, clinic scope and ownership; administrative accounts have no clinician API permissions. A separate doctor account owns invitations, admission, encounters and draft review. Verified allowlisted patients may enter directly; others wait for doctor admission. Admission is not attendance. Attachments remain disabled. Scheduling is default-off and deployment-gated, separate from invitation access. Summaries require finalization, consent and usable evidence. Administrative oversight uses metadata; a full audit/metrics dashboard is future work, not a surveyed result.",
+    "reason": "Align the actor description with verified direct entry, clinician admission, disabled attachments and conditional AI finalization. Updated 28 November: distinct staff entry and proposed metadata-only administrative oversight, without implying commercial tenancy or scheduling release.",
+    "lineheight": 1.85
+  },
+  {
+    "id": "staff-entry-role-scope",
+    "page": 86,
+    "start": "Designed for dentists",
+    "end": "Reset.",
+    "replacement": "Clinical work uses a separately provisioned doctor identity. /doctor/login supports password, Google and reset; administrator identities are refused. Clinic administrators enter at /admin/login; platform owners use /super-admin/login. Both use the shared /admin workspace, where the server checks role and clinic scope. Signup grants no privileged role. Administrative authority does not confer consultation ownership. The later appointment workbench remains hidden while its server capability is off.",
+    "lineheight": 1.7,
+    "reason": "Separate staff entry by audience while preserving shared server authorization and default-off scheduling."
+  },
+  {
+    "id": "main-entry-role-boundaries",
+    "page": 98,
+    "start": "The landing page serves",
+    "end": "routes end-users toward consultation access via a green action button",
+    "replacement": "The landing page introduces TeleConsole and its doctor and patient entry paths. Doctors use /doctor/login for invitations, admission and their clinical records; patients use /patient/login or a valid invitation. Clinic administrators use /admin/login and platform owners /super-admin/login. These later staff entry routes share Firebase identity, not clinical authority: the server resolves permission and scope, and rejects the wrong audience. Both administrator levels use /admin for staff provisioning; an audit/metrics oversight dashboard is proposed. The historical screenshot is not evidence that respondents evaluated these later changes. Scheduling stays hidden until its default-off server capability passes the documented release gates.",
+    "lineheight": 1.8,
+    "reason": "Correct administrative-versus-clinical entry wording and distinguish later role routes, future oversight and gated scheduling from the historical screenshot."
+  },
+  {
+    "id": "device-menu-responsive-controls",
+    "page": 106,
+    "start": "video and audio streaming grid",
+    "end": "utilities.",
+    "replacement": "video and audio grid with connection status. The toolbar provides microphone, camera, screen sharing and chat controls. LiveKit device menus retain positioned popups with isolated styles. Synthetic browser checks cover device selection and layout at desktop/phone widths; connected calls and real hardware require separate acceptance.",
+    "lineheight": 1.6,
+    "reason": "Preserve vendor device selection and fix popup-style containment; distinguish real-component synthetic browser coverage from hardware or connected-call acceptance."
+  }
+]

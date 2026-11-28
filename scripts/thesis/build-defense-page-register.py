@@ -7,9 +7,11 @@ items = json.loads((pack / 'revision-manifest.json').read_text(encoding='utf-8')
 pages = sorted({item['page'] for item in items})
 intro = f'''# Exact same-page manuscript changes
 
-27 November 2026. The manuscript remains **259 physical pages**, with the original title, page sizes, numbering, objectives, survey figures and expense amounts unchanged. This register records **{len(items)} bounded substantive edits across {len(pages)} physical pages**. Printed chapter page = PDF page minus 12. This is an editorial supplement, not new study results.
+28 November 2026. The manuscript remains **259 physical pages**, with the original title, page sizes, numbering, objectives, survey figures and expense amounts unchanged. This register records **{len(items)} bounded substantive edits across {len(pages)} physical pages**. Printed chapter page = PDF page minus 12. This is an editorial supplement, not new study results.
 
-This follow-up revises PDF **66, 71, 75, 106 and 111** / printed **54, 59, 63, 94 and 99**: administrator separation; opt-in retention and future attachment cleanup; encounter finalization; responsive consultation context and consent; implemented but deployment-gated doctor-booked appointments. Retention also remains qualified at PDF **105** / printed **93**. Scheduling remains default-off pending production rules/indexes, data/retention review and signed-in staging acceptance. This later implementation does not change the original survey results.
+This follow-up changes physical PDF **66, 86, 98, 106 and 111** / printed chapter **54, 74, 86, 94 and 99**: separate doctor, clinic-administrator and platform-owner entry; server role/scope checks; metadata-only administrative oversight as future work; hidden, default-off scheduling release gates; and isolated LiveKit device-menu styles with synthetic browser/hardware boundaries. It adds three bounded regions and revises two existing regions. The cumulative count below includes earlier changes and does not mean 37 pages changed today. These later source changes do not change the original survey results.
+
+The PDF has no machine-readable page-label rules. Printed chapter numbers are visible page text; for these chapter pages the printed value equals physical page minus 12. Do not apply that arithmetic to front matter.
 
 All substantive PDF pages: {', '.join(map(str, pages))}.
 
@@ -22,10 +24,10 @@ rows = [f"| {x['page']} | {x['page'] - 12} | `{x['id']}` | {x['reason'].replace(
 tail = '''
 ## Verification and privacy
 
-The [current PDF verification](evidence/appointments-defense-2026-11-27/pdf-verification.json) records exact selected rectangles, hashes and all-page checks. The manifest contains every replacement. Historical reports are retained under their original dated folders; their artifact hashes are not current.
+The [current PDF verification](evidence/admin-oversight-2026-11-28/pdf-verification.json) records exact selected rectangles, hashes and all-page checks. The cumulative manifest contains every replacement. The incremental 28 November manifest is `revision-manifest-2026-11-28.json`. Its baseline is the already-redacted public PDF (SHA-256 in the report), because the private original was unavailable on this machine. Earlier privacy masks and substantive edits were preserved; this run did not reprocess private appendices. Historical reports are retained under their original dated folders; their artifact hashes are not current.
 
-Public-copy identifier masks and CV image omissions are additional privacy edits, not changes to the private academic submission. The public copy omits CV images on PDF249-259 and masks selected screenshot identifiers. The private copy remains local. Both retain259 pages. Expense total7,856.69 and its component amounts remain unchanged at PDF94 / printed82. No objective or ChapterIV survey value is replaced. Advisers/authors must approve the final academic submission.
+Public-copy identifier masks and CV image omissions are additional privacy edits, not changes to the private academic submission. The public copy omits CV images on PDF249-259 and masks selected screenshot identifiers. The private copy remains local. The current public copy retains 259 pages. Expense total 7,856.69 and its component amounts remain unchanged at PDF 94 / printed 82. No objective or Chapter IV survey value is replaced. Advisers/authors must approve the final academic submission.
 '''
-(pack / 'page-changes-2026-11-27.md').write_text(intro + ''.join(rows) + tail, encoding='utf-8', newline='\n')
-(pack / 'page-change-register.md').write_text(intro.split('## Exact edits')[0] + '\nSee the [complete exact table](page-changes-2026-11-27.md), [replacement manifest](revision-manifest.json) and [current all-page verification](evidence/appointments-defense-2026-11-27/pdf-verification.json).\n' + tail, encoding='utf-8', newline='\n')
+(pack / 'page-changes-2026-11-28.md').write_text(intro + ''.join(rows) + tail, encoding='utf-8', newline='\n')
+(pack / 'page-change-register.md').write_text(intro.split('## Exact edits')[0] + '\nSee the [complete exact table](page-changes-2026-11-28.md), [replacement manifest](revision-manifest.json) and [current all-page verification](evidence/admin-oversight-2026-11-28/pdf-verification.json).\n' + tail, encoding='utf-8', newline='\n')
 print(json.dumps({'edits': len(items), 'substantive_pages': len(pages), 'physical_pages': pages}))

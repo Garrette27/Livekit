@@ -1,0 +1,30 @@
+(node:34130) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+i  emulators: Starting emulators: firestore
+i  emulators: Detected demo project ID "demo-livekit-security", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail.
+i  firestore: Firestore Emulator logging to firestore-debug.log
+✔  firestore: Firestore Emulator was started in standard edition.
+✔  firestore: Firestore Emulator UI websocket is running on 9150.
+i  Running script: node /tmp/teleconsole-2026-11-19/supplemental-rules.cjs
+[
+  {
+    "id": "ADD01",
+    "criterion": "A patient cannot bypass server role checks to create a consultation attributed to another patient",
+    "writeAllowed": true,
+    "readableByTargetPatient": true,
+    "status": "FAIL"
+  },
+  {
+    "id": "ADD02",
+    "criterion": "An existing consultation owner cannot reassign trusted doctor/patient identity fields through a direct client update",
+    "reassignmentAllowed": true,
+    "status": "FAIL"
+  }
+]
+⚠  Script exited unsuccessfully (code 1)
+i  emulators: Shutting down emulators.
+i  firestore: Stopping Firestore Emulator
+i  hub: Stopping emulator hub
+i  logging: Stopping Logging Emulator
+
+Error: Script "node /tmp/teleconsole-2026-11-19/supplemental-rules.cjs" exited with code 1

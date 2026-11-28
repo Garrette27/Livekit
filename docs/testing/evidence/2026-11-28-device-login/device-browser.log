@@ -1,0 +1,59 @@
+TAP version 13
+# Subtest: docked room panels occupy layout space instead of covering the call
+ok 1 - docked room panels occupy layout space instead of covering the call
+  ---
+  duration_ms: 65.378256
+  type: 'test'
+  ...
+# Subtest: the owning doctor receives invitation counts and times but no identity hashes
+ok 2 - the owning doctor receives invitation counts and times but no identity hashes
+  ---
+  duration_ms: 33.569229
+  type: 'test'
+  ...
+# Subtest: another doctor cannot obtain invitation context
+ok 3 - another doctor cannot obtain invitation context
+  ---
+  duration_ms: 21.416296
+  type: 'test'
+  ...
+# Subtest: cached invitation links retain the same minimized context
+ok 4 - cached invitation links retain the same minimized context
+  ---
+  duration_ms: 5.620102
+  type: 'test'
+  ...
+# Subtest: the call queue shows identity provenance and progressively disclosed arrival times
+ok 5 - the call queue shows identity provenance and progressively disclosed arrival times
+  ---
+  duration_ms: 32.238562
+  type: 'test'
+  ...
+# Subtest: a compact room starts with a labelled action rather than an open sheet
+ok 6 - a compact room starts with a labelled action rather than an open sheet
+  ---
+  duration_ms: 11.943346
+  type: 'test'
+  ...
+# Subtest: tablet widths choose the same on-demand room arrangement as phones
+ok 7 - tablet widths choose the same on-demand room arrangement as phones
+  ---
+  duration_ms: 2.818207
+  type: 'test'
+  ...
+# Synthetic device-menu evidence: /tmp/livekit-device-menu-final
+# Subtest: LiveKit device options remain readable, reachable and selectable at desktop and phone widths
+ok 8 - LiveKit device options remain readable, reachable and selectable at desktop and phone widths
+  ---
+  duration_ms: 2990.206853
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3602.767583

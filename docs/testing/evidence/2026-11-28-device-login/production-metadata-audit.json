@@ -1,0 +1,47 @@
+{
+  "project": "livekit-5eef6",
+  "environment": "production read-only",
+  "readAt": "2026-11-28T05:46:55.144Z",
+  "purpose": "Validate administrative metadata and appointment release-gate assumptions; projection only; no identities or clinical content",
+  "collections": {
+    "users": {
+      "count": 25,
+      "complete": true,
+      "missingFields": {
+        "role": 0,
+        "clinicId": 24
+      },
+      "states": {
+        "patient": 16,
+        "doctor": 9
+      }
+    },
+    "adminAuditEvents": {
+      "count": 3,
+      "complete": true,
+      "missingFields": {
+        "action": 0,
+        "role": 0,
+        "clinicId": 0,
+        "at": 0,
+        "outcome": 3
+      },
+      "states": {
+        "role_grant": 2,
+        "role_revoke": 1
+      }
+    },
+    "appointments": {
+      "count": 0,
+      "complete": true,
+      "missingFields": {
+        "status": 0,
+        "schemaVersion": 0,
+        "timeZone": 0,
+        "startAt": 0,
+        "endAt": 0
+      },
+      "states": {}
+    }
+  }
+}

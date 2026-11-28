@@ -1,0 +1,102 @@
+{
+  "project": "livekit-5eef6",
+  "database": "(default)",
+  "readAt": "2026-11-19T06:39:11.001Z",
+  "collections": {
+    "invitations": {
+      "count": 207,
+      "complete": true,
+      "states": {
+        "active": 84,
+        "other_or_missing": 44,
+        "revoked": 79
+      },
+      "missingExpiry": 0,
+      "expiredActive": 83,
+      "missingConsentVersion": 207
+    },
+    "waitingPatients": {
+      "count": 154,
+      "complete": true,
+      "states": {
+        "admitted": 69,
+        "left": 58,
+        "rejected": 14,
+        "waiting": 13
+      },
+      "missingExpiry": 154,
+      "expiredActive": 0,
+      "missingConsentVersion": 154
+    },
+    "consultationSessions": {
+      "count": 53,
+      "complete": true,
+      "states": {
+        "completed": 52,
+        "active": 1
+      },
+      "missingExpiry": 53,
+      "expiredActive": 0,
+      "missingConsentVersion": 53
+    },
+    "consultations": {
+      "count": 119,
+      "complete": true,
+      "states": {
+        "active": 71,
+        "completed": 48
+      },
+      "missingExpiry": 119,
+      "expiredActive": 0,
+      "missingConsentVersion": 119
+    },
+    "call-summaries": {
+      "count": 9,
+      "complete": true,
+      "states": {
+        "other_or_missing": 9
+      },
+      "missingExpiry": 9,
+      "expiredActive": 0,
+      "missingConsentVersion": 9
+    },
+    "users": {
+      "count": 22,
+      "complete": true,
+      "states": {
+        "other_or_missing": 22
+      },
+      "missingExpiry": 22,
+      "expiredActive": 0,
+      "missingConsentVersion": 20
+    },
+    "summaryJobs": {
+      "count": 13,
+      "complete": true,
+      "states": {
+        "ready": 13
+      },
+      "missingExpiry": 13,
+      "expiredActive": 0,
+      "missingConsentVersion": 13
+    },
+    "securityRateLimits": {
+      "count": 384,
+      "complete": true,
+      "states": {
+        "other_or_missing": 384
+      },
+      "missingExpiry": 0,
+      "expiredActive": 0,
+      "missingConsentVersion": 384
+    }
+  },
+  "firestoreRules": {
+    "sha256": "8e6c8a31af5c5fbb8b333b405fcd3bb90b109de7c5f9371959e86aaccef9a4e6",
+    "matchesRepository": true
+  },
+  "storageRules": {
+    "status": "BLOCKED",
+    "reason": "The authenticated rules read failed; no deployed rule result is asserted."
+  }
+}

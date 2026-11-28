@@ -1,6 +1,6 @@
 # TeleConsole defense downloads
 
-Updated 27 November 2026 (Asia/Singapore), source `69f9c85`. Current manuscript, 97-question ranked bank, quick answers and panel/demo slides cover non-clinical administrators, responsive calls, encounter/retention boundaries and implemented but deployment-gated doctor-booked appointments. Scheduling remains default-off pending release gates; it was not surveyed. Dated capacity/cost research remains historical planning evidence, not a new load result.
+Local review updated 28 November 2026: 259-page manuscript, 100-question bank and quick-answer PDFs cover separate staff login, researched metadata-only oversight, scheduling gates and the device-menu correction. These changes have not been pushed or published by this task. Remote download links and the ZIP below retain their earlier checkpoint until an authorized publication rebuild; use local files for this review. Slides and the dated capacity/cost brief are historical artifacts. No new load result or production acceptance is claimed.
 
 ## Download the public-safe pack
 

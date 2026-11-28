@@ -1,0 +1,160 @@
+TAP version 13
+# Subtest: doctor google entry rejects every non-doctor before profile writes or workspace navigation
+ok 1 - doctor google entry rejects every non-doctor before profile writes or workspace navigation
+  ---
+  duration_ms: 177.047496
+  type: 'test'
+  ...
+# Subtest: doctor google rejection leaves the other sign-in method usable
+ok 2 - doctor google rejection leaves the other sign-in method usable
+  ---
+  duration_ms: 31.829408
+  type: 'test'
+  ...
+# Subtest: /admin/login google entry accepts only admin and signs out other roles
+ok 3 - /admin/login google entry accepts only admin and signs out other roles
+  ---
+  duration_ms: 55.576452
+  type: 'test'
+  ...
+# Subtest: /super-admin/login google entry accepts only super_admin and signs out other roles
+ok 4 - /super-admin/login google entry accepts only super_admin and signs out other roles
+  ---
+  duration_ms: 46.428773
+  type: 'test'
+  ...
+# Subtest: doctor password entry rejects every non-doctor before profile writes or workspace navigation
+ok 5 - doctor password entry rejects every non-doctor before profile writes or workspace navigation
+  ---
+  duration_ms: 74.511022
+  type: 'test'
+  ...
+# Subtest: doctor password rejection leaves the other sign-in method usable
+ok 6 - doctor password rejection leaves the other sign-in method usable
+  ---
+  duration_ms: 21.077756
+  type: 'test'
+  ...
+# Subtest: /admin/login password entry accepts only admin and signs out other roles
+ok 7 - /admin/login password entry accepts only admin and signs out other roles
+  ---
+  duration_ms: 41.246961
+  type: 'test'
+  ...
+# Subtest: /super-admin/login password entry accepts only super_admin and signs out other roles
+ok 8 - /super-admin/login password entry accepts only super_admin and signs out other roles
+  ---
+  duration_ms: 39.437771
+  type: 'test'
+  ...
+# Subtest: administrator access refresh enforces the selected entry audience on an existing session
+ok 9 - administrator access refresh enforces the selected entry audience on an existing session
+  ---
+  duration_ms: 25.376274
+  type: 'test'
+  ...
+# Subtest: doctor entry and platform-owner entry expose only their intended sign-in choices
+ok 10 - doctor entry and platform-owner entry expose only their intended sign-in choices
+  ---
+  duration_ms: 13.592851
+  type: 'test'
+  ...
+# Subtest: clinic signup creates only an identity and cannot enter administration without a role grant
+ok 11 - clinic signup creates only an identity and cannot enter administration without a role grant
+  ---
+  duration_ms: 10.602578
+  type: 'test'
+  ...
+# Subtest: clinic signup uses the same clinic-only Google access check and never converts a platform owner
+ok 12 - clinic signup uses the same clinic-only Google access check and never converts a platform owner
+  ---
+  duration_ms: 10.909675
+  type: 'test'
+  ...
+# Subtest: an unavailable server access check cannot navigate or create a clinician profile
+ok 13 - an unavailable server access check cannot navigate or create a clinician profile
+  ---
+  duration_ms: 27.20171
+  type: 'test'
+  ...
+# Subtest: the server sends admins to Administration and doctors to Invitations, without self-promotion
+ok 14 - the server sends admins to Administration and doctors to Invitations, without self-promotion
+  ---
+  duration_ms: 4.873737
+  type: 'test'
+  ...
+# Subtest: only a provider-verified configured owner receives bootstrap administration without a profile
+ok 15 - only a provider-verified configured owner receives bootstrap administration without a profile
+  ---
+  duration_ms: 3.854002
+  type: 'test'
+  ...
+# Subtest: platform owners are administrative only even with historical doctor/admin claims
+ok 16 - platform owners are administrative only even with historical doctor/admin claims
+  ---
+  duration_ms: 4.472566
+  type: 'test'
+  ...
+# Subtest: the server denies every clinical permission to configured platform owners before profile fallback
+ok 17 - the server denies every clinical permission to configured platform owners before profile fallback
+  ---
+  duration_ms: 72.270793
+  type: 'test'
+  ...
+# Subtest: account presentation distinguishes administrator claims, doctor-only claims, legacy and disabled accounts
+ok 18 - account presentation distinguishes administrator claims, doctor-only claims, legacy and disabled accounts
+  ---
+  duration_ms: 3.798607
+  type: 'test'
+  ...
+# Subtest: role commands cannot change environment-managed bootstrap accounts
+ok 19 - role commands cannot change environment-managed bootstrap accounts
+  ---
+  duration_ms: 3.71393
+  type: 'test'
+  ...
+# Subtest: an ordinary signed-in account cannot enumerate role targets before authorization
+ok 20 - an ordinary signed-in account cannot enumerate role targets before authorization
+  ---
+  duration_ms: 18.894196
+  type: 'test'
+  ...
+# Subtest: doctor and administrator grant commands have different real claim effects and grants do not revoke sessions
+ok 21 - doctor and administrator grant commands have different real claim effects and grants do not revoke sessions
+  ---
+  duration_ms: 32.502268
+  type: 'test'
+  ...
+# Subtest: removing an administrator does not silently restore legacy doctor access
+ok 22 - removing an administrator does not silently restore legacy doctor access
+  ---
+  duration_ms: 13.303397
+  type: 'test'
+  ...
+# Subtest: a malformed JSON null role command returns 400 rather than throwing
+ok 23 - a malformed JSON null role command returns 400 rather than throwing
+  ---
+  duration_ms: 11.218925
+  type: 'test'
+  ...
+# Subtest: an Auth lookup outage is retryable, not an assertion that the account is missing
+ok 24 - an Auth lookup outage is retryable, not an assertion that the account is missing
+  ---
+  duration_ms: 14.761085
+  type: 'test'
+  ...
+# Subtest: a revoked doctor is refused on the next API request, not after token expiry
+ok 25 - a revoked doctor is refused on the next API request, not after token expiry
+  ---
+  duration_ms: 9.933814
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 776.954116

@@ -1,0 +1,28 @@
+{
+  "id": "dpl_4u7etjZyfQijywJD79wm8r9HciuE",
+  "name": "livekit-frontend",
+  "url": "livekit-frontend-fz22b1tkp-garrette27s-projects.vercel.app",
+  "readyState": "READY",
+  "target": "production",
+  "createdAt": 1794985834809,
+  "buildingAt": 1794985835932,
+  "ready": 1794985954789,
+  "alias": [
+    "livekit-frontend-tau.vercel.app",
+    "livekit-frontend-garrette27s-projects.vercel.app",
+    "livekit-frontend-git-main-garrette27s-projects.vercel.app"
+  ],
+  "regions": [
+    "iad1"
+  ],
+  "projectId": "prj_4U4goAPtZ5TnyyWPZyPceX7AAM0E",
+  "commit": "0be08989759dbbe6aaef53c02444aa0121cb4baf",
+  "branch": "main",
+  "gitSource": {
+    "type": "github",
+    "sha": "0be08989759dbbe6aaef53c02444aa0121cb4baf",
+    "ref": "main",
+    "repoId": 1038968145
+  },
+  "method": "authenticated Vercel API through CLI; production deployment GET only"
+}

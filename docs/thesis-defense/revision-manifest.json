@@ -312,8 +312,9 @@
     "page": 111,
     "start": "The researchers configured the TeleConsole",
     "end": "restrictions based on user roles.",
-    "replacement": "Firebase Authentication and Google sign-in support accounts; Firestore stores application and encounter records. LiveKit Cloud handles audio, video and screen sharing. OpenAI supports optional evidence-grounded drafts. File uploads remain disabled. Doctor-booked appointments are implemented but deployment-gated: UTC times, named timezones, overlap prevention and version-checked changes. Booking grants no admission or clinical evidence and was not surveyed. ip-api.com is not an admission dependency. JWT, webhook and ownership checks are layered controls, not certification. Clinic release still requires verified rules/indexes, retention, restore, provider agreements, recurring budget and measured call quality/concurrency.",
-    "reason": "Make the deployment plan consistent with currently enabled features and remaining readiness work."
+    "replacement": "Firebase authenticates accounts and stores records; LiveKit carries media. OpenAI drafts require consented evidence and clinician review. Doctor, clinic-admin and platform-owner entry remain separate; administrators have no blanket clinical access. Role-change audit metadata exists; tenant lifecycle, paginated audit review and aggregate cost/operating dashboards remain future work. Files stay disabled. Doctor-booked scheduling is default-off pending rules/indexes, data/contact-retention review and signed-in staging. Booking grants no admission or clinical evidence and was not surveyed. Clinic release also needs retention, restore, provider agreements, recurring budget and measured call quality/concurrency.",
+    "reason": "Make the deployment plan consistent with currently enabled features and remaining readiness work. Updated 28 November: distinct staff entry and proposed metadata-only administrative oversight, without implying commercial tenancy or scheduling release.",
+    "lineheight": 1.85
   },
   {
     "id": "test-recommendation-specific",
@@ -337,8 +338,9 @@
     "page": 66,
     "start": "Concurrently, the Doctor actor initiates authentication",
     "end": "backend generation of an AI-assisted clinical summary.",
-    "replacement": "Staff use Firebase Authentication; signup grants no administrative role. Platform and clinic administrators manage staff access without clinician API permissions, even with old combined claims. Clinic administrators provision doctors in their clinic; legacy profiles remain transitional. A separate doctor account manages invitations, admission, calls and draft review. Verified allowlisted patients may enter directly. Admission is permission, not attendance; the host is not a patient visit. Attachments remain disabled. Doctor-booked appointments are implemented but deployment-gated, separate from admission and encounters. Summary processing requires finalization, consent and usable evidence. Administration does not confer clinical record ownership.",
-    "reason": "Align the actor description with verified direct entry, clinician admission, disabled attachments and conditional AI finalization."
+    "replacement": "Staff authenticate through role-specific entry: Doctor, clinic administrator or platform owner. Signup grants identity only. The server checks role, clinic scope and ownership; administrative accounts have no clinician API permissions. A separate doctor account owns invitations, admission, encounters and draft review. Verified allowlisted patients may enter directly; others wait for doctor admission. Admission is not attendance. Attachments remain disabled. Scheduling is default-off and deployment-gated, separate from invitation access. Summaries require finalization, consent and usable evidence. Administrative oversight uses metadata; a full audit/metrics dashboard is future work, not a surveyed result.",
+    "reason": "Align the actor description with verified direct entry, clinician admission, disabled attachments and conditional AI finalization. Updated 28 November: distinct staff entry and proposed metadata-only administrative oversight, without implying commercial tenancy or scheduling release.",
+    "lineheight": 1.85
   },
   {
     "id": "queue-invite-direct-exception",
@@ -480,5 +482,32 @@
     ],
     "replacement": "advanced Invitation Settings: an optional email allowlist (verified signed-in accounts on it join directly; others wait for admission), a customizable token expiration",
     "reason": "A typed email never bypasses waiting; only a provider-verified signed-in account on the allowlist does."
+  },
+  {
+    "id": "staff-entry-role-scope",
+    "page": 86,
+    "start": "Designed for dentists",
+    "end": "Reset.",
+    "replacement": "Clinical work uses a separately provisioned doctor identity. /doctor/login supports password, Google and reset; administrator identities are refused. Clinic administrators enter at /admin/login; platform owners use /super-admin/login. Both use the shared /admin workspace, where the server checks role and clinic scope. Signup grants no privileged role. Administrative authority does not confer consultation ownership. The later appointment workbench remains hidden while its server capability is off.",
+    "lineheight": 1.7,
+    "reason": "Separate staff entry by audience while preserving shared server authorization and default-off scheduling."
+  },
+  {
+    "id": "main-entry-role-boundaries",
+    "page": 98,
+    "start": "The landing page serves",
+    "end": "routes end-users toward consultation access via a green action button",
+    "replacement": "The landing page introduces TeleConsole and its doctor and patient entry paths. Doctors use /doctor/login for invitations, admission and their clinical records; patients use /patient/login or a valid invitation. Clinic administrators use /admin/login and platform owners /super-admin/login. These later staff entry routes share Firebase identity, not clinical authority: the server resolves permission and scope, and rejects the wrong audience. Both administrator levels use /admin for staff provisioning; an audit/metrics oversight dashboard is proposed. The historical screenshot is not evidence that respondents evaluated these later changes. Scheduling stays hidden until its default-off server capability passes the documented release gates.",
+    "lineheight": 1.8,
+    "reason": "Correct administrative-versus-clinical entry wording and distinguish later role routes, future oversight and gated scheduling from the historical screenshot."
+  },
+  {
+    "id": "device-menu-responsive-controls",
+    "page": 106,
+    "start": "video and audio streaming grid",
+    "end": "utilities.",
+    "replacement": "video and audio grid with connection status. The toolbar provides microphone, camera, screen sharing and chat controls. LiveKit device menus retain positioned popups with isolated styles. Synthetic browser checks cover device selection and layout at desktop/phone widths; connected calls and real hardware require separate acceptance.",
+    "lineheight": 1.6,
+    "reason": "Preserve vendor device selection and fix popup-style containment; distinguish real-component synthetic browser coverage from hardware or connected-call acceptance."
   }
 ]

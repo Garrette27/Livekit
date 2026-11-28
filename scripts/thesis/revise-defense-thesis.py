@@ -3,7 +3,9 @@
 The source stays immutable. Each edit selects existing lines by exact normalized
 anchors, refuses ambiguous matches or text overflow, and leaves drawings alone.
 Verification compares every untouched page and every changed page outside its
-approved rectangles at render time. This is not an application/security retest.
+approved rectangles at render time. An already-redacted public PDF can be an
+incremental source when the private original is unavailable; retain its hash
+and the matching incremental manifest. This is not an application/security retest.
 """
 import argparse
 import hashlib
@@ -69,6 +71,10 @@ def main():
     parser.add_argument("--public-copy", action="store_true", help="Redact demo identifiers and personal CV images before GitHub publication")
     parser.add_argument("--date", default="2026-11-27", help="Revision date recorded in the verification report")
     parser.add_argument("--baseline", default="aa041fe", help="Source-review checkpoint for this revision, not proof of active deployment")
+    parser.add_argument("--report", type=Path, default=ROOT / "output" / "qa" / "defense-revision-verification.json",
+                        help="Verification report for this exact source/output pair")
+    parser.add_argument("--render-dir", type=Path, default=ROOT / "tmp" / "pdfs" / "defense-qa",
+                        help="Private local renders for visual review")
     args = parser.parse_args()
     source_hash = hashlib.sha256(args.source.read_bytes()).hexdigest()
     original = fitz.open(args.source)
@@ -135,7 +141,7 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     document.save(args.output, garbage=4, deflate=True)
     revised = fitz.open(args.output)
-    qa = ROOT / "tmp" / "pdfs" / "defense-qa"
+    qa = args.render_dir
     qa.mkdir(parents=True, exist_ok=True)
     assertions = {"page_count_259": len(revised) == 259,
                   "page_sizes_unchanged": True, "page_labels_unchanged": original.get_page_labels() == revised.get_page_labels(),
@@ -184,7 +190,7 @@ def main():
               "public_copy": args.public_copy, "privacy_redactions": privacy_redactions,
               "outside_differences": outside_differences,
               "not_performed": ["No provider load trial", "No application tests run by this PDF script", "No production data write", "No survey recalculation"]}
-    report_file = ROOT / "output" / "qa" / "defense-revision-verification.json"
+    report_file = args.report
     report_file.parent.mkdir(parents=True, exist_ok=True)
     report_file.write_text(json.dumps(report, indent=2), encoding="utf-8")
     if not all(assertions.values()):

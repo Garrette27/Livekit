@@ -1,0 +1,15 @@
+{
+  "cliVersion": "66.2.0",
+  "cliAuthenticated": true,
+  "cliUser": "garrette27",
+  "guidance": "Existing Vercel user plugin enabled",
+  "sharedMcpUrl": "https://mcp.vercel.com",
+  "oauthAuthenticated": true,
+  "configuration": "C:/Users/Gar/.codex/config.toml",
+  "unrelatedSettingsPreserved": true,
+  "directSharedMcpToolsInvokedInCurrentChat": false,
+  "toolRefreshRequiredForCurrentChat": true,
+  "cliTeam": "garrette27s-projects",
+  "cliProject": "livekit-frontend",
+  "deployedByThisAssessment": false
+}

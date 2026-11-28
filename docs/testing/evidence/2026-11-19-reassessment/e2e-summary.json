@@ -1,0 +1,332 @@
+{
+  "stats": {
+    "startTime": "2026-11-19T06:38:08.164Z",
+    "duration": 22948.101,
+    "expected": 29,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "cases": [
+    {
+      "case": "accessibility-smoke.spec.ts / public accessibility and secure fallback states / access-denied guidance has a named heading and keyboard link",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2548
+        }
+      ]
+    },
+    {
+      "case": "accessibility-smoke.spec.ts / public accessibility and secure fallback states / initial patient room response / direct patient-room navigation explains the invitation requirement",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 4376
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / GET /api/doctor/history rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1923
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / GET /api/patient/consultations rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1284
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / GET /api/patient/pending-waiting-room rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 652
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / GET /api/summary/process-queue rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 253
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / GET /api/invite/get-link?roomName=security-test rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1076
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / GET /api/waiting-room/list rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1255
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/doctor-access rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 464
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/invite/create rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 636
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/invite/revoke rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 364
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/link-patient-consultations rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 303
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/patient/consent rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 296
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/summary/generate rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 342
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/token rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 577
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/track-consultation rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 651
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/track-doctor-presence rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 406
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/user/role-conflict rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 350
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/waiting-room/admit rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 372
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/waiting-room/check-admission rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 960
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/waiting-room/mark-left rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 196
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / POST /api/waiting-room/reject rejects anonymous callers",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 592
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / password reset response does not disclose account details",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 418
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / password reset does not expose a user-status GET endpoint",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 18
+        }
+      ]
+    },
+    {
+      "case": "api-access-control.spec.ts / API access control / unsigned LiveKit webhooks fail closed",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 458
+        }
+      ]
+    },
+    {
+      "case": "mobile-waiting-room.spec.ts / Mobile Waiting Room Lifecycle / marks waiting entry left on back and allows forward navigation recovery",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 8628
+        }
+      ]
+    },
+    {
+      "case": "mobile-waiting-room.spec.ts / Mobile Waiting Room Lifecycle / tracks patient leave on tab close in admitted consultation mode",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2651
+        }
+      ]
+    },
+    {
+      "case": "mobile-waiting-room.spec.ts / Mobile Waiting Room Lifecycle / shows access denied when waiting patient is revoked/removed by doctor",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2796
+        }
+      ]
+    },
+    {
+      "case": "mobile-waiting-room.spec.ts / Mobile Waiting Room Lifecycle / shows access denied when waiting patient state is left",
+      "project": "mobile-chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1606
+        }
+      ]
+    }
+  ],
+  "omitted": "Raw reporter configuration, environment variables, attachments and traces excluded; suite uses synthetic fixtures and mocked invitation lifecycle responses."
+}

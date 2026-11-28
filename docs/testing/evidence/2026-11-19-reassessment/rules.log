@@ -1,0 +1,108 @@
+(node:33355) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+i  emulators: Starting emulators: firestore, storage
+i  emulators: Detected demo project ID "demo-livekit-security", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail.
+i  firestore: downloading cloud-firestore-emulator-v1.22.0.jar...
+
+i  firestore: Firestore Emulator logging to firestore-debug.log
+✔  firestore: Firestore Emulator was started in standard edition.
+✔  firestore: Firestore Emulator UI websocket is running on 9150.
+i  storage: downloading cloud-storage-rules-runtime-v1.1.3.jar...
+
+i  Running script: npm --prefix /home/ret/Livekit/functions run test:rules
+
+> test:rules
+> node --test test/security-rules.test.cjs
+
+TAP version 13
+# [2026-11-19T06:40:31.145Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8be0 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# false for 'create' @ L142, false for 'update' @ L142
+# Subtest: server-owned operational collections deny every client role
+ok 1 - server-owned operational collections deny every client role
+  ---
+  duration_ms: 896.550234
+  type: 'test'
+  ...
+# Subtest: summary ownership permits the doctor and denies a patient
+ok 2 - summary ownership permits the doctor and denies a patient
+  ---
+  duration_ms: 138.389024
+  type: 'test'
+  ...
+# [2026-11-19T06:40:31.355Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8be5 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# false for 'create' @ L101, evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# Subtest: a user cannot elevate their own role
+ok 3 - a user cannot elevate their own role
+  ---
+  duration_ms: 69.849558
+  type: 'test'
+  ...
+# Subtest: disabled attachments deny even owner uploads
+ok 4 - disabled attachments deny even owner uploads
+  ---
+  duration_ms: 95.948209
+  type: 'test'
+  ...
+# Subtest: private profiles allow owner reads but deny other users and listing
+ok 5 - private profiles allow owner reads but deny other users and listing
+  ---
+  duration_ms: 94.719016
+  type: 'test'
+  ...
+# [2026-11-19T06:40:31.592Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8beb error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-19T06:40:31.601Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8bec error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-19T06:40:31.612Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8bed error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-19T06:40:31.623Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8bee error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-19T06:40:31.633Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8bef error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-19T06:40:31.642Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8bf0 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-19T06:40:31.652Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8bf1 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-19T06:40:31.662Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8bf2 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# evaluation error at L112:24 for 'update' @ L112, false for 'update' @ L112
+# [2026-11-19T06:40:31.668Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8bf3 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# false for 'delete' @ L117
+# Subtest: profile updates cannot inject authority, consent, or change identity
+ok 6 - profile updates cannot inject authority, consent, or change identity
+  ---
+  duration_ms: 136.764285
+  type: 'test'
+  ...
+# [2026-11-19T06:40:31.708Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8bf5 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# false for 'create' @ L101, evaluation error at L112:24 for 'update' @ L112, false for 'create' @ L101
+# [2026-11-19T06:40:31.720Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8bf6 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# false for 'create' @ L101, evaluation error at L112:24 for 'update' @ L112, false for 'create' @ L101
+# [2026-11-19T06:40:31.731Z]  @firebase/firestore: Firestore (12.19.0): GrpcConnection RPC 'Write' stream 0x317b8bf7 error. Code: 7 Message: 7 PERMISSION_DENIED: 
+# false for 'create' @ L101, evaluation error at L112:24 for 'update' @ L112, false for 'create' @ L101
+# Subtest: only trusted claims can provision clinician profiles
+ok 7 - only trusted claims can provision clinician profiles
+  ---
+  duration_ms: 80.995766
+  type: 'test'
+  ...
+# Subtest: live queue queries return only the signed-in doctor’s waiting and admitted visits
+ok 8 - live queue queries return only the signed-in doctor’s waiting and admitted visits
+  ---
+  duration_ms: 96.22801
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1754.926422
+✔  Script exited successfully (code 0)
+i  emulators: Shutting down emulators.
+i  firestore: Stopping Firestore Emulator
+i  storage: Stopping Storage Emulator
+i  hub: Stopping emulator hub
+i  logging: Stopping Logging Emulator
