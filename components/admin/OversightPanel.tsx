@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
+import RefreshIconButton from '@/components/ui/RefreshIconButton';
 import type { OversightSnapshot } from '@/lib/services/admin/oversight-service';
 
 const ACTION_LABEL: Record<string, string> = {
@@ -55,7 +56,12 @@ export default function OversightPanel({ staffLabels }: { staffLabels: Record<st
           <>
             <p className="muted">
               {snapshot.scope === 'platform' ? 'Platform-wide' : 'Your clinic only'} · as of {when(snapshot.generatedAt)}{' '}
-              <button type="button" className="secondary" onClick={() => void load()} disabled={loading}>Refresh</button>
+              <RefreshIconButton
+                label="Refresh oversight"
+                hint="Reloads the counts and the newest administrative events. Nothing refreshes on its own."
+                busy={loading}
+                onClick={() => void load()}
+              />
             </p>
             <ul className="metrics">
               {snapshot.metrics.map((metric) => (

@@ -107,3 +107,25 @@ LiveKit's `DisconnectReason` name, the page's navigation type at start
 leaving participant's export: `pagehide` followed by `navigation=reload` is a
 refresh; `Disconnected reason=…` without `pagehide` is a connection drop and
 becomes the bug to chase. Media settings are still unchanged.
+
+## Run of 28 November 2026, 16:17 (deployed `b3d278f`, same PC, normal + incognito window)
+
+- The patient window's rejoin started with `navigation=reload`: that page was
+  **reloaded**, not disconnected. The doctor saw a clean `participantDisconnected`
+  at ≈54.9 s and the new session at ≈61.8 s (7 s gap, normal for a reload plus
+  sign-in and admission). Repository search found no code that reloads the
+  invite or room page; the invite page only listens to `pagehide`/`beforeunload`
+  to record a clean exit. The panel now also logs `discarded=` so a Chrome
+  Memory Saver reload of a background tab can be told apart from a person
+  pressing refresh.
+- Outside the reload, remote video held 1280×720 at 26–31 fps. Over about
+  100 s there was one freeze (t≈7 s: 6 dropped frames, 9 lost packets) and two
+  small loss bursts (≈95 s, 12 packets; ≈34 s in the other window). These are
+  network loss on a shared Wi-Fi/PC and recover within a second.
+- Both windows capture the **same physical camera** at 1280×720@30. Two
+  capture sessions on one camera is the remaining untested variable: the
+  stats cannot see a flicker that happens inside the camera driver before
+  encoding. Run 1 (two devices) still decides whether the product path
+  flickers at all.
+
+No media settings were changed.

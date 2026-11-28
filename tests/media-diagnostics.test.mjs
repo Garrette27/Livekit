@@ -63,6 +63,7 @@ test('diagnostics distinguish a refresh or a dropped connection from a clean lea
   assert.match(panel, /DisconnectReason\[arg\]/, 'with a readable reason, not a bare number');
   assert.match(panel, /navigation=\$\{navigation\}/, 'the page records whether it was reloaded');
   assert.match(panel, /'pagehide'/, 'leaving or refreshing the page is logged');
+  assert.match(panel, /discarded=\$\{discarded\}/, 'a browser tab-discard reload is distinguished from a manual refresh');
 });
 
 test('call overlays stay below side panels so a panel close button is never covered', () => {

@@ -66,7 +66,11 @@ export default function MediaDiagnosticsPanel() {
     // Disconnected reason below this separates a user action from a dropped
     // connection when a participant leaves and rejoins.
     const navigation = (performance.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined)?.type ?? 'unknown';
-    log('diagnostics-start', `visibility=${document.visibilityState} · navigation=${navigation}`);
+    // Chrome's Memory Saver/tab discarding reloads a background tab when it is
+    // refocused and reports it as navigation=reload; wasDiscarded separates
+    // that from a person pressing refresh.
+    const discarded = (document as Document & { wasDiscarded?: boolean }).wasDiscarded === true;
+    log('diagnostics-start', `visibility=${document.visibilityState} · navigation=${navigation} · discarded=${discarded}`);
 
     const roomEvents: RoomEvent[] = [
       RoomEvent.TrackSubscribed, RoomEvent.TrackUnsubscribed, RoomEvent.TrackMuted, RoomEvent.TrackUnmuted,

@@ -330,3 +330,16 @@ test('administrator entry shows the refresh icon and sign-out only for a signed-
   const source = readFileSync('components/admin/AdministratorEntry.tsx', 'utf8');
   assert.match(source, /\.entry-card :global\(a\)/, 'next/link anchors are styled despite styled-jsx scoping');
 });
+
+test('admin refresh controls are labelled icon buttons with a hover and focus explanation', () => {
+  const icon = readFileSync('components/ui/RefreshIconButton.tsx', 'utf8');
+  assert.match(icon, /aria-label=\{label\}/, 'the icon button has an accessible name');
+  assert.match(icon, /aria-describedby=\{tipId\}/, 'the tooltip text describes the button for assistive technology');
+  assert.match(icon, /role="tooltip"/);
+  assert.match(icon, /:focus-visible \+ \.refresh-tip/, 'the explanation also appears on keyboard focus, not only mouse hover');
+  for (const path of ['app/admin/page.tsx', 'components/admin/OversightPanel.tsx']) {
+    const source = readFileSync(path, 'utf8');
+    assert.match(source, /<RefreshIconButton[\s\S]*?hint="/, `${path} explains what the refresh re-reads`);
+    assert.doesNotMatch(source, />Refresh( access and accounts)?<\/button>/, `${path} has no text-only refresh button left`);
+  }
+});

@@ -6,6 +6,7 @@ import { auth } from '@/lib/firebase';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 import DoctorAppHeader from '@/components/doctor/DoctorAppHeader';
 import OversightPanel from '@/components/admin/OversightPanel';
+import RefreshIconButton from '@/components/ui/RefreshIconButton';
 
 interface Account {
   uid: string;
@@ -45,6 +46,7 @@ export default function AdminPage() {
   const [createIfMissing, setCreateIfMissing] = useState(true);
   const [role, setRole] = useState<'doctor' | 'admin'>('doctor');
   const [busy, setBusy] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
   useEffect(() => (auth ? onAuthStateChanged(auth, setUser) : setUser(null)), []);
@@ -214,8 +216,15 @@ export default function AdminPage() {
             </section>
 
             <section className="card">
-              <h2>Clinician and administrator accounts ({accounts.length})</h2>
-              <button className="secondary" type="button" onClick={() => void load()}>Refresh access and accounts</button>
+              <div className="card-header">
+                <h2>Clinician and administrator accounts ({accounts.length})</h2>
+                <RefreshIconButton
+                  label="Refresh access and accounts"
+                  hint="Re-checks your own administrator access and reloads this list, so roles granted or revoked since the page opened (here or elsewhere) appear."
+                  busy={refreshing}
+                  onClick={() => { setRefreshing(true); void load().finally(() => setRefreshing(false)); }}
+                />
+              </div>
               {accounts.length === 0 ? (
                 <p className="muted">No clinician accounts yet.</p>
               ) : (
@@ -260,6 +269,8 @@ export default function AdminPage() {
       </main>
       <style jsx>{`
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 1.25rem 1.5rem; }
+        .card-header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .5rem; }
+        .card-header h2 { margin: 0; }
         h2 { font-size: 1.125rem; font-weight: 700; margin: 0 0 0.5rem; color: #111827; }
         .muted { color: #6b7280; font-size: 0.8125rem; }
         .grant-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; align-items: end; margin-top: 0.75rem; }
