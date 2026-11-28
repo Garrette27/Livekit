@@ -707,6 +707,7 @@ function patientHistoryFixture() {
     };
   } };
   const { FirestoreSummaryProjectionService } = loadModule('lib/services/history-summary/summary-projection-service.ts', {
+    '@/lib/ai/claim-verification': loadModule('lib/ai/claim-verification.ts', {}, { Map, Set, Number, Array }),
     '@/lib/consultations/identity-utils': loadModule('lib/consultations/identity-utils.ts'),
     '@/lib/services/consultation-finalization': { generateAndStoreConsultationSummary() { throw new Error('Unexpected AI call'); } },
     '@/lib/repositories/call-summary-repository': loadModule('lib/repositories/call-summary-repository.ts'),

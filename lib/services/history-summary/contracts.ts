@@ -1,3 +1,5 @@
+import type { VerifiedClaim } from '@/lib/ai/claim-verification';
+
 export interface WaitingRoomParticipantHistoryRecord {
   waitingPatientId: string;
   invitationId: string | null;
@@ -56,6 +58,8 @@ export interface HistoryRecord {
   keyPoints?: string[];
   recommendations?: string[];
   followUpActions?: string[];
+  /** Verified transcript citations behind the AI draft's statements; empty for legacy or manual summaries. */
+  claimEvidence?: VerifiedClaim[];
   summaryStatus?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable' | 'reviewed';
   requiresClinicianReview?: boolean;
   isEdited?: boolean;

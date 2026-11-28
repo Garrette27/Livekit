@@ -15,17 +15,21 @@ export function deviceForKind(kind: string | undefined): 'camera' | 'microphone'
 }
 
 const CAUSE: Record<DeviceProblem, string> = {
-  blocked: 'is blocked for this site. Click the site icon left of the address bar, set it to Allow, then reload this page.',
-  'in-use': 'is in use by another app or browser window. Close the other app or window (or choose another device), then try again.',
-  'not-found': 'was not found. Check that it is connected, or choose another device.',
-  failed: 'could not be started. Try choosing the device again or reload this page.',
+  blocked: 'blocked for this site. Click the site icon left of the address bar, set it to Allow, then reload this page.',
+  'in-use': 'in use by another app or browser window. Close the other app or window (or choose another device), then try again.',
+  'not-found': 'not found. Check that it is connected, or choose another device.',
+  failed: 'not starting. Try choosing the device again or reload this page.',
 };
 
-/** One sentence per affected device, or null when nothing is wrong. */
+/** One sentence per distinct cause (both devices named together when they share it), or null when nothing is wrong. */
 export function describeDeviceProblems(problems: DeviceProblems): string | null {
-  const lines = (['camera', 'microphone'] as const)
-    .filter((device) => problems[device])
-    .map((device) => `The ${device} ${CAUSE[problems[device]!]}`);
-  if (!lines.length) return null;
+  const devices = (['camera', 'microphone'] as const).filter((device) => problems[device]);
+  if (!devices.length) return null;
+  const causes = [...new Set(devices.map((device) => problems[device]!))];
+  const lines = causes.map((cause) => {
+    const named = devices.filter((device) => problems[device] === cause);
+    const subject = named.length === 2 ? 'The camera and microphone are' : `The ${named[0]} is`;
+    return `${subject} ${CAUSE[cause]}`;
+  });
   return `${lines.join(' ')} You can still hear, see and chat with the other participant meanwhile.`;
 }

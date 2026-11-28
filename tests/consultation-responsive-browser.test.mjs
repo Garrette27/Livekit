@@ -5,7 +5,7 @@ import { chromium, expect } from '@playwright/test';
 import { consultationBrowserFixture } from './helpers/consultation-browser-fixture.mjs';
 
 test('the real room workspace fits phone, tablet and desktop widths with optional panels closed', async () => {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH });
   mkdirSync('tmp/consultation-responsive', { recursive: true });
   const script = consultationBrowserFixture();
   try {

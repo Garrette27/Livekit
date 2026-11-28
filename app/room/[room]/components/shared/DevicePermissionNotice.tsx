@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRoomContext } from '@livekit/components-react';
 import { MediaDeviceFailure, RoomEvent, Track, type LocalTrackPublication } from 'livekit-client';
+import { ROOM_LAYERS } from '@/lib/ui/room-layers';
 import { describeDeviceProblems, deviceForKind, type DeviceProblem, type DeviceProblems } from '@/lib/livekit/device-problems';
 
 /**
@@ -92,7 +93,7 @@ export default function DevicePermissionNotice() {
         top: '3.25rem',
         left: '50%',
         transform: 'translateX(-50%)',
-        zIndex: 10060,
+        zIndex: ROOM_LAYERS.notice,
         width: 'min(32rem, calc(100% - 2rem))',
         padding: '0.75rem 1rem',
         borderRadius: '0.5rem',

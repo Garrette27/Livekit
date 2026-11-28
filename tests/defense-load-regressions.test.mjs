@@ -125,6 +125,7 @@ test('100 history records enrich chat with at most six outstanding reads and pre
     } }; } };
   } };
   const { FirestoreSummaryProjectionService } = loadModule('lib/services/history-summary/summary-projection-service.ts', {
+    '@/lib/ai/claim-verification': loadModule('lib/ai/claim-verification.ts', {}, { Map, Set, Number, Array }),
     '@/lib/consultations/identity-utils': identity,
     '@/lib/services/consultation-finalization': { generateAndStoreConsultationSummary: async () => { throw new Error('History must never call AI'); } },
     '@/lib/repositories/call-summary-repository': { CallSummaryRepository: class { async findByDoctor() { return []; } } },

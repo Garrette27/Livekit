@@ -1,3 +1,4 @@
+import { parseStoredClaims } from '@/lib/ai/claim-verification';
 import type { Firestore } from 'firebase-admin/firestore';
 import { hasRecordedPatientIdentity, isKnownUserId } from '@/lib/consultations/identity-utils';
 import { generateAndStoreConsultationSummary } from '@/lib/services/consultation-finalization';
@@ -591,6 +592,7 @@ export class FirestoreSummaryProjectionService implements SummaryProjectionServi
         followUpActions: Array.isArray(summaryData.followUpActions)
           ? (summaryData.followUpActions as string[])
           : undefined,
+        claimEvidence: parseStoredClaims(summaryData.claimEvidence),
         summaryStatus:
           summaryMetadata.isEdited === true
             ? 'reviewed'

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { ROOM_LAYERS } from '@/lib/ui/room-layers';
 
 interface ErrorToastProps {
   error: string | null;
@@ -11,8 +12,8 @@ export default function ErrorToast({ error, onDismiss }: ErrorToastProps) {
   if (!error) return null;
 
   return (
-    // Top-anchored above the call chrome: a bottom toast sat behind the
-    // LiveKit control bar (z-index 10000) and could not be read or dismissed.
+    // Top-anchored above the call chrome (a bottom toast sat behind LiveKit's
+    // control bar) but below side panels, so it never covers their close button.
     <div
       role="alert"
       style={{
@@ -25,7 +26,7 @@ export default function ErrorToast({ error, onDismiss }: ErrorToastProps) {
         borderRadius: '0.5rem',
         padding: '1rem',
         color: '#dc2626',
-        zIndex: 10070,
+        zIndex: ROOM_LAYERS.errorToast,
         maxWidth: '400px',
         textAlign: 'center'
       }}

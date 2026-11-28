@@ -2,8 +2,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useIsCompactViewport } from '@/hooks/useIsCompactViewport';
+import { ROOM_LAYERS } from '@/lib/ui/room-layers';
 
-const SIDEBAR_Z_INDEX = 10020;
+const SIDEBAR_Z_INDEX = ROOM_LAYERS.sidePanel;
 
 interface CollapsibleSidebarProps {
   children: React.ReactNode;

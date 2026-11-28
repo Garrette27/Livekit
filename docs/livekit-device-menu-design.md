@@ -97,3 +97,14 @@ button rules under `[data-lk-theme]`; LiveKit's guide places that attribute on
 The browser fixture added it on its own wrapper, so the test could not see the
 gap. `RoomShell` now passes `data-lk-theme="default"` to `LiveKitRoom`, and
 `tests/consultation-workspace.test.mjs` pins it.
+
+## Follow-up 3: overlay layering (28 November 2026)
+
+`tests/consultation-responsive-browser.test.mjs` showed the device notice
+covering the Session sheet's Close button at 320 px (headless Chromium reports
+camera/microphone permission as denied, so the notice appears). Room overlays
+had ad-hoc z-indexes at or above the side panel's. `lib/ui/room-layers.ts` now
+defines one order: control bar < call quality < diagnostics < device notice <
+error toast < side panels. Panels the user opens always win, and
+`tests/media-diagnostics.test.mjs` pins the order. When both devices share a
+cause, the notice now states it once ("The camera and microphone are blocked…").

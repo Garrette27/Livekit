@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRoomContext } from '@livekit/components-react';
 import { MediaDeviceFailure, RoomEvent, Track, type LocalVideoTrack, type Room, type TrackPublication } from 'livekit-client';
+import { ROOM_LAYERS } from '@/lib/ui/room-layers';
 import { redactId, videoStatDeltas, type VideoStatDelta } from '@/lib/livekit/media-diagnostics';
 
 /**
@@ -193,7 +194,7 @@ export default function MediaDiagnosticsPanel() {
   return (
     <section
       aria-label="Media diagnostics"
-      style={{ position: 'absolute', right: 12, top: 52, zIndex: 10030, width: 'min(34rem, calc(100% - 24px))', maxHeight: '60%', overflow: 'auto',
+      style={{ position: 'absolute', right: 12, top: 52, zIndex: ROOM_LAYERS.diagnostics, width: 'min(34rem, calc(100% - 24px))', maxHeight: '60%', overflow: 'auto',
         background: 'rgba(2,6,23,0.92)', color: '#e2e8f0', font: '11px/1.4 ui-monospace, monospace', border: '1px solid #f59e0b', borderRadius: 8, padding: 8 }}
     >
       <strong style={{ color: '#fbbf24' }}>Media diagnostics (temporary)</strong>{' '}

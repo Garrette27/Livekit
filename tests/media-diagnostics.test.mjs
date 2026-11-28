@@ -15,6 +15,9 @@ test('only the failing device is named, and "in use" is never described as block
   assert.match(inUse, /^The camera is in use by another app or browser window/);
   assert.doesNotMatch(inUse, /blocked|microphone/);
   assert.match(describeDeviceProblems({ microphone: 'blocked' }), /^The microphone is blocked for this site/);
+  const both = describeDeviceProblems({ camera: 'blocked', microphone: 'blocked' });
+  assert.match(both, /^The camera and microphone are blocked for this site/);
+  assert.equal(both.match(/blocked/g).length, 1, 'a shared cause is stated once');
   assert.equal(describeDeviceProblems({}), null);
 });
 
@@ -52,4 +55,18 @@ test('diagnostics are opt-in per page load and redact identifiers', () => {
   assert.match(panel, /get\('mediaDiagnostics'\) === '1'/);
   assert.match(panel, /`remote \$\{redactId\(identity\)\}`/, 'remote participants are labelled by a redacted id');
   assert.doesNotMatch(panel, /room\.name\b|\broomName\b|\.metadata\b|getToken|accessToken/, 'no room name, metadata or token reaches the export');
+});
+
+test('call overlays stay below side panels so a panel close button is never covered', () => {
+  const { ROOM_LAYERS } = loadModule('lib/ui/room-layers.ts');
+  for (const overlay of ['callQuality', 'diagnostics', 'notice', 'errorToast']) {
+    assert.ok(ROOM_LAYERS[overlay] > ROOM_LAYERS.controlBar && ROOM_LAYERS[overlay] < ROOM_LAYERS.sidePanel, overlay);
+  }
+  for (const [file, layer] of [
+    ['app/room/[room]/components/shared/DevicePermissionNotice.tsx', 'notice'],
+    ['app/room/[room]/doctor/components/shared/ErrorToast.tsx', 'errorToast'],
+    ['app/room/[room]/components/shared/CallQualityMeter.tsx', 'callQuality'],
+    ['app/room/[room]/components/shared/MediaDiagnosticsPanel.tsx', 'diagnostics'],
+  ]) assert.match(readFileSync(file, 'utf8'), new RegExp(`zIndex: ROOM_LAYERS\\.${layer}`), file);
+  assert.match(readFileSync('components/CollapsibleSidebar.tsx', 'utf8'), /SIDEBAR_Z_INDEX = ROOM_LAYERS\.sidePanel/);
 });

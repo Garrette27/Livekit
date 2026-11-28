@@ -7,6 +7,7 @@ import { useAuthSession } from '@/hooks/useAuthSession';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 import ConsultationHistoryView from './components/ConsultationHistoryView';
 import type { ConsultationCardRecord } from './components/ConsultationCard';
+import type { VerifiedClaim } from '@/lib/ai/claim-verification';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,7 @@ interface CallSummary {
   keyPoints: string[];
   recommendations: string[];
   followUpActions: string[];
+  claimEvidence?: VerifiedClaim[];
   riskLevel: string;
   category: string;
   createdAt: Timestamp;
@@ -97,6 +99,7 @@ interface DoctorHistoryResponseItem {
   keyPoints?: string[];
   recommendations?: string[];
   followUpActions?: string[];
+  claimEvidence?: VerifiedClaim[];
   summaryStatus?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable' | 'reviewed';
   requiresClinicianReview?: boolean;
   isEdited?: boolean;
@@ -164,6 +167,7 @@ function mapHistoryRecordToSummary(record: DoctorHistoryResponseItem): CallSumma
     keyPoints: Array.isArray(record.keyPoints) ? record.keyPoints : [],
     recommendations: Array.isArray(record.recommendations) ? record.recommendations : [],
     followUpActions: Array.isArray(record.followUpActions) ? record.followUpActions : [],
+    claimEvidence: Array.isArray(record.claimEvidence) ? record.claimEvidence : [],
     riskLevel: record.riskLevel || 'Pending',
     category: record.category || 'General',
     createdAt: toTimestamp(record.createdAt),
@@ -200,6 +204,7 @@ function toCardRecord(summary: CallSummary): ConsultationCardRecord {
     keyPoints: summary.keyPoints,
     recommendations: summary.recommendations,
     followUpActions: summary.followUpActions,
+    claimEvidence: summary.claimEvidence ?? [],
     riskLevel: summary.riskLevel,
     category: summary.category,
     patientEmail: summary.patientEmail,

@@ -26,6 +26,7 @@ function loadModule(path, dependencies) {
 test('docked room panels occupy layout space instead of covering the call', () => {
   const Sidebar = loadModule('components/CollapsibleSidebar.tsx', {
     '@/hooks/useIsCompactViewport': { useIsCompactViewport: () => false },
+    '@/lib/ui/room-layers': loadModule('lib/ui/room-layers.ts'),
   }).default;
   const markup = renderToStaticMarkup(React.createElement(Sidebar, {
     title: 'Waiting Queue', icon: 'WQ', position: 'left', width: 360,
@@ -106,6 +107,7 @@ test('the call queue shows identity provenance and progressively disclosed arriv
 test('a compact room starts with a labelled action rather than an open sheet', () => {
   const Sidebar = loadModule('components/CollapsibleSidebar.tsx', {
     '@/hooks/useIsCompactViewport': { useIsCompactViewport: () => true },
+    '@/lib/ui/room-layers': loadModule('lib/ui/room-layers.ts'),
   }).default;
   const markup = renderToStaticMarkup(React.createElement(Sidebar, {
     title: 'Waiting Queue', icon: 'WQ', position: 'left',

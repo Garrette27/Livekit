@@ -10,6 +10,7 @@ import {
   resolveConsultationStatus,
   resolveRiskPresentation,
 } from '@/lib/consultations/history-presentation';
+import type { VerifiedClaim } from '@/lib/ai/claim-verification';
 
 export interface ConsultationCardRecord {
   id: string;
@@ -20,6 +21,8 @@ export interface ConsultationCardRecord {
   keyPoints: string[];
   recommendations: string[];
   followUpActions: string[];
+  /** Verified transcript citations for the AI draft's statements. */
+  claimEvidence?: VerifiedClaim[];
   riskLevel: string;
   category: string;
   patientEmail?: string | null;
@@ -236,6 +239,10 @@ export default function ConsultationCard({ record, isGenerating, onEdit, onGener
         </details>
       )}
 
+      {record.claimEvidence && record.claimEvidence.length > 0 && (
+        <ClaimSources claims={record.claimEvidence} edited={record.isEdited === true} />
+      )}
+
       {record.waitingRoomHistory && record.waitingRoomHistory.totalParticipants > 0 && (
         <details style={{ marginTop: '0.25rem' }}>
           <summary style={disclosureStyle}>
@@ -366,5 +373,46 @@ function DetailList({ title, items }: { title: string; items: string[] }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+const SECTION_LABEL: Record<VerifiedClaim['section'], string> = {
+  summary: 'Summary',
+  keyPoints: 'Key point',
+  recommendations: 'Recommendation',
+  followUpActions: 'Follow-up',
+};
+const SPEAKER_LABEL = { doctor: 'Doctor', patient: 'Patient', unlabelled: 'Speaker not identified' } as const;
+
+/**
+ * Linked evidence for the AI draft: each statement with the recognized words
+ * it was verified against. Lets the clinician catch a misheard word (for
+ * example a disease name produced by speech recognition) before accepting it.
+ */
+function ClaimSources({ claims, edited }: { claims: VerifiedClaim[]; edited: boolean }) {
+  return (
+    <details style={{ marginTop: '0.25rem' }}>
+      <summary style={disclosureStyle}>Sources for AI statements ({claims.length})</summary>
+      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0.25rem 0 0.5rem', maxWidth: '72ch' }}>
+        Each statement was kept only because these words appear in the recognized transcript. Speech recognition can
+        mishear words; confirm anything clinical with the patient before accepting it.
+        {edited ? ' These sources belong to the original AI draft, before your edits.' : ''}
+      </p>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '0.5rem', maxWidth: '72ch' }}>
+        {claims.map((claim, index) => (
+          <li key={index} style={{ fontSize: '0.8125rem', color: '#374151', background: '#f9fafb', borderRadius: '0.375rem', padding: '0.5rem 0.625rem' }}>
+            <div><span style={{ fontWeight: 600 }}>{SECTION_LABEL[claim.section]}:</span> {claim.text}</div>
+            {claim.sources.map((source, sourceIndex) => (
+              <div key={sourceIndex} style={{ marginTop: '0.25rem', color: '#4b5563' }}>
+                {SPEAKER_LABEL[source.speaker]}, line {source.line}: <q>{source.quote}</q>
+              </div>
+            ))}
+            {claim.speakerUnconfirmed && (
+              <div style={{ marginTop: '0.25rem', color: '#92400e' }}>Speaker not identified in the source; it may have been the doctor.</div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

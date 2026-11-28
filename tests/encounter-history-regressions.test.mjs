@@ -52,6 +52,7 @@ function projectionFixture() {
   const snapshot = (id, value) => ({ id, exists: Boolean(value), data: () => value });
   let generations = 0;
   const { FirestoreSummaryProjectionService } = loadModule('lib/services/history-summary/summary-projection-service.ts', {
+    '@/lib/ai/claim-verification': loadModule('lib/ai/claim-verification.ts', {}, { Map, Set, Number, Array }),
     '@/lib/consultations/identity-utils': loadModule('lib/consultations/identity-utils.ts'),
     '@/lib/services/consultation-finalization': {
       async generateAndStoreConsultationSummary() { generations++; },

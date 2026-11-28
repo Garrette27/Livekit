@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRoomContext } from '@livekit/components-react';
 import { RoomEvent } from 'livekit-client';
+import { ROOM_LAYERS } from '@/lib/ui/room-layers';
 import { summarizeCallStats, type CallQualitySample } from '@/lib/livekit/call-quality';
 
 const SAMPLE_INTERVAL_MS = 3000;
@@ -100,7 +101,7 @@ export default function CallQualityMeter({ encryption }: { encryption: 'end-to-e
         position: 'absolute',
         top: 12,
         left: 12,
-        zIndex: 10020,
+        zIndex: ROOM_LAYERS.callQuality,
         background: 'rgba(15, 23, 42, 0.88)',
         color: '#e2e8f0',
         border: '1px solid rgba(255,255,255,0.15)',
