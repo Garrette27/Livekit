@@ -130,3 +130,10 @@ test('tablet widths choose the same on-demand room arrangement as phones', () =>
     assert.ok(width <= Number(query.match(/max-width:\s*(\d+)px/)[1]), `${width}px must not dock two panels over video`);
   }
 });
+
+test('the in-call LiveKitRoom is a LiveKit theme root so device menus get their styles', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync('app/room/[room]/components/shared/RoomShell.tsx', 'utf8');
+  const room = shell.slice(shell.indexOf('<LiveKitRoom'), shell.indexOf('>', shell.indexOf('<LiveKitRoom')));
+  if (!/data-lk-theme="default"/.test(room)) throw new Error('LiveKitRoom must carry data-lk-theme="default"');
+});

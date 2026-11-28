@@ -54,14 +54,18 @@ export default function DoctorAppHeader({ title, subtitle, user, navLink, doctor
   return (
     <header className="doctor-app-header">
       <div className="app-header-bar" style={{ maxWidth: '80rem', margin: '0 auto' }}>
-        <a href={homePath} className="doctor-title-box" aria-label="TeleConsole workspace home">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/teleconsole-logo.svg" alt="" width={36} height={36} />
+        {/* Only the logo is the home link. The page title names where you are;
+            when it was part of the link, "Appointments" navigated to Invitations. */}
+        <div className="doctor-title-box">
+          <a href={homePath} aria-label="TeleConsole workspace home" style={{ display: 'inline-flex', lineHeight: 0 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/teleconsole-logo.svg" alt="" width={36} height={36} />
+          </a>
           <span>
             <span className="doctor-title">{title}</span>
             {subtitle && <span className="doctor-subtitle">{subtitle}</span>}
           </span>
-        </a>
+        </div>
         <nav className="doctor-header-actions" aria-label="Workspace navigation">
           {/* A full document navigation, not a client transition: the client
               transition between the two doctor pages could stall on the
@@ -104,12 +108,8 @@ export default function DoctorAppHeader({ title, subtitle, user, navLink, doctor
         }
         :global(.doctor-title-box > span) { min-width: 0; overflow-wrap: anywhere; }
         :global(.doctor-title-box > img) { flex: none; }
-        :global(.doctor-title-box:hover) {
-          background: #f0fdfa;
-          border-color: #99f6e4;
-          box-shadow: 0 1px 2px rgba(15, 118, 110, 0.15);
-        }
-        :global(.doctor-title-box:focus-visible) {
+        :global(.doctor-title-box > a) { flex: none; border-radius: 0.5rem; }
+        :global(.doctor-title-box > a:focus-visible) {
           outline: 3px solid #14b8a6;
           outline-offset: 2px;
         }

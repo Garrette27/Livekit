@@ -96,6 +96,7 @@ function appointmentRoute({ role = 'doctor', enabled = true, authenticated = tru
     '@/lib/appointments/appointment-policy': { ...policy(), parseAppointmentCommand: (body) => policy().parseAppointmentCommand(body, now) },
     '@/lib/services/appointments/appointment-service': { AppointmentService: class { async execute() { observed.writes++; return result.serviceOk({ appointment: {} }); } async list() { return result.serviceOk({ appointments: [], nextCursor: null }); } } },
     '@/lib/rate-limit': { enforceRateLimit: async () => null, RateLimitConfigs: { TOKEN_GENERATION: {} } },
+    '@/lib/invitations/revoke-invitation': { revokeActiveInvitationsForRoom: async () => { observed.writes++; return 0; } },
   };
   const route = loadAppointmentModule('app/api/doctor/appointments/route.ts', deps, { Headers });
   return { observed, route, post: (body) => route.POST({ json: async () => body }), get: () => route.GET({ url: 'https://example.test/api/doctor/appointments' }) };
@@ -151,4 +152,22 @@ test('prepare-invitation handoff derives a PII-free room from the booking id and
   assert.equal(parseInvitationRoomHandoff('?room=Kia'), null);
   assert.equal(parseInvitationRoomHandoff('?room=visit-111111111111%3Cscript%3E'), null);
   assert.equal(parseInvitationRoomHandoff(''), null);
+});
+
+test('cancellation carries a coded reason (default other) and rejects free text', () => {
+  const { parseAppointmentCommand } = policy();
+  const base = { action: 'cancel', id: create.id, expectedVersion: 2 };
+  assert.equal(parseAppointmentCommand(base, now).data.cancellationReason, 'other');
+  assert.equal(parseAppointmentCommand({ ...base, cancellationReason: 'patient-request' }, now).data.cancellationReason, 'patient-request');
+  assert.equal(parseAppointmentCommand({ ...base, cancellationReason: 'patient has a toothache' }, now).ok, false);
+});
+
+test('cancelling an appointment revokes the visit room invitations through the shared revocation owner', () => {
+  const route = readFileSync('app/api/doctor/appointments/route.ts', 'utf8');
+  assert.match(route, /revokeActiveInvitationsForRoom\(db, auth\.data\.userId, appointmentRoomName\(command\.data\.id\)\)/);
+  const revoke = readFileSync('lib/invitations/revoke-invitation.ts', 'utf8');
+  assert.match(revoke, /where\('createdBy', '==', doctorUserId\)[\s\S]*where\('roomName', '==', roomName\)[\s\S]*where\('status', '==', 'active'\)[\s\S]*limit\(MAX_CASCADE_REVOCATIONS\)/);
+  assert.match(readFileSync('app/api/invite/revoke/route.ts', 'utf8'), /revokeInvitation\(db, invitationId, auth\.data\.userId\)/);
+  const service = readFileSync('lib/services/appointments/appointment-service.ts', 'utf8');
+  assert.match(service, /byUserId: doctorUserId, reason: command\.cancellationReason/);
 });

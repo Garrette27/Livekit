@@ -5,7 +5,8 @@ import { serviceResultToResponse, unexpectedErrorResponse } from '@/lib/services
 import { serviceError } from '@/lib/services/shared/service-result';
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { isConsultationCapabilityEnabled } from '@/lib/consultations/consultation-capabilities';
-import { parseAppointmentCommand } from '@/lib/appointments/appointment-policy';
+import { appointmentRoomName, parseAppointmentCommand } from '@/lib/appointments/appointment-policy';
+import { revokeActiveInvitationsForRoom } from '@/lib/invitations/revoke-invitation';
 import { AppointmentService } from '@/lib/services/appointments/appointment-service';
 import { enforceRateLimit, RateLimitConfigs } from '@/lib/rate-limit';
 
@@ -22,7 +23,21 @@ async function handle(req: NextRequest, write: boolean) {
     const db = getFirebaseAdmin();
     if (!db) return serviceResultToResponse(serviceError(503, 'db_unavailable', 'Appointment service is unavailable. Please retry.'));
     const service = new AppointmentService(db);
-    if (command?.ok) return serviceResultToResponse(await service.execute(auth.data.userId, command.data));
+    if (command?.ok) {
+      const result = await service.execute(auth.data.userId, command.data);
+      // Cancelling a visit also closes its door: revoke this doctor's active
+      // invitations for the visit room (the calendar-cancel pattern). Runs after
+      // the booking commit; a repeated cancel simply finds nothing to revoke.
+      if (result.ok && command.data.action === 'cancel' && result.data.appointment.status === 'cancelled') {
+        const revoked = await revokeActiveInvitationsForRoom(db, auth.data.userId, appointmentRoomName(command.data.id));
+        if (revoked > 0 || result.data.appointment.cancellation?.revokedInvitationCount == null) {
+          await service.recordRevokedInvitations(command.data.id, revoked);
+        }
+        const cancellation = result.data.appointment.cancellation;
+        return serviceResultToResponse({ ...result, data: { ...result.data, revokedInvitationCount: revoked, appointment: { ...result.data.appointment, cancellation: cancellation ? { ...cancellation, revokedInvitationCount: (cancellation.revokedInvitationCount || 0) + revoked } : cancellation } } });
+      }
+      return serviceResultToResponse(result);
+    }
     return serviceResultToResponse(await service.list(auth.data.userId, new URL(req.url).searchParams.get('cursor') || undefined));
   } catch (error) { return unexpectedErrorResponse(error); }
 }

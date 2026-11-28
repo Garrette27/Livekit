@@ -11,7 +11,14 @@ export interface AppointmentFields {
 export type AppointmentCommand =
   | (AppointmentFields & { action: 'create'; id: string })
   | (AppointmentFields & { action: 'reschedule'; id: string; expectedVersion: number })
-  | { action: 'cancel'; id: string; expectedVersion: number };
+  | { action: 'cancel'; id: string; expectedVersion: number; cancellationReason: AppointmentCancellationReason };
+
+/**
+ * Coded cancellation reasons (after HL7 FHIR Appointment.cancellationReason):
+ * a short enumerated value, never free text, so no clinical detail is stored.
+ */
+export const APPOINTMENT_CANCELLATION_REASONS = ['patient-request', 'clinic-request', 'rescheduled', 'other'] as const;
+export type AppointmentCancellationReason = typeof APPOINTMENT_CANCELLATION_REASONS[number];
 
 type ParsedCommand = { ok: true; data: AppointmentCommand }
   | { ok: false; error: { status: number; code: string; message: string } };
@@ -79,11 +86,15 @@ export function parseAppointmentCommand(body: unknown, now: Date = new Date()): 
     return invalid('Choose a valid booking action and identifier.');
   }
   const allowed = action === 'cancel'
-    ? ['action', 'id', 'expectedVersion']
+    ? ['action', 'id', 'expectedVersion', 'cancellationReason']
     : ['action', 'id', 'patientName', 'patientEmail', 'localStart', 'durationMinutes', 'displayTimeZone', ...(action === 'reschedule' ? ['expectedVersion'] : [])];
   if (Object.keys(input).some((key) => !allowed.includes(key))) return invalid('The command contains unsupported fields.');
   if (action !== 'create' && (!Number.isSafeInteger(expectedVersion) || Number(expectedVersion) < 1)) return invalid('Refresh the appointment before changing it.');
-  if (action === 'cancel') return { ok: true, data: { action, id, expectedVersion: Number(expectedVersion) } };
+  if (action === 'cancel') {
+    const reason = input.cancellationReason ?? 'other';
+    if (!APPOINTMENT_CANCELLATION_REASONS.includes(reason as AppointmentCancellationReason)) return invalid('Choose a listed cancellation reason.');
+    return { ok: true, data: { action, id, expectedVersion: Number(expectedVersion), cancellationReason: reason as AppointmentCancellationReason } };
+  }
   const patientName = typeof input.patientName === 'string' ? input.patientName.trim() : '';
   const patientEmail = typeof input.patientEmail === 'string' ? input.patientEmail.trim().toLowerCase() : null;
   if (!patientName || patientName.length > 100 || /[\u0000-\u001f\u007f]/.test(patientName)) return invalid('Enter a patient name of 1-100 characters.');

@@ -551,7 +551,12 @@ export default function RoomShell({
 
   return (
     <div ref={roomScopeRef} style={{ width: '100%', minWidth: 0, height: '100dvh', position: 'relative', flex: 1, order: 2 }}>
+      {/* data-lk-theme is LiveKit's documented theme root: its list, button
+          and device-menu styles (and the --lk-* variables our menu overrides
+          use) are scoped under [data-lk-theme]. Without it the device popup
+          renders transparent with dark, bulleted options on the black stage. */}
       <LiveKitRoom
+        data-lk-theme="default"
         room={preparation.room}
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://video-icebzbvf.livekit.cloud'}

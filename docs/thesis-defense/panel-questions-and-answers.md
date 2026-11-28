@@ -153,9 +153,9 @@ Yes, for everything our server controls. When an administrator revokes a doctor,
 
 One honest detail: if the revoked doctor is *inside a call at that moment*, that media connection continues until they leave or are removed, because LiveKit room credentials are self-contained (doctor credentials last up to 4 hours). They cannot obtain a new one.
 
-### 21. Is appointment scheduling implemented, and how is it switched on?
+### 21. Is appointment scheduling implemented, and what happens when a booking is cancelled?
 
-Yes. Doctors book, reschedule and cancel their own visits at `/doctor/appointments`, and a booked visit's **Prepare invitation** opens the normal invitation workbench with a room derived from the booking id (no patient name or email in the link). The server owns everything: the doctor comes from the verified token, times are stored as UTC instants with an explicit IANA zone (nonexistent/ambiguous daylight-saving times are refused), a per-doctor calendar lock plus an overlap query inside one Firestore transaction prevents double booking, create retries are idempotent and reschedule/cancel need the current version. Clients cannot read or write appointments directly. It appears only when the server-only `ENABLE_CONSULTATION_SCHEDULING=true` is set and the two `appointments` indexes are deployed. Booking grants no admission, call token or transcription consent, and no reminders are sent. The survey did not evaluate this module. See [release gates](../production-readiness.md).
+Yes. Doctors book, reschedule and cancel their own visits at `/doctor/appointments`; **Prepare invitation** opens the invitation form with a room derived from the booking id (no patient name or email in the link). The server owns ownership, UTC + named-zone times (nonexistent/ambiguous daylight-saving times refused), a per-doctor lock plus overlap query in one Firestore transaction, idempotent create retries and versioned reschedule/cancel. Cancelling follows the calendar-cancel pattern: the appointment becomes `cancelled` with FHIR-style metadata (cancellation time, the doctor, a coded reason such as *Patient request*, never free text) and the server revokes that doctor's active invitations for the visit room, removing anyone waiting, so a cancelled visit no longer has an open door. The record is kept, struck through, with that metadata. Booking itself grants no admission or consent; no reminders are sent. The survey did not evaluate this module.
 
 ### 22. Where is consultation scheduling in the demo, and why is it separate from invitations?
 
@@ -193,9 +193,9 @@ Yes as an architectural precedent: AWS separates a provider control plane from t
 
 Every credential is checked against current state when it is used. Invitation status and expiry are rechecked on every token request, so a revoked link stops issuing credentials immediately. Waiting credentials carry the visit id, so a credential from an earlier visit is refused for a later one. Staff API access is refused on the next request after revocation. A consultation credential already inside a live call keeps working until that participant leaves, and the doctor's **Remove** action disconnects them at once.
 
-### 31. What caused the microphone/camera menu bugs, and how was the fix verified?
+### 31. What caused the microphone/camera menu, layout and blinking bugs, and how were they fixed?
 
-Two separate causes. First, application CSS forced `bottom: 100%` while LiveKit computed the popup's `top`, clipping it to a strip; the fix keeps LiveKit's own positioning and scopes toolbar colours to real toolbar buttons. Second, an empty menu: LiveKit lists devices only after the browser grants camera/microphone permission, so a site the browser has **blocked** shows an empty list. The room now shows an accessible notice naming the blocked device and how to re-allow it (Permissions API plus LiveKit's `MediaDevicesError`), and error toasts sit above the control bar. Browser checks mount the installed components with synthetic devices at 1280, 390 and 320 px; they are not physical-device or production acceptance. See the [device-menu design](../livekit-device-menu-design.md).
+One root cause. LiveKit scopes its component styles and layout variables (`--lk-bg2`, `--lk-control-bar-height`, `--lk-grid-gap`) under a `data-lk-theme` root, which LiveKit's docs place on `<LiveKitRoom>`. Our in-call room never had it; old `!important` overrides hid that until they were removed. Without it the device popup was transparent with dark bulleted options on the black stage, the tile grid's height calculation was invalid so tiles collapsed to the top leaving empty space, and the grid kept re-measuring (blinking). The fix adds `data-lk-theme="default"` to the in-call `LiveKitRoom`, pinned by a regression test. Earlier, a CSS rule had also clipped the popup, and a browser that *blocks* camera/microphone shows an empty list; the room now explains that case. Two tabs sharing one physical camera can still flicker; test with two devices. Physical-device acceptance on the deployment is done by a person. See the [device-menu design](../livekit-device-menu-design.md).
 
 ### 32. Is the app tested on phones and tablets?
 
@@ -241,9 +241,9 @@ Reopening starts a new visit at the back of the queue, and it always waits — e
 
 Short network drops are handled by LiveKit's own reconnection. If the page is lost, a verified allowlisted account that reopens the link rejoins its open admission directly; anyone else reopening goes back to waiting on the same entry and the doctor re-admits them. A dropped call is not treated as a completed or failed consultation by itself.
 
-### 43. Does removing a patient always create a summary?
+### 43. Does removing a patient, or a visit where no patient joined, call the AI?
 
-No. Removal changes the operational queue and disconnects the selected transport participant. Scoped encounter finalization, eligibility and evidence quality are separate decisions. A summary may be deterministic, unavailable, failed or a draft; the queue action is not an unconditional OpenAI billing switch.
+No, not automatically. Removal changes the queue; encounter finalization, eligibility and evidence quality are separate decisions. When no patient was present (no-show) or nobody was admitted, the server writes a deterministic *No patient joined* / *Patient not admitted* record and returns **before** any AI entitlement check or OpenAI request; a regression test pins that order. Insufficient transcript evidence likewise produces a deterministic record with no AI call. OpenAI is called only for an attended encounter with enough consented evidence, and its output is a draft that requires clinician review.
 
 ### 44. What load do ten waiting patients create?
 
@@ -470,7 +470,7 @@ Yes, a first version. Each server-written event stores an opaque id, time, clini
 
 ### 98. How would that audit dashboard preserve privacy and database budget?
 
-Scope is applied in the query from the verified token, never from a URL or form field; non-administrators get 403. The panel loads only when an administrator opens it, uses `count()` aggregations (about one read per 1,000 index entries) and one bounded page of at most 50 events, so a visit costs a few dozen reads. Responses are `private, no-store`. Clinical drill-through is deliberately absent: an administrator who needs clinical access must use a separately provisioned doctor identity. Regression tests check clinic scoping, the empty view for an unassigned clinic administrator, the page bound and that extra stored fields never leak into the response.
+Scope is applied in the query from the verified token, never from a URL or form field; non-administrators get 403. The panel uses `count()` aggregations (about one read per 1,000 index entries) and one bounded page of at most 50 events, so a visit costs a few dozen reads. Responses are `private, no-store`. Clinical drill-through is deliberately absent: an administrator who needs clinical access must use a separately provisioned doctor identity. Regression tests check clinic scoping, the empty view for an unassigned clinic administrator, the page bound and that extra stored fields never leak into the response.
 
 ### 99. Can an administration dashboard guarantee low costs or prove the business is profitable?
 

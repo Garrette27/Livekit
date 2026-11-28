@@ -1,11 +1,9 @@
 import { withRequestLogging } from '@/lib/services/shared/request-logging';
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '../../../../lib/firebase-admin';
-import { finalizeConsultationForRoom } from '../../../../lib/services/consultation-finalization';
-import { FirestoreInvitationAccessCore } from '@/lib/services/invitation-access';
-import { InvitationRepository } from '../../../../lib/repositories/invitation-repository';
 import { authorizeBearerRequest } from '@/lib/services/shared/request-auth';
 import { serviceResultToResponse, unexpectedErrorResponse } from '@/lib/services/shared/http';
+import { revokeInvitation } from '@/lib/invitations/revoke-invitation';
 
 // Revocation can finalize the consultation and run AI summarization; give it
 // more than the 10s default.
@@ -37,83 +35,9 @@ async function handlePOST(req: NextRequest) {
       );
     }
 
-    const invitationRepo = new InvitationRepository(db);
-    const invitationDoc = await invitationRepo.getById(invitationId);
-    if (!invitationDoc.exists) {
-      return NextResponse.json(
-        { success: false, error: 'Invitation not found' },
-        { status: 404 }
-      );
-    }
-
-    const invitation = invitationDoc.data() as {
-      roomName?: string;
-      status?: string;
-      createdBy?: string;
-    };
-    if (invitation.createdBy !== auth.data.userId) {
-      return NextResponse.json(
-        { success: false, error: 'You can only revoke invitations created by your account' },
-        { status: 403 }
-      );
-    }
-
-    const revokedAt = new Date();
-
-    if (invitation.status !== 'revoked') {
-      await invitationRepo.mergeFields(invitationId, {
-        status: 'revoked',
-        revokedAt,
-      });
-    }
-
-    const invitationAccess = new FirestoreInvitationAccessCore(db);
-    const activeWaitingEntries = await invitationAccess.listWaitingEntries({
-      invitationId,
-      statuses: ['waiting', 'admitted'],
-      activeOnly: false,
-    });
-
-    await Promise.all(
-      activeWaitingEntries.map((waitingEntry) =>
-        invitationAccess.rejectWaitingEntry({
-          waitingPatientId: waitingEntry.id,
-          doctorUserId: invitation.createdBy,
-        })
-      )
-    );
-
-    let finalizationResult: { consultationSessionId: string; finalDurationMinutes: number } | null = null;
-    if (invitation.roomName) {
-      finalizationResult = await finalizeConsultationForRoom(db, {
-        roomName: invitation.roomName,
-        finalizedAt: revokedAt,
-        reason: 'invitation_revoked',
-        regenerateSummary: true,
-      });
-
-      if (finalizationResult) {
-        await invitationRepo.mergeFields(invitationId, {
-          metadata: {
-            finalization: {
-              at: revokedAt.toISOString(),
-              reason: 'invitation_revoked',
-              consultationSessionId: finalizationResult.consultationSessionId,
-              finalDurationMinutes: finalizationResult.finalDurationMinutes,
-              removedParticipantsCount: activeWaitingEntries.length,
-            },
-          },
-        });
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      invitationId,
-      revokedAt: revokedAt.toISOString(),
-      removedParticipantsCount: activeWaitingEntries.length,
-      finalization: finalizationResult,
-    });
+    const result = await revokeInvitation(db, invitationId, auth.data.userId);
+    if (!result.ok) return serviceResultToResponse(result);
+    return NextResponse.json({ success: true, ...result.data });
   } catch (error) {
     // Internal Firestore/finalization text stays in server logs, never the response.
     console.error('Error revoking invitation:', error);

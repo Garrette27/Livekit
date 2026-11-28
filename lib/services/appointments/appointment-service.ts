@@ -1,6 +1,6 @@
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import { createHash } from 'node:crypto';
-import type { AppointmentCommand, AppointmentFields } from '@/lib/appointments/appointment-policy';
+import { APPOINTMENT_CANCELLATION_REASONS, type AppointmentCancellationReason, type AppointmentCommand, type AppointmentFields } from '@/lib/appointments/appointment-policy';
 import { serviceError, serviceOk, type ServiceResult } from '../shared/service-result';
 
 export interface AppointmentRecord extends AppointmentFields {
@@ -10,6 +10,8 @@ export interface AppointmentRecord extends AppointmentFields {
   version: number;
   createdAt: string;
   updatedAt: string;
+  /** Lifecycle metadata, set only when status is `cancelled`. */
+  cancellation: { at: string; byUserId: string; reason: AppointmentCancellationReason; revokedInvitationCount: number | null } | null;
 }
 
 /** Immutable request receipt, distinct from later mutable booking state. Never logged or returned. */
@@ -34,6 +36,20 @@ function appointmentRecord(id: string, value: Record<string, unknown>): Appointm
     status: value.status as 'booked' | 'cancelled', version: Number(value.version),
     startsAt: isoDate(value.startsAt), endsAt: isoDate(value.endsAt),
     createdAt: isoDate(value.createdAt), updatedAt: isoDate(value.updatedAt),
+    cancellation: storedCancellation(value),
+  };
+}
+
+/** Records cancelled before this metadata existed project as `null` rather than failing. */
+function storedCancellation(value: Record<string, unknown>): AppointmentRecord['cancellation'] {
+  const raw = value.cancellation as Record<string, unknown> | undefined;
+  if (value.status !== 'cancelled' || !raw || typeof raw !== 'object') return null;
+  let at: string;
+  try { at = isoDate(raw.at); } catch { return null; }
+  const reason = APPOINTMENT_CANCELLATION_REASONS.includes(raw.reason as AppointmentCancellationReason) ? raw.reason as AppointmentCancellationReason : 'other';
+  return {
+    at, byUserId: typeof raw.byUserId === 'string' ? raw.byUserId : '', reason,
+    revokedInvitationCount: Number.isSafeInteger(raw.revokedInvitationCount) ? Number(raw.revokedInvitationCount) : null,
   };
 }
 
@@ -64,6 +80,14 @@ export class AppointmentService {
     const last = appointments.at(-1);
     const nextCursor = snapshot.size > 50 && last ? Buffer.from(JSON.stringify({ startsAt: last.startsAt, id: last.id })).toString('base64url') : null;
     return serviceOk({ appointments, nextCursor });
+  }
+
+  /**
+   * Record how many invitation links the cancellation revoked. Written after
+   * the cascade, so a crash in between leaves `null` (unknown), never a false 0.
+   */
+  async recordRevokedInvitations(appointmentId: string, count: number): Promise<void> {
+    await this.db.collection('appointments').doc(appointmentId).set({ cancellation: { revokedInvitationCount: count } }, { merge: true });
   }
 
   /** Commit a validated command, returning conflicts without mutating either booking or calendar. */
@@ -100,10 +124,18 @@ export class AppointmentService {
         startsAt: fields.startsAt, endsAt: fields.endsAt, displayTimeZone: fields.displayTimeZone,
         status: command.action === 'cancel' ? 'cancelled' : 'booked', version,
         createdAt: current?.createdAt || at.toISOString(), updatedAt: at.toISOString(),
+        cancellation: command.action === 'cancel'
+          ? { at: at.toISOString(), byUserId: doctorUserId, reason: command.cancellationReason, revokedInvitationCount: null }
+          : null,
       };
-      const { id: documentId, ...stored } = appointment;
+      const { id: documentId, cancellation, ...stored } = appointment;
       void documentId;
-      transaction.set(ref, { ...stored, creationIntentHash: command.action === 'create' ? creationIntentHash(command) : existing.data()?.creationIntentHash || null, startsAt: new Date(stored.startsAt), endsAt: new Date(stored.endsAt), createdAt: new Date(stored.createdAt), updatedAt: at });
+      transaction.set(ref, {
+        ...stored,
+        cancellation: cancellation ? { ...cancellation, at } : null,
+        creationIntentHash: command.action === 'create' ? creationIntentHash(command) : existing.data()?.creationIntentHash || null,
+        startsAt: new Date(stored.startsAt), endsAt: new Date(stored.endsAt), createdAt: new Date(stored.createdAt), updatedAt: at,
+      });
       transaction.set(calendar, { version: Number(calendarDoc.data()?.version || 0) + 1, updatedAt: at });
       return serviceOk({ appointment });
     });

@@ -2,11 +2,17 @@
 
 import React, { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
-import { appointmentRoomName } from '@/lib/appointments/appointment-policy';
+import { appointmentRoomName, type AppointmentCancellationReason } from '@/lib/appointments/appointment-policy';
 import type { AppointmentRecord } from '@/lib/services/appointments/appointment-service';
 
 const EMPTY_DRAFT = { patientName: '', patientEmail: '', localStart: '', durationMinutes: 30, displayTimeZone: 'Asia/Manila' };
 type Feedback = { error: boolean; text: string } | null;
+const REASON_LABEL: Record<AppointmentCancellationReason, string> = {
+  'patient-request': 'Patient request',
+  'clinic-request': 'Clinic request',
+  rescheduled: 'Rebooked as a new appointment',
+  other: 'Other',
+};
 
 /** Display/edit a stored instant in its explicit booking zone, never the device's zone. */
 function localInput(instant: string, zone: string): string {
@@ -31,6 +37,7 @@ export default function AppointmentWorkbench({ doctorUserId }: { doctorUserId: s
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [editing, setEditing] = useState<AppointmentRecord | null>(null);
   const [cancelTarget, setCancelTarget] = useState<{ id: string; version: number } | null>(null);
+  const [cancelReason, setCancelReason] = useState<AppointmentCancellationReason>('patient-request');
   const createId = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const alive = useRef(true);
@@ -91,7 +98,11 @@ export default function AppointmentWorkbench({ doctorUserId }: { doctorUserId: s
       if (command.action !== 'cancel' || editing?.id === command.id) resetDraft();
       setCancelTarget(null);
       const action = command.action === 'create' ? 'booked' : command.action === 'cancel' ? 'cancelled' : 'rescheduled';
-      setFeedback({ error: false, text: body.replayed ? 'Original booking request confirmed. The current appointment is shown below.' : `Appointment ${action}. Room admission and clinical records are unchanged.` });
+      const revoked = Number(body.revokedInvitationCount) || 0;
+      const cancelText = revoked > 0
+        ? `Appointment cancelled. ${revoked} active invitation link${revoked === 1 ? '' : 's'} for this visit ${revoked === 1 ? 'was' : 'were'} revoked; anyone waiting was removed. Clinical records are unchanged.`
+        : 'Appointment cancelled. No active invitation link existed for this visit. Clinical records are unchanged.';
+      setFeedback({ error: false, text: body.replayed ? 'Original booking request confirmed. The current appointment is shown below.' : command.action === 'cancel' ? cancelText : `Appointment ${action}. Room admission and clinical records are unchanged.` });
       await load();
     } catch { if (alive.current) setFeedback({ error: true, text: 'The change could not be confirmed. Refresh the list before retrying. Retrying the same booking request will not create a duplicate.' }); }
     finally { if (alive.current) setBusy(null); }
@@ -144,11 +155,11 @@ export default function AppointmentWorkbench({ doctorUserId }: { doctorUserId: s
         <ul className="booking-list">{records.map((record) => {
           const date = new Intl.DateTimeFormat(undefined, { timeZone: record.displayTimeZone, dateStyle: 'medium', timeStyle: 'short' });
           return <li key={record.id}>
-            <div><h3>{record.patientName}</h3><p>{date.format(new Date(record.startsAt))} – {date.format(new Date(record.endsAt))}</p><p className="muted">{record.displayTimeZone} · Room {appointmentRoomName(record.id)} · {record.status === 'cancelled' ? 'Cancelled' : 'Booked'}</p>{record.patientEmail && <details><summary>Contact details (unverified)</summary><p>{record.patientEmail}</p></details>}</div>
+            <div><h3>{record.patientName}</h3><p className={record.status === 'cancelled' ? 'struck' : undefined}>{date.format(new Date(record.startsAt))} – {date.format(new Date(record.endsAt))}</p><p className="muted">{record.displayTimeZone} · Room {appointmentRoomName(record.id)} · <span className={record.status === 'cancelled' ? 'status-badge cancelled' : 'status-badge booked'}>{record.status === 'cancelled' ? 'Cancelled' : 'Booked'}</span></p>{record.status === 'cancelled' && <p className="cancel-meta">{record.cancellation ? <>Cancelled {new Intl.DateTimeFormat(undefined, { timeZone: record.displayTimeZone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(record.cancellation.at))} · {REASON_LABEL[record.cancellation.reason]} · {record.cancellation.revokedInvitationCount == null ? 'invitation revocation not recorded' : `${record.cancellation.revokedInvitationCount} invitation link${record.cancellation.revokedInvitationCount === 1 ? '' : 's'} revoked`}</> : 'Cancelled before cancellation details were recorded.'}</p>}{record.patientEmail && <details><summary>Contact details (unverified)</summary><p>{record.patientEmail}</p></details>}</div>
             {record.status === 'booked' && <div className="booking-actions">
               {Date.parse(record.endsAt) > Date.now() && <a className="link-button" href={`/doctor/invitations?room=${appointmentRoomName(record.id)}`} aria-label={`Prepare invitation for ${record.patientName}`}>Prepare invitation</a>}
               <button disabled={!!busy} aria-label={`Reschedule appointment for ${record.patientName}`} onClick={() => edit(record)}>Reschedule</button>
-              {cancelTarget?.id === record.id && cancelTarget.version === record.version ? <><button disabled={!!busy} className="danger" onClick={() => void send({ action: 'cancel', id: record.id, expectedVersion: cancelTarget.version })}>Confirm cancellation</button><button onClick={() => setCancelTarget(null)} disabled={!!busy}>Keep appointment</button></> : <button className="danger" disabled={!!busy} aria-label={`Cancel appointment for ${record.patientName}`} onClick={() => setCancelTarget({ id: record.id, version: record.version })}>Cancel appointment</button>}
+              {cancelTarget?.id === record.id && cancelTarget.version === record.version ? <div className="cancel-confirm" role="group" aria-label={`Cancel appointment for ${record.patientName}`}><label className="reason">Reason<select value={cancelReason} onChange={(e) => setCancelReason(e.target.value as AppointmentCancellationReason)}>{(Object.keys(REASON_LABEL) as AppointmentCancellationReason[]).map((reason) => <option key={reason} value={reason}>{REASON_LABEL[reason]}</option>)}</select></label><p className="muted">This also revokes any active invitation link for room {appointmentRoomName(record.id)} and removes anyone waiting through it.</p><div className="booking-actions"><button disabled={!!busy} className="danger" onClick={() => void send({ action: 'cancel', id: record.id, expectedVersion: cancelTarget.version, cancellationReason: cancelReason })}>Confirm cancellation</button><button onClick={() => setCancelTarget(null)} disabled={!!busy}>Keep appointment</button></div></div> : <button className="danger" disabled={!!busy} aria-label={`Cancel appointment for ${record.patientName}`} onClick={() => setCancelTarget({ id: record.id, version: record.version })}>Cancel appointment</button>}
             </div>}
           </li>;
         })}</ul>
@@ -163,7 +174,7 @@ export default function AppointmentWorkbench({ doctorUserId }: { doctorUserId: s
         .booking-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem}.zone-field{grid-column:1/-1}
         label{display:grid;gap:.4rem;min-width:0;font-size:.9rem;font-weight:600}input{min-width:0;width:100%;height:2.9rem;padding:.5rem;border:1px solid #b7cac4;border-radius:.4rem;font:inherit;font-size:1rem;background:white;color:#153530}
         .booking-actions,.list-heading{display:flex;align-items:center;flex-wrap:wrap;gap:.65rem}.list-heading{justify-content:space-between}
-        button{font:inherit;min-height:2.75rem;max-width:100%;padding:.55rem .85rem;border:1px solid #b7cac4;border-radius:.4rem;background:white;color:#17594f;cursor:pointer;overflow-wrap:anywhere}button:hover{background:#edf8f4}button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #14b8a6;outline-offset:2px}button:disabled{opacity:.6;cursor:wait}.primary{background:#0f766e;color:white}.primary:hover{background:#115e59}.danger{color:#a52828;border-color:#e9b4b4}.link-button{display:inline-flex;align-items:center;min-height:2.75rem;padding:.55rem .85rem;border-radius:.4rem;background:#0f766e;color:white;text-decoration:none;font-weight:600}.link-button:hover{background:#115e59}.link-button:focus-visible{outline:3px solid #14b8a6;outline-offset:2px}
+        button{font:inherit;min-height:2.75rem;max-width:100%;padding:.55rem .85rem;border:1px solid #b7cac4;border-radius:.4rem;background:white;color:#17594f;cursor:pointer;overflow-wrap:anywhere}button:hover{background:#edf8f4}button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #14b8a6;outline-offset:2px}button:disabled{opacity:.6;cursor:wait}.primary{background:#0f766e;color:white}.primary:hover{background:#115e59}.danger{color:#a52828;border-color:#e9b4b4}.status-badge{display:inline-block;padding:.05rem .5rem;border-radius:999px;font-weight:600}.status-badge.booked{background:#dcfce7;color:#166534}.status-badge.cancelled{background:#fee2e2;color:#991b1b}.cancel-meta{color:#7f1d1d;font-size:.85rem;background:#fef2f2;border-radius:.4rem;padding:.4rem .6rem}.struck{text-decoration:line-through;color:#6b7280}.cancel-confirm{display:grid;gap:.5rem;width:100%}.reason{max-width:20rem}select{min-width:0;width:100%;height:2.75rem;padding:.4rem;border:1px solid #b7cac4;border-radius:.4rem;font:inherit;background:white;color:#153530}.link-button{display:inline-flex;align-items:center;min-height:2.75rem;padding:.55rem .85rem;border-radius:.4rem;background:#0f766e;color:white;text-decoration:none;font-weight:600}.link-button:hover{background:#115e59}.link-button:focus-visible{outline:3px solid #14b8a6;outline-offset:2px}
         .feedback-error,.feedback-success{padding:.85rem;border-radius:.5rem;overflow-wrap:anywhere;line-height:1.5}.feedback-error{color:#8f2020;background:#fff1f1}.feedback-success{color:#115e43;background:#edf9f2}
         .booking-list{list-style:none;padding:0;margin:1rem 0;display:grid;gap:.8rem}.booking-list li{border:1px solid #dce5e3;border-radius:.6rem;padding:1rem;display:grid;gap:.75rem;min-width:0}summary{cursor:pointer;color:#17594f;min-height:2rem}
         @media(max-width:600px){.booking-fields{grid-template-columns:minmax(0,1fr)}.booking-actions{align-items:stretch}.booking-actions button{flex:1 1 auto}}

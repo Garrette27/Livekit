@@ -13,11 +13,11 @@ const ACTION_LABEL: Record<string, string> = {
  * Read-only oversight for administrators: dated aggregate cards and the latest
  * page of administrative audit events from /api/admin/oversight. Staff ids are
  * shown with the staff label already visible on this page; patient identity
- * and clinical content are never part of this view. Loads only when opened, so
- * the staff-management page costs nothing extra by default.
+ * and clinical content are never part of this view. Open by default; collapsing
+ * it skips the load (a visit costs a few dozen aggregate reads).
  */
 export default function OversightPanel({ staffLabels }: { staffLabels: Record<string, string> }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [snapshot, setSnapshot] = useState<OversightSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

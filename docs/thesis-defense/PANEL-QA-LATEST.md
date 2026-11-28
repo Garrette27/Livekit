@@ -24,10 +24,11 @@ Every answer follows **rule → reason → evidence → boundary**, in 20–40 s
 - **Three staff entries.** `/doctor/login` is doctor-only, `/admin/login` is clinic-administrator entry, `/super-admin/login` is platform-owner entry. Both administrative levels use the server-scoped `/admin` workspace; a login page never grants a role. *(Q27, Q26)*
 - **Proven pattern.** AWS/Azure separate provider control-plane duties from tenant work. We adapt that to clinic-scoped staff administration and separate doctor ownership. Full tenant lifecycle, audit review and business metrics are future work. *(Q28, Q29)*
 - **Monitor the service, preserve privacy.** Proposed aggregate invitation/queue/encounter/summary outcomes, quotas and estimated costs; bounded audit pages show actor/action/target/outcome ids. No blanket access to clinical content. Current successful role-change events are narrower, with no audit dashboard. *(Q24, Q25, Q96, Q97, Q98, Q99)*
-- **Where is scheduling?** Doctor-booked appointments with UTC + named-zone times, transactional overlap refusal, versioned reschedule/cancel and a *Prepare invitation* handoff. Shown only when the server-only flag is on; booking never grants admission; not surveyed. *(Q21, Q22)*
+- **Where is scheduling?** Doctor-booked appointments with transactional overlap refusal and a *Prepare invitation* handoff. Cancelling records time, doctor and a coded reason, and revokes the visit's active invitation (calendar-cancel pattern). Booking never grants admission; not surveyed. *(Q21, Q22)*
+- **No patient, no AI.** No-show / not-admitted visits get a deterministic record before any OpenAI call. *(Q43)*
 - **Evidence.** Source and local checks show only their tested cases; current deployment and authenticated production acceptance need separate proof. The [researched design note](../admin-oversight-design.md) records scope and primary sources. *(Q100)*
 
-**Device menu.** Clipped popup fixed by keeping LiveKit's own positioning; an empty list means the browser blocked camera/microphone, and the room now says so and how to allow it. *(Q31)*
+**Device menu, layout, blinking.** One root cause: the in-call `LiveKitRoom` lacked LiveKit's `data-lk-theme` root, so popup styles and grid-height variables were undefined. Fixed and pinned by a test. *(Q31)*
 
 ## Demo order (each step answers a question)
 

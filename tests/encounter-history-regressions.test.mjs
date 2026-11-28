@@ -373,3 +373,15 @@ test('chat transcripts load on demand: the list never fetches messages for every
   const service = readFileSync('lib/services/history-summary/summary-projection-service.ts', 'utf8');
   assert.match(service, /doctorUserId !== doctorUserId\) return undefined/);
 });
+
+test('an unattended encounter (no-show / not admitted) returns before any AI entitlement or OpenAI call', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync('lib/services/consultation-finalization/summary-generator.ts', 'utf8');
+  const unattended = source.indexOf("if (outcome !== 'attended')");
+  const earlyReturn = source.indexOf('return;', unattended);
+  const entitlement = source.indexOf('resolveAiEntitlement(', unattended);
+  const openAiCall = source.indexOf('Calling OpenAI API for consultation summary', unattended);
+  if (!(unattended > 0 && earlyReturn > unattended && earlyReturn < entitlement && earlyReturn < openAiCall)) {
+    throw new Error('Unattended encounters must be stored deterministically before any AI call');
+  }
+});

@@ -85,3 +85,15 @@ device and tells the user to allow it from the site settings and reload. It
 never requests permission itself and never blocks the call. The doctor-room
 error toast also moved above the control bar, where it had been hidden.
 Physical-device acceptance on the deployment still has to be done by a person.
+
+## Follow-up 2: missing theme root (28 November 2026)
+
+The deployed menu still rendered transparent, bulleted, dark options at the
+bottom of the stage, the tile grid filled only the top of the screen, and the
+grid flickered. Cause: `@livekit/components-styles` defines every theme and
+layout variable under `[data-lk-theme=default]` and scopes `.lk-list` and
+button rules under `[data-lk-theme]`; LiveKit's guide places that attribute on
+`<LiveKitRoom>`. The in-call room never had it (only the pre-join screen did).
+The browser fixture added it on its own wrapper, so the test could not see the
+gap. `RoomShell` now passes `data-lk-theme="default"` to `LiveKitRoom`, and
+`tests/consultation-workspace.test.mjs` pins it.
