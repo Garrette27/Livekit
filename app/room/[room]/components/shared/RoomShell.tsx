@@ -385,7 +385,7 @@ function ChatBehaviorBridge({
 /**
  * Media quality settings, all standard LiveKit options:
  * - adaptiveStream: each receiver subscribes to a video size that matches the
- *   tile it renders and pauses video it cannot see;
+ *   tile it renders (background pausing is off; see the option below);
  * - dynacast: the sender stops encoding layers nobody is receiving;
  * - simulcast (publish default): the sender offers several qualities so a weak
  *   receiver gets a lower layer instead of freezing;
@@ -396,7 +396,12 @@ function ChatBehaviorBridge({
  * None of these is a guaranteed quality level; they adapt to the network.
  */
 const ROOM_MEDIA_OPTIONS: RoomOptions = {
-  adaptiveStream: true,
+  // Keep receiving video while this tab is in the background. LiveKit's default
+  // pauses it and resumes on return, and the picture stays partly stale until
+  // the next keyframe arrives (seen as "blinking" when a doctor switches
+  // between the call and another tab). A 1:1 consultation has one remote video,
+  // so the saved bandwidth is small; size-based layer selection stays on.
+  adaptiveStream: { pauseVideoInBackground: false },
   dynacast: true,
   videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
   audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },

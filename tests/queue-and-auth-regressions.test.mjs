@@ -1318,7 +1318,7 @@ test('waiting limit changes are owner-only, clamped 1-100, and only on active wa
 
 test('room media uses adaptive stream, dynacast, simulcast and browser speech processing', () => {
   const source = readFileSync('app/room/[room]/components/shared/RoomShell.tsx', 'utf8');
-  for (const option of ['adaptiveStream: true', 'dynacast: true', 'simulcast: true', 'echoCancellation: true', 'noiseSuppression: true']) {
+  for (const option of ['adaptiveStream: { pauseVideoInBackground: false }', 'dynacast: true', 'simulcast: true', 'echoCancellation: true', 'noiseSuppression: true']) {
     assert.ok(source.includes(option), option);
   }
   // The options reach LiveKit through the (end-to-end encrypted) Room constructor.

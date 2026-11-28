@@ -30,3 +30,23 @@ test('missing stats stay null instead of becoming a guessed value', () => {
   assert.equal(sample.packetLossPercent, null);
   assert.equal(sample.receivedVideo, null);
 });
+
+test('freezes, dropped frames, keyframe requests and send limitation are reported from standard stats', () => {
+  const sample = summarizeCallStats([
+    { type: 'inbound-rtp', kind: 'video', freezeCount: 3, totalFreezesDuration: 1.24, framesDropped: 7, pliCount: 4, firCount: 1 },
+    { type: 'outbound-rtp', kind: 'video', qualityLimitationReason: 'none' },
+    { type: 'outbound-rtp', kind: 'video', qualityLimitationReason: 'cpu' },
+  ]);
+  assert.deepEqual({ ...sample.videoFreezes }, { count: 3, seconds: 1.2 });
+  assert.equal(sample.framesDropped, 7);
+  assert.equal(sample.keyframeRequests, 5);
+  assert.equal(sample.sendLimitedBy, 'cpu');
+  const empty = summarizeCallStats([]);
+  assert.equal(empty.videoFreezes, null);
+  assert.equal(empty.sendLimitedBy, null);
+});
+
+test('the call keeps receiving video while its tab is in the background', () => {
+  const shell = readFileSync('app/room/[room]/components/shared/RoomShell.tsx', 'utf8');
+  assert.match(shell, /adaptiveStream: \{ pauseVideoInBackground: false \}/);
+});

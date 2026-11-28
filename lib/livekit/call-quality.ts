@@ -20,6 +20,20 @@ export interface CallQualitySample {
   packetLossPercent: number | null;
   receivedVideo: { width: number; height: number; fps: number | null } | null;
   sentVideo: { width: number; height: number; fps: number | null } | null;
+  /**
+   * Received-video freezes since join (W3C webrtc-stats `freezeCount` /
+   * `totalFreezesDuration`): what a person perceives as the picture
+   * "blinking" or stalling. Null when the browser does not report them.
+   */
+  videoFreezes: { count: number; seconds: number } | null;
+  /** Received video frames dropped before display, and keyframe requests (PLI + FIR) sent to recover. */
+  framesDropped: number | null;
+  keyframeRequests: number | null;
+  /**
+   * Why this browser is lowering its own outgoing video (`qualityLimitationReason`):
+   * `cpu` means the device is overloaded, `bandwidth` the uplink. `none` when unlimited.
+   */
+  sendLimitedBy: 'none' | 'cpu' | 'bandwidth' | 'other' | null;
 }
 
 type StatEntry = Record<string, unknown> & { type?: string };
@@ -67,7 +81,27 @@ export function summarizeCallStats(entries: StatEntry[]): CallQualitySample {
     received += entryReceived;
   }
 
+  const inboundVideo = inbound.filter((entry) => entry.kind === 'video');
+  const sumOf = (list: StatEntry[], field: string): number | null => {
+    const values = list.map((entry) => num(entry[field])).filter((value): value is number => value !== null);
+    return values.length ? values.reduce((total, value) => total + value, 0) : null;
+  };
+  const freezeCount = sumOf(inboundVideo, 'freezeCount');
+  const freezeSeconds = sumOf(inboundVideo, 'totalFreezesDuration');
+  const pli = sumOf(inboundVideo, 'pliCount');
+  const fir = sumOf(inboundVideo, 'firCount');
+  // Simulcast publishes one outbound entry per layer; the worst reason wins.
+  const reasons = outboundVideo.map((entry) => entry.qualityLimitationReason).filter((value): value is string => typeof value === 'string');
+  const sendLimitedBy = !reasons.length ? null
+    : reasons.includes('cpu') ? 'cpu'
+      : reasons.includes('bandwidth') ? 'bandwidth'
+        : reasons.some((reason) => reason !== 'none') ? 'other' : 'none';
+
   return {
+    videoFreezes: freezeCount === null ? null : { count: freezeCount, seconds: round(freezeSeconds ?? 0) },
+    framesDropped: sumOf(inboundVideo, 'framesDropped'),
+    keyframeRequests: pli === null && fir === null ? null : (pli ?? 0) + (fir ?? 0),
+    sendLimitedBy,
     roundTripMs: rtts.length ? round(Math.max(...rtts) * 1000, 0) : null,
     jitterMs: jitters.length ? round(Math.max(...jitters) * 1000) : null,
     packetLossPercent: sawCounters && lost + received > 0 ? round((lost / (lost + received)) * 100, 2) : null,

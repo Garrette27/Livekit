@@ -119,6 +119,9 @@ export default function CallQualityMeter({ encryption }: { encryption: 'end-to-e
         <dt>Packet loss</dt><dd style={{ margin: 0 }}>{show(sample?.packetLossPercent ?? null, '% since join')}</dd>
         <dt>Receiving</dt><dd style={{ margin: 0 }}>{video(sample?.receivedVideo ?? null)}</dd>
         <dt>Sending</dt><dd style={{ margin: 0 }}>{video(sample?.sentVideo ?? null)}</dd>
+        <dt>Video freezes</dt><dd style={{ margin: 0 }}>{sample?.videoFreezes ? `${sample.videoFreezes.count} (${sample.videoFreezes.seconds} s total)` : 'not measured'}</dd>
+        <dt>Dropped frames</dt><dd style={{ margin: 0 }}>{sample?.framesDropped ?? 'not measured'}{sample?.keyframeRequests != null ? ` · ${sample.keyframeRequests} keyframe requests` : ''}</dd>
+        <dt>Send limited by</dt><dd style={{ margin: 0 }}>{sample?.sendLimitedBy === 'cpu' ? 'CPU (this device is overloaded)' : sample?.sendLimitedBy === 'bandwidth' ? 'Bandwidth (upload)' : sample?.sendLimitedBy ?? 'not measured'}</dd>
         <dt>Protection</dt><dd style={{ margin: 0 }}>{protection}</dd>
       </dl>
       <button
