@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useRoomContext } from '@livekit/components-react';
-import { MediaDeviceFailure, RoomEvent, Track, type LocalVideoTrack, type Room, type TrackPublication } from 'livekit-client';
+import { DisconnectReason, MediaDeviceFailure, RoomEvent, Track, type LocalVideoTrack, type Room, type TrackPublication } from 'livekit-client';
 import { ROOM_LAYERS } from '@/lib/ui/room-layers';
 import { redactId, videoStatDeltas, type VideoStatDelta } from '@/lib/livekit/media-diagnostics';
 
@@ -61,7 +61,12 @@ export default function MediaDiagnosticsPanel() {
       if (events.current.length > MAX_EVENTS) events.current.shift();
       setEventCount(events.current.length);
     };
-    log('diagnostics-start', `visibility=${document.visibilityState}`);
+    // How this page was opened: `reload` on a rejoin means the participant
+    // refreshed; `navigate` means a fresh open of the link. Together with the
+    // Disconnected reason below this separates a user action from a dropped
+    // connection when a participant leaves and rejoins.
+    const navigation = (performance.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined)?.type ?? 'unknown';
+    log('diagnostics-start', `visibility=${document.visibilityState} · navigation=${navigation}`);
 
     const roomEvents: RoomEvent[] = [
       RoomEvent.TrackSubscribed, RoomEvent.TrackUnsubscribed, RoomEvent.TrackMuted, RoomEvent.TrackUnmuted,
@@ -69,13 +74,14 @@ export default function MediaDiagnosticsPanel() {
       RoomEvent.LocalTrackPublished, RoomEvent.LocalTrackUnpublished, RoomEvent.ActiveDeviceChanged,
       RoomEvent.Reconnecting, RoomEvent.Reconnected, RoomEvent.SignalReconnecting, RoomEvent.ConnectionStateChanged,
       RoomEvent.EncryptionError, RoomEvent.ParticipantEncryptionStatusChanged, RoomEvent.ParticipantConnected,
-      RoomEvent.ParticipantDisconnected,
+      RoomEvent.ParticipantDisconnected, RoomEvent.Disconnected,
     ];
     const handlers = roomEvents.map((name) => {
       const handler = (...args: unknown[]) => {
         const parts: string[] = [];
         for (const arg of args) {
-          if (typeof arg === 'string') parts.push(name === RoomEvent.ActiveDeviceChanged ? redactId(arg) : arg);
+          if (typeof arg === 'number' && name === RoomEvent.Disconnected) parts.push(`reason=${DisconnectReason[arg] ?? arg}`);
+          else if (typeof arg === 'string') parts.push(name === RoomEvent.ActiveDeviceChanged ? redactId(arg) : arg);
           else if (arg && typeof arg === 'object') {
             const value = arg as { trackSid?: string; sid?: string; source?: string; identity?: string; name?: string };
             if (value.trackSid || value.sid) parts.push(`track ${redactId(value.trackSid || value.sid)}${value.source ? ` ${value.source}` : ''}`);
@@ -94,6 +100,8 @@ export default function MediaDiagnosticsPanel() {
 
     const onVisibility = () => log('page-visibility', document.visibilityState);
     document.addEventListener('visibilitychange', onVisibility);
+    const onPageHide = (event: PageTransitionEvent) => log('pagehide', `persisted=${event.persisted}`);
+    window.addEventListener('pagehide', onPageHide);
     const mediaEvents = ['emptied', 'stalled', 'waiting', 'resize', 'loadedmetadata', 'pause', 'suspend'];
     const onMediaElement = (event: Event) => {
       const element = event.target as HTMLVideoElement;
@@ -171,6 +179,7 @@ export default function MediaDiagnosticsPanel() {
       handlers.forEach(([name, handler]) => room.off(name, handler));
       room.off(RoomEvent.MediaDevicesError, onMediaError);
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
       mediaEvents.forEach((name) => document.removeEventListener(name, onMediaElement, true));
       observer.disconnect();
     };

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
+import { onAuthStateChanged, sendPasswordResetEmail, type User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 import DoctorAppHeader from '@/components/doctor/DoctorAppHeader';
@@ -22,8 +22,11 @@ interface Account {
 type Feedback = { tone: 'ok' | 'error'; text: string } | null;
 
 /**
- * Administration console: grant or revoke the doctor (and, for super admins,
- * admin) role. Object-centred list of clinician accounts with their state
+ * Administration console: add people and grant or revoke the doctor (and, for
+ * super admins, admin) role. Adding someone new follows the invite pattern
+ * used by workspace products: name + email + role, the server creates the
+ * account without a password, and Firebase emails the person a link to set
+ * their own. No administrator chooses, sees or transmits a password. Object-centred list of clinician accounts with their state
  * ("Provisioned" vs "Legacy profile"), one compact grant form, and modeless
  * inline feedback. The server re-checks every action; this page is only a
  * convenient surface over /api/admin/roles.
@@ -38,6 +41,8 @@ export default function AdminPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [email, setEmail] = useState('');
+  const [personName, setPersonName] = useState('');
+  const [createIfMissing, setCreateIfMissing] = useState(true);
   const [role, setRole] = useState<'doctor' | 'admin'>('doctor');
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -70,25 +75,51 @@ export default function AdminPage() {
     else { setLevel(null); setAccounts([]); setLoaded(false); }
   }, [user, load]);
 
-  const change = async (targetEmail: string, targetRole: 'doctor' | 'admin', action: 'grant' | 'revoke', targetClinic?: string | null) => {
+  /** Ask Firebase to email a set-password link; the link lands on that role's sign-in page. */
+  const emailSetPasswordLink = async (targetEmail: string, targetRole: string) => {
+    if (!auth) throw new Error('Sign-in unavailable');
+    await sendPasswordResetEmail(auth, targetEmail, { url: `${window.location.origin}${targetRole === 'admin' ? '/admin/login' : '/doctor/login'}` });
+  };
+
+  const resendSetPassword = async (targetEmail: string, targetRole: string) => {
+    setBusy(`reset:${targetEmail}`);
+    setFeedback(null);
+    try {
+      await emailSetPasswordLink(targetEmail, targetRole);
+      setFeedback({ tone: 'ok', text: `Set-password email sent to ${targetEmail}. Ask them to check spam if it does not arrive within a few minutes.` });
+    } catch {
+      setFeedback({ tone: 'error', text: `Could not send the set-password email to ${targetEmail}. Retry, or ask them to use "Forgot password?" on the sign-in page.` });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const change = async (targetEmail: string, targetRole: 'doctor' | 'admin', action: 'grant' | 'revoke', targetClinic?: string | null, invite?: { name: string }) => {
     setBusy(`${action}:${targetEmail}`);
     setFeedback(null);
     try {
       const response = await authenticatedFetch('/api/admin/roles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: targetEmail, role: targetRole, action, clinicId: targetClinic ?? clinicId }),
+        body: JSON.stringify({ email: targetEmail, role: targetRole, action, clinicId: targetClinic ?? clinicId, ...(invite ? { createAccount: true, name: invite.name } : {}) }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) {
         setFeedback({ tone: 'error', text: data.error || 'The change was not applied.' });
         return;
       }
+      let invited = '';
+      if (data.accountCreated) {
+        invited = await emailSetPasswordLink(targetEmail, targetRole).then(
+          () => ` Account created and a set-password email was sent to ${targetEmail}.`,
+          () => ' Account created, but the set-password email could not be sent — use "Email set-password link" on their row.',
+        );
+      }
       setFeedback({
         tone: 'ok',
-        text: `${action === 'grant' ? 'Granted' : 'Revoked'} ${targetRole} for ${targetEmail}. Granted roles apply at their next sign-in or within an hour; revoked roles end their other sessions.`,
+        text: `${action === 'grant' ? 'Granted' : 'Revoked'} ${targetRole} for ${targetEmail}.${invited} Granted roles apply at their next sign-in or within an hour; revoked roles end their other sessions.`,
       });
-      if (action === 'grant') setEmail('');
+      if (action === 'grant') { setEmail(''); setPersonName(''); }
       await load();
     } catch {
       setFeedback({ tone: 'error', text: 'The request could not be confirmed. Refresh the account list before retrying.' });
@@ -131,10 +162,11 @@ export default function AdminPage() {
         ) : (
           <>
             <section className="card">
-              <h2>Grant a role</h2>
+              <h2>Add a person or grant a role</h2>
               <p className="muted">
-                The clinician must have signed in once (Google or email) so the account exists. Patient accounts
-                cannot be converted; clinicians use a separate account.{' '}
+                Enter their name and work email. If they have no account yet, one is created and Firebase emails them
+                a link to set their own password — you never choose or see it. Existing accounts (Google or email)
+                just receive the role. Patient accounts cannot be converted; clinicians use a separate account.{' '}
                 {level === 'super_admin'
                   ? 'As super admin you choose the clinic; grant "Administrator" to create a clinic admin.'
                   : `You manage doctors in your clinic${callerClinic ? ` (${callerClinic})` : ''} only.`}
@@ -143,9 +175,13 @@ export default function AdminPage() {
                 className="grant-row"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  if (email.trim()) void change(email.trim().toLowerCase(), role, 'grant', level === 'super_admin' ? clinicId : callerClinic);
+                  if (email.trim()) void change(email.trim().toLowerCase(), role, 'grant', level === 'super_admin' ? clinicId : callerClinic, createIfMissing ? { name: personName } : undefined);
                 }}
               >
+                <label>
+                  <span>Full name</span>
+                  <input autoComplete="off" value={personName} onChange={(e) => setPersonName(e.target.value)} placeholder="Dr. Ana Reyes" maxLength={120} />
+                </label>
                 <label>
                   <span>Account email</span>
                   <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="clinician@clinic.example" />
@@ -165,7 +201,11 @@ export default function AdminPage() {
                     {level === 'super_admin' && <option value="admin">Administrator</option>}
                   </select>
                 </label>
-                <button type="submit" disabled={Boolean(busy)}>{busy?.startsWith('grant') ? 'Granting…' : 'Grant role'}</button>
+                <label className="checkbox">
+                  <input type="checkbox" checked={createIfMissing} onChange={(e) => setCreateIfMissing(e.target.checked)} />
+                  <span>Create the account and email a set-password link if this email has no account yet</span>
+                </label>
+                <button type="submit" disabled={Boolean(busy)}>{busy?.startsWith('grant') ? 'Saving…' : createIfMissing ? 'Add person' : 'Grant role'}</button>
               </form>
               <p className="muted grant-preview">{role === 'admin' ? 'Administrator grants clinic staff-management access only, not doctor access. Use a separate provisioned identity for consultations.' : 'Doctor grants clinician access only. It does not grant clinic administration.'}</p>
               {feedback && (
@@ -198,6 +238,11 @@ export default function AdminPage() {
                           </button>
                         )}
                         {account.canManage && account.email && account.uid !== callerUid && (account.role === 'doctor' || level === 'super_admin') && (
+                          <button type="button" className="secondary" disabled={Boolean(busy)} onClick={() => void resendSetPassword(account.email!, account.role)}>
+                            Email set-password link
+                          </button>
+                        )}
+                        {account.canManage && account.email && account.uid !== callerUid && (account.role === 'doctor' || level === 'super_admin') && (
                           <button type="button" className="danger" disabled={Boolean(busy)} onClick={() => change(account.email!, account.role as 'doctor' | 'admin', 'revoke', account.clinicId)}>
                             Revoke
                           </button>
@@ -217,8 +262,10 @@ export default function AdminPage() {
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 1.25rem 1.5rem; }
         h2 { font-size: 1.125rem; font-weight: 700; margin: 0 0 0.5rem; color: #111827; }
         .muted { color: #6b7280; font-size: 0.8125rem; }
-        .grant-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(0, 1fr); gap: 0.75rem; align-items: end; margin-top: 0.75rem; }
-        .grant-row > button { justify-self: start; grid-column: 1 / -1; }
+        .grant-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; align-items: end; margin-top: 0.75rem; }
+        .grant-row > button, .grant-row > .checkbox { justify-self: start; grid-column: 1 / -1; }
+        .checkbox { display: flex; align-items: center; gap: .5rem; font-weight: 500; }
+        .checkbox input { width: auto; }
         .grant-preview { margin-top: .75rem; }
         label { display: grid; min-width: 0; gap: 0.3rem; font-size: 0.8125rem; font-weight: 600; color: #374151; }
         input, select { min-width: 0; width: 100%; box-sizing: border-box; padding: 0.55rem 0.7rem; border: 1px solid #d1d5db; border-radius: 0.5rem; font-size: 0.9375rem; }
@@ -234,7 +281,8 @@ export default function AdminPage() {
         .badge { font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: #f3f4f6; color: #374151; }
         .ok-badge { background: #d1fae5; color: #065f46; }
         .warn-badge { background: #fef3c7; color: #92400e; }
-        .actions { display: flex; gap: 0.5rem; }
+        .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .actions .secondary { margin: 0; }
         @media (min-width: 641px) and (max-width: 900px) { .grant-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 640px) { .grant-row { grid-template-columns: 1fr; } }
       `}</style>

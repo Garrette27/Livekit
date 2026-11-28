@@ -210,7 +210,8 @@ test('role commands cannot change environment-managed bootstrap accounts', () =>
 });
 
 function roleRoute(callerData, target = { uid: 'u-target', email: 'target@example.test', emailVerified: true, customClaims: {} }, lookupError = null) {
-  const observed = { lookups: 0, claims: null, revocations: 0, audits: [], profileWrites: [] };
+  const observed = { lookups: 0, claims: null, revocations: 0, audits: [], profileWrites: [], created: [] };
+  const missing = () => { throw Object.assign(new Error('missing'), { code: 'auth/user-not-found' }); };
   const profile = { exists: true, data: () => ({ role: 'doctor', clinicId: 'north-clinic' }), async set(value) { observed.profileWrites.push(value); } };
   const deps = {
     'next/server': { NextResponse: { json: (body, init = {}) => ({ status: init.status || 200, body }) } },
@@ -219,7 +220,7 @@ function roleRoute(callerData, target = { uid: 'u-target', email: 'target@exampl
     '@/lib/services/shared/http': {},
     '@/lib/firebase-admin': {
       getFirebaseAdmin: () => ({ collection: () => ({ doc: () => ({ get: async () => profile, set: profile.set }), add: async (event) => observed.audits.push(event), where() { return this; }, limit() { return this; }, async get() { return { docs: [{ id: 'u-target', data: profile.data }] }; } }) }),
-      getFirebaseAdminAuth: () => ({ getUser: async () => { if (lookupError) throw lookupError; return target; }, getUserByEmail: async () => { observed.lookups++; if (lookupError) throw lookupError; return target; }, setCustomUserClaims: async (_, claims) => { observed.claims = claims; }, revokeRefreshTokens: async () => { observed.revocations++; } }),
+      getFirebaseAdminAuth: () => ({ getUser: async () => { if (lookupError) throw lookupError; return target; }, getUserByEmail: async () => { observed.lookups++; if (lookupError) throw lookupError; return target ?? missing(); }, createUser: async (properties) => { observed.created.push(properties); return { uid: 'u-new', customClaims: {}, ...properties }; }, setCustomUserClaims: async (_, claims) => { observed.claims = claims; }, revokeRefreshTokens: async () => { observed.revocations++; } }),
     },
     '@/lib/rate-limit': { enforceRateLimit: async () => null, RateLimitConfigs: { TOKEN_GENERATION: {} } },
     '@/lib/auth/role-administration': loadPolicy(),
@@ -256,6 +257,36 @@ test('removing an administrator does not silently restore legacy doctor access',
   assert.equal(h.observed.profileWrites[0].role, 'revoked');
 });
 
+test('invite provisioning creates a password-less account only after the policy allows the grant', async () => {
+  const owner = { ...caller, email: 'owner@example.test' };
+  const created = roleRoute(owner, null);
+  const response = await created.post({ email: 'New.Doctor@example.test', name: 'Dr. New', role: 'doctor', action: 'grant', clinicId: 'north-clinic', createAccount: true });
+  assert.equal(response.status, 200);
+  assert.equal(response.body.accountCreated, true);
+  assert.equal(created.observed.created.length, 1);
+  assert.equal(created.observed.created[0].email, 'new.doctor@example.test');
+  assert.equal('password' in created.observed.created[0], false, 'no administrator-chosen password exists');
+  assert.equal(created.observed.created[0].emailVerified, false);
+  assert.equal(created.observed.claims.role, 'doctor');
+  assert.equal(created.observed.audits[0].accountCreated, true);
+  assert.equal(JSON.stringify(created.observed.audits[0]).includes('example.test'), false, 'the audit event is uid-only');
+
+  const withoutOptIn = roleRoute(owner, null);
+  assert.equal((await withoutOptIn.post({ email: 'x@example.test', role: 'doctor', action: 'grant', clinicId: 'north-clinic' })).status, 404);
+  assert.equal(withoutOptIn.observed.created.length, 0);
+
+  for (const [who, body] of [
+    [{ ...caller, isAdminClaim: true, clinicId: 'north-clinic' }, { role: 'admin', clinicId: 'north-clinic' }],
+    [owner, { role: 'doctor' }],
+    [owner, { role: 'doctor', clinicId: 'north-clinic', email: 'owner@example.test' }],
+  ]) {
+    const refused = roleRoute(who, null);
+    const result = await refused.post({ email: 'y@example.test', action: 'grant', createAccount: true, ...body });
+    assert.notEqual(result.status, 200);
+    assert.equal(refused.observed.created.length, 0, 'a refused invitation leaves no orphan account');
+  }
+});
+
 test('a malformed JSON null role command returns 400 rather than throwing', async () => {
   const h = roleRoute({ ...caller, email: 'owner@example.test' });
   assert.equal((await h.post(null)).status, 400);
@@ -278,4 +309,24 @@ test('a revoked doctor is refused on the next API request, not after token expir
   assert.equal(result.ok, false);
   assert.equal(result.error.status, 401);
   assert.equal(result.error.code, 'session_revoked');
+});
+
+test('administrator entry shows the refresh icon and sign-out only for a signed-in session, with obvious links', async () => {
+  const buttons = (tree, label) => entryNodes(tree, node => node.type === 'button' && entryText(node).includes(label));
+  for (const route of ['/admin/login', '/admin/signup', '/super-admin/login']) {
+    const signedOut = loginEntryHarness(route, loginAccess.unassigned);
+    assert.equal(buttons(signedOut.render(), 'Sign out').length, 0, `${route}: no sign-out without a session`);
+    assert.equal(buttons(signedOut.render(), 'Check access again').length, 0, `${route}: no access refresh without a session`);
+    const signedIn = loginEntryHarness(route, loginAccess.unassigned, { existingSession: true });
+    const tree = signedIn.render();
+    const [refresh] = buttons(tree, 'Check access again');
+    assert.ok(refresh, `${route}: refresh present while signed in`);
+    assert.equal(refresh.props.title, 'Check access again', 'the icon has a tooltip');
+    assert.ok(entryNodes(refresh, node => node.type === 'svg' && node.props['aria-hidden'] === 'true').length, 'the icon is decorative; the hidden label names the button');
+    assert.ok(entryText(tree).includes('staff@example.test'), 'the account bar names the signed-in account');
+    await signedIn.click('Sign out');
+    assert.equal(buttons(signedIn.render(), 'Sign out').length, 0, 'the account bar disappears after sign-out');
+  }
+  const source = readFileSync('components/admin/AdministratorEntry.tsx', 'utf8');
+  assert.match(source, /\.entry-card :global\(a\)/, 'next/link anchors are styled despite styled-jsx scoping');
 });

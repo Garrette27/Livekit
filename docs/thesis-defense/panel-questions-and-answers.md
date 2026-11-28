@@ -217,6 +217,8 @@ A link can be forwarded. It proves possession of a scoped capability, not the ho
 
 The server-only SUPER_ADMIN_EMAILS configuration recognizes the owner's provider-verified account. It bootstraps administration without relying on a pre-existing doctor profile or an administrator signup checkbox. The platform owner grants clinic administrators; those administrators manage doctors in their own clinic. Self-change and bootstrap-account guards constrain role commands, but do not make a compromised owner account harmless. Protect the hosting environment and authentication account, and define recovery procedures.
 
+Adding a new clinic administrator or doctor uses the invite pattern: the administrator enters a name, work email, clinic and role, the server creates the account **without a password** after the same policy check, and Firebase emails the person a set-password link. No administrator ever chooses or sees another person's password, and a refused invitation leaves no orphan account. A second platform owner is added only through SUPER_ADMIN_EMAILS in the deployment environment, never from the console.
+
 ### 37. Two guests use the same clinic Wi-Fi and the same browser. Do they get mixed up?
 
 No. Each browser tab gets its own random session id, so two guests on the same Wi-Fi and the same browser get two separate queue rows — a regression test checks exactly that case. A signed-in patient is identified by their verified Firebase account instead, so one account is one person across tabs. None of these signals ever grants direct entry; only a verified allowlisted account or the doctor's admission does.

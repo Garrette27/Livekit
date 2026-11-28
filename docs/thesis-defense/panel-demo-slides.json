@@ -159,7 +159,7 @@
         ]
       ],
       "bottom": "API ownership and clinic checks remain authoritative",
-      "notes": "Show the chosen role and server-confirmed result. An old ID token may not contain newly granted claims; Check access again explicitly refreshes. A screenshot saying Granted doctor does not establish an admin grant. Auth lookup outages now produce retryable errors rather than false deleted-account labels. No real account changes are part of the rehearsal; use approved synthetic identities. Firebase claims reference: https://firebase.google.com/docs/auth/admin/custom-claims ."
+      "notes": "Show the chosen role and server-confirmed result. An old ID token may not contain newly granted claims; The Check access again refresh icon explicitly refreshes. A screenshot saying Granted doctor does not establish an admin grant. Auth lookup outages now produce retryable errors rather than false deleted-account labels. No real account changes are part of the rehearsal; use approved synthetic identities. Firebase claims reference: https://firebase.google.com/docs/auth/admin/custom-claims ."
     },
     {
       "title": "Filipino, Taglish and English summaries",

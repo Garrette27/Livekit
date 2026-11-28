@@ -37,8 +37,10 @@ export function loginEntryHarness(route, access, { existingSession = false, acce
   const effects = [];
   const observed = { redirects: [], writes: [], signouts: 0, identityCreations: 0, accessChecks: 0 };
   const user = { uid: 'synthetic-staff', email: 'staff@example.test', displayName: 'Synthetic staff' };
-  const auth = { currentUser: existingSession ? user : null, async signOut() { observed.signouts++; auth.currentUser = null; } };
-  const signIn = async () => { auth.currentUser = user; return { user }; };
+  const listeners = [];
+  const notify = () => listeners.forEach(listener => listener(auth.currentUser));
+  const auth = { currentUser: existingSession ? user : null, async signOut() { observed.signouts++; auth.currentUser = null; notify(); } };
+  const signIn = async () => { auth.currentUser = user; notify(); return { user }; };
   const react = {
     useState(initial) {
       const index = cursor++;
@@ -57,6 +59,7 @@ export function loginEntryHarness(route, access, { existingSession = false, acce
     'next/link': { default: 'a' },
     'next/navigation': { useRouter: () => ({ push: path => observed.redirects.push(path), replace: path => observed.redirects.push(path) }) },
     'firebase/auth': {
+      onAuthStateChanged: (_auth, listener) => { listeners.push(listener); listener(auth.currentUser); return () => listeners.splice(listeners.indexOf(listener), 1); },
       signInWithPopup: signIn, signInWithEmailAndPassword: signIn, sendPasswordResetEmail: async () => {}, sendEmailVerification: async () => {},
       createUserWithEmailAndPassword: async () => { observed.identityCreations++; return signIn(); },
     },

@@ -78,3 +78,32 @@ the sender's own local preview). `video-element-removed`/`added` or
 `TrackUnsubscribed` around the moment points at **remount/subscription**.
 Rising `drop` with `loss` points at **network**. `EncryptionError` points at
 **E2EE**. `MediaDevicesError … DeviceInUse` points at **camera sharing**.
+
+## Run of 28 November 2026 (deployed `dcd2594`, same PC, two windows)
+
+Per-second deltas from both windows, about 3½ minutes:
+
+- Remote video held 28–30 fps at 1280×720 with **0 freezes and 0 dropped
+  frames** in every interval except one: the doctor's view at t≈174 s
+  (5 dropped frames, 11 packets lost). The patient window lost 9 packets
+  around t≈30 s with no freeze.
+- The patient **left and rejoined twice** (participant disconnected at
+  ≈60 s and ≈179 s, connected at ≈163 s and ≈185 s). Each rejoin removes and
+  re-adds the `<video>` element. Playback restarts at 320×180 and reaches
+  720p about 1.3 s later (simulcast layer ramp).
+- The doctor's encoder sent nothing from ≈66 s to ≈162 s while nobody was
+  subscribed. That is expected dynacast behaviour, not a fault. The doctor tab
+  was hidden from ≈25 s to ≈203 s.
+
+Finding: the stats show **no decode-side flicker mechanism**. The visible
+"blinks" that line up with events are the leave/rejoin remounts (black frame,
+then a low-resolution start). The root cause of the flicker is **not
+confirmed**. The open question is why the patient left: a refresh, or a
+dropped connection.
+
+Added for the next run: the panel now logs the local `Disconnected` event with
+LiveKit's `DisconnectReason` name, the page's navigation type at start
+(`navigation=reload` means the page was refreshed), and `pagehide`. Read the
+leaving participant's export: `pagehide` followed by `navigation=reload` is a
+refresh; `Disconnected reason=…` without `pagehide` is a connection drop and
+becomes the bug to chase. Media settings are still unchanged.

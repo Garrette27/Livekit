@@ -22,7 +22,13 @@ function superAdmins() {
 /**
  * GET: the caller's administrator level and the clinician/admin accounts,
  * each with whether its role comes from a claim (provisioned) or only from a
- * legacy profile. POST { email, role, action }: grant or revoke a role.
+ * legacy profile. POST { email, role, action, clinicId?, name?, createAccount? }:
+ * grant or revoke a role. With `createAccount: true` a grant to an email that
+ * has no account yet creates the Firebase Auth user first (invite-based
+ * provisioning): the account has no password, the caller never chooses one,
+ * and the browser then asks Firebase to email the person a set-password link.
+ * The policy check runs before the account is created, so a refused grant
+ * leaves nothing behind.
  * Changes align claims/profile metadata and write a uid-only audit event.
  * Only revocations revoke refresh tokens; grants appear on token refresh.
  */
@@ -94,8 +100,32 @@ async function handlePOST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Could not verify the target account. Please retry.' }, { status: 503 });
     }
   }
+  const createAccount = !target && action === 'grant' && body.createAccount === true;
+  if (!target && !createAccount) {
+    return NextResponse.json({ success: false, code: 'account_not_found', error: 'No account uses that email. Choose "Create the account and email a set-password link", or ask the person to sign in once first.' }, { status: 404 });
+  }
+  if (createAccount) {
+    // Decide before creating: a refused invitation must not leave an orphan account.
+    const preflight = decideRoleChange({
+      caller: caller.data, superAdminEmails: superAdmins(), targetUserId: '', role, action, clinicId: body.clinicId,
+      targetIsSuperAdmin: superAdmins().has(email),
+    });
+    if (!preflight.allowed) {
+      return NextResponse.json({ success: false, code: preflight.code, error: preflight.message }, { status: preflight.status });
+    }
+    const displayName = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : '';
+    try {
+      target = await auth.createUser({ email, emailVerified: false, disabled: false, ...(displayName ? { displayName } : {}) });
+    } catch (error) {
+      const code = (error as { code?: string })?.code;
+      if (code === 'auth/email-already-exists') {
+        return NextResponse.json({ success: false, code: 'account_exists', error: 'An account with that email was just created. Refresh and grant the role again.' }, { status: 409 });
+      }
+      return NextResponse.json({ success: false, error: 'Could not create the account. Check the email address and retry.' }, { status: code === 'auth/invalid-email' ? 400 : 503 });
+    }
+  }
   if (!target) {
-    return NextResponse.json({ success: false, code: 'account_not_found', error: 'No account uses that email. Ask the clinician to sign in once first.' }, { status: 404 });
+    return NextResponse.json({ success: false, error: 'Service unavailable' }, { status: 503 });
   }
   const profileRef = db.collection('users').doc(target.uid);
   const profile = await profileRef.get();
@@ -144,7 +174,8 @@ async function handlePOST(req: NextRequest) {
   }
   await auth.setCustomUserClaims(target.uid, claims);
   if (action === 'grant') {
-    await profileRef.set({ email, role, clinicId: decision.clinicId, provisionedAt: now, ...(profile.exists ? {} : { registeredAt: now }) }, { merge: true });
+    const doctorName = createAccount && typeof body.name === 'string' && body.name.trim() ? { doctorName: body.name.trim().slice(0, 120) } : {};
+    await profileRef.set({ email, role, clinicId: decision.clinicId, provisionedAt: now, ...doctorName, ...(profile.exists ? {} : { registeredAt: now }) }, { merge: true });
   } else if ((role === 'doctor' || wasAdministrator) && profileRole && PRIVILEGED_PROFILE_ROLES.includes(profileRole)) {
     // Keep the profile (history stays attributable) but stop the legacy
     // profile-role fallback from honouring it.
@@ -163,13 +194,14 @@ async function handlePOST(req: NextRequest) {
   await db.collection('adminAuditEvents').add({
     action: `role_${action}`,
     role,
+    accountCreated: createAccount,
     clinicId: decision.clinicId,
     targetUid: target.uid,
     actorUid: caller.data.userId,
     at: now,
   });
 
-  return NextResponse.json({ success: true, uid: target.uid, role, action, clinicId: decision.clinicId });
+  return NextResponse.json({ success: true, uid: target.uid, role, action, clinicId: decision.clinicId, accountCreated: createAccount });
 }
 
 export const GET = withRequestLogging(handleGET);

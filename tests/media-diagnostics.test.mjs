@@ -57,6 +57,14 @@ test('diagnostics are opt-in per page load and redact identifiers', () => {
   assert.doesNotMatch(panel, /room\.name\b|\broomName\b|\.metadata\b|getToken|accessToken/, 'no room name, metadata or token reaches the export');
 });
 
+test('diagnostics distinguish a refresh or a dropped connection from a clean leave', () => {
+  const panel = readFileSync('app/room/[room]/components/shared/MediaDiagnosticsPanel.tsx', 'utf8');
+  assert.match(panel, /RoomEvent\.Disconnected\b/, 'the local disconnect is logged');
+  assert.match(panel, /DisconnectReason\[arg\]/, 'with a readable reason, not a bare number');
+  assert.match(panel, /navigation=\$\{navigation\}/, 'the page records whether it was reloaded');
+  assert.match(panel, /'pagehide'/, 'leaving or refreshing the page is logged');
+});
+
 test('call overlays stay below side panels so a panel close button is never covered', () => {
   const { ROOM_LAYERS } = loadModule('lib/ui/room-layers.ts');
   for (const overlay of ['callQuality', 'diagnostics', 'notice', 'errorToast']) {

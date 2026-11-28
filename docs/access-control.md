@@ -47,6 +47,37 @@ administrative authority (or the reverse) revoke refresh tokens. Manual steps, e
 4. Refresh the recipient's ID token after a grant. Revoke refresh tokens when
    removing access; existing ID tokens and transport grants have separate expiry.
 
+### Adding people: invite-based provisioning
+
+The **Add a person or grant a role** form in `/admin` takes a full name, work
+email, clinic and role. When the email has no account yet and *Create the
+account and email a set-password link* is ticked (the default), the server
+first runs the same `decideRoleChange` policy, then creates the Firebase Auth
+user **without a password** (`createUser`, `emailVerified: false`), sets the
+claims and profile, and writes a uid-only audit event with `accountCreated:
+true`. The administrator's browser then asks Firebase to send its standard
+password-reset email, which the new person uses to choose their own password
+and which lands on the sign-in page for their role. Each account row also has
+**Email set-password link** for a lost or expired email.
+
+Pattern and tradeoff: this is the invite flow used by workspace products
+(Google Workspace, Slack, GitHub organizations). The administrator never
+chooses, sees or transmits a password, so no shared secret exists to leak and
+the person proves control of the mailbox before they can sign in. The cost is a
+dependency on email delivery (Firebase's sender can land in spam) and a link
+that expires, hence the resend action. A policy refusal happens before
+creation, so a refused invitation leaves no orphan account. Existing accounts,
+including Google sign-ins, simply receive the role as before.
+
+### Platform owner (super administrator)
+
+The super administrator is not granted in the console. Add the person's email
+to the server-only `SUPER_ADMIN_EMAILS` variable (comma-separated) in the
+deployment environment and redeploy. The account must be non-anonymous and its
+email provider-verified: sign in with Google, or create it at `/admin/signup`
+and open the verification email. Then sign in at `/super-admin/login`. Never
+send passwords through chat or tickets; if one was, change it.
+
 Clinic-administrator entry uses `/admin/login` and identity-only `/admin/signup`.
 The platform owner signs in separately at `/super-admin/login`.
 Signup never writes privileged claims or clinician profiles. `/api/account/access`
@@ -70,7 +101,11 @@ redirect an administrative identity into `/admin`.
 `/admin/login` accepts exactly the `admin` authority; `/super-admin/login`
 accepts exactly `super_admin`. A mismatched authenticated identity is signed
 out with an inline explanation, including when an existing session chooses
-**Check access again**. Neither route automatically forwards a restored
+**Check access again** — the circular-arrow refresh icon in the "Signed in as
+…" account bar (an icon button with a tooltip and an accessible name). That
+bar, with its **Sign out** action, appears only while a session exists; it is
+how a shared computer switches accounts and how a newly approved person
+refreshes their ID token to pick up new claims. Neither route automatically forwards a restored
 session. `/admin/signup` creates only a Firebase identity for clinic access;
 it cannot grant a role or configure a platform owner. The platform-owner entry
 has no signup option. Both accepted administrative authorities use `/admin`,
