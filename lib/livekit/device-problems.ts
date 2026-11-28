@@ -4,7 +4,7 @@
  * testable: a device that is in use by another app or window must never be
  * described as "blocked", and only the device that failed is named.
  */
-export type DeviceProblem = 'blocked' | 'in-use' | 'not-found' | 'failed';
+export type DeviceProblem = 'blocked' | 'in-use' | 'not-found' | 'failed' | 'switch-failed';
 export type DeviceProblems = Partial<Record<'camera' | 'microphone', DeviceProblem>>;
 
 /** Map a MediaDeviceKind from LiveKit's MediaDevicesError to the device it names, or null when unknown. */
@@ -19,6 +19,7 @@ const CAUSE: Record<DeviceProblem, string> = {
   'in-use': 'in use by another app or browser window. Close the other app or window (or choose another device), then try again.',
   'not-found': 'not found. Check that it is connected, or choose another device.',
   failed: 'not starting. Try choosing the device again or reload this page.',
+  'switch-failed': 'still the one you used before: the device you picked would not start. It may be off, in use by another app, or (for a virtual camera such as OBS) not started yet.',
 };
 
 /** One sentence per distinct cause (both devices named together when they share it), or null when nothing is wrong. */

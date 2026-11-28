@@ -5,6 +5,7 @@ import { useRoomContext } from '@livekit/components-react';
 import { MediaDeviceFailure, RoomEvent, Track, type LocalTrackPublication } from 'livekit-client';
 import { ROOM_LAYERS } from '@/lib/ui/room-layers';
 import { describeDeviceProblems, deviceForKind, type DeviceProblem, type DeviceProblems } from '@/lib/livekit/device-problems';
+import { DeviceSwitchError } from '@/lib/livekit/recoverable-device-switch';
 
 /**
  * In-call notice for a camera or microphone this browser could not use.
@@ -14,7 +15,9 @@ import { describeDeviceProblems, deviceForKind, type DeviceProblem, type DeviceP
  * `MediaDeviceFailure` (permission denied, device in use, not found). Only the
  * device named by `kind` is reported. A problem clears as soon as that device
  * publishes a track again, so a working camera never sits under a stale
- * "blocked" warning. It never requests permission and never blocks the call.
+ * "blocked" warning. A device picked from the menu that would not start is
+ * reported as such after lib/livekit/recoverable-device-switch.ts restores
+ * the previous one. It never requests permission and never blocks the call.
  */
 export default function DevicePermissionNotice() {
   const room = useRoomContext();
@@ -59,8 +62,14 @@ export default function DevicePermissionNotice() {
       void watch('microphone');
     }
 
-    const onMediaError = (error: Error, kind?: MediaDeviceKind) => {
+    const onMediaError = (reported: Error, kind?: MediaDeviceKind) => {
       const device = deviceForKind(kind);
+      // A failed pick from the device menu: the previous device was restored.
+      if (device && reported instanceof DeviceSwitchError && reported.restored) {
+        set(device, 'switch-failed');
+        return;
+      }
+      const error = reported instanceof DeviceSwitchError ? reported.cause as Error : reported;
       const failure = MediaDeviceFailure.getFailure(error);
       if (!device || !failure) return;
       set(device, failure === MediaDeviceFailure.PermissionDenied ? 'blocked'
@@ -71,14 +80,27 @@ export default function DevicePermissionNotice() {
       if (publication.source === Track.Source.Camera) set('camera', null);
       if (publication.source === Track.Source.Microphone) set('microphone', null);
     };
+    // A later successful pick replaces the "would not start" note.
+    const onDeviceChanged = (kind: MediaDeviceKind) => {
+      const device = deviceForKind(kind);
+      if (!device) return;
+      setProblems((current) => {
+        if (current[device] !== 'switch-failed') return current;
+        const next = { ...current };
+        delete next[device];
+        return next;
+      });
+    };
     room.on(RoomEvent.MediaDevicesError, onMediaError);
     room.on(RoomEvent.LocalTrackPublished, onPublished);
+    room.on(RoomEvent.ActiveDeviceChanged, onDeviceChanged);
 
     return () => {
       cancelled = true;
       statuses.forEach((status) => { status.onchange = null; });
       room.off(RoomEvent.MediaDevicesError, onMediaError);
       room.off(RoomEvent.LocalTrackPublished, onPublished);
+      room.off(RoomEvent.ActiveDeviceChanged, onDeviceChanged);
     };
   }, [room]);
 

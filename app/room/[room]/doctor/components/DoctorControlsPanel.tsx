@@ -292,7 +292,21 @@ export default function DoctorControlsPanel({
             </p>
             <p style={{ margin: '0.5rem 0' }}>Created: {invitationContext.createdAt ? new Date(invitationContext.createdAt).toLocaleString() : 'Unknown'}</p>
             <p style={{ margin: '0.5rem 0' }}>Expires: {new Date(invitationContext.expiresAt).toLocaleString()}</p>
-            <Link href="/doctor/invitations" target="_blank" rel="noopener noreferrer">Manage invitations in a new tab</Link>
+            {/* Styled as a link (blue, underlined, new-tab icon): the global
+                reset leaves bare anchors looking like body text. */}
+            <Link
+              href="/doctor/invitations"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="manage-invitations-link"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', minHeight: '2.75rem', color: '#1d4ed8', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: '2px' }}
+            >
+              Manage invitations
+              <svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 4h6v6" /><path d="M20 4 10 14" /><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" />
+              </svg>
+              <span style={{ fontWeight: 400, color: '#4b5563', textDecoration: 'none' }}>(opens in a new tab)</span>
+            </Link>
           </details>
         )}
 

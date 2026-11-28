@@ -1,6 +1,7 @@
 'use client';
 
 import { ExternalE2EEKeyProvider, Room, isE2EESupported, type RoomOptions } from 'livekit-client';
+import { makeDeviceSwitchRecoverable } from '@/lib/livekit/recoverable-device-switch';
 
 /**
  * Builds the LiveKit Room a consultation joins, end-to-end encrypted when the
@@ -42,7 +43,9 @@ export async function prepareConsultationRoom(
     return { kind: 'failed', message: result?.error || 'Could not secure this call. Please retry.' };
   }
   if (result.enabled !== true) {
-    return { kind: 'ready', room: new Room(options), encryption: 'transport' };
+    const room = new Room(options);
+    makeDeviceSwitchRecoverable(room);
+    return { kind: 'ready', room, encryption: 'transport' };
   }
   if (typeof result.key !== 'string' || !result.key || !isE2EESupported()) {
     return { kind: 'unsupported' };
@@ -58,5 +61,6 @@ export async function prepareConsultationRoom(
     worker.terminate();
     return { kind: 'unsupported' };
   }
+  makeDeviceSwitchRecoverable(room);
   return { kind: 'ready', room, encryption: 'end-to-end' };
 }

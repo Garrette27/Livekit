@@ -23,7 +23,7 @@ test('only the failing device is named, and "in use" is never described as block
 
 test('the notice classifies with MediaDeviceFailure using the event kind and clears on a successful publish', () => {
   const source = readFileSync('app/room/[room]/components/shared/DevicePermissionNotice.tsx', 'utf8');
-  assert.match(source, /onMediaError = \(error: Error, kind\?: MediaDeviceKind\)/);
+  assert.match(source, /onMediaError = \(reported: Error, kind\?: MediaDeviceKind\)/);
   assert.match(source, /MediaDeviceFailure\.getFailure\(error\)/);
   assert.match(source, /RoomEvent\.LocalTrackPublished/);
   assert.doesNotMatch(source, /new Set<BlockedDevice>\(\['camera', 'microphone'\]\)/);
@@ -97,4 +97,46 @@ test('render meter reports painted frames, the longest stall and blinks to black
   const panel = readFileSync('app/room/[room]/components/shared/MediaDiagnosticsPanel.tsx', 'utf8');
   assert.match(panel, /requestVideoFrameCallback/, 'painted frames are measured, not only decoded ones');
   assert.doesNotMatch(panel, /toDataURL|toBlob/, 'no image ever leaves the element; only a luminance number');
+});
+
+test('a camera pick that will not start restores the previous camera and reports it', async () => {
+  const { makeDeviceSwitchRecoverable, DeviceSwitchError } = loadModule('lib/livekit/recoverable-device-switch.ts',
+    { 'livekit-client': { RoomEvent: { MediaDevicesError: 'mediaDevicesError' } } }, { Error, Promise });
+  const calls = [];
+  const emitted = [];
+  let active = 'usb-camera';
+  const room = {
+    getActiveDevice: () => active,
+    async switchActiveDevice(kind, id) {
+      calls.push(id);
+      if (id === 'obs-virtual-camera') throw Object.assign(new Error('Could not start video source'), { name: 'NotReadableError' });
+      active = id;
+      return true;
+    },
+    emit: (...args) => emitted.push(args),
+  };
+  makeDeviceSwitchRecoverable(room);
+  await assert.rejects(room.switchActiveDevice('videoinput', 'obs-virtual-camera'), /Could not start/);
+  assert.deepEqual(calls, ['obs-virtual-camera', 'usb-camera'], 'falls back to the camera that worked');
+  assert.equal(emitted.length, 1);
+  assert.equal(emitted[0][0], 'mediaDevicesError');
+  assert.ok(emitted[0][1] instanceof DeviceSwitchError);
+  assert.equal(emitted[0][1].restored, true);
+  assert.equal(emitted[0][2], 'videoinput');
+  assert.equal(await room.switchActiveDevice('videoinput', 'usb-camera'), true, 'a working pick passes through');
+});
+
+test('a failed device pick is described as kept, not blocked', () => {
+  const text = problems().describeDeviceProblems({ camera: 'switch-failed' });
+  assert.match(text, /camera is still the one you used before/);
+  assert.match(text, /OBS/);
+  assert.doesNotMatch(text, /blocked/);
+  const wiring = readFileSync('lib/livekit/media-encryption-client.ts', 'utf8');
+  assert.equal((wiring.match(/makeDeviceSwitchRecoverable\(room\)/g) || []).length, 2, 'both transport and E2EE rooms recover');
+});
+
+test('the in-call "Manage invitations" control looks and reads like a new-tab link', () => {
+  const panel = readFileSync('app/room/[room]/doctor/components/DoctorControlsPanel.tsx', 'utf8');
+  assert.match(panel, /textDecoration: 'underline'/);
+  assert.match(panel, /\(opens in a new tab\)/);
 });
