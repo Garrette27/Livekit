@@ -88,3 +88,51 @@ export function redactId(value: string | undefined | null): string {
   }
   return `#${(hash >>> 0).toString(16).padStart(8, '0').slice(0, 6)}`;
 }
+
+/**
+ * What the viewer actually saw for one <video> element over an interval —
+ * the layer WebRTC stats cannot see. Frames come from
+ * HTMLVideoElement.requestVideoFrameCallback (one call per frame the browser
+ * composited); luminance comes from a tiny downscaled canvas sample, so only a
+ * number leaves the element, never an image.
+ *
+ * - renderFps: frames actually presented in the interval;
+ * - maxGapMs: longest wait between two presented frames (a visible stall when
+ *   it exceeds ~200 ms even if `decoded` looks healthy);
+ * - blackFlashes: samples that dropped to near-black right after a lit sample
+ *   (a blink to black, e.g. a remount or a GPU/compositor glitch).
+ */
+export interface RenderInterval { renderFps: number; maxGapMs: number | null; blackFlashes: number }
+
+export const DARK_LUMA = 16;
+const LIT_LUMA = 40;
+
+export class RenderMeter {
+  private frames = 0;
+  private lastFrameAt: number | null = null;
+  private maxGap = 0;
+  private flashes = 0;
+  private lastLuma: number | null = null;
+
+  /** Record one presented frame at `now` (ms, requestVideoFrameCallback clock). */
+  frame(now: number): void {
+    if (this.lastFrameAt !== null) this.maxGap = Math.max(this.maxGap, now - this.lastFrameAt);
+    this.lastFrameAt = now;
+    this.frames += 1;
+  }
+
+  /** Record a mean-luminance sample (0–255). */
+  luma(value: number): void {
+    if (this.lastLuma !== null && this.lastLuma >= LIT_LUMA && value < DARK_LUMA) this.flashes += 1;
+    this.lastLuma = value;
+  }
+
+  /** Read and reset the interval. The gap carries across intervals via lastFrameAt. */
+  take(): RenderInterval {
+    const result = { renderFps: this.frames, maxGapMs: this.frames ? Math.round(this.maxGap) : null, blackFlashes: this.flashes };
+    this.frames = 0;
+    this.maxGap = 0;
+    this.flashes = 0;
+    return result;
+  }
+}

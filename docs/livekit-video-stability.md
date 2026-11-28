@@ -129,3 +129,40 @@ becomes the bug to chase. Media settings are still unchanged.
   flickers at all.
 
 No media settings were changed.
+
+## LiveKit's recommended pattern, and what is left (28 Nov 2026, 16:30 run)
+
+LiveKit's guidance for stable video in React is to render with its own
+layout components (`VideoConference`/`GridLayout`, which use
+`useVisualStableUpdate` to keep tiles from remounting or reordering). It also
+recommends enabling `adaptiveStream`, `dynacast` and simulcast, and keeping
+room options stable. The app already does all of this. LiveKit only reconnects
+a participant when their page reloads or the signal drops.
+
+The 16:27 exports (after the redeploy) show both windows reloaded
+(`navigation=reload`, `discarded=false`, confirmed as manual refreshes).
+After each start-up ramp (320×180 → 1280×720 within about 1.4 s), the remote
+video ran at 28–31 fps with 0 freezes, 0 drops and 0 packet loss for the whole
+capture. **The decoder side is clean.** If a flicker is still visible, it
+happens after decoding, when the browser paints the frame (the
+compositor/GPU), or inside the shared camera, and WebRTC stats cannot see
+either.
+
+New measurement: the diagnostics now also record **what was painted** for
+each video element, using the standard `requestVideoFrameCallback` API:
+
+- `rfps`: frames actually presented each second;
+- `gap`: the longest wait between two presented frames in that second
+  (over ~200 ms is a visible stall);
+- `blk`: blinks to black, from a 16×9 luminance sample every 250 ms. Only a
+  number is kept, never an image.
+
+How to read it while the flicker is visible:
+
+- `dec` about 30 but `rfps` low, `gap` large or `blk` above 0 means the
+  browser's rendering. Try `chrome://settings` → System → turn off "Use
+  graphics acceleration", then repeat. If that cures it, it is a GPU driver
+  issue on that PC, not the app.
+- All four steady while you still see flicker means the problem is in the
+  camera image itself (two windows sharing one webcam). Repeat with the
+  patient on a phone.

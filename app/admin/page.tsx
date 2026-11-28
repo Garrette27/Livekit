@@ -7,6 +7,8 @@ import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 import DoctorAppHeader from '@/components/doctor/DoctorAppHeader';
 import OversightPanel from '@/components/admin/OversightPanel';
 import RefreshIconButton from '@/components/ui/RefreshIconButton';
+import ChangePasswordCard from '@/components/admin/ChangePasswordCard';
+import { resendSecondsLeft } from '@/lib/auth/resend-cooldown';
 
 interface Account {
   uid: string;
@@ -47,6 +49,16 @@ export default function AdminPage() {
   const [role, setRole] = useState<'doctor' | 'admin'>('doctor');
   const [busy, setBusy] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // When each set-password email was last sent (per recipient), and a 1 s
+  // clock that only ticks while some cooldown is running.
+  const [sentAt, setSentAt] = useState<Record<string, number>>({});
+  const [now, setNow] = useState(() => Date.now());
+  const coolingDown = Object.values(sentAt).some((at) => resendSecondsLeft(at, now) > 0);
+  useEffect(() => {
+    if (!coolingDown) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [coolingDown]);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
   useEffect(() => (auth ? onAuthStateChanged(auth, setUser) : setUser(null)), []);
@@ -80,7 +92,11 @@ export default function AdminPage() {
   /** Ask Firebase to email a set-password link; the link lands on that role's sign-in page. */
   const emailSetPasswordLink = async (targetEmail: string, targetRole: string) => {
     if (!auth) throw new Error('Sign-in unavailable');
+    if (resendSecondsLeft(sentAt[targetEmail], Date.now()) > 0) throw new Error('cooldown');
     await sendPasswordResetEmail(auth, targetEmail, { url: `${window.location.origin}${targetRole === 'admin' ? '/admin/login' : '/doctor/login'}` });
+    const at = Date.now();
+    setSentAt((current) => ({ ...current, [targetEmail]: at }));
+    setNow(at);
   };
 
   const resendSetPassword = async (targetEmail: string, targetRole: string) => {
@@ -247,9 +263,21 @@ export default function AdminPage() {
                           </button>
                         )}
                         {account.canManage && account.email && account.uid !== callerUid && (account.role === 'doctor' || level === 'super_admin') && (
-                          <button type="button" className="secondary" disabled={Boolean(busy)} onClick={() => void resendSetPassword(account.email!, account.role)}>
-                            Email set-password link
-                          </button>
+                          <span className="resend">
+                            <button type="button" className="secondary"
+                              disabled={Boolean(busy) || resendSecondsLeft(sentAt[account.email!], now) > 0}
+                              aria-describedby={`resend-${account.uid}`}
+                              onClick={() => void resendSetPassword(account.email!, account.role)}>
+                              {busy === `reset:${account.email}` ? 'Sending…'
+                                : resendSecondsLeft(sentAt[account.email!], now) > 0 ? `Resend in ${resendSecondsLeft(sentAt[account.email!], now)}s`
+                                  : sentAt[account.email!] ? 'Resend set-password link' : 'Email set-password link'}
+                            </button>
+                            {sentAt[account.email!] && (
+                              <span id={`resend-${account.uid}`} className="sent" role="status">
+                                ✓ Sent {new Date(sentAt[account.email!]).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </span>
                         )}
                         {account.canManage && account.email && account.uid !== callerUid && (account.role === 'doctor' || level === 'super_admin') && (
                           <button type="button" className="danger" disabled={Boolean(busy)} onClick={() => change(account.email!, account.role as 'doctor' | 'admin', 'revoke', account.clinicId)}>
@@ -262,6 +290,8 @@ export default function AdminPage() {
                 </ul>
               )}
             </section>
+
+            <ChangePasswordCard user={user} />
 
             <OversightPanel staffLabels={Object.fromEntries(accounts.map((account) => [account.uid, account.name || account.email || account.uid.slice(0, 8)]))} />
           </>
@@ -294,6 +324,8 @@ export default function AdminPage() {
         .warn-badge { background: #fef3c7; color: #92400e; }
         .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .actions .secondary { margin: 0; }
+        .resend { display: inline-flex; align-items: center; gap: .5rem; }
+        .sent { color: #047857; font-size: .8125rem; font-weight: 600; white-space: nowrap; }
         @media (min-width: 641px) and (max-width: 900px) { .grant-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 640px) { .grant-row { grid-template-columns: 1fr; } }
       `}</style>

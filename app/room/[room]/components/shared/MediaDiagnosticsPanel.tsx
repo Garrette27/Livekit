@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useRoomContext } from '@livekit/components-react';
 import { DisconnectReason, MediaDeviceFailure, RoomEvent, Track, type LocalVideoTrack, type Room, type TrackPublication } from 'livekit-client';
 import { ROOM_LAYERS } from '@/lib/ui/room-layers';
-import { redactId, videoStatDeltas, type VideoStatDelta } from '@/lib/livekit/media-diagnostics';
+import { RenderMeter, redactId, videoStatDeltas, type RenderInterval, type VideoStatDelta } from '@/lib/livekit/media-diagnostics';
 
 /**
  * TEMPORARY media diagnostics for the video-flicker investigation (28 Nov 2026).
@@ -18,9 +18,49 @@ import { redactId, videoStatDeltas, type VideoStatDelta } from '@/lib/livekit/me
  * added/removed from the DOM, emptied/stalled/waiting/resize). "Copy
  * diagnostics" exports JSON with no tokens, names, emails, room names or media.
  * It observes only; it never changes media, consent or admission.
+ *
+ * Render columns (rfps, gap, blk) measure what was actually painted, via
+ * requestVideoFrameCallback and a 16x9 luminance sample: a flicker that WebRTC
+ * stats miss (decoded frames fine, picture still blinking) shows up here.
  */
 
-interface TrackRow extends Partial<VideoStatDelta> {
+type FrameCallbackVideo = HTMLVideoElement & {
+  requestVideoFrameCallback?: (callback: (now: number) => void) => number;
+  cancelVideoFrameCallback?: (handle: number) => void;
+};
+
+/** Start measuring one element; returns a stop function. Luminance is sampled every 250 ms. */
+function watchRendering(element: FrameCallbackVideo, meter: RenderMeter): () => void {
+  let stopped = false;
+  let handle = 0;
+  const onFrame = (now: number) => {
+    if (stopped) return;
+    meter.frame(now);
+    handle = element.requestVideoFrameCallback!(onFrame);
+  };
+  if (element.requestVideoFrameCallback) handle = element.requestVideoFrameCallback(onFrame);
+  const canvas = document.createElement('canvas');
+  canvas.width = 16;
+  canvas.height = 9;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  const lumaTimer = window.setInterval(() => {
+    if (!context || element.readyState < 2) return;
+    try {
+      context.drawImage(element, 0, 0, 16, 9);
+      const pixels = context.getImageData(0, 0, 16, 9).data;
+      let sum = 0;
+      for (let index = 0; index < pixels.length; index += 4) sum += 0.2126 * pixels[index] + 0.7152 * pixels[index + 1] + 0.0722 * pixels[index + 2];
+      meter.luma(sum / (pixels.length / 4));
+    } catch { /* element not drawable yet */ }
+  }, 250);
+  return () => {
+    stopped = true;
+    if (element.cancelVideoFrameCallback) element.cancelVideoFrameCallback(handle);
+    window.clearInterval(lumaTimer);
+  };
+}
+
+interface TrackRow extends Partial<VideoStatDelta>, Partial<RenderInterval> {
   who: string;
   track: string;
   source: string;
@@ -125,6 +165,19 @@ export default function MediaDiagnosticsPanel() {
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
+    // One meter per rendered <video>; a remount gets a fresh element and meter.
+    const meters = new Map<HTMLVideoElement, { meter: RenderMeter; stop: () => void }>();
+    const meterFor = (element: HTMLVideoElement | undefined) => {
+      if (!element) return null;
+      let entry = meters.get(element);
+      if (!entry) {
+        const meter = new RenderMeter();
+        entry = { meter, stop: watchRendering(element, meter) };
+        meters.set(element, entry);
+      }
+      return entry.meter;
+    };
+
     let previous = new Map<string, Record<string, unknown>>();
     let cancelled = false;
     const timer = window.setInterval(async () => {
@@ -151,6 +204,7 @@ export default function MediaDiagnosticsPanel() {
             streamState: track && 'streamState' in track ? String((track as { streamState: string }).streamState) : null,
             attachedElements: track?.attachedElements.length ?? 0,
             capture,
+            ...(meterFor(track?.attachedElements[0] as HTMLVideoElement | undefined)?.take() ?? {}),
           };
           const entries: Record<string, unknown>[] = [];
           if (track) {
@@ -163,6 +217,9 @@ export default function MediaDiagnosticsPanel() {
         }
       }
       if (cancelled) return;
+      meters.forEach((entry, element) => {
+        if (!element.isConnected) { entry.stop(); meters.delete(element); }
+      });
       const next = new Map<string, Record<string, unknown>>();
       for (const { base, entries } of entriesByTrack) {
         const { deltas, next: trackNext } = videoStatDeltas(previous, entries);
@@ -180,6 +237,7 @@ export default function MediaDiagnosticsPanel() {
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      meters.forEach((entry) => entry.stop());
       handlers.forEach(([name, handler]) => room.off(name, handler));
       room.off(RoomEvent.MediaDevicesError, onMediaError);
       document.removeEventListener('visibilitychange', onVisibility);
@@ -214,7 +272,7 @@ export default function MediaDiagnosticsPanel() {
       <span>t={latest ? `${(latest.t / 1000).toFixed(0)}s` : '…'} · {latest?.visibility} · events {eventCount}</span>{' '}
       <button type="button" onClick={copy} style={{ font: 'inherit', marginLeft: 6 }}>{copied ? 'Copied' : 'Copy diagnostics'}</button>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 6 }}>
-        <thead><tr>{['who', 'track', 'dir/rid', 'res@fps', 'dec', 'enc', 'drop', 'frz', 'key', 'kreq', 'state', 'el', 'limit'].map((h) => <th key={h} style={{ textAlign: 'left', paddingRight: 6 }}>{h}</th>)}</tr></thead>
+        <thead><tr>{['who', 'track', 'dir/rid', 'res@fps', 'dec', 'enc', 'drop', 'frz', 'key', 'kreq', 'rfps', 'gap', 'blk', 'state', 'el', 'limit'].map((h) => <th key={h} style={{ textAlign: 'left', paddingRight: 6 }}>{h}</th>)}</tr></thead>
         <tbody>
           {latest?.rows.map((row, index) => (
             <tr key={index}>
@@ -222,6 +280,7 @@ export default function MediaDiagnosticsPanel() {
               <td>{row.width ? `${row.width}x${row.height}@${cell(row.fps)}` : '—'}</td>
               <td>{cell(row.decoded)}</td><td>{cell(row.encoded)}</td><td>{cell(row.dropped)}</td><td>{cell(row.freezes)}</td>
               <td>{cell(row.keyframes)}</td><td>{cell(row.keyframeRequests)}</td>
+              <td>{cell(row.renderFps)}</td><td>{cell(row.maxGapMs)}</td><td>{cell(row.blackFlashes)}</td>
               <td>{row.muted ? 'muted ' : ''}{row.subscribed === false ? 'unsub ' : ''}{cell(row.streamState)}</td>
               <td>{row.attachedElements}</td><td>{cell(row.limitedBy)}</td>
             </tr>

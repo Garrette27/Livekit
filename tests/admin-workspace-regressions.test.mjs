@@ -343,3 +343,34 @@ test('admin refresh controls are labelled icon buttons with a hover and focus ex
     assert.doesNotMatch(source, />Refresh( access and accounts)?<\/button>/, `${path} has no text-only refresh button left`);
   }
 });
+
+function loadTs(path, deps = {}) {
+  const record = { exports: {} };
+  runInNewContext(ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText,
+    { module: record, exports: record.exports, Math, require: (name) => deps[name] ?? {} });
+  return record.exports;
+}
+
+test('set-password emails have a 60-second per-recipient resend window with a visible countdown', () => {
+  const { resendSecondsLeft, RESEND_WINDOW_MS } = loadTs('lib/auth/resend-cooldown.ts');
+  assert.equal(RESEND_WINDOW_MS, 60_000);
+  assert.equal(resendSecondsLeft(undefined, 1000), 0, 'never sent: allowed');
+  assert.equal(resendSecondsLeft(0 + 1, 1 + 1000), 59);
+  assert.equal(resendSecondsLeft(1, 1 + 59_500), 1, 'rounds up so the button never says 0s while still blocked');
+  assert.equal(resendSecondsLeft(1, 1 + 60_000), 0);
+  const page = readFileSync('app/admin/page.tsx', 'utf8');
+  assert.match(page, /Resend in \$\{resendSecondsLeft/, 'the countdown is shown on the button');
+  assert.match(page, /✓ Sent/, 'a lasting per-row confirmation is shown after sending');
+  assert.match(page, /if \(resendSecondsLeft\(sentAt\[targetEmail\], Date\.now\(\)\) > 0\) throw/, 'the send itself refuses inside the window');
+});
+
+test('change password re-authenticates first and validates the new password', () => {
+  const source = readFileSync('components/admin/ChangePasswordCard.tsx', 'utf8');
+  assert.ok(source.indexOf('reauthenticateWithCredential') < source.indexOf('await updatePassword'), 'current password is verified before the update');
+  assert.doesNotMatch(source, /console\.|localStorage|fetch\(/, 'the password goes only to Firebase Auth');
+  const { newPasswordProblem } = loadTs('components/admin/ChangePasswordCard.tsx', { react: { useState: () => [] } });
+  assert.match(newPasswordProblem('old-secret', 'short', 'short'), /at least 8/);
+  assert.match(newPasswordProblem('old-secret', 'new-secret-1', 'new-secret-2'), /do not match/);
+  assert.match(newPasswordProblem('same-secret', 'same-secret', 'same-secret'), /different/);
+  assert.equal(newPasswordProblem('old-secret', 'new-secret-1', 'new-secret-1'), null);
+});

@@ -69,6 +69,24 @@ that expires, hence the resend action. A policy refusal happens before
 creation, so a refused invitation leaves no orphan account. Existing accounts,
 including Google sign-ins, simply receive the role as before.
 
+Each set-password send starts a 60-second window for that recipient: the
+button counts down ("Resend in 42s") and the row keeps a "✓ Sent 4:31 PM"
+confirmation (`lib/auth/resend-cooldown.ts`). The window prevents duplicate
+emails from repeated clicks. It is not a security control, since Firebase
+rate-limits on its side as well.
+
+### Changing your own password
+
+`/admin` has a **Your account · change password** card for the signed-in
+administrator, including the platform owner. It follows Firebase's required
+pattern: re-authenticate with the current password
+(`reauthenticateWithCredential`), then `updatePassword`. The new password must
+be at least 8 characters, entered twice, and different from the current one.
+Google-only accounts have no password here; the card offers to email a link
+that adds one. The password goes only to Firebase Auth and is never stored or
+logged by the app. Super-admin authority comes from `SUPER_ADMIN_EMAILS`, so it
+is unaffected by a password change.
+
 ### Platform owner (super administrator)
 
 The super administrator is not granted in the console. Add the person's email

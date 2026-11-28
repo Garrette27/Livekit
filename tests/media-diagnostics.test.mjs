@@ -79,3 +79,22 @@ test('call overlays stay below side panels so a panel close button is never cove
   ]) assert.match(readFileSync(file, 'utf8'), new RegExp(`zIndex: ROOM_LAYERS\\.${layer}`), file);
   assert.match(readFileSync('components/CollapsibleSidebar.tsx', 'utf8'), /SIDEBAR_Z_INDEX = ROOM_LAYERS\.sidePanel/);
 });
+
+test('render meter reports painted frames, the longest stall and blinks to black', () => {
+  const { RenderMeter } = diagnostics();
+  const meter = new RenderMeter();
+  for (let index = 0; index < 30; index += 1) meter.frame(index * 33);
+  meter.frame(30 * 33 + 400); // one 433 ms stall
+  meter.luma(120); meter.luma(5); meter.luma(110); meter.luma(110);
+  const interval = meter.take();
+  assert.equal(interval.renderFps, 31);
+  assert.equal(interval.maxGapMs, 433);
+  assert.equal(interval.blackFlashes, 1, 'a lit-to-black sample counts once');
+  const empty = meter.take();
+  assert.equal(empty.renderFps, 0, 'intervals reset');
+  assert.equal(empty.maxGapMs, null);
+  assert.equal(empty.blackFlashes, 0);
+  const panel = readFileSync('app/room/[room]/components/shared/MediaDiagnosticsPanel.tsx', 'utf8');
+  assert.match(panel, /requestVideoFrameCallback/, 'painted frames are measured, not only decoded ones');
+  assert.doesNotMatch(panel, /toDataURL|toBlob/, 'no image ever leaves the element; only a luminance number');
+});
