@@ -168,6 +168,9 @@ Minimum necessary:
 Showing patient names to administrators would be a policy decision. It needs
 an approved purpose, access auditing and retention review first.
 
+Decision, 28 November 2026: the project owner chose to keep patient names
+hidden from administrators in this view.
+
 Scope:
 - The platform owner sees the newest 25 invitations platform-wide.
 - A clinic administrator sees invitations created by doctors in their verified
