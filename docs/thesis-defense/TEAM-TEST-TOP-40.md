@@ -1,5 +1,7 @@
 # Team test plan: prove the top-40 answers before the defense
 
+Question numbers follow priority-order-v3 (28 November 2026).
+
 Use only synthetic accounts: **Doctor** (provisioned), **Patient A** (Google, verified, on the invitation list), **Guest 1–3** (separate incognito windows or browser profiles), and the **Admin** account. Never use real patients. Record each result as PASS / FAIL plus a screenshot in a shared folder.
 
 ## Message to send the team
@@ -27,10 +29,10 @@ Use only synthetic accounts: **Doctor** (provisioned), **Patient A** (Google, ve
 | 14 | Guest types Patient A's email | Guest waits (typed email is not proof) |
 | 14 | Patient A opens the link signed in with Google | Enters directly, even when the queue is full |
 | 15 | While waiting, check camera light / browser permission prompt | No camera or microphone use until admitted |
-| 26 | Two incognito tabs in the same browser on the same Wi-Fi | Two separate queue rows |
-| 27, 35 | Reject Guest 1; Guest 1 reopens the link | Back of the queue, still waiting; Revoke the invitation → link refused |
-| 31, 40 | Open `/admin` with the clinic admin account | No Invitations link; cannot open doctor pages; can grant a doctor only in their clinic |
-| 34 | Doctor has queue open; Guest leaves and rejoins; doctor clicks Admit on the old row | Conflict message asking to refresh |
+| 36 | Two incognito tabs in the same browser on the same Wi-Fi | Two separate queue rows |
+| 30, 41 | Reject Guest 1; Guest 1 reopens the link | Back of the queue, still waiting; Revoke the invitation → link refused |
+| 27, 46 | Open `/admin` with the clinic admin account | No Invitations link; cannot open doctor pages; can grant a doctor only in their clinic |
+| 40 | Doctor has queue open; Guest leaves and rejoins; doctor clicks Admit on the old row | Conflict message asking to refresh |
 
 ## Block C — Writer 3 (numbers, quality, devices, language)
 
@@ -38,11 +40,11 @@ Use only synthetic accounts: **Doctor** (provisioned), **Patient A** (Google, ve
 |---|---|---|
 | 8, 9 | In a call, open **Call quality** (top-left) and click *Copy measurement* | Shows RTT ms, jitter ms, loss %, received/sent resolution and fps |
 | 8 | **Paired-call trial:** run 1, then 3, then 5 doctor–patient pairs on separate devices for 5 minutes each; at minute 4 copy the measurement from one patient device per pair | Fill the sheet below; report the highest level that stayed acceptable |
-| 22 | Doctor-booked appointments are off in production | No Appointments link in production; explain the feature flag |
+| 21 | With scheduling enabled: book a synthetic visit, book an overlapping one, then **Prepare invitation** | Overlap refused; invitation form opens with room `visit-…`; no patient name/email in the URL |
 | 17 | In a call, open **Call quality** | Summary reads *End-to-end encrypted*; Protection reads *End-to-end (AES-GCM) + DTLS-SRTP*; Copy measurement shows `"mediaEncryption":"end-to-end"` |
-| 23 | Open the doctor room and invitations page on a real phone | No sideways scrolling; queue/session panels open on demand; the camera menu shows full device names |
-| 24 | Speech notes with Filipino/Tagalog selected, speak Taglish | Transcript captured; summary in English |
-| 39 | Open Consultation History | Summaries appear first; chat transcripts fill in after |
+| 32, 31 | Open the doctor room and invitations page on a real phone; then block camera in site settings and reload | No sideways scrolling; camera menu shows full device names; when blocked, an amber notice explains how to allow it |
+| 33 | Speech notes with Filipino/Tagalog selected, speak Taglish | Transcript captured; summary in English |
+| 45 | Open Consultation History | Summaries appear first; chat transcripts fill in after |
 | — | Click **Join as Doctor** and sign in as doctor | Skeleton "Preparing your secure room…" / "Checking your doctor access…" instead of a blank or login screen |
 
 ### Paired-call numbers sheet (paste into answer 8)

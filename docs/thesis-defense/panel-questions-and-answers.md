@@ -1,8 +1,8 @@
 # Panel questions and answers: priority study order
 
-28 November 2026. <!-- priority-order-v2 -->
+28 November 2026. <!-- priority-order-v3 -->
 
-Current bank: **100 questions**. Q90–Q100 cover the researched administration pattern, separate staff entry routes and the scheduling release boundary. The original priority order Q1–Q89 is preserved; later source evidence does not rewrite the surveyed build.
+Current bank: **100 questions**, re-ranked by importance on 28 November 2026 (priority-order-v3). Q1-Q20 are unchanged; scheduling, super-administrator privacy, clinic isolation, staff login routes and the device-menu fix moved into the Q21-Q40 follow-up band. Old numbers map to new ones in [panel-priority-order-v3-map.json](panel-priority-order-v3-map.json).
 
 Questions 1–20 are the ones every writer must answer without notes; 21–40 are the next most likely follow-ups. The order reflects what a capstone panel probes first (title, security, contribution, AI and consent, numbers) and what the demo proves. Each answer is built as **rule → reason → evidence → boundary**. Numbers come from the dated evidence files and the in-room Call quality panel; anything marked *[fill in]* must be replaced with the team's own trial result or left out.
 
@@ -153,271 +153,295 @@ Yes, for everything our server controls. When an administrator revokes a doctor,
 
 One honest detail: if the revoked doctor is *inside a call at that moment*, that media connection continues until they leave or are removed, because LiveKit room credentials are self-contained (doctor credentials last up to 4 hours). They cannot obtain a new one.
 
-### 21. Are summaries deleted after 30 days, and which job does that?
+### 21. Is appointment scheduling implemented, and how is it switched on?
+
+Yes. Doctors book, reschedule and cancel their own visits at `/doctor/appointments`, and a booked visit's **Prepare invitation** opens the normal invitation workbench with a room derived from the booking id (no patient name or email in the link). The server owns everything: the doctor comes from the verified token, times are stored as UTC instants with an explicit IANA zone (nonexistent/ambiguous daylight-saving times are refused), a per-doctor calendar lock plus an overlap query inside one Firestore transaction prevents double booking, create retries are idempotent and reschedule/cancel need the current version. Clients cannot read or write appointments directly. It appears only when the server-only `ENABLE_CONSULTATION_SCHEDULING=true` is set and the two `appointments` indexes are deployed. Booking grants no admission, call token or transcription consent, and no reminders are sent. The survey did not evaluate this module. See [release gates](../production-readiness.md).
+
+### 22. Where is consultation scheduling in the demo, and why is it separate from invitations?
+
+Show it after the invitation flow: book a synthetic visit, try an overlapping time to show the refusal, then choose **Prepare invitation** and issue the link as usual. Planning (Appointment), admission (invitation) and what actually happened (Encounter) are separate records, following HL7 FHIR's separate Appointment and Encounter resources as a design precedent, not a claim of FHIR conformance. Keeping them separate means rescheduling never changes who may enter, and a revoked invitation never rewrites the schedule. If the deployment flag is off the menu is hidden; say so rather than enabling it live. Reminders, recurrence, patient self-booking and calendar sync remain future work.
+
+### 23. Are summaries deleted after 30 days, and which job does that?
 
 Summary deletion is a switch the clinic turns on, by design. The Firebase function `autoDeleteSummaries` runs **daily**; when `RETENTION_ENFORCEMENT_ENABLED=true` it deletes summaries older than the cutoff (**default 30 days**), up to **200 summaries per run** (each needs two deletes, so 400 writes stay under Firestore's 500-write batch limit). That is about 6,000 a month — far more than our expected volume of about 125 consultations a month on the free plan. It is off by default because deleting clinical records must be an explicit clinic decision, not a side effect of deploying code. The separate Vercel daily job only retries summaries that failed; it never deletes.
 
-### 22. Is appointment scheduling implemented? Why is it switched off in production?
+### 24. Why not give the super admin access to every consultation and summary?
 
-The repository contains a later doctor-booked `/doctor/appointments` module behind the default-off, server-only `ENABLE_CONSULTATION_SCHEDULING` capability. Ordinary deployments hide its navigation, so its absence is expected. Local tests cover UTC/named-zone times, doctor ownership, overlap transactions, retry receipts and versioned reschedule/cancel; they do not prove production acceptance. Before enabling it, verify rules/indexes, existing-data shape and contact retention, timezone/concurrency/account-switch cases and signed-in staging. Reminders, recurrence, self-booking and calendar sync are excluded. Booking grants no admission, call token or transcript consent. The survey did not evaluate this later module. See [release gates](../production-readiness.md).
+Platform responsibility does not establish a treatment relationship or ownership. Routine provisioning, configuration and reliability work can use bounded metadata. Server clinician permissions continue to deny administrators. Any exceptional support access would need an explicit purpose, narrow/time-limited authorization, approval, auditing and privacy review; no blanket clinical grant or patient-data export is proposed. This applies [OWASP least privilege and per-object authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html).
 
-### 23. Is the app tested on phones and tablets?
+### 25. Is a clinic id in the URL enough to isolate clinics?
 
-The interface is responsive and automatically tested on every build at **six screen widths — 320, 390, 768, 820, 1024 and 1280 px**: forms fit, there is no sideways scrolling, and on phones and tablets the waiting queue and session panels open on demand so they never cover the video. Our patient respondents rated Flexibility **3.97**. Physical devices still matter for camera and microphone permissions, so before the defense we also ran the call on an actual phone; for a clinic rollout, the supported-device list is confirmed on the clinic's own phones and tablets.
+No. The server derives the caller's clinic from verified authority and checks action, target clinic and ownership on every request. A browser-supplied id or hidden navigation is not authorization. Clinic administrators cannot manage another clinic or grant administrator authority; clinical records remain doctor-owned. Current staff-scoping preparation is not evidence that all future tenant data is isolated. New endpoints need explicit cross-clinic denial tests. [OWASP resource and tenant checks](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Patterns_Cheat_Sheet.html).
 
-### 24. Can patients speak Filipino, Tagalog or Taglish, and what language is the summary?
+### 26. Why three staff login pages if Firebase signs in everyone?
 
-Yes for speech: the clinician's speech-notes selector offers **Filipino/Tagalog (fil-PH)** and **English (en-US)**, and Taglish is handled by the recognition engine for the selected language. The summary is written in **English** — the clinic's record language — and the prompt tells the model to keep uncertain names, medicines, measurements and short Filipino phrases as spoken rather than guess a translation. Because recognition quality depends on the browser and microphone, the dentist reviews negations, doses and durations against the transcript before approving the draft.
+They express three different tasks and prevent an administrator from landing in a clinician workspace: `/doctor/login`, `/admin/login` for a clinic administrator and `/super-admin/login` for the platform owner. The two administrator entries reuse one implementation and the same server-scoped `/admin` workspace. Authentication establishes the account; trusted claims/configuration authorize its work. A wrong-audience account is rejected/signed out; signup grants no privileged role. The pages neither create three authentication systems nor replace API checks.
 
-### 25. Can you reuse that scheduled worker for future attachment retention?
+### 27. Why must administrators use a separate doctor account?
 
-Yes — we would reuse the *pattern*, not the same query. The summary worker already shows the shape: scheduled daily, bounded batch, opt-in switch, idempotent (safe to run twice). Attachment cleanup would add per-file expiry, deleting the stored file *and* its metadata together, a reconciliation pass for half-finished deletions, and tests for dry runs, expiry boundaries and duplicate runs. Attachments are disabled today, so this is the documented plan, ready for when uploads are enabled.
-
-### 26. Two guests use the same clinic Wi-Fi and the same browser. Do they get mixed up?
-
-No. Each browser tab gets its own random session id, so two guests on the same Wi-Fi and the same browser get two separate queue rows — a regression test checks exactly that case. A signed-in patient is identified by their verified Firebase account instead, so one account is one person across tabs. None of these signals ever grants direct entry; only a verified allowlisted account or the doctor's admission does.
-
-### 27. When an invitation is revoked, do credentials already issued stop working?
-
-Every credential is checked against current state when it is used. Invitation status and expiry are rechecked on every token request, so a revoked link stops issuing credentials immediately. Waiting credentials carry the visit id, so a credential from an earlier visit is refused for a later one. Staff API access is refused on the next request after revocation. A consultation credential already inside a live call keeps working until that participant leaves, and the doctor's **Remove** action disconnects them at once.
+Separation of duties: administrative identity manages staff, while a separately provisioned doctor identity owns clinical work. `/doctor/login` rejects administrator identities, `/admin/login` admits clinic administrators and `/super-admin/login` admits the configured platform owner; Google/password authentication must pass the same server-derived role checks. Both administrator levels reuse `/admin` with server scope. The route is guidance; APIs and Firestore Rules remain the boundary. Legacy mixed claims/profile fallback and already-issued media credentials retain their documented migration/expiry limits. We accept another sign-in for people doing both jobs to avoid turning staff-management access into clinical ownership.
 
 ### 28. If you sold this to several small clinics, how would accounts be provisioned?
 
 Use **delegated, tenant-scoped administration**: the platform operator grants clinic administrators; each clinic administrator manages doctors only in their verified clinic; doctors own their encounters. This follows the provider control-plane/tenant application distinction described by [AWS](https://docs.aws.amazon.com/whitepapers/latest/saas-architecture-fundamentals/control-plane-vs.-application-plane.html). The source already has `clinicId` role checks and separate administrative/clinical identities. A tenant catalog, complete staff pagination, billing and aggregate oversight remain future work. The thesis evaluated a single clinic; staff scope preparation does not prove commercial multi-clinic readiness or clinical sharing.
 
-### 29. Why have a waiting queue when the patient has a valid link?
+### 29. Is the super-admin/clinic pattern based on a proven company architecture?
+
+Yes as an architectural precedent: AWS separates a provider control plane from the tenant application, and Azure distinguishes global and tenant administration. We adapt that to platform oversight, clinic-scoped staff administration and doctor-owned clinical work. It is a researched design choice, not proof of healthcare compliance or an endorsement. Current provisioning implements part of it; the full oversight dashboard is proposed. [AWS](https://docs.aws.amazon.com/whitepapers/latest/saas-architecture-fundamentals/control-plane-vs.-application-plane.html), [Azure](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/control-planes).
+
+### 30. When an invitation is revoked, do credentials already issued stop working?
+
+Every credential is checked against current state when it is used. Invitation status and expiry are rechecked on every token request, so a revoked link stops issuing credentials immediately. Waiting credentials carry the visit id, so a credential from an earlier visit is refused for a later one. Staff API access is refused on the next request after revocation. A consultation credential already inside a live call keeps working until that participant leaves, and the doctor's **Remove** action disconnects them at once.
+
+### 31. What caused the microphone/camera menu bugs, and how was the fix verified?
+
+Two separate causes. First, application CSS forced `bottom: 100%` while LiveKit computed the popup's `top`, clipping it to a strip; the fix keeps LiveKit's own positioning and scopes toolbar colours to real toolbar buttons. Second, an empty menu: LiveKit lists devices only after the browser grants camera/microphone permission, so a site the browser has **blocked** shows an empty list. The room now shows an accessible notice naming the blocked device and how to re-allow it (Permissions API plus LiveKit's `MediaDevicesError`), and error toasts sit above the control bar. Browser checks mount the installed components with synthetic devices at 1280, 390 and 320 px; they are not physical-device or production acceptance. See the [device-menu design](../livekit-device-menu-design.md).
+
+### 32. Is the app tested on phones and tablets?
+
+The interface is responsive and automatically tested on every build at **six screen widths — 320, 390, 768, 820, 1024 and 1280 px**: forms fit, there is no sideways scrolling, and on phones and tablets the waiting queue and session panels open on demand so they never cover the video. Our patient respondents rated Flexibility **3.97**. Physical devices still matter for camera and microphone permissions, so before the defense we also ran the call on an actual phone; for a clinic rollout, the supported-device list is confirmed on the clinic's own phones and tablets.
+
+### 33. Can patients speak Filipino, Tagalog or Taglish, and what language is the summary?
+
+Yes for speech: the clinician's speech-notes selector offers **Filipino/Tagalog (fil-PH)** and **English (en-US)**, and Taglish is handled by the recognition engine for the selected language. The summary is written in **English** — the clinic's record language — and the prompt tells the model to keep uncertain names, medicines, measurements and short Filipino phrases as spoken rather than guess a translation. Because recognition quality depends on the browser and microphone, the dentist reviews negations, doses and durations against the transcript before approving the draft.
+
+### 34. Why have a waiting queue when the patient has a valid link?
 
 A link can be forwarded. It proves possession of a scoped capability, not the holder's identity. Waiting admission lets the owning doctor inspect the visitor's displayed identity provenance and decide whether to grant consultation access. This preserves a guest path without treating typed email as verification.
 
-### 30. Who is the first administrator? Isn't that a chicken-and-egg problem?
+### 35. Who is the first administrator? Isn't that a chicken-and-egg problem?
 
 The server-only SUPER_ADMIN_EMAILS configuration recognizes the owner's provider-verified account. It bootstraps administration without relying on a pre-existing doctor profile or an administrator signup checkbox. The platform owner grants clinic administrators; those administrators manage doctors in their own clinic. Self-change and bootstrap-account guards constrain role commands, but do not make a compromised owner account harmless. Protect the hosting environment and authentication account, and define recovery procedures.
 
-### 31. Why must administrators use a separate doctor account?
+### 36. Two guests use the same clinic Wi-Fi and the same browser. Do they get mixed up?
 
-Separation of duties: administrative identity manages staff, while a separately provisioned doctor identity owns clinical work. `/doctor/login` rejects administrator identities, `/admin/login` admits clinic administrators and `/super-admin/login` admits the configured platform owner; Google/password authentication must pass the same server-derived role checks. Both administrator levels reuse `/admin` with server scope. The route is guidance; APIs and Firestore Rules remain the boundary. Legacy mixed claims/profile fallback and already-issued media credentials retain their documented migration/expiry limits. We accept another sign-in for people doing both jobs to avoid turning staff-management access into clinical ownership.
+No. Each browser tab gets its own random session id, so two guests on the same Wi-Fi and the same browser get two separate queue rows — a regression test checks exactly that case. A signed-in patient is identified by their verified Firebase account instead, so one account is one person across tabs. None of these signals ever grants direct entry; only a verified allowlisted account or the doctor's admission does.
 
-### 32. If the patient refreshes, do they use up another invitation use?
+### 37. Can you reuse that scheduled worker for future attachment retention?
+
+Yes — we would reuse the *pattern*, not the same query. The summary worker already shows the shape: scheduled daily, bounded batch, opt-in switch, idempotent (safe to run twice). Attachment cleanup would add per-file expiry, deleting the stored file *and* its metadata together, a reconciliation pass for half-finished deletions, and tests for dry runs, expiry boundaries and duplicate runs. Attachments are disabled today, so this is the documented plan, ready for when uploads are enabled.
+
+### 38. If the patient refreshes, do they use up another invitation use?
 
 No. A refresh during an open visit reuses the same queue row and visit id and spends no use. Only a genuinely new visit (after leaving or being rejected) spends one.
 
-### 33. The patient opened the call on a second device. Does the queue think they left?
+### 39. The patient opened the call on a second device. Does the queue think they left?
 
 No. LiveKit disconnects the first device and reports it left; before marking the patient as left, the server checks whether the same identity is still connected and whether the departing connection belongs to an earlier visit. The patient stays in the call on the new device.
 
-### 34. The doctor clicked Admit on an old screen after the patient left and came back. What happens?
+### 40. The doctor clicked Admit on an old screen after the patient left and came back. What happens?
 
 The Admit command carries the visit the doctor was looking at. If the patient has since left and started a new visit, the server returns a conflict and asks the doctor to refresh and review again — the doctor never admits someone they did not actually see. This is an expected-version check, the same pattern used to prevent two editors overwriting each other.
 
-### 35. A doctor rejects a visitor. What stops them reopening the link and queueing again?
+### 41. A doctor rejects a visitor. What stops them reopening the link and queueing again?
 
 Reopening starts a new visit at the back of the queue, and it always waits — even for a verified account on the direct-join list, because the doctor's rejection outranks the list. The doctor sees them again and can reject again. To stop the link entirely, the doctor revokes the invitation, which every token request rechecks. We chose this so one mistaken click does not permanently lock out a real patient, while a removed person can never walk straight back in.
 
-### 36. What if the patient's phone dies after being admitted?
+### 42. What if the patient's phone dies after being admitted?
 
 Short network drops are handled by LiveKit's own reconnection. If the page is lost, a verified allowlisted account that reopens the link rejoins its open admission directly; anyone else reopening goes back to waiting on the same entry and the doctor re-admits them. A dropped call is not treated as a completed or failed consultation by itself.
 
-### 37. Does removing a patient always create a summary?
+### 43. Does removing a patient always create a summary?
 
 No. Removal changes the operational queue and disconnects the selected transport participant. Scoped encounter finalization, eligibility and evidence quality are separate decisions. A summary may be deterministic, unavailable, failed or a draft; the queue action is not an unconditional OpenAI billing switch.
 
-### 38. What load do ten waiting patients create?
+### 44. What load do ten waiting patients create?
 
 At the nominal interval, ten pages imply roughly 200 admission HTTP checks/minute, before timing effects or other work. That is arithmetic, not measured database reads. Authorization, invitation reads and rate counters can add operations. The number does not measure video capacity or AI throughput.
 
-### 39. Why does consultation history take a while to load?
+### 45. Why does consultation history take a while to load?
 
 Each consultation's chat transcript is a separate Firestore query, so a doctor with ~50 consultations triggered ~50 extra reads before anything showed, plus a serverless cold start. The dashboard now shows the summaries first and adds chat transcripts when they arrive. A paginated history endpoint and measured timings are the next step; we have not published a latency figure.
 
-### 40. How is a doctor account created? Show us.
+### 46. How is a doctor account created? Show us.
 
 The clinician first creates a Firebase sign-in identity. An authorized administrator opens /admin, selects the clinic and Doctor role, and submits. The server checks authority, clinic scope and the patient-account guard, writes claims/profile metadata and records a uid-only audit event. Grants do not revoke sessions. The recipient signs in again or explicitly refreshes access to get the new claim. Administrator grants are a different operation available only to the platform owner. Revocation has the separate existing-token window described below.
 
-### 41. Does the new administrator signup let anyone become an administrator?
+### 47. Does the new administrator signup let anyone become an administrator?
 
 No. It creates a Firebase Authentication identity only, without writing a privileged profile or custom claim. Google can establish that identity too. The platform owner separately grants Administrator within a clinic. An unapproved identity receives pending-access guidance and can refresh after approval. Never use a client-selected role or signup URL as authority. Demonstrate an unapproved identity being denied by the admin API as well as the page.
 
-### 42. What do you do when newly granted access does not appear, or the account service is down?
+### 48. What do you do when newly granted access does not appear, or the account service is down?
 
 Refresh the recipient's token and re-query the server access projection; granted claims are not automatically present in an already-issued token. Keep a visible checking, pending or retry state. An Auth lookup outage must not be labeled as a deleted account, and an unsuccessful request must not be shown as an empty account list. No client retry grants a role. Existing-token revocation limits remain separate.
 
-### 43. Can anyone sign up as a doctor?
+### 49. Can anyone sign up as a doctor?
 
 No self-service flow may grant a clinician role. Firebase sign-in creates an identity; profile behavior depends on the entry route. Authorized administrators grant privileges through the console or provisioning script. Firestore rules refuse an unclaimed client-created doctor profile. A documented server-read legacy clinician-profile fallback still exists for older accounts; it needs an audited migration before removal. Do not describe current authorization as universally claim-only. Protect Firebase administrative credentials and verify clinician eligibility operationally.
 
-### 44. A patient account wants to become a doctor. Can the admin convert it?
+### 50. A patient account wants to become a doctor. Can the admin convert it?
 
 No. Granting a clinician role to an existing patient account is refused; clinicians use a separate account. This keeps a person's own health history from mixing with clinician access.
 
-### 45. Can another doctor admit my patient?
+### 51. Can another doctor admit my patient?
 
 The server derives the acting doctor from verified authorization and checks scope. A doctor id supplied in a query/body cannot grant ownership. Test with two unrelated synthetic doctor accounts in staging rather than inferring safety from hidden buttons.
 
-### 46. How would you validate bilingual AI summaries rather than just demonstrate them?
+### 52. How would you validate bilingual AI summaries rather than just demonstrate them?
 
 Use synthetic or explicitly consented paired Filipino/English scripts reviewed by a qualified clinician and bilingual reviewer. Compare source speech, captured text and generated draft separately. Record recognition errors, omissions, unsupported facts and translation changes to negation, dose, duration and names; assess reviewer agreement and report failures. A few correct examples do not establish accuracy. The current study's acceptability survey is not that experiment, and the clinician must verify the draft.
 
-### 47. What happens to the data after 30 days?
+### 53. What happens to the data after 30 days?
 
 Summary deletion runs only if retention enforcement is switched on, and it deletes summaries, not sessions, messages, transcripts or backups. We do not claim everything disappears after 30 days.
 
-### 48. Who can see a consultation's record?
+### 54. Who can see a consultation's record?
 
 The owning doctor receives the authorized clinical projection; the patient bound by a verified uid receives their own encounter history, not the clinician's full AI draft. A typed guest email grants no historical ownership. The administrator console now manages staff access metadata; it does not establish shared clinic-wide clinical-record access. Faculty reviewer access remains backend-only and deny-by-default. Privileged Firebase operators are a separate infrastructure trust boundary.
 
-### 49. Does the doctor count as a verified patient visit?
+### 55. Does the doctor count as a verified patient visit?
 
 No. Creating an invitation, appearing in the direct-entry audience configuration and joining as its owning doctor are not patient visits. Patient counters must be based on reserved patient visits, not the host's presence. Verified-account visits and guests describe identity provenance, not unique people or completed consultations. Reconnects reuse the same active visit. Older invitations may only have a historical aggregate join count; do not invent a verified/guest breakdown for them.
 
-### 50. How many patients used a link, and were they anonymous?
+### 56. How many patients used a link, and were they anonymous?
 
 Each invitation records its visits by identification kind inside the same transaction that admits the visit: verified accounts, unverified accounts and guests (anonymous sessions or typed emails). The card shows e.g. "5 visits · 2 verified accounts · 3 guests"; reconnects are not counted twice. Older invitations created before visit counting was added show only their total join count.
 
-### 51. What belongs in the consultation room rather than repeating invitation management?
+### 57. What belongs in the consultation room rather than repeating invitation management?
 
 Show operational context: room/session identity, waiting occupancy versus its configured cap, verified direct-entry audience count, and participant state. Put captured arrival/admission/departure times and identity provenance in expandable details. Never label self-declared email verified or admission as confirmed media attendance. Teams and Zoom use participant/lobby controls separate from richer attendance reports; that is a useful design precedent, not proof of our app's usability. Hashed invitation emails cannot be recovered for display; show recorded participant identities truthfully and manage the invitation separately.
 
-### 52. If a guest has no account, how is their queue entry kept across a refresh?
+### 58. If a guest has no account, how is their queue entry kept across a refresh?
 
 By the server-verified Firebase uid when a session exists. Without a Firebase session, the fallback combines keyed network/browser signals with the per-tab session id when supplied. Reloading that tab reuses its entry; an email is only a label. A shared Firebase uid still represents one principal across tabs, and duplicated tabs can copy session storage. Do not promise that every tab is a separate person or treat the tab id as identity verification. Use separate browser profiles/accounts for repeatable multi-person testing.
 
-### 53. What happens if the patient refreshes or returns?
+### 59. What happens if the patient refreshes or returns?
 
 A refresh during the same visit reuses the same queue row and keeps the person's place and visit id. If the visit had ended (left or rejected) and the person reopens the link, the same row starts a **new visit**: new visit id, new arrival time, old end markers cleared. Waiting and admission credentials carry the visit id as a signed claim, and the server refuses a credential from an earlier visit when it polls admission or sends a "left" beacon. Boundary: a consultation credential already issued stays valid until it expires (up to two hours) — the doctor can remove that participant from the room, but we do not claim instant revocation.
 
-### 54. Does active-only filtering eliminate archive reads?
+### 60. Does active-only filtering eliminate archive reads?
 
 No. It limits the projected result. Some current doctor-list paths fetch the doctor's rows before status/freshness filtering. Large archives therefore need indexed bounded queries and pagination. An empty displayed queue does not prove a zero-read operation.
 
-### 55. How quickly does admission appear?
+### 61. How quickly does admission appear?
 
 The patient checks immediately and then about every three seconds, with overlap protection and cleanup. Network delay, throttling and errors can extend that. It is an implementation interval, not a guaranteed three-second response SLA.
 
-### 56. Are patient and doctor updates both Firestore listeners?
+### 62. Are patient and doctor updates both Firestore listeners?
 
 No. The doctor uses change invalidations that trigger authenticated API re-query, plus a default fifteen-second foreground reconciliation. The patient's waiting page polls the admission API about every three seconds. A loading spinner is not proof of continuous successful synchronization.
 
-### 57. Does the shared coordinator eliminate all duplicate requests?
+### 63. Does the shared coordinator eliminate all duplicate requests?
 
 It shares an in-flight request and polling scope within one browser runtime. Separate tabs, devices, users and different scopes can still issue requests. Changes/actions can trigger additional refreshes. Do not describe this as a global distributed cache.
 
-### 58. What if Firestore or the network fails?
+### 64. What if Firestore or the network fails?
 
 Use visible error/retry states and retain the distinction between unknown/stale state and an empty queue. Do not bypass admission to keep a demonstration moving. Database outage behavior is separate from optional AI availability. A real deployment needs monitoring and a recovery process.
 
-### 59. What would most likely break during your demo, and what is your plan?
+### 65. What would most likely break during your demo, and what is your plan?
 
 Provisioning (doctor must hold the claim), venue network or camera permissions, AI availability, and a duplicate tab replacing a patient's connection. We freeze the build, test on a preview first, keep a one-click rollback to the previous production deployment, use a fresh invitation, and have a hotspot and screenshots as backup. If AI is unavailable, the call still works and the record says so.
 
-### 60. Is the production site running these fixes?
+### 66. Is the production site running these fixes?
 
 Answer truthfully for the day: either "yes, merged at commit …, tested on preview first" or "the fixes are on our pull request preview; production runs the evaluated build". Do not claim a deployment you have not verified.
 
-### 61. Why so many fixes the week of the defense — doesn't that undermine your results?
+### 67. Why so many fixes the week of the defense — doesn't that undermine your results?
 
 Distinguish the evaluated build from later maintenance. Report the actual survey date/build if recorded; do not claim respondents tested today's admin console, security fixes or media settings. The original survey results and objectives remain unchanged, while dated engineering evidence describes later changes. Similar-looking screens do not establish that a change has no effect on study validity. Ask the adviser how to present this separation.
 
-### 62. How do you know your tests test the real code and not a copy?
+### 68. How do you know your tests test the real code and not a copy?
 
 The regression tests load the actual TypeScript modules and replace only the database and network with synthetic fakes. The queue fix was additionally run against the Firestore emulator's real transaction engine. Neither is a production test.
 
-### 63. Does flexible access mean anyone can become a doctor?
+### 69. Does flexible access mean anyone can become a doctor?
 
 No. Patient admission alternatives are separate from staff role provisioning. Google authenticates an account; trusted provisioning and server permissions authorize clinician actions. The identity provider does not verify a medical license for this application. Real-clinic onboarding and review of existing privileged accounts remain operational gates.
 
-### 64. Chapter I says patients get "device, browser, and location validation". Does the app do that?
+### 70. Chapter I says patients get "device, browser, and location validation". Does the app do that?
 
 No, and it should not. That sentence describes an early design. The current app does not use device fingerprints, browser checks or IP location to admit anyone, because none of those prove who a person is and they collect personal data. Admission is a verified allowlisted account or the doctor's decision. Table I's ip-api.com row is marked "not used". Ask the adviser to correct the Chapter I sentence (printed page 3).
 
-### 65. Appendix C shows code that reads IP geolocation, stores device fingerprints and asks the AI for "prescriptions" and a Low/Medium/High risk. Is that the system you evaluated?
+### 71. Appendix C shows code that reads IP geolocation, stores device fingerprints and asks the AI for "prescriptions" and a Low/Medium/High risk. Is that the system you evaluated?
 
 Appendix C is labelled as historical excerpts. The current summary code tells the model to use only facts in the transcript, allows "Unknown" risk, and stores a deterministic insufficient-evidence record when there is not enough transcript. Be precise about timing: if respondents evaluated an earlier build, say so; do not claim the survey evaluated today's code.
 
-### 66. Four of five dentists came from other clinics. Does "for Henry Cheung Dental Clinic" still hold?
+### 72. Four of five dentists came from other clinics. Does "for Henry Cheung Dental Clinic" still hold?
 
 The design followed the beneficiary clinic's workflow; the evaluation added outside dentists for broader professional opinion. That supports perceived acceptability among dentists generally, not proof that the beneficiary clinic adopted it.
 
-### 67. Waterfall says each phase is finished before the next. You fixed code during the defense week. Is that still Waterfall?
+### 73. Waterfall says each phase is finished before the next. You fixed code during the defense week. Is that still Waterfall?
 
 In practice we iterated inside the implementation and testing phases. Say that honestly rather than claim a strictly linear process; the fix is documented with dated evidence like any maintenance change.
 
-### 68. What design patterns did you use?
+### 74. What design patterns did you use?
 
 Deep modules behind small interfaces (invitation access service, queue coordinator); pure decision functions with IO adapters (admission policy, `planWaitingArrival`); transactions for coupled writes (use counting, capacity, queue row); expected-version checks (visit ids); Command/Fact separation for lifecycle; realtime as invalidation with authenticated re-query; adapter around LiveKit; claims-based RBAC.
 
-### 69. What were the architectural risks you found in your own design?
+### 75. What were the architectural risks you found in your own design?
 
 We found guest-key trust, capacity check/commit races, stale visit commands, and unclear identity-versus-role routing. Specific queue cases have local regressions and emulator evidence. Those fixes do not establish complete replay isolation across every already-issued token or eliminate the documented legacy privileged-profile fallback. Authentication, operational queue state, clinical encounter state and displayed labels must remain separate authorities.
 
-### 70. If you had one more month, what would you do first?
+### 76. If you had one more month, what would you do first?
 
 A staged acceptance run: deploy the fixed commit, run the two-account replay and cross-doctor tests, then paired-call trials at 1, 3 and 5 simultaneous pairs with receiver statistics. Then clinician review of AI summary accuracy. Each produces a measurement we currently do not have.
 
-### 71. Why didn't you add file attachments to chat?
+### 77. Why didn't you add file attachments to chat?
 
 Attachments are a prepared but disabled capability. Before enabling them we require private storage, type and size limits, malware scanning, download authorization, retention and cross-session denial tests. Adding uploads untested would weaken the security claims and risk the working call. Chat itself is persisted per encounter, length-bounded, retry-safe and visible in history; it is not used as AI evidence.
 
-### 72. A patient wants to send a photo of their tooth or an X-ray. Why can't they attach it in chat?
+### 78. A patient wants to send a photo of their tooth or an X-ray. Why can't they attach it in chat?
 
 Because file attachments are a prepared but disabled capability, by design. A clinical image is sensitive personal information, and a safe upload path needs: private storage tied to one encounter, an allow-list of file types and a size limit, malware/content scanning, download only by the owning doctor and that patient, audit events, a retention and deletion rule, and tests proving another encounter cannot read the file. None of that is evaluated in this study, so we did not switch it on. Today the patient can show the tooth on camera or share their screen; the image is not stored. Attachments are listed as future work with those gates.
 
-### 73. Wouldn't attachments make your summaries better?
+### 79. Wouldn't attachments make your summaries better?
 
 Possibly, but only if the extracted content is trusted: the summary code is designed to accept attachment evidence only when an extraction is marked `ready` after scanning. Without that, an uploaded file could inject untrusted text into a clinical draft. So the evidence path exists in the design, and stays off until the safeguards are built and tested.
 
-### 74. Could you add attachments on Firebase's free tier?
+### 80. Could you add attachments on Firebase's free tier?
 
 Plan for Cloud Storage for Firebase billing eligibility and region/bucket-specific quotas, not an unlimited free upload service. Confirm current official requirements before enabling it. Putting images into Firestore documents is not a safe substitute. Attachments remain disabled until private storage, permission checks, file limits, scanning, audit, retention and isolation tests are implemented. See the attachment plan for the proposed boundary, not a shipped feature.
 
-### 75. Anyone with a link can create a patient account. Isn't that a security risk?
+### 81. Anyone with a link can create a patient account. Isn't that a security risk?
 
 Open identity registration is a deliberate least-privilege entry path, not a claim of zero risk. A patient can read only records actually bound to their verified uid; registration must not grant clinician access or adopt a guest's history by typed email. A valid invitation and admission policy still control call entry. Abuse, account quotas, verification, recovery and monitoring need controls before clinic use. A claim of impossible privilege escalation would require broader independent testing than this study provides.
 
-### 76. How does a doctor assign a patient?
+### 82. How does a doctor assign a patient?
 
 The invitation is the admission assignment. It belongs to the doctor and one room; emails in "Patients who can join directly" let those verified accounts skip the queue. Everyone else with the link waits for that doctor. The encounter, summary and history are owned by that doctor; the patient sees only their own records. The later, deployment-gated appointment module plans a time; it does not replace that policy or prove attendance. It was not evaluated in the original survey.
 
-### 77. Is this first-in-first-out scheduling?
+### 83. Is this first-in-first-out scheduling?
 
 The list sorts oldest arrivals first, by the arrival time of the visitor's *current* visit. A visitor who leaves and comes back gets a new arrival time, so nobody jumps the line. The doctor chooses whom to admit, so it is an admission worklist rather than an automatic FIFO dispatcher. The software does not enforce an appointment schedule or guarantee a treatment order.
 
-### 78. Does the queue perform emergency triage?
+### 84. Does the queue perform emergency triage?
 
 No. It does not validate symptom urgency or calculate clinical priority. An emergency workflow needs explicit clinician processes and separate validation. Display order must not be described as a medical decision.
 
-### 79. What does admitted mean?
+### 85. What does admitted mean?
 
 The server granted permission to enter the consultation. It does not prove that the patient clicked Join, published media, stayed online or completed a visit. Queue state, LiveKit connection state and encounter lifecycle are separate records/signals.
 
-### 80. Can one room have several invitations?
+### 86. Can one room have several invitations?
 
 Yes. Per-invitation counts do not establish a combined room/clinic cap. If the product needs an aggregate room admission budget, it must explicitly own and enforce that separate invariant. Separate clinical encounters also need confidentiality and evidence isolation.
 
-### 81. Why not fix everything the night before defense?
+### 87. Why not fix everything the night before defense?
 
 The initial queue repair was small and additive: a transaction, a signed claim, a queue-row field and removal of a hidden component. Later maintenance added role separation, lifecycle safeguards and a tested but deployment-gated appointment module. These checkpoints do not rewrite the original study results. We preserved the call's security boundary, optional consent, official title and AI model; attachments remain disabled. A passing build is not a reason to bypass release gates or enable unverified production features.
 
-### 82. Which manuscript pages changed for this topic?
+### 88. Which manuscript pages changed for this topic?
 
 The 28 November follow-up changes physical PDF pages **66, 86, 98, 106 and 111**, whose printed chapter numbers are **54, 74, 86, 94 and 99**. It clarifies separate doctor/clinic/platform entry, server role checks, administrative oversight as future work and hidden scheduling release gates, plus the media-device popup correction. The cumulative manifest has 48 bounded edits across the same 37 physical pages; this update adds three regions and revises two existing regions. The official title, 259-page count, numbering, budget and survey data are preserved. See [exact register](page-change-register.md); public privacy masks are separate.
 
-### 83. Which manuscript pages changed?
+### 89. Which manuscript pages changed?
 
 The current manuscript has 37 cumulatively edited physical pages and remains 259 pages. This follow-up changes five of those pages: physical 66/86/98/106/111, printed 54/74/86/94/99. The [page register](page-change-register.md) records both numbering systems and every reason. Objectives, reported Chapter IV findings and expenses were not changed.
 
-### 84. What stops a patient opening the patient room URL directly?
+### 90. What stops a patient opening the patient room URL directly?
 
 Not the Referer header — it is optional and spoofable, and the middleware comment says so. The room needs a signed, room-scoped LiveKit credential that only the server issues after invitation validation or doctor admission.
 
-### 85. Where is doctor and patient provisioning, and what pattern is it?
+### 91. Where is doctor and patient provisioning, and what pattern is it?
 
 Doctors: administrator provisioning with claims-based RBAC — an administrator grants the role in the **/admin** console (or with `scripts/admin/provision-role.mjs`); Firestore rules allow a doctor profile only for an account holding that claim, and the server reads the claim first (legacy doctor profiles are honoured transitionally and audited). Registered patients: self-service just-in-time provisioning of the lowest role (always `patient`) plus versioned consent. Guests: a capability link plus doctor admission. No self-service path leads to a privileged role.
 
-### 86. Is the study-book title your thesis title?
+### 92. Is the study-book title your thesis title?
 
 No. The official title begins "TeleConsole: Design and Development of a Secure Telehealth Video Communication System" and continues with LiveKit, AI summarization and flexible access. The 60,000-word book is a separate study resource. Rehearsal document labels do not rename the approved thesis.
 
-### 87. What evidence can we present today?
+### 93. What evidence can we present today?
 
 Four kinds, each labelled for what it proves:
 
@@ -428,57 +452,33 @@ Four kinds, each labelled for what it proves:
 
 We present each for what it is: perceptions, automated checks, a local transaction measurement and a live call measurement — not a penetration test or a clinical accuracy study.
 
-### 88. Five dentists — is a weighted mean of 3.51 meaningful?
+### 94. Five dentists — is a weighted mean of 3.51 meaningful?
 
 It is descriptive for those five purposively chosen people, not generalisable. We report no standard deviation or reliability coefficient (e.g. Cronbach's alpha), so we cannot say how consistent answers were. Chapter V already limits the findings to the selected respondents. A better next step is a larger sample with dispersion and reliability reported.
 
-### 89. You use ISO/IEC 25010:2023 but your questionnaire says "Usability" and "Compatibility". Which is it?
+### 95. You use ISO/IEC 25010:2023 but your questionnaire says "Usability" and "Compatibility". Which is it?
 
 In the 2023 edition Usability was renamed Interaction Capability, and Portability became Flexibility; Compatibility still exists as a separate characteristic. Our "F. Compatibility" items ask about devices, browsers and environment, which matches Flexibility (adaptability) in the 2023 model. The data is unchanged; the section heading in the instrument uses the older name. Admit the labelling mismatch; do not claim we evaluated Compatibility in the 2023 sense. The validation certificate also lists eight characteristics while the instrument covers six.
 
-### 90. Is the super-admin/clinic pattern based on a proven company architecture?
-
-Yes as an architectural precedent: AWS separates a provider control plane from the tenant application, and Azure distinguishes global and tenant administration. We adapt that to platform oversight, clinic-scoped staff administration and doctor-owned clinical work. It is a researched design choice, not proof of healthcare compliance or an endorsement. Current provisioning implements part of it; the full oversight dashboard is proposed. [AWS](https://docs.aws.amazon.com/whitepapers/latest/saas-architecture-fundamentals/control-plane-vs.-application-plane.html), [Azure](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/control-planes).
-
-### 91. What should a platform owner monitor without reading patient records?
+### 96. What should a platform owner monitor without reading patient records?
 
 Approved aggregate operational and business metadata: active clinics/doctors, invitation outcomes, waiting/admission delays, connected/completed encounter counts, summary lifecycle/retry backlog, service errors, provider quotas and estimated consumption. Show period, freshness, denominator and coverage; suppress identifying small groups. Admission is not attendance and a ready draft is not a reviewed record. This is the proposed oversight view; the current `/admin` page manages staff rather than providing those analytics. Tenant consumption monitoring follows the [AWS SaaS Lens](https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/tenant-activity-and-consumption.html).
 
-### 92. Why not give the super admin access to every consultation and summary?
-
-Platform responsibility does not establish a treatment relationship or ownership. Routine provisioning, configuration and reliability work can use bounded metadata. Server clinician permissions continue to deny administrators. Any exceptional support access would need an explicit purpose, narrow/time-limited authorization, approval, auditing and privacy review; no blanket clinical grant or patient-data export is proposed. This applies [OWASP least privilege and per-object authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html).
-
-### 93. What belongs in an audit event, and do you already have an audit dashboard?
+### 97. What belongs in an audit event, and do you already have an audit dashboard?
 
 Proposed event: opaque id, timestamp, clinic scope, actor id/type, action, target type/id, outcome, bounded reason code and correlation id. Distinguish an attempt, denial, failure and completed lifecycle change. Microsoft Entra demonstrates activity/status/actor/target review. Our existing successful role-change events contain uid/clinic/role/action/time; they do not provide every outcome or an audit browser. Invitation events are separate. A paginated authorized viewer and cross-service failure reconciliation remain future work. [Entra audit logs](https://learn.microsoft.com/en-us/entra/identity/monitoring-health/concept-audit-logs).
 
-### 94. How would that audit dashboard preserve privacy and database budget?
+### 98. How would that audit dashboard preserve privacy and database budget?
 
 Apply clinic scope in the server query before paging; allowlist filters and a time window, cap pages (proposed 50), order by timestamp/id and reauthorize each opaque cursor. Exclude clinical text, names/emails, tokens, raw IP/user-agent and clinical snapshots. Uids still require restricted access and approved retention. Current staff listing caps 200 global profiles before clinic filtering, so it can omit staff and is not a total. The proposed query follows [Firestore cursor pagination](https://firebase.google.com/docs/firestore/query-data/query-cursors); exclusions follow [OWASP logging](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html).
 
-### 95. Can an administration dashboard guarantee low costs or prove the business is profitable?
+### 99. Can an administration dashboard guarantee low costs or prove the business is profitable?
 
 No. A future dashboard should show bounded usage rollups, quota pressure and dated estimated costs, with alerts and retry backoff. Configuration needs allowlisted fields, safe ranges, versions and audit receipts; secrets stay server-only. Provider usage estimates are not invoices, revenue or profit, and an alert is not a hard spend cap. The PHP 7,856.69 thesis development budget stays separate. No billing/analytics product or commercial capacity measurement is claimed.
 
-### 96. Is a clinic id in the URL enough to isolate clinics?
-
-No. The server derives the caller's clinic from verified authority and checks action, target clinic and ownership on every request. A browser-supplied id or hidden navigation is not authorization. Clinic administrators cannot manage another clinic or grant administrator authority; clinical records remain doctor-owned. Current staff-scoping preparation is not evidence that all future tenant data is isolated. New endpoints need explicit cross-clinic denial tests. [OWASP resource and tenant checks](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Patterns_Cheat_Sheet.html).
-
-### 97. Why three staff login pages if Firebase signs in everyone?
-
-They express three different tasks and prevent an administrator from landing in a clinician workspace: `/doctor/login`, `/admin/login` for a clinic administrator and `/super-admin/login` for the platform owner. The two administrator entries reuse one implementation and the same server-scoped `/admin` workspace. Authentication establishes the account; trusted claims/configuration authorize its work. A wrong-audience account is rejected/signed out; signup grants no privileged role. The pages neither create three authentication systems nor replace API checks.
-
-### 98. Where is consultation scheduling in the demo?
-
-It stays hidden while the server capability is off. The repository contains the doctor-booked module, but it was not part of the survey and has not passed the documented deployment release gates. Say that directly instead of searching for a missing menu or enabling it during the defense. Appointment planning is separate from invitation admission and the encounter that actually happened; booking grants no room access. Verify rules/indexes, data/contact retention and signed-in staging first. Attachments also remain disabled. See [scheduling boundary](../production-readiness.md).
-
-### 99. What evidence makes these administration answers defensible today?
+### 100. What evidence makes these administration answers defensible today?
 
 Three distinct things: official AWS/Azure/OWASP/Firebase sources justify the pattern; repository source shows the current role/scope boundary; fresh local regressions/browser checks show only the cases and environment actually tested. Future audit/metrics screens are a design roadmap, not a demo claim. The regenerated manuscript is separately checked for 259 pages, exact changed regions and preserved unrelated pages. Production identity acceptance, provider deployment and multi-clinic/security/clinical validation require their own evidence. Use the [design note](../admin-oversight-design.md) and current test record; never carry an old passing count into a new build.
-
-### 100. What caused the microphone/camera menu bug, and how was the fix verified?
-
-Application CSS forced `bottom: 100%` while LiveKit computed the popup's `top`; broad toolbar rules also affected its nested choice buttons. The fix keeps the vendor's positioning and device-selection behavior, scopes toolbar styles to actual controls, and gives the popup/list their own wrapping and viewport bounds. That follows [LiveKit's recommendation to retain its lower-level controls](https://docs.livekit.io/reference/components/react/guide/); its [MediaDeviceMenu](https://docs.livekit.io/reference/components/react/component/mediadevicemenu/) already handles device selection. Browser checks mount the installed real components with synthetic device discovery at 1280, 390 and 320 px: geometry, hit testing, long names, Enter/Tab selection, pointer selection and the Room's active device. This is not a connected consultation, physical-device capture or production acceptance. See the [device-menu design and tradeoff](../livekit-device-menu-design.md).
 
 ## Three-writer rehearsal
 

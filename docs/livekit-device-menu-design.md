@@ -67,3 +67,21 @@ node --test tests/livekit-device-menu-browser.test.mjs tests/consultation-worksp
 The [verification evidence](testing/evidence/2026-11-28-device-login/)
 records the tested environment and command outcomes. No patient data, token,
 transcript or connected-call screenshot was used.
+
+## Follow-up: empty device list (28 November 2026)
+
+A deployed doctor room showed the popup opening with an empty
+`ul.lk-media-device-select`. This is not a styling fault. LiveKit's
+`getDevices(kind, requestPermissions)` calls `getUserMedia` when labels are
+missing; when the browser has **blocked** camera/microphone for the site that
+call throws `NotAllowedError` and the list stays empty. The same session's
+speech-notes recognizer reported `not-allowed`, which confirms the browser
+permission state.
+
+`app/room/[room]/components/shared/DevicePermissionNotice.tsx` now explains
+the state inside the room: it watches the Permissions API (`camera`,
+`microphone`) and LiveKit's `RoomEvent.MediaDevicesError`, names the blocked
+device and tells the user to allow it from the site settings and reload. It
+never requests permission itself and never blocks the call. The doctor-room
+error toast also moved above the control bar, where it had been hidden.
+Physical-device acceptance on the deployment still has to be done by a person.

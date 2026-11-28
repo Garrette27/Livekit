@@ -73,7 +73,22 @@ with delayed responses, timezone gaps/ambiguities and cancellation before releas
 The local evidence is in `docs/testing/evidence/2026-11-27-appointments/`.
 
 Booking does not issue invitations/media tokens or start a consultation or
-transcription. There are no reminders, recurrence, self-booking or calendar sync.
+transcription. A booked, unfinished visit offers **Prepare invitation**, which
+opens `/doctor/invitations?room=visit-<12 hex of the booking id>`; the doctor
+then issues the invitation through the normal server-validated flow. The link
+carries no patient name or contact, and nothing from the booking is copied into
+the invitation document (pattern: separate Appointment and admission records,
+after HL7 FHIR's Appointment/Encounter split; not a FHIR conformance claim).
+There are no reminders, recurrence, self-booking or calendar sync.
+
+Enable checklist (operator):
+
+1. `firebase deploy --only firestore:indexes,firestore:rules --project livekit-5eef6`
+   and wait until both `appointments` indexes show *Enabled*.
+2. `vercel env add ENABLE_CONSULTATION_SCHEDULING production` with value `true`
+   (server-only; never `NEXT_PUBLIC_`), then redeploy production.
+3. Signed in as a synthetic doctor, confirm the Appointments link, book, try an
+   overlapping booking (refused), reschedule, cancel and Prepare invitation.
 Vercel deployment does not deploy Firebase indexes, rules or retention functions.
 
 ### Existing deployment requirements

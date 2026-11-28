@@ -140,3 +140,15 @@ test('private workspace capability never exposes scheduling to an administrator'
     assert.equal(response.body.schedulingEnabled, !administrator);
   }
 });
+
+test('prepare-invitation handoff derives a PII-free room from the booking id and rejects other query values', () => {
+  const { appointmentRoomName, parseInvitationRoomHandoff } = loadAppointmentModule('lib/appointments/appointment-policy.ts', {}, { URLSearchParams });
+  const room = appointmentRoomName(create.id);
+  assert.equal(room, 'visit-111111111111');
+  assert.match(room, /^[a-zA-Z0-9-_]{3,50}$/, 'must satisfy the invitation room-name validator');
+  assert.ok(!room.includes('Synthetic') && !room.includes('@'));
+  assert.equal(parseInvitationRoomHandoff(`?room=${room}`), room);
+  assert.equal(parseInvitationRoomHandoff('?room=Kia'), null);
+  assert.equal(parseInvitationRoomHandoff('?room=visit-111111111111%3Cscript%3E'), null);
+  assert.equal(parseInvitationRoomHandoff(''), null);
+});

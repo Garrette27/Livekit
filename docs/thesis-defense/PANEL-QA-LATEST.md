@@ -1,6 +1,6 @@
 # Panel Q&A: start here
 
-28 November 2026. Full ranked bank: [panel-questions-and-answers.md](panel-questions-and-answers.md) (100 questions; Q1–Q89 retain their order; old→new numbers in [panel-priority-order-v2-map.json](panel-priority-order-v2-map.json)). Team test plan for the top 40: [TEAM-TEST-TOP-40.md](TEAM-TEST-TOP-40.md). Demo script: [one-day-defense-guide.md §4](one-day-defense-guide.md).
+28 November 2026. Full ranked bank: [panel-questions-and-answers.md](panel-questions-and-answers.md) (100 questions, re-ranked by importance; Q1–Q20 unchanged; old→new numbers in [panel-priority-order-v3-map.json](panel-priority-order-v3-map.json)). Team test plan for the top 40: [TEAM-TEST-TOP-40.md](TEAM-TEST-TOP-40.md). Demo script: [one-day-defense-guide.md §4](one-day-defense-guide.md).
 
 Every answer follows **rule → reason → evidence → boundary**, in 20–40 seconds.
 
@@ -15,23 +15,23 @@ Every answer follows **rule → reason → evidence → boundary**, in 20–40 s
 7. **How many simultaneous consultations?** Provider ceiling 100 connections = 50 pairs; 5,000 participant-minutes ≈ 125 twenty-minute visits a month; our own trial result from the Call quality panel *[fill in]*. *(Q8, Q9)*
 8. **How many can wait?** Default 10, doctor sets 1–100, enforced in one transaction. Measured: 25 at once into 10 → exactly 10; 12 waves of 10 into 100 → exactly 100, 18 refused. Raising applies to the next arrival; lowering removes nobody. *(Q10–Q13)*
 9. **Revoked doctor?** Cut on the next request: refresh tokens revoked and every protected API checks revocation. An already-open call ends when they leave or are removed. *(Q20)*
-10. **Data after 30 days / OpenAI?** Daily opt-in deletion, default 30 days, 200 per run; OpenAI API data is not used for training and is kept up to 30 days for abuse monitoring. Chat is never sent to the AI. *(Q18, Q19, Q21)*
+10. **Data after 30 days / OpenAI?** Daily opt-in deletion, default 30 days, 200 per run; OpenAI API data is not used for training and is kept up to 30 days for abuse monitoring. Chat is never sent to the AI. *(Q18, Q19, Q23)*
 
 **Encrypted?** Yes. Media and chat are end-to-end encrypted (AES-GCM) in the browser, so LiveKit forwards only ciphertext. The key is released only to consultation credentials, never to waiting visitors. Trial result: an eavesdropper with the wrong key decoded 0 frames. Our own server could derive the key but never receives media. *(Q17)*
 
 ## New administration and scheduling answers
 
-- **Three staff entries.** `/doctor/login` is doctor-only, `/admin/login` is clinic-administrator entry, `/super-admin/login` is platform-owner entry. Both administrative levels use the server-scoped `/admin` workspace; a login page never grants a role. *(Q31, Q97)*
-- **Proven pattern.** AWS/Azure separate provider control-plane duties from tenant work. We adapt that to clinic-scoped staff administration and separate doctor ownership. Full tenant lifecycle, audit review and business metrics are future work. *(Q28, Q90)*
-- **Monitor the service, preserve privacy.** Proposed aggregate invitation/queue/encounter/summary outcomes, quotas and estimated costs; bounded audit pages show actor/action/target/outcome ids. No blanket access to clinical content. Current successful role-change events are narrower, with no audit dashboard. *(Q91–Q96)*
-- **Where is scheduling?** Hidden while its default-off server flag is unset. The later module needs rules/indexes, data/contact-retention review and signed-in staging; booking never grants admission. It was not surveyed. *(Q22, Q98)*
-- **Evidence.** Source and local checks show only their tested cases; current deployment and authenticated production acceptance need separate proof. The [researched design note](../admin-oversight-design.md) records scope and primary sources. *(Q99)*
+- **Three staff entries.** `/doctor/login` is doctor-only, `/admin/login` is clinic-administrator entry, `/super-admin/login` is platform-owner entry. Both administrative levels use the server-scoped `/admin` workspace; a login page never grants a role. *(Q27, Q26)*
+- **Proven pattern.** AWS/Azure separate provider control-plane duties from tenant work. We adapt that to clinic-scoped staff administration and separate doctor ownership. Full tenant lifecycle, audit review and business metrics are future work. *(Q28, Q29)*
+- **Monitor the service, preserve privacy.** Proposed aggregate invitation/queue/encounter/summary outcomes, quotas and estimated costs; bounded audit pages show actor/action/target/outcome ids. No blanket access to clinical content. Current successful role-change events are narrower, with no audit dashboard. *(Q24, Q25, Q96, Q97, Q98, Q99)*
+- **Where is scheduling?** Doctor-booked appointments with UTC + named-zone times, transactional overlap refusal, versioned reschedule/cancel and a *Prepare invitation* handoff. Shown only when the server-only flag is on; booking never grants admission; not surveyed. *(Q21, Q22)*
+- **Evidence.** Source and local checks show only their tested cases; current deployment and authenticated production acceptance need separate proof. The [researched design note](../admin-oversight-design.md) records scope and primary sources. *(Q100)*
 
-**Device menu.** Vendor LiveKit selection/positioning is preserved; toolbar and popup styles are isolated. Real-component browser checks use synthetic devices at 1280/390/320 px; hardware and connected-call acceptance remain separate. *(Q100)*
+**Device menu.** Clipped popup fixed by keeping LiveKit's own positioning; an empty list means the browser blocked camera/microphone, and the room now says so and how to allow it. *(Q31)*
 
 ## Demo order (each step answers a question)
 
-Use separate synthetic identities: doctor entry, clinic admin entry and platform owner entry → `/admin` grant (Q28, Q40) → create invitation, limit 2 (Q10) → guest types patient email and waits (Q14, Q29) → third guest refused, raise to 3 (Q11, Q12) → visit breakdown → verified patient enters directly (Q14) → call with Call quality panel open, reading *End-to-end encrypted* (Q8, Q9, Q17) and consent shown (Q5, Q7) → leave and rejoin to show a second encounter (Q6) → summary draft with Unknown risk (Q4).
+Use separate synthetic identities: doctor entry, clinic admin entry and platform owner entry → `/admin` grant (Q28, Q46) → create invitation, limit 2 (Q10) → guest types patient email and waits (Q14, Q34) → third guest refused, raise to 3 (Q11, Q12) → visit breakdown → verified patient enters directly (Q14) → call with Call quality panel open, reading *End-to-end encrypted* (Q8, Q9, Q17) and consent shown (Q5, Q7) → leave and rejoin to show a second encounter (Q6) → summary draft with Unknown risk (Q4).
 
 ## Manuscript
 

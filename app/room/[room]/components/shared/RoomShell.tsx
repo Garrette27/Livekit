@@ -15,6 +15,7 @@ import {
 import { VideoPresets, type RoomOptions } from 'livekit-client';
 import PageSkeleton from '@/components/ui/feedback/PageSkeleton';
 import { prepareConsultationRoom, type ConsultationRoomPreparation } from '@/lib/livekit/media-encryption-client';
+import DevicePermissionNotice from './DevicePermissionNotice';
 import CallQualityMeter from './CallQualityMeter';
 import LiveKitStyles from './LiveKitStyles';
 import SessionTranscriptionBridge from './SessionTranscriptionBridge';
@@ -565,6 +566,7 @@ export default function RoomShell({
         <ConnectionStatusBanner />
         <ConnectionStateToast />
         <CallQualityMeter encryption={preparation.encryption} />
+        <DevicePermissionNotice />
         <ChatBehaviorBridge
           enabled={chatEnabled}
           defaultOpen={chatDefaultOpen}

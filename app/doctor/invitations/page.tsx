@@ -23,6 +23,7 @@ import {
   formatVisitBreakdown,
   resolveInvitationStatusPresentation,
 } from '@/lib/invitations/invitation-presentation';
+import { parseInvitationRoomHandoff } from '@/lib/appointments/appointment-policy';
 
 const INVITATIONS_PER_PAGE = 12;
 
@@ -77,7 +78,9 @@ export default function DoctorInvitationsPage() {
   // Persist room name in localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedRoom = localStorage.getItem('doctor_selected_room');
+      // An appointment's "Prepare invitation" handoff wins over the last room used.
+      const handoffRoom = parseInvitationRoomHandoff(window.location.search);
+      const savedRoom = handoffRoom || localStorage.getItem('doctor_selected_room');
       if (savedRoom) {
         setSelectedRoom(savedRoom);
       }

@@ -16,6 +16,22 @@ export type AppointmentCommand =
 type ParsedCommand = { ok: true; data: AppointmentCommand }
   | { ok: false; error: { status: number; code: string; message: string } };
 
+/**
+ * Room name suggested when a doctor prepares an invitation from a booking.
+ * Derived from the booking id only (no patient name or contact), so the
+ * handoff URL carries no personal data. The invitation remains a separate
+ * document with its own lifecycle; nothing about the booking is copied into it.
+ */
+export function appointmentRoomName(appointmentId: string): string {
+  return `visit-${appointmentId.replace(/[^0-9a-f]/gi, '').slice(0, 12).toLowerCase()}`;
+}
+
+/** Read the room handoff from `/doctor/invitations?room=…`; anything unexpected is ignored. */
+export function parseInvitationRoomHandoff(search: string): string | null {
+  const room = new URLSearchParams(search).get('room');
+  return room && /^visit-[0-9a-f]{12}$/.test(room) ? room : null;
+}
+
 /** Half-open intervals allow the next booking to start when the previous one ends. */
 export function appointmentsOverlap(start: number, end: number, otherStart: number, otherEnd: number): boolean {
   return start < otherEnd && otherStart < end;

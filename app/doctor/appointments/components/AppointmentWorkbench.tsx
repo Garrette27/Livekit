@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
+import { appointmentRoomName } from '@/lib/appointments/appointment-policy';
 import type { AppointmentRecord } from '@/lib/services/appointments/appointment-service';
 
 const EMPTY_DRAFT = { patientName: '', patientEmail: '', localStart: '', durationMinutes: 30, displayTimeZone: 'Asia/Manila' };
@@ -16,7 +17,9 @@ function localInput(instant: string, zone: string): string {
 /**
  * A doctor-owned booking workbench. Server responses are committed facts; drafts
  * retain the reviewed version until the doctor explicitly reloads an appointment.
- * Scheduling commands never request an invitation, media token or transcription.
+ * Scheduling commands never request an invitation, media token or transcription;
+ * "Prepare invitation" only opens the invitation workbench with a suggested
+ * room, where the doctor issues the invitation through its normal server checks.
  */
 export default function AppointmentWorkbench({ doctorUserId }: { doctorUserId: string }) {
   const [records, setRecords] = useState<AppointmentRecord[]>([]);
@@ -115,7 +118,7 @@ export default function AppointmentWorkbench({ doctorUserId }: { doctorUserId: s
     <div className="appointments-workbench">
       <section className="appointment-card">
         <h1>{editing ? 'Reschedule appointment' : 'Book an appointment'}</h1>
-        <p className="muted">Plan a visit for your own patient. Booking does not grant room access or start a consultation.</p>
+        <p className="muted">Plan a visit for your own patient. Booking does not grant room access or start a consultation. When it is time, choose Prepare invitation to issue a secure link for that visit&apos;s room.</p>
         <form onSubmit={submit} ref={formRef}>
           <fieldset disabled={busy !== null}>
             <legend className="sr-only">Appointment details</legend>
@@ -141,8 +144,9 @@ export default function AppointmentWorkbench({ doctorUserId }: { doctorUserId: s
         <ul className="booking-list">{records.map((record) => {
           const date = new Intl.DateTimeFormat(undefined, { timeZone: record.displayTimeZone, dateStyle: 'medium', timeStyle: 'short' });
           return <li key={record.id}>
-            <div><h3>{record.patientName}</h3><p>{date.format(new Date(record.startsAt))} – {date.format(new Date(record.endsAt))}</p><p className="muted">{record.displayTimeZone} · {record.status === 'cancelled' ? 'Cancelled' : 'Booked'}</p>{record.patientEmail && <details><summary>Contact details (unverified)</summary><p>{record.patientEmail}</p></details>}</div>
+            <div><h3>{record.patientName}</h3><p>{date.format(new Date(record.startsAt))} – {date.format(new Date(record.endsAt))}</p><p className="muted">{record.displayTimeZone} · Room {appointmentRoomName(record.id)} · {record.status === 'cancelled' ? 'Cancelled' : 'Booked'}</p>{record.patientEmail && <details><summary>Contact details (unverified)</summary><p>{record.patientEmail}</p></details>}</div>
             {record.status === 'booked' && <div className="booking-actions">
+              {Date.parse(record.endsAt) > Date.now() && <a className="link-button" href={`/doctor/invitations?room=${appointmentRoomName(record.id)}`} aria-label={`Prepare invitation for ${record.patientName}`}>Prepare invitation</a>}
               <button disabled={!!busy} aria-label={`Reschedule appointment for ${record.patientName}`} onClick={() => edit(record)}>Reschedule</button>
               {cancelTarget?.id === record.id && cancelTarget.version === record.version ? <><button disabled={!!busy} className="danger" onClick={() => void send({ action: 'cancel', id: record.id, expectedVersion: cancelTarget.version })}>Confirm cancellation</button><button onClick={() => setCancelTarget(null)} disabled={!!busy}>Keep appointment</button></> : <button className="danger" disabled={!!busy} aria-label={`Cancel appointment for ${record.patientName}`} onClick={() => setCancelTarget({ id: record.id, version: record.version })}>Cancel appointment</button>}
             </div>}
@@ -159,7 +163,7 @@ export default function AppointmentWorkbench({ doctorUserId }: { doctorUserId: s
         .booking-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem}.zone-field{grid-column:1/-1}
         label{display:grid;gap:.4rem;min-width:0;font-size:.9rem;font-weight:600}input{min-width:0;width:100%;height:2.9rem;padding:.5rem;border:1px solid #b7cac4;border-radius:.4rem;font:inherit;font-size:1rem;background:white;color:#153530}
         .booking-actions,.list-heading{display:flex;align-items:center;flex-wrap:wrap;gap:.65rem}.list-heading{justify-content:space-between}
-        button{font:inherit;min-height:2.75rem;max-width:100%;padding:.55rem .85rem;border:1px solid #b7cac4;border-radius:.4rem;background:white;color:#17594f;cursor:pointer;overflow-wrap:anywhere}button:hover{background:#edf8f4}button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #14b8a6;outline-offset:2px}button:disabled{opacity:.6;cursor:wait}.primary{background:#0f766e;color:white}.primary:hover{background:#115e59}.danger{color:#a52828;border-color:#e9b4b4}
+        button{font:inherit;min-height:2.75rem;max-width:100%;padding:.55rem .85rem;border:1px solid #b7cac4;border-radius:.4rem;background:white;color:#17594f;cursor:pointer;overflow-wrap:anywhere}button:hover{background:#edf8f4}button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #14b8a6;outline-offset:2px}button:disabled{opacity:.6;cursor:wait}.primary{background:#0f766e;color:white}.primary:hover{background:#115e59}.danger{color:#a52828;border-color:#e9b4b4}.link-button{display:inline-flex;align-items:center;min-height:2.75rem;padding:.55rem .85rem;border-radius:.4rem;background:#0f766e;color:white;text-decoration:none;font-weight:600}.link-button:hover{background:#115e59}.link-button:focus-visible{outline:3px solid #14b8a6;outline-offset:2px}
         .feedback-error,.feedback-success{padding:.85rem;border-radius:.5rem;overflow-wrap:anywhere;line-height:1.5}.feedback-error{color:#8f2020;background:#fff1f1}.feedback-success{color:#115e43;background:#edf9f2}
         .booking-list{list-style:none;padding:0;margin:1rem 0;display:grid;gap:.8rem}.booking-list li{border:1px solid #dce5e3;border-radius:.6rem;padding:1rem;display:grid;gap:.75rem;min-width:0}summary{cursor:pointer;color:#17594f;min-height:2rem}
         @media(max-width:600px){.booking-fields{grid-template-columns:minmax(0,1fr)}.booking-actions{align-items:stretch}.booking-actions button{flex:1 1 auto}}

@@ -229,17 +229,20 @@ transcription, summary, or access-control behavior.
 
 ### Prepared but disabled capabilities
 
-- File attachments and consultation scheduling have server capability names but
-  remain disabled by default and have no UI. Keep
-  `ENABLE_FILE_ATTACHMENTS` and `ENABLE_CONSULTATION_SCHEDULING` server-only and
-  unset in ordinary deployments.
+- File attachments have a server capability name but remain disabled by
+  default and have no UI. Keep `ENABLE_FILE_ATTACHMENTS` server-only and unset.
+- Doctor-booked scheduling is implemented (`/doctor/appointments`) behind the
+  server-only `ENABLE_CONSULTATION_SCHEDULING` flag. Enable it per deployment
+  only after the release gate in `docs/production-readiness.md`; never expose
+  the flag through `NEXT_PUBLIC_*`.
 - Before attachments ship: require session ownership, allowlisted type/size,
   private object storage, malware/content scanning, download authorization,
   audit events, deletion/retention, and cross-session denial tests. Summary code
   consumes only trusted `ready` extraction results.
-- Before scheduling ships: add a separate timezone-safe appointment lifecycle,
-  participant ownership, availability/conflict policy, idempotent reminders,
-  reschedule/cancel commands, and invitation issuance. Do not mix scheduling
+- Scheduling keeps a separate timezone-safe appointment lifecycle, doctor
+  ownership, transactional overlap policy, versioned reschedule/cancel and an
+  invitation-issuance handoff (a PII-free suggested room). Reminders are not
+  implemented; add them only as idempotent server jobs. Do not mix scheduling
   fields directly into invitation documents. FHIR-inspired vocabulary is not a
   claim of FHIR compliance.
 

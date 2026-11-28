@@ -6,7 +6,7 @@ import { appointmentBrowserFixture } from './helpers/appointment-browser-fixture
 
 test('the real appointment workbench supports booking, stale-version recovery and cancellation at phone/tablet/desktop sizes', async () => {
   const script = appointmentBrowserFixture();
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH });
   mkdirSync('tmp/appointments', { recursive: true });
   try {
     for (const width of [320,820,1280]) {
@@ -47,7 +47,7 @@ test('the real appointment workbench supports booking, stale-version recovery an
 
 test('Show more appends the next appointment page without replacing the first page', async () => {
   const script = appointmentBrowserFixture({ paged: true });
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH });
   try {
     const page = await browser.newPage();
     await page.setContent('<div id="root"></div>');
@@ -62,7 +62,7 @@ test('Show more appends the next appointment page without replacing the first pa
 
 test('a disabled deployment exposes no dead appointment form or booking actions', async () => {
   const script = appointmentBrowserFixture({ disabled: true });
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH });
   try {
     const page = await browser.newPage({ viewport: { width: 320, height: 568 } });
     await page.setContent('<div id="root"></div>');
@@ -73,7 +73,7 @@ test('a disabled deployment exposes no dead appointment form or booking actions'
 });
 
 async function mountedWorkbench(options = {}) {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH });
   const page = await browser.newPage();
   await page.route('https://synthetic.test/**', (route) => route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }));
   await page.goto('https://synthetic.test/');
