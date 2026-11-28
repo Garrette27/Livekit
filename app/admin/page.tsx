@@ -5,6 +5,7 @@ import { onAuthStateChanged, type User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { authenticatedFetch } from '@/lib/auth/authenticated-fetch';
 import DoctorAppHeader from '@/components/doctor/DoctorAppHeader';
+import OversightPanel from '@/components/admin/OversightPanel';
 
 interface Account {
   uid: string;
@@ -207,6 +208,8 @@ export default function AdminPage() {
                 </ul>
               )}
             </section>
+
+            <OversightPanel staffLabels={Object.fromEntries(accounts.map((account) => [account.uid, account.name || account.email || account.uid.slice(0, 8)]))} />
           </>
         )}
       </main>

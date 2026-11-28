@@ -8,9 +8,9 @@
     },
     "TeleConsole-Panel-Questions-and-Answers.pdf": {
       "pages": 18,
-      "sha256": "b4df4a4f1e23d07650cdaf54efb893168acd685ce88568ab0904c9172be5cf77",
+      "sha256": "90a6ae412aea5d1aa852e0e29c75f2e8351100e3c6e0097f86541a137c4e7c75",
       "questions": 100,
-      "https_links": 13,
+      "https_links": 7,
       "question_heading_pages": {
         "1": 1,
         "2": 2,
@@ -116,14 +116,15 @@
     },
     "TeleConsole-Panel-Quick-Answers.pdf": {
       "pages": 2,
-      "sha256": "26bb78a64e75a4405dd65bca5fb367192e2adfde5fd77ef5995426d6b4bdeb75"
+      "sha256": "9c42bb27c29b7bea8ad94c4a5a6de058af6a13e93e2cde03e92c1cd6666f5153"
     },
     "TeleConsole-Team-Test-Top-40.pdf": {
       "pages": 3,
-      "sha256": "ff52bf07afec3ea2268de2499d6fd49edb49df16feeb65fb09815c2d9b3228d8"
+      "sha256": "168f1233a0bf19667d44edf567ccd893984e933bdde14a9c239c483758005b66"
     }
   },
   "notes": [
-    "Panel PDFs regenerated after priority-order-v3 re-ranking and scheduling/device-menu answer updates (28 November 2026)."
+    "Panel PDFs regenerated after priority-order-v3 re-ranking and scheduling/device-menu answer updates (28 November 2026).",
+    "Regenerated after retention (Vercel cron) and oversight-panel answer updates, 28 November 2026."
   ]
 }

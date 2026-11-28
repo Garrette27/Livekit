@@ -120,6 +120,28 @@ Vercel deployment does not deploy Firebase indexes, rules or retention functions
 - Keep retention enforcement disabled until the thesis team approves the
   period and backup/deletion implications.
 
+### Summary retention on Spark (Vercel cron, 28 Nov 2026)
+
+Firebase scheduled functions need Blaze, so the active retention path is the
+Vercel cron `GET /api/maintenance/summary-retention` (daily 03:00 UTC,
+`lib/consultations/summary-retention.ts`). It requires `CRON_SECRET` (Vercel
+sends it as a bearer token only when the variable exists; the 02:00 summary
+retry cron needs it too). Variables, Production only:
+
+| Name | Value | Effect |
+| --- | --- | --- |
+| `CRON_SECRET` | random 32+ byte hex, marked Sensitive | Authorizes both cron routes |
+| `RETENTION_ENFORCEMENT_ENABLED` | `true` | Turns the dry run into deletion |
+| `SUMMARY_RETENTION_DAYS` | `30` (optional; default 30, range 1-3650) | Retention window |
+
+Without `RETENTION_ENFORCEMENT_ENABLED=true` each run is a dry run that only
+counts summaries older than the window. Each run writes a metadata-only
+receipt to `retention-runs/{UTC date}` (window, cutoff, eligible/deleted
+counts) that the super-administrator oversight panel shows. One run deletes
+at most 200 summaries plus their `scheduled-deletions` rows; consultation
+sessions, messages, transcripts and provider backups are not deleted. Leave
+one dry run first, read the eligible count, then enable enforcement.
+
 ## Firestore free-tier budget (27 Nov 2026)
 
 Production hit Spark's daily quota (50k reads / 20k writes). A read-only code

@@ -7,6 +7,10 @@
     {
       "path": "/api/summary/process-queue",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/maintenance/summary-retention",
+      "schedule": "0 3 * * *"
     }
   ],
   "headers": [

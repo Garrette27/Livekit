@@ -33,8 +33,8 @@ authorization guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authoriza
 | Clinic entry | `/admin/login`; clinic administrator uses shared `/admin`, manages doctors only in their verified clinic | Complete cursor-paginated staff listing and clinic lifecycle |
 | Platform entry | `/super-admin/login`; provider-verified bootstrap identity from server-only `SUPER_ADMIN_EMAILS`; shared `/admin` | Tenant catalog, onboarding/offboarding and policy-approved configuration |
 | Role changes | Server authority, no self-change, clinic guard, patient-account protection, claims/profile updates and successful `adminAuditEvents` | Idempotent recovery across Auth/profile/audit partial failures |
-| Audit review | Successful role mutations store `actorUid`, `targetUid`, `clinicId`, `action`, `role`, `at`; invitation security has separate bounded events | Authorized event browser, explicit outcomes, lifecycle events, filters and cursor pages |
-| Operations/business | Provider consoles and existing bounded engineering evidence; no in-app aggregate business dashboard | Tenant consumption, reliability, queue and summary-job aggregates with freshness and denominators |
+| Audit review | Successful role mutations store `actorUid`, `targetUid`, `clinicId`, `action`, `role`, `at`; `/admin` Oversight panel lists the newest 50, clinic-scoped in the query for clinic administrators (`/api/admin/oversight`) | Explicit outcomes, sign-in/denial/lifecycle events, filters and cursor pages |
+| Operations/business | Platform-owner Oversight cards from Firestore `count()` aggregations: staff, patients, active invitations, 30-day encounters/summaries, drafts awaiting review, failed summary jobs, upcoming appointments, last retention run | Per-clinic consumption (encounters are not clinic-scoped yet), time series, small-group suppression, provider cost/quota import |
 | Clinical access | Administrators are denied clinician APIs; a separate provisioned Doctor identity is required | No blanket clinical-data grant is proposed |
 
 These login routes distinguish task and audience. Visiting a URL, choosing a

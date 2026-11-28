@@ -213,6 +213,11 @@ service cloud.firestore {
       }
     }
 
+    // Metadata-only retention receipts written by the server cron worker.
+    match /retention-runs/{runDate} {
+      allow read, write: if false;
+    }
+
     // Calendar serialization state is owned by the authenticated server service.
     match /appointmentCalendars/{doctorUserId} {
       allow read, write: if false;

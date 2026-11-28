@@ -163,7 +163,7 @@ Show it after the invitation flow: book a synthetic visit, try an overlapping ti
 
 ### 23. Are summaries deleted after 30 days, and which job does that?
 
-Summary deletion is a switch the clinic turns on, by design. The Firebase function `autoDeleteSummaries` runs **daily**; when `RETENTION_ENFORCEMENT_ENABLED=true` it deletes summaries older than the cutoff (**default 30 days**), up to **200 summaries per run** (each needs two deletes, so 400 writes stay under Firestore's 500-write batch limit). That is about 6,000 a month — far more than our expected volume of about 125 consultations a month on the free plan. It is off by default because deleting clinical records must be an explicit clinic decision, not a side effect of deploying code. The separate Vercel daily job only retries summaries that failed; it never deletes.
+Yes, when the clinic switches it on. A daily Vercel cron (`/api/maintenance/summary-retention`, 03:00 UTC) deletes AI summaries whose `createdAt` is older than the window (default **30 days**), at most **200 per run** plus each summary's schedule row, so 400 writes stay under Firestore's 500-write batch limit (about 6,000 a month, far above our ~125 consultations a month). It moved from a Firebase scheduled function to Vercel because scheduled functions need the paid Blaze plan. Deletion is opt-in (`RETENTION_ENFORCEMENT_ENABLED=true`); otherwise each run is a dry run that only counts. Every run writes a metadata-only receipt (window, cutoff, counts) shown in the super-admin oversight panel, which is our evidence that deletion ran. Consultation records, chat, transcripts and provider backups are outside this job.
 
 ### 24. Why not give the super admin access to every consultation and summary?
 
@@ -283,7 +283,7 @@ Use synthetic or explicitly consented paired Filipino/English scripts reviewed b
 
 ### 53. What happens to the data after 30 days?
 
-Summary deletion runs only if retention enforcement is switched on, and it deletes summaries, not sessions, messages, transcripts or backups. We do not claim everything disappears after 30 days.
+Only the AI summary is deleted, and only when retention enforcement is switched on; the daily run's receipt records how many were deleted. Consultation records, messages, transcripts and provider backups are not deleted by this job, so we do not claim everything disappears after 30 days. A clinic would approve a full record-retention schedule before real patient use.
 
 ### 54. Who can see a consultation's record?
 
@@ -462,15 +462,15 @@ In the 2023 edition Usability was renamed Interaction Capability, and Portabilit
 
 ### 96. What should a platform owner monitor without reading patient records?
 
-Approved aggregate operational and business metadata: active clinics/doctors, invitation outcomes, waiting/admission delays, connected/completed encounter counts, summary lifecycle/retry backlog, service errors, provider quotas and estimated consumption. Show period, freshness, denominator and coverage; suppress identifying small groups. Admission is not attendance and a ready draft is not a reviewed record. This is the proposed oversight view; the current `/admin` page manages staff rather than providing those analytics. Tenant consumption monitoring follows the [AWS SaaS Lens](https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/tenant-activity-and-consumption.html).
+Aggregates, not records. The super-admin **Oversight** panel on `/admin` shows dated counts: provisioned doctors, clinic administrators, patient accounts, active invitations, encounters and summaries in the last 30 days, AI drafts awaiting clinician review, failed summary jobs in the retry queue, upcoming appointments, and the last retention run. Each number is a Firestore `count()` aggregation, so no document or patient field is read. This follows the SaaS control-plane pattern (AWS/Azure): operate the service from metadata, keep clinical work in the doctor's workspace. Cost/quota and spend stay in the provider consoles; small-group suppression and time-series charts are future work.
 
 ### 97. What belongs in an audit event, and do you already have an audit dashboard?
 
-Proposed event: opaque id, timestamp, clinic scope, actor id/type, action, target type/id, outcome, bounded reason code and correlation id. Distinguish an attempt, denial, failure and completed lifecycle change. Microsoft Entra demonstrates activity/status/actor/target review. Our existing successful role-change events contain uid/clinic/role/action/time; they do not provide every outcome or an audit browser. Invitation events are separate. A paginated authorized viewer and cross-service failure reconciliation remain future work. [Entra audit logs](https://learn.microsoft.com/en-us/entra/identity/monitoring-health/concept-audit-logs).
+Yes, a first version. Each server-written event stores an opaque id, time, clinic, actor id, action, role and target id; never names, emails, tokens or clinical text. The Oversight panel lists the newest 50 events; a clinic administrator's query is filtered to their verified clinic inside Firestore (composite index `clinicId, at`), and the platform owner sees all clinics. Staff ids are shown with the staff name already on the admin page. Today only role grants/revocations are recorded; sign-in, denial and invitation-lifecycle events, filters and cursor paging are next. Pattern: Microsoft Entra-style audit fields, privacy-minimized per OWASP logging guidance.
 
 ### 98. How would that audit dashboard preserve privacy and database budget?
 
-Apply clinic scope in the server query before paging; allowlist filters and a time window, cap pages (proposed 50), order by timestamp/id and reauthorize each opaque cursor. Exclude clinical text, names/emails, tokens, raw IP/user-agent and clinical snapshots. Uids still require restricted access and approved retention. Current staff listing caps 200 global profiles before clinic filtering, so it can omit staff and is not a total. The proposed query follows [Firestore cursor pagination](https://firebase.google.com/docs/firestore/query-data/query-cursors); exclusions follow [OWASP logging](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html).
+Scope is applied in the query from the verified token, never from a URL or form field; non-administrators get 403. The panel loads only when an administrator opens it, uses `count()` aggregations (about one read per 1,000 index entries) and one bounded page of at most 50 events, so a visit costs a few dozen reads. Responses are `private, no-store`. Clinical drill-through is deliberately absent: an administrator who needs clinical access must use a separately provisioned doctor identity. Regression tests check clinic scoping, the empty view for an unassigned clinic administrator, the page bound and that extra stored fields never leak into the response.
 
 ### 99. Can an administration dashboard guarantee low costs or prove the business is profitable?
 
